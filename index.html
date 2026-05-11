@@ -239,6 +239,27 @@ function computePilotTitle() {
     return 'ROOKIE';
   } catch (e) { return 'ROOKIE'; }
 }
+// Returns the next pilot title + progress description for PROFILE display.
+// Mirrors computePilotTitle thresholds in priority order.
+function computePilotNextRank() {
+  try {
+    const csN = loadCumStats(false), csC = loadCumStats(true);
+    const totalRuns = (csN.sessions || 0) + (csC.sessions || 0);
+    const totalKills = (csN.kills || 0) + (csC.kills || 0);
+    const bestStage = Math.max(csN.bestStage || 0, csC.bestStage || 0);
+    const dexCount = (typeof dexUnlocked !== 'undefined') ? dexUnlocked.size : 0;
+    const achCount = (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements.size : 0;
+    const achTotal = Object.keys(ACHIEVEMENTS || {}).length || 1;
+    const achPct = Math.round((achCount / achTotal) * 100);
+    // Current rank evaluated; next rank is the first higher tier not yet reached.
+    if (achPct >= 80) return { next: null, label: 'MAX RANK' };
+    if (dexCount >= 8) return { next: 'ACE PILOT', label: 'NEED ' + (80 - achPct) + '% MORE ACHIEVEMENTS' };
+    if (bestStage >= 30) return { next: 'BESTIARY MASTER', label: 'BESTIARY ' + dexCount + ' / 8' };
+    if (totalKills >= 1000) return { next: 'APEX SURVIVOR', label: 'STAGE 30 (CURRENT ' + bestStage + ')' };
+    if (totalRuns >= 10) return { next: 'VETERAN', label: fmtScore(totalKills) + ' / 1000 KILLS' };
+    return { next: 'PILOT', label: totalRuns + ' / 10 RUNS' };
+  } catch (e) { return { next: 'PILOT', label: '' }; }
+}
 
 // Ship-change preview pulse — set when V is pressed on title; decays in title update.
 let shipChangeFrame = 0;
@@ -13413,6 +13434,21 @@ function drawStatsOverlay() {
     drawRetroText('CALLSIGN', px + 8, y, 6, COL.gray, 'left');
     drawRetroText('[' + playerCallsign + ']', px + panelW - 8, y, 7, callsignColor(), 'right');
     y += 10;
+    // PILOT RANK + next-rank progress
+    const _curRank = computePilotTitle();
+    const _nextInfo = computePilotNextRank();
+    drawRetroText('RANK', px + 8, y, 6, COL.gray, 'left');
+    drawRetroText(_curRank, px + panelW - 8, y, 6, '#0cf', 'right');
+    y += 8;
+    if (_nextInfo.next) {
+      drawRetroText('NEXT', px + 8, y, 5, COL.gray, 'left');
+      drawRetroText(_nextInfo.next + ' — ' + _nextInfo.label, px + panelW - 8, y, 5, '#fc8', 'right');
+      y += 8;
+    } else {
+      drawRetroText('NEXT', px + 8, y, 5, COL.gray, 'left');
+      drawRetroText(_nextInfo.label, px + panelW - 8, y, 5, '#fc4', 'right');
+      y += 8;
+    }
     // Combined cumulative stats
     const csN2 = loadCumStats(false);
     const csC2 = loadCumStats(true);
