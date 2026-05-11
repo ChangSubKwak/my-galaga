@@ -3864,7 +3864,7 @@ function setupChallengingStage() {
 // Layered ON TOP of existing super/double semantics so HP/scale/duo logic untouched.
 function archetypeFor(stage) {
   const idx = Math.max(0, Math.floor(stage / BOSS_STAGE_INTERVAL) - 1);
-  return ['standard', 'horned', 'tendril', 'crystal'][idx % 4];
+  return ['standard', 'horned', 'tendril', 'crystal', 'phantom'][idx % 5];
 }
 
 function makeMegaBoss(s, opts) {
@@ -4163,6 +4163,35 @@ function updateOneMegaBoss(mb) {
         }
         playSound('enemyDive');
       }
+      // PHANTOM teleFlash tick
+      if ((mb.teleFlash || 0) > 0) mb.teleFlash--;
+      // PHANTOM archetype — periodic teleport during phase 2. Every ~5 seconds
+      // the boss vanishes for 6 frames (invincibility), re-spawns at a new x
+      // position avoiding the player ±40 corridor. Visual: 2 explosion puffs at
+      // depart + arrive sites, plus brief invincibility flash.
+      if (mb.archetype === 'phantom') {
+        mb.teleTimer = (mb.teleTimer || 0) + 1;
+        if (mb.teleTimer >= 300) {
+          mb.teleTimer = 0;
+          const oldX = mb.x;
+          // Find new x avoiding player corridor (±40)
+          const pX = game.playerX || BASE_W / 2;
+          let nx;
+          for (let tries = 0; tries < 6; tries++) {
+            nx = 30 + Math.random() * (BASE_W - 60);
+            if (Math.abs(nx - pX) >= 40) break;
+          }
+          mb.x = nx;
+          mb.teleFlash = 12;
+          // Depart + arrive puffs
+          game.explosions.push({ x: oldX, y: mb.y, timer: 0, maxTime: 18 });
+          game.explosions.push({ x: mb.x, y: mb.y, timer: 0, maxTime: 18 });
+          if (game.shockwaves) {
+            game.shockwaves.push({ x: mb.x, y: mb.y, life: 0, maxLife: 16, maxR: 16, color: '#a8f' });
+          }
+          playSound('powerUp');
+        }
+      }
     }
   }
 
@@ -4174,6 +4203,8 @@ function updateOneMegaBoss(mb) {
     const b = game.bullets[bi];
     const hitRX = mb.super ? 21 : 14;
     const hitRY = mb.super ? 18 : 12;
+    // PHANTOM teleFlash invincibility — boss is intangible during teleport flash
+    if ((mb.teleFlash || 0) > 0) continue;
     if (Math.abs(b.x - mb.x) < hitRX && Math.abs(b.y - mb.y) < hitRY) {
       game.bullets.splice(bi, 1);
       game.stats.shotsHit++;
@@ -10801,10 +10832,12 @@ function drawStageIntro() {
       const archLabel = arch === 'horned'  ? 'TYPE — HORNED'
                        : arch === 'tendril' ? 'TYPE — TENDRIL'
                        : arch === 'crystal' ? 'TYPE — CRYSTAL'
+                       : arch === 'phantom' ? 'TYPE — PHANTOM'
                        : 'TYPE — STANDARD';
       const archCol = arch === 'horned'  ? '#f86'
                      : arch === 'tendril' ? '#8af'
                      : arch === 'crystal' ? '#cef'
+                     : arch === 'phantom' ? '#a8f'
                      : '#fc4';
       drawRetroText(archLabel, BASE_W/2 + offX, BASE_H/2 + 58, 5, archCol);
     }
@@ -12971,6 +13004,9 @@ function drawBossStage() {
   // Mega-bosses (super bosses render at 1.5× scale)
   for (const mb of aliveBosses) {
     const drawScale = mb.scale || 1;
+    // PHANTOM teleFlash — blink the boss sprite during the 12-frame
+    // intangibility window so the player sees the dodge happened.
+    if ((mb.teleFlash || 0) > 0 && (mb.teleFlash >> 1) % 2 === 0) continue;
     const renderBoss = (hit) => {
       if (drawScale === 1) {
         drawMegaBoss(mb.x, mb.y, mb.frame, hit, mb.archetype);
