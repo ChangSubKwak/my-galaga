@@ -6627,6 +6627,22 @@ function updatePowerUps() {
       game.stagePowerUpsPicked = (game.stagePowerUpsPicked || 0) + 1;
       game.runPowerUps = (game.runPowerUps || 0) + 1;
       if (game.runPowerUps === 30) unlockAchievement('collector');
+      // PICKUP STREAK — consecutive pickups without dying. Milestone bonuses at
+      // 5/10/15 give modest reward + visual. Resets in killPlayer.
+      game.pickupStreak = (game.pickupStreak || 0) + 1;
+      const _streakBonus = game.pickupStreak === 5  ? 200
+                         : game.pickupStreak === 10 ? 500
+                         : game.pickupStreak === 15 ? 1000
+                         : 0;
+      if (_streakBonus > 0) {
+        addScore(_streakBonus);
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 28,
+          text: 'PICKUP STREAK x' + game.pickupStreak + '! +' + _streakBonus,
+          color: '#0ff', life: 80, maxLife: 80, size: 8
+        });
+        playSound('milestone');
+      }
       // POWERUP SFX VARIETY — type-specific audio cues so the player can identify
       // a pickup by sound alone, not just color. B/T keep their existing distinct
       // audio; others get reused SFX that match the effect's mood:
@@ -8382,6 +8398,8 @@ function killPlayer(srcX, srcY) {
     game.deathGhostTrail = game.playerTrail.slice(0, 10).map(t => ({ x: t.x, y: t.y }));
     game.deathGhostLife = 40;
   }
+  // PICKUP STREAK reset — death breaks the no-death pickup chain
+  game.pickupStreak = 0;
   // Clear the motion-trail ghost so the dead ship doesn't leave behind ~14 frames
   // of after-image during the RESPAWN cutscene.
   game.playerTrail = [];
