@@ -6563,10 +6563,26 @@ function updatePowerUps() {
       game.stagePowerUpsPicked = (game.stagePowerUpsPicked || 0) + 1;
       game.runPowerUps = (game.runPowerUps || 0) + 1;
       if (game.runPowerUps === 30) unlockAchievement('collector');
-      // B already plays its own boom + rumble; others get the standard pickup chime.
+      // POWERUP SFX VARIETY — type-specific audio cues so the player can identify
+      // a pickup by sound alone, not just color. B/T keep their existing distinct
+      // audio; others get reused SFX that match the effect's mood:
+      //   R → tick (fast clicky, suits rapid)
+      //   W → graze (metallic ping, suits zigzag)
+      //   H → milestone (chime, suits homing's tracking feel)
+      //   L → extraLife (triumph, marks the rare/strong piercer)
+      //   E → comboStep (heavy clunk, suits shield)
+      //   S/N/P → powerUp (standard chime)
       if (p.type !== 'B') {
-        playSound(p.type === 'T' ? 'slowTime' : 'powerUp');
+        const sfx = p.type === 'T' ? 'slowTime'
+                  : p.type === 'R' ? 'tick'
+                  : p.type === 'W' ? 'graze'
+                  : p.type === 'H' ? 'milestone'
+                  : p.type === 'L' ? 'extraLife'
+                  : p.type === 'E' ? 'comboStep'
+                  : 'powerUp';
+        playSound(sfx);
         if (p.type === 'T' || p.type === 'R' || p.type === 'W' || p.type === 'H') rumble(180, 0.7, 0.35);
+        else if (p.type === 'L') rumble(220, 0.8, 0.45);
         else                                                     rumble(60,  0.4, 0.15);
       } else {
         playSound('explode');
