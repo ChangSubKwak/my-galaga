@@ -7910,6 +7910,27 @@ function updateCollisions() {
           if (game.lastKillFrame === game.animFrame) {
             unlockAchievement('trickShot');
           }
+          // MULTI-KILL BONUS — track kills per animFrame; award tiered bonus
+          // on the 3rd, 5th, and 10th kill of the same frame (laser pierce or
+          // splitter chain reactions). One bonus per tier per frame.
+          if (game._multiKillFrame !== game.animFrame) {
+            game._multiKillFrame = game.animFrame;
+            game._multiKillCount = 0;
+          }
+          game._multiKillCount++;
+          const _mkc = game._multiKillCount;
+          let _mkBonus = 0, _mkLabel = '';
+          if (_mkc === 3)       { _mkBonus = 300;  _mkLabel = 'MULTI x3!'; }
+          else if (_mkc === 5)  { _mkBonus = 800;  _mkLabel = 'MULTI x5!'; }
+          else if (_mkc === 10) { _mkBonus = 2000; _mkLabel = 'MULTI x10!'; }
+          if (_mkBonus > 0) {
+            addScore(_mkBonus);
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 - 12, text: _mkLabel + ' +' + _mkBonus,
+              color: '#fc4', life: 50, maxLife: 50, size: _mkc >= 10 ? 11 : 9
+            });
+            playSound('milestone');
+          }
           game.lastKillFrame = game.animFrame;
           // Bestiary unlock — first kill of each type registers in the codex.
           // Idempotent: subsequent kills no-op the unlock path.
