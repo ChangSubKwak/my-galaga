@@ -7874,7 +7874,21 @@ function updateCollisions() {
                        : e.type === 'boss'      ? 'killFormationBoss'
                        : e.type === 'goldenBee' ? 'killGoldenBee'
                        :                          'explode';
-          playSound(killSfx);
+          // KILL CHAIN AUDIO — chain count tracks consecutive kills within 30
+          // frames of each other. At tier 5+, swap base SFX for 'crit' to add
+          // audio cresc to long streaks. Decay is checked at the chain branch.
+          if ((game.animFrame - (game.lastKillFrame || 0)) <= 30) {
+            game._killChainAudio = (game._killChainAudio || 0) + 1;
+          } else {
+            game._killChainAudio = 1;
+          }
+          // Use 'crit' SFX as a high-tier substitute when chain ≥ 5; keeps the
+          // type-specific killSfx for solo kills and short chains.
+          if (game._killChainAudio >= 5) {
+            playSound('crit');
+          } else {
+            playSound(killSfx);
+          }
 
           // TRICK SHOT — 2+ kills in the same frame (typically chained off explosions/splitter chain)
           if (game.lastKillFrame === game.animFrame) {
