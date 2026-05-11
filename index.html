@@ -5327,7 +5327,12 @@ function updatePlayer() {
     game.dashCooldown--;
     // DASH READY GLOW — trigger a short cyan ring around the ship the instant the
     // cooldown hits 0, telling the player "you can dash again". 30-frame fade.
-    if (game.dashCooldown === 0) game.dashReadyFrames = 30;
+    // Plus DASH READY SFX — short metallic ping so the player hears readiness
+    // without taking eyes off the playfield.
+    if (game.dashCooldown === 0) {
+      game.dashReadyFrames = 30;
+      playSound('graze');
+    }
   }
   if ((game.dashReadyFrames || 0) > 0) game.dashReadyFrames--;
   // SHIP MOMENTUM TILT — smoothly steer game.playerTilt toward the active movement
