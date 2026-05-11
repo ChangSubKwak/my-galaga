@@ -8745,7 +8745,14 @@ function checkStageComplete() {
         playSound('stageStart');
       }
     }
-    if (game.challengeWaveTimer > 0) game.challengeWaveTimer--;
+    if (game.challengeWaveTimer > 0) {
+      game.challengeWaveTimer--;
+      // WAVE COUNTDOWN AUDIO — 3-tone escalation before next wave arrives.
+      // 30 frames left = soft tick, 15 = sharper tick, 1 = release (entry).
+      if (game.challengeWaveTimer === 30) playSound('tick');
+      else if (game.challengeWaveTimer === 15) playSound('tick');
+      else if (game.challengeWaveTimer === 1) playSound('milestone');
+    }
   } else {
     const alive = game.enemies.filter(e => e.alive).length;
     if (alive === 0 && game.allEntered && explosionsClear) {
