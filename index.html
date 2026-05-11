@@ -7617,6 +7617,18 @@ function updateChallengeEnemies() {
         playSound('powerUp');
       }
     }
+    // WAVE CLEAR FEEDBACK — short tick on every wave clear (not just quick ones)
+    // so the player gets immediate auditory confirmation. Skip on the FINAL wave
+    // (about to transition to stage clear, which has its own fanfare).
+    const isFinalWave = (game.challengeWaveIdx + 1) >= (game.challengeWaves ? game.challengeWaves.length : 0);
+    if (!isFinalWave) {
+      playSound('tick');
+      // Small "+1" wave count pip near top
+      game.floatTexts.push({
+        x: BASE_W - 18, y: 36, text: '+1',
+        color: '#f6f', life: 30, maxLife: 30, size: 5
+      });
+    }
     game.challengeWaveIdx++;
     game.challengeWaveStartFrame = game.stageFrames; // mark start of next wave
     game.challengeWaveTimer = 35; // brief telegraph window between waves
