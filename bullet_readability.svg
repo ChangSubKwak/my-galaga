@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 420" width="840" height="420">
+  <defs>
+    <filter id="g-blue">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="g-gold">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="g-cyan">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="tb">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+    <linearGradient id="r-sleek" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="30%" stop-color="#C0E0FF"/>
+      <stop offset="100%" stop-color="#2244BB"/>
+    </linearGradient>
+    <radialGradient id="r-nova" cx="45%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="40%" stop-color="#FFE066"/>
+      <stop offset="100%" stop-color="#DD7700"/>
+    </radialGradient>
+    <linearGradient id="r-shard" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="25%" stop-color="#99FFE8"/>
+      <stop offset="100%" stop-color="#007766"/>
+    </linearGradient>
+  </defs>
+
+  <!-- BG -->
+  <rect width="840" height="420" fill="#060610"/>
+
+  <!-- Stars -->
+  <circle cx="30" cy="20" r="0.7" fill="white" opacity="0.3"/>
+  <circle cx="150" cy="40" r="0.5" fill="#AAAAFF" opacity="0.25"/>
+  <circle cx="400" cy="15" r="0.8" fill="white" opacity="0.3"/>
+  <circle cx="650" cy="35" r="0.6" fill="#AAAAFF" opacity="0.2"/>
+  <circle cx="810" cy="20" r="0.7" fill="white" opacity="0.25"/>
+
+  <!-- Header -->
+  <text x="420" y="32" text-anchor="middle" font-family="'Courier New',monospace" font-size="13" fill="#8899CC" letter-spacing="2">연사 가독성 테스트 · 5발 동시 노출</text>
+  <line x1="60" y1="44" x2="780" y2="44" stroke="#1A1A35" stroke-width="1"/>
+
+  <!-- Column dividers -->
+  <line x1="280" y1="50" x2="280" y2="380" stroke="#111128" stroke-width="1"/>
+  <line x1="560" y1="50" x2="560" y2="380" stroke="#111128" stroke-width="1"/>
+
+  <!-- ── Sleek × 5 (staggered) ── -->
+  <!-- Bullet positions for Sleek: 5 bullets in a typical spread -->
+  <g transform="translate(140,0)">
+    <!-- b1 -->
+    <g transform="translate(-40,105)">
+      <rect x="-1" y="28" width="2" height="35" rx="1" fill="#4466CC" opacity="0.45" filter="url(#tb)"/>
+      <path d="M0,-52 C3,-38 5,-5 5,18 C5,27 2,31 0,32 C-2,31 -5,27 -5,18 C-5,-5 -3,-38 0,-52 Z" fill="url(#r-sleek)" filter="url(#g-blue)"/>
+    </g>
+    <!-- b2 -->
+    <g transform="translate(-20,160)">
+      <rect x="-1" y="28" width="2" height="35" rx="1" fill="#4466CC" opacity="0.45" filter="url(#tb)"/>
+      <path d="M0,-52 C3,-38 5,-5 5,18 C5,27 2,31 0,32 C-2,31 -5,27 -5,18 C-5,-5 -3,-38 0,-52 Z" fill="url(#r-sleek)" filter="url(#g-blue)"/>
+    </g>
+    <!-- b3 center -->
+    <g transform="translate(0,80)">
+      <rect x="-1" y="28" width="2" height="35" rx="1" fill="#4466CC" opacity="0.45" filter="url(#tb)"/>
+      <path d="M0,-52 C3,-38 5,-5 5,18 C5,27 2,31 0,32 C-2,31 -5,27 -5,18 C-5,-5 -3,-38 0,-52 Z" fill="url(#r-sleek)" filter="url(#g-blue)"/>
+    </g>
+    <!-- b4 -->
+    <g transform="translate(20,145)">
+      <rect x="-1" y="28" width="2" height="35" rx="1" fill="#4466CC" opacity="0.45" filter="url(#tb)"/>
+      <path d="M0,-52 C3,-38 5,-5 5,18 C5,27 2,31 0,32 C-2,31 -5,27 -5,18 C-5,-5 -3,-38 0,-52 Z" fill="url(#r-sleek)" filter="url(#g-blue)"/>
+    </g>
+    <!-- b5 -->
+    <g transform="translate(40,110)">
+      <rect x="-1" y="28" width="2" height="35" rx="1" fill="#4466CC" opacity="0.45" filter="url(#tb)"/>
+      <path d="M0,-52 C3,-38 5,-5 5,18 C5,27 2,31 0,32 C-2,31 -5,27 -5,18 C-5,-5 -3,-38 0,-52 Z" fill="url(#r-sleek)" filter="url(#g-blue)"/>
+    </g>
+    <text x="0" y="320" text-anchor="middle" font-family="'Courier New',monospace" font-size="13" fill="#6699EE">A. Sleek</text>
+    <text x="0" y="338" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#334466">겹쳐도 개별 인식 양호</text>
+  </g>
+
+  <!-- ── Nova × 5 ── -->
+  <g transform="translate(420,0)">
+    <g transform="translate(-40,115)">
+      <path d="M-3,30 C-5,52 -4,70 -2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M3,30 C5,52 4,70 2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M0,-50 C5,-32 9,-2 9,22 C9,31 5,36 0,38 C-5,36 -9,31 -9,22 C-9,-2 -5,-32 0,-50 Z" fill="url(#r-nova)" filter="url(#g-gold)"/>
+    </g>
+    <g transform="translate(-20,165)">
+      <path d="M-3,30 C-5,52 -4,70 -2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M3,30 C5,52 4,70 2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M0,-50 C5,-32 9,-2 9,22 C9,31 5,36 0,38 C-5,36 -9,31 -9,22 C-9,-2 -5,-32 0,-50 Z" fill="url(#r-nova)" filter="url(#g-gold)"/>
+    </g>
+    <g transform="translate(0,88)">
+      <path d="M-3,30 C-5,52 -4,70 -2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M3,30 C5,52 4,70 2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M0,-50 C5,-32 9,-2 9,22 C9,31 5,36 0,38 C-5,36 -9,31 -9,22 C-9,-2 -5,-32 0,-50 Z" fill="url(#r-nova)" filter="url(#g-gold)"/>
+    </g>
+    <g transform="translate(20,148)">
+      <path d="M-3,30 C-5,52 -4,70 -2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M3,30 C5,52 4,70 2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M0,-50 C5,-32 9,-2 9,22 C9,31 5,36 0,38 C-5,36 -9,31 -9,22 C-9,-2 -5,-32 0,-50 Z" fill="url(#r-nova)" filter="url(#g-gold)"/>
+    </g>
+    <g transform="translate(40,118)">
+      <path d="M-3,30 C-5,52 -4,70 -2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M3,30 C5,52 4,70 2,82" stroke="#CC7700" stroke-width="1.5" fill="none" opacity="0.3" filter="url(#tb)"/>
+      <path d="M0,-50 C5,-32 9,-2 9,22 C9,31 5,36 0,38 C-5,36 -9,31 -9,22 C-9,-2 -5,-32 0,-50 Z" fill="url(#r-nova)" filter="url(#g-gold)"/>
+    </g>
+    <text x="0" y="320" text-anchor="middle" font-family="'Courier New',monospace" font-size="13" fill="#FFBB44">B. Nova</text>
+    <text x="0" y="338" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#775533">글로우 겹침 있으나 임팩트 명확</text>
+  </g>
+
+  <!-- ── Shard × 5 ── -->
+  <g transform="translate(700,0)">
+    <g transform="translate(-40,108)">
+      <line x1="-4" y1="26" x2="-7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <line x1="4" y1="26" x2="7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <path d="M0,-52 L10,-6 L8,24 L0,30 L-8,24 L-10,-6 Z" fill="url(#r-shard)" filter="url(#g-cyan)"/>
+    </g>
+    <g transform="translate(-20,162)">
+      <line x1="-4" y1="26" x2="-7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <line x1="4" y1="26" x2="7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <path d="M0,-52 L10,-6 L8,24 L0,30 L-8,24 L-10,-6 Z" fill="url(#r-shard)" filter="url(#g-cyan)"/>
+    </g>
+    <g transform="translate(0,84)">
+      <line x1="-4" y1="26" x2="-7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <line x1="4" y1="26" x2="7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <path d="M0,-52 L10,-6 L8,24 L0,30 L-8,24 L-10,-6 Z" fill="url(#r-shard)" filter="url(#g-cyan)"/>
+    </g>
+    <g transform="translate(20,145)">
+      <line x1="-4" y1="26" x2="-7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <line x1="4" y1="26" x2="7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <path d="M0,-52 L10,-6 L8,24 L0,30 L-8,24 L-10,-6 Z" fill="url(#r-shard)" filter="url(#g-cyan)"/>
+    </g>
+    <g transform="translate(40,112)">
+      <line x1="-4" y1="26" x2="-7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <line x1="4" y1="26" x2="7" y2="65" stroke="#00AAAA" stroke-width="1.2" opacity="0.4" filter="url(#tb)"/>
+      <path d="M0,-52 L10,-6 L8,24 L0,30 L-8,24 L-10,-6 Z" fill="url(#r-shard)" filter="url(#g-cyan)"/>
+    </g>
+    <text x="0" y="320" text-anchor="middle" font-family="'Courier New',monospace" font-size="13" fill="#33DDBB">C. Shard</text>
+    <text x="0" y="338" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#226655">각진 실루엣 · 군집 시 구분 명확</text>
+  </g>
+
+  <!-- Footer -->
+  <line x1="60" y1="380" x2="780" y2="380" stroke="#1A1A35" stroke-width="1"/>
+  <text x="420" y="400" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#2A2A45">
+    ※ 모두 청·금·청록 계열로 적 총알(빨강/자주 계열 통상)과 색상/명도 분리 유지
+  </text>
+</svg>

@@ -1,0 +1,13 @@
+# Claude Code session state (local-only)
+.claude/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node / dev artifacts (none currently, but defensive)
+node_modules/
+*.log

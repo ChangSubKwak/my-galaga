@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 560" width="840" height="560">
+  <defs>
+    <!-- Glow filters -->
+    <filter id="glow-blue" x="-80%" y="-40%" width="260%" height="180%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-gold" x="-80%" y="-40%" width="260%" height="180%">
+      <feGaussianBlur stdDeviation="9" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-cyan" x="-80%" y="-40%" width="260%" height="180%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft-blur">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+    <filter id="trail-blur">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+
+    <!-- Concept A: Sleek — Blue/White -->
+    <linearGradient id="sleek-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="25%" stop-color="#C8E8FF"/>
+      <stop offset="70%" stop-color="#3366CC"/>
+      <stop offset="100%" stop-color="#112266"/>
+    </linearGradient>
+    <radialGradient id="sleek-glow" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#88BBFF" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1133AA" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Concept B: Nova — White/Gold -->
+    <radialGradient id="nova-core" cx="45%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="35%" stop-color="#FFEE99"/>
+      <stop offset="75%" stop-color="#FF9900"/>
+      <stop offset="100%" stop-color="#CC5500"/>
+    </radialGradient>
+    <radialGradient id="nova-glow" cx="50%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#FFD044" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#FF6600" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Concept C: Shard — Cyan/Teal -->
+    <linearGradient id="shard-body" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="20%" stop-color="#AAFFF0"/>
+      <stop offset="60%" stop-color="#00CCAA"/>
+      <stop offset="100%" stop-color="#006655"/>
+    </linearGradient>
+    <radialGradient id="shard-glow" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#44FFDD" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#009988" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ── Background ── -->
+  <rect width="840" height="560" fill="#060610"/>
+
+  <!-- Subtle star field -->
+  <circle cx="45" cy="30" r="0.8" fill="#FFFFFF" opacity="0.4"/>
+  <circle cx="120" cy="75" r="0.6" fill="#AAAAFF" opacity="0.3"/>
+  <circle cx="200" cy="18" r="1" fill="#FFFFFF" opacity="0.3"/>
+  <circle cx="310" cy="55" r="0.7" fill="#FFFFFF" opacity="0.25"/>
+  <circle cx="450" cy="22" r="0.9" fill="#AAAAFF" opacity="0.35"/>
+  <circle cx="560" cy="60" r="0.6" fill="#FFFFFF" opacity="0.3"/>
+  <circle cx="670" cy="15" r="1" fill="#FFFFFF" opacity="0.25"/>
+  <circle cx="780" cy="45" r="0.7" fill="#AAAAFF" opacity="0.3"/>
+  <circle cx="820" cy="90" r="0.5" fill="#FFFFFF" opacity="0.2"/>
+  <circle cx="35" cy="200" r="0.6" fill="#FFFFFF" opacity="0.2"/>
+  <circle cx="800" cy="350" r="0.8" fill="#AAAAFF" opacity="0.25"/>
+
+  <!-- Header -->
+  <text x="420" y="38" text-anchor="middle" font-family="'Courier New',monospace" font-size="15" fill="#8899CC" letter-spacing="2">GAM-27 · 아군 총알 비주얼 시안</text>
+  <line x1="60" y1="50" x2="780" y2="50" stroke="#1A1A35" stroke-width="1"/>
+
+  <!-- Column dividers -->
+  <line x1="280" y1="60" x2="280" y2="500" stroke="#111128" stroke-width="1"/>
+  <line x1="560" y1="60" x2="560" y2="500" stroke="#111128" stroke-width="1"/>
+
+  <!-- ══════════════════════════════════════════════
+       CONCEPT A: SLEEK  (x=140)
+  ══════════════════════════════════════════════ -->
+  <g transform="translate(140,300)">
+    <!-- Trailing glow blob (bottom/back) -->
+    <ellipse cx="0" cy="60" rx="10" ry="40" fill="#2244BB" opacity="0.18" filter="url(#soft-blur)"/>
+    <!-- Trail line -->
+    <rect x="-1.5" y="48" width="3" height="70" rx="1.5"
+          fill="url(#sleek-glow)" opacity="0.6" filter="url(#trail-blur)"/>
+    <rect x="-0.8" y="48" width="1.6" height="55" rx="0.8" fill="#88BBFF" opacity="0.5"/>
+    <!-- Ambient glow halo -->
+    <ellipse cx="0" cy="-10" rx="26" ry="58" fill="url(#sleek-glow)" filter="url(#soft-blur)"/>
+    <!-- Bullet body: slim teardrop tapering to sharp point -->
+    <path d="M0,-95 C4,-72 8,-20 8,30 C8,42 4,50 0,52 C-4,50 -8,42 -8,30 C-8,-20 -4,-72 0,-95 Z"
+          fill="url(#sleek-body)" filter="url(#glow-blue)"/>
+    <!-- Specular highlight on left edge -->
+    <path d="M0,-93 C2,-68 3,-15 2,25 C1,38 0,44 0,44" stroke="white" stroke-width="1.2" fill="none" opacity="0.65"/>
+    <!-- Tiny core spark at tip -->
+    <circle cx="0" cy="-92" r="2" fill="white" opacity="0.9"/>
+
+    <!-- Label -->
+    <text x="0" y="140" text-anchor="middle" font-family="'Courier New',monospace" font-size="15" fill="#6699EE" font-weight="bold" letter-spacing="1">A. Sleek</text>
+    <text x="0" y="160" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="#445577">"슬림 · 속도감 · 신뢰"</text>
+    <text x="0" y="180" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#334466">기본 총알 — 파랑/흰 그라디언트</text>
+    <text x="0" y="194" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#334466">단일 트레일 · 부드러운 블루 글로우</text>
+  </g>
+
+  <!-- ══════════════════════════════════════════════
+       CONCEPT B: NOVA  (x=420)
+  ══════════════════════════════════════════════ -->
+  <g transform="translate(420,300)">
+    <!-- Wide energy bloom (back) -->
+    <ellipse cx="0" cy="55" rx="18" ry="50" fill="#CC6600" opacity="0.12" filter="url(#soft-blur)"/>
+    <!-- Dual fork trail -->
+    <path d="M-4,50 C-6,75 -5,100 -3,120" stroke="#DD8800" stroke-width="2" fill="none" opacity="0.35" filter="url(#trail-blur)"/>
+    <path d="M4,50 C6,75 5,100 3,120" stroke="#DD8800" stroke-width="2" fill="none" opacity="0.35" filter="url(#trail-blur)"/>
+    <path d="M0,50 L0,105" stroke="#FFCC44" stroke-width="1.5" fill="none" opacity="0.55"/>
+    <!-- Ambient glow halo (larger, warmer) -->
+    <ellipse cx="0" cy="-5" rx="34" ry="65" fill="url(#nova-glow)" filter="url(#soft-blur)"/>
+    <!-- Bullet body: rounder/wider = more mass/power -->
+    <path d="M0,-88 C7,-60 15,-5 14,35 C12,48 6,55 0,57 C-6,55 -12,48 -14,35 C-15,-5 -7,-60 0,-88 Z"
+          fill="url(#nova-core)" filter="url(#glow-gold)"/>
+    <!-- Inner bright core oval -->
+    <ellipse cx="-3" cy="-30" rx="5" ry="20" fill="white" opacity="0.55"/>
+    <!-- Tip flare -->
+    <circle cx="0" cy="-87" r="3.5" fill="white" opacity="0.85"/>
+    <circle cx="0" cy="-87" r="7" fill="#FFEEAA" opacity="0.3" filter="url(#soft-blur)"/>
+
+    <!-- Label -->
+    <text x="0" y="140" text-anchor="middle" font-family="'Courier New',monospace" font-size="15" fill="#FFBB44" font-weight="bold" letter-spacing="1">B. Nova</text>
+    <text x="0" y="160" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="#886633">"파워 · 에너지 · 임팩트"</text>
+    <text x="0" y="180" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#775533">파워업 총알 — 금/백 방사형 코어</text>
+    <text x="0" y="194" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#775533">이중 트레일 · 넓은 골드 글로우</text>
+  </g>
+
+  <!-- ══════════════════════════════════════════════
+       CONCEPT C: SHARD  (x=700)
+  ══════════════════════════════════════════════ -->
+  <g transform="translate(700,300)">
+    <!-- Back glow -->
+    <ellipse cx="0" cy="50" rx="12" ry="38" fill="#009977" opacity="0.15" filter="url(#soft-blur)"/>
+    <!-- Dual split trail lines -->
+    <line x1="-6" y1="44" x2="-10" y2="112" stroke="#00BBAA" stroke-width="1.8" opacity="0.4" filter="url(#trail-blur)"/>
+    <line x1="6" y1="44" x2="10" y2="112" stroke="#00BBAA" stroke-width="1.8" opacity="0.4" filter="url(#trail-blur)"/>
+    <line x1="-6" y1="44" x2="-9" y2="90" stroke="#88FFEE" stroke-width="1" opacity="0.6"/>
+    <line x1="6" y1="44" x2="9" y2="90" stroke="#88FFEE" stroke-width="1" opacity="0.6"/>
+    <!-- Ambient halo -->
+    <ellipse cx="0" cy="-10" rx="22" ry="55" fill="url(#shard-glow)" filter="url(#soft-blur)"/>
+    <!-- Bullet body: angular rhombus — pointed top & bottom, wider waist -->
+    <path d="M0,-90 L16,-10 L12,40 L0,48 L-12,40 L-16,-10 Z"
+          fill="url(#shard-body)" filter="url(#glow-cyan)"/>
+    <!-- Left facet highlight -->
+    <path d="M0,-90 L16,-10" stroke="white" stroke-width="1.2" fill="none" opacity="0.55"/>
+    <!-- Right facet subtle edge -->
+    <path d="M0,-90 L-16,-10" stroke="#AAFFF0" stroke-width="0.7" fill="none" opacity="0.35"/>
+    <!-- Inner bright panel (left face) -->
+    <path d="M0,-85 L13,-12 L10,30 L0,38 Z" fill="white" opacity="0.12"/>
+    <!-- Tip -->
+    <circle cx="0" cy="-89" r="2.5" fill="white" opacity="0.9"/>
+
+    <!-- Label -->
+    <text x="0" y="140" text-anchor="middle" font-family="'Courier New',monospace" font-size="15" fill="#33DDBB" font-weight="bold" letter-spacing="1">C. Shard</text>
+    <text x="0" y="160" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="#227766">"각진 · 날카로운 · SF"</text>
+    <text x="0" y="180" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#226655">고속 총알 — 청록/백 다면체</text>
+    <text x="0" y="194" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#226655">이중 분기 트레일 · 청록 글로우</text>
+  </g>
+
+  <!-- ── Footer ── -->
+  <line x1="60" y1="506" x2="780" y2="506" stroke="#1A1A35" stroke-width="1"/>
+  <text x="420" y="525" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#2A2A45">
+    ※ 3종 모두: 적 총알과 명도·색상 분리 유지 / 연사 2~10발 동시 노출 가독성 고려 / 파티클 범벅 없이 1 glow레이어
+  </text>
+  <text x="420" y="542" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#222240">
+    GAM-27 · CEO 시안 초안 · 2026-04-25
+  </text>
+</svg>
