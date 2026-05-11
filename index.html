@@ -7648,6 +7648,15 @@ function updateChallengeEnemies() {
     game.challengeWaveIdx++;
     game.challengeWaveStartFrame = game.stageFrames; // mark start of next wave
     game.challengeWaveTimer = 35; // brief telegraph window between waves
+    // FINAL WAVE BANNER — when the NEXT wave is the last one, surface a clear
+    // "FINAL WAVE!" callout so the player knows the stage closes after it.
+    if (game.challengeWaves
+        && (game.challengeWaveIdx + 1) === game.challengeWaves.length) {
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 30, text: 'FINAL WAVE!',
+        color: '#f6f', life: 70, maxLife: 70, size: 10
+      });
+    }
   }
 }
 
