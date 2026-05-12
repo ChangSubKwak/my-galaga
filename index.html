@@ -16820,7 +16820,14 @@ function drawStatsOverlay() {
 
   row('SESSIONS',    String(cs.sessions || 0), COL.cyan);
   row('PLAY TIME',   playTime, '#fff');
-  row('TOTAL KILLS', fmtScore(cs.kills || 0), COL.yellow);
+  {
+    const _tk = cs.kills || 0;
+    const _tkTier = _tk >= 10000 ? 'LEGENDARY'
+                  : _tk >= 2000  ? 'EXTERMINATOR'
+                  : _tk >= 500   ? 'SLAYER'
+                  : _tk >= 100   ? 'HUNTER' : '';
+    row('TOTAL KILLS', fmtScore(_tk) + (_tkTier ? ' ' + _tkTier : ''), COL.yellow);
+  }
   {
     const _accTier = acc >= 95 ? 'SHARPSHOOTER'
                    : acc >= 85 ? 'CRACK SHOT'
