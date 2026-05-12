@@ -10622,6 +10622,25 @@ function update() {
     if ((game.zoomPulse || 0) > 0) game.zoomPulse--;
     if ((game.cinematicBars || 0) > 0) game.cinematicBars--;
     if ((game.lifeGainPulseTimer || 0) > 0) game.lifeGainPulseTimer--;
+    // RUN TIME MILESTONE BANNERS — 5/10/20/30 minute marks, one-shot per run.
+    // Encourages staying alive and offers paced rewards in long sessions.
+    {
+      const _milestones = [18000, 36000, 72000, 108000]; // 5/10/20/30 min @60fps
+      const _labels = ['5 MIN MARK', '10 MIN MARK', '20 MIN MARK', '30 MIN MARK'];
+      const _cols = ['#0ff', '#0f8', '#fc4', '#f6f'];
+      if (!game._runTimeMileFired) game._runTimeMileFired = [false, false, false, false];
+      for (let _mi = 0; _mi < _milestones.length; _mi++) {
+        if (!game._runTimeMileFired[_mi] && (game.runFrames || 0) >= _milestones[_mi]) {
+          game._runTimeMileFired[_mi] = true;
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 - 40, text: _labels[_mi],
+            color: _cols[_mi], life: 100, maxLife: 100, size: 10
+          });
+          if (typeof spawnConfetti === 'function') spawnConfetti(8);
+          if (typeof playSound === 'function') playSound('milestone');
+        }
+      }
+    }
     // SCORE ROLL — lerp scoreDisplay toward game.score (or jump if gap large).
     // Faster ease near target keeps it from lingering on small diffs. Pure visual.
     {
