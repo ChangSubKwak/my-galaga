@@ -17143,7 +17143,12 @@ function drawStatsOverlay() {
         const cbEver = parseInt(localStorage.getItem('galagaMaxComboEver') || '0', 10) || 0;
         if (cbEver >= 10) {
           const cbCol = cbEver >= 100 ? '#fc4' : cbEver >= 60 ? '#0ff' : cbEver >= 30 ? '#0f8' : '#cce';
-          profileRow('COMBO LIFETIME BEST', 'x' + cbEver, cbCol);
+          const _cbTier = cbEver >= 100 ? 'MYTHIC'
+                        : cbEver >= 60  ? 'PLATINUM'
+                        : cbEver >= 30  ? 'GOLD'
+                        : cbEver >= 20  ? 'SILVER'
+                        : 'BRONZE';
+          profileRow('COMBO LIFETIME BEST', 'x' + cbEver + ' ' + _cbTier, cbCol);
         }
       } catch (e) {}
       // MULTI KILL BEST — lifetime max same-frame kills
