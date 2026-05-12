@@ -12178,6 +12178,10 @@ function drawStageIntro() {
     if ((game.parryCount || 0) >= 3) {
       drawRetroText('PR x' + game.parryCount, BASE_W - 4, BASE_H/2 + 17, 4, '#0cf', 'right');
     }
+    // RUN KILLS PEEK — session kill count when meaningful (>= 10).
+    if (game.stats && (game.stats.kills || 0) >= 10) {
+      drawRetroText('K x' + game.stats.kills, BASE_W - 4, BASE_H/2 + 23, 4, '#f88', 'right');
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
