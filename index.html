@@ -15180,6 +15180,17 @@ function drawGameOverScreen() {
 
   drawRetroText('MAX STAGE', BASE_W/2 - 40, cy + 18, 6, COL.cyan);
   drawRetroText(Math.floor(s.maxStage * tStage).toString(), BASE_W/2 + 40, cy + 18, 7, COL.yellow, 'right');
+  // PB COMPARISON — tiny 'BEST: N' below max stage when we have lifetime PB to compare
+  try {
+    const _csNg = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
+    const _csCg = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
+    const _pbStage = Math.max(_csNg.bestStage || 0, _csCg.bestStage || 0);
+    if (_pbStage > 0 && tStage >= 1) {
+      const _pbCol = (s.maxStage || 0) >= _pbStage ? '#fc4' : '#888';
+      const _pbLab = (s.maxStage || 0) >= _pbStage ? 'PB!' : 'BEST: ' + _pbStage;
+      drawRetroText(_pbLab, BASE_W/2 + 40, cy + 24, 4, _pbCol, 'right');
+    }
+  } catch (e) {}
 
   drawRetroText('BEST COMBO', BASE_W/2 - 40, cy + 26, 6, COL.cyan);
   drawRetroText(Math.floor((game.comboBest || 0) * tCombo).toString(), BASE_W/2 + 40, cy + 26, 7, COL.yellow, 'right');
