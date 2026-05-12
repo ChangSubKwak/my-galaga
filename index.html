@@ -12245,6 +12245,16 @@ function drawStageIntro() {
   // from screen center outward. Reads as cinematic transition between stages.
   // Color picked from biome for cohesion (or default cyan).
   const introElapsed = 120 - game.stageTimer;
+  // HARD MODE BANDS — when difficultyMode === 'hard', paint left/right 1px
+  // red bands across the entire intro to reinforce the chosen challenge.
+  if (typeof difficultyMode !== 'undefined' && difficultyMode === 'hard') {
+    ctx.save();
+    ctx.globalAlpha = 0.32 + 0.18 * Math.sin(game.animFrame * 0.18);
+    ctx.fillStyle = '#f44';
+    ctx.fillRect(0, 0, 1, BASE_H);
+    ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
+    ctx.restore();
+  }
   // STAGE TYPE BG TINT — faint 4-frame edge band by stage type so the player
   // instantly reads what kind of stage is starting. Boss/challenge get the
   // tint; normal stages stay clean (no distraction).
