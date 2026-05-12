@@ -14827,6 +14827,28 @@ function drawBossStage() {
   // Player (blink during invincibility)
   if (game.playerAlive && (game.invincibleTimer <= 0 || (game.invincibleTimer >> 2) % 2 === 0)) {
     const pcol = (game.ship && game.ship.color) || '#0cf';
+    // PLAYER BUFF AURA — single highest-priority temp buff produces a colored
+    // pulsing ring around the ship. Priority: laser > homing > wave > rapid > slow.
+    let _buffCol = null;
+    if ((game.laserTimer  || 0) > 0)      _buffCol = '#f6c';
+    else if ((game.homingTimer || 0) > 0) _buffCol = '#0f8';
+    else if ((game.waveTimer   || 0) > 0) _buffCol = '#6cf';
+    else if ((game.rapidTimer  || 0) > 0) _buffCol = '#fc4';
+    else if ((game.slowTimer   || 0) > 0) _buffCol = '#8ff';
+    if (_buffCol) {
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.20 * Math.sin(game.animFrame * 0.18);
+      ctx.strokeStyle = _buffCol;
+      ctx.lineWidth = 1;
+      const _r = 10 + 1 * Math.sin(game.animFrame * 0.25);
+      if (game.dualFighter) {
+        ctx.beginPath(); ctx.arc(game.playerX - 8, game.playerY, _r, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(game.playerX + 8, game.playerY, _r, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.arc(game.playerX, game.playerY, _r, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
     if (game.dualFighter) {
       drawShipTraitAura(game.playerX - 8, game.playerY, selectedShip);
       drawShipTraitAura(game.playerX + 8, game.playerY, selectedShip);
