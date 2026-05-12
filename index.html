@@ -16023,6 +16023,10 @@ function drawGameOverScreen() {
   if (tTime >= 1 && (game.extraShipsRun || 0) >= 1) {
     drawRetroText('+' + game.extraShipsRun + ' SHIPS EARNED', BASE_W/2, cy + 70, 4, '#ff4');
   }
+  // MULTIKILL BEST — biggest same-frame kill count this run
+  if (tTime >= 1 && (game.multiKillBest || 0) >= 3) {
+    drawRetroText('MULTIKILL x' + game.multiKillBest, BASE_W/2, cy + 82, 4, '#fc4');
+  }
   // MAX CORRUPTION REACHED — translate maxStage to corruption tier
   if (tTime >= 1) {
     const _msC = (s.maxStage || 0);
