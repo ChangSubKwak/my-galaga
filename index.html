@@ -15592,6 +15592,16 @@ function drawGameOverScreen() {
     drawRetroText('— FINAL TRANSMISSION —', BASE_W/2, ey, 5, '#888');
     ctx.globalAlpha = 0.85 * fade;
     drawRetroText(game.runEpitaph, BASE_W/2, ey + 8, 6, '#cfc');
+    // TIME-OF-DAY MOOD — atmospheric line below epitaph based on real-world hour.
+    const _h = new Date().getHours();
+    const _mood = _h < 5  ? 'THE LATE NIGHT KEEPS WATCH.'
+                : _h < 9  ? 'THE DAY BEGINS WITHOUT YOU.'
+                : _h < 12 ? 'MORNING LIGHT REACHES THE WRECK.'
+                : _h < 17 ? 'THE AFTERNOON HOLDS QUIET.'
+                : _h < 21 ? 'EVENING SETTLES OVER THE FIELD.'
+                : 'THE NIGHT REMEMBERS.';
+    ctx.globalAlpha = 0.45 * fade;
+    drawRetroText(_mood, BASE_W/2, ey + 16, 4, '#888');
     ctx.restore();
   }
 
