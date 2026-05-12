@@ -11835,6 +11835,15 @@ function drawTitleScreen() {
     if (_comp >= 5) {
       const _cmpCol = _comp >= 80 ? '#fc4' : _comp >= 50 ? '#0ff' : _comp >= 20 ? '#0f8' : '#888';
       drawRetroText('CMPL ' + _comp + '%', BASE_W/2, 94, 4, _cmpCol, 'center');
+      // Mini bar under text
+      ctx.save();
+      const _cbW = 40, _cbX = BASE_W/2 - _cbW/2, _cbY = 99;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(_cbX, _cbY, _cbW, 1);
+      ctx.fillStyle = _cmpCol;
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(_cbX, _cbY, Math.round(_cbW * _comp / 100), 1);
+      ctx.restore();
     }
   }
   // PERKS DOTS — 10 dots showing perks tried at least once (lifetime).
