@@ -16031,6 +16031,10 @@ function drawGameOverScreen() {
   if (tTime >= 1 && (game.laserPierceBest || 0) >= 3) {
     drawRetroText('PIERCE x' + game.laserPierceBest, BASE_W/2 + 30, cy + 82, 4, '#f6c');
   }
+  // ACE STREAK BEST — best S/A grade streak this run
+  if (tTime >= 1 && (game.aceStreakBest || 0) >= 3) {
+    drawRetroText('ACE x' + game.aceStreakBest, BASE_W/2, cy + 88, 4, '#fc4');
+  }
   // MAX CORRUPTION REACHED — translate maxStage to corruption tier
   if (tTime >= 1) {
     const _msC = (s.maxStage || 0);
