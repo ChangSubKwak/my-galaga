@@ -13764,6 +13764,23 @@ function drawGameOverScreen() {
       drawRetroText(game.runGoal, BASE_W/2, goalY, 6, blink);
       ctx.restore();
     }
+    // NEXT ACHIEVEMENT — first un-unlocked achievement as a forward target. Helps
+    // the player end the death screen with one specific trophy in mind.
+    if (elapsedGo > 260 && typeof ACHIEVEMENTS !== 'undefined' && typeof unlockedAchievements !== 'undefined') {
+      const allIds = Object.keys(ACHIEVEMENTS);
+      let nextAch = null;
+      for (const id of allIds) {
+        if (!unlockedAchievements.has(id)) { nextAch = ACHIEVEMENTS[id]; break; }
+      }
+      if (nextAch) {
+        const aFade = Math.min(1, (elapsedGo - 260) / 30);
+        ctx.save();
+        ctx.globalAlpha = aFade * 0.85;
+        const aY = hy + 8 + game.runHighlights.length * 8 + 22;
+        drawRetroText('TRY: ' + nextAch.name, BASE_W/2, aY, 4, '#0ff');
+        ctx.restore();
+      }
+    }
     // GAME OVER SHARE LINE — compact stat string for manual share/transcription.
     // "[CSK] S25 145K 76% DAILY" format. Reveals last so it lands as a coda.
     if (elapsedGo > 280) {
