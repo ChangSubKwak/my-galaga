@@ -14962,6 +14962,27 @@ function drawHUD() {
       }
     } catch (e) {}
   }
+  // LIVE PB PACE INDICATOR — during gameplay, compare current stageFrames to
+  // this stage's recorded PB. Shows time delta as you race the clock.
+  // Skipped if no PB for this stage (first run) or first 60 frames (slide-in).
+  if (!minimalHud
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (game.stageFrames || 0) > 60
+      && typeof stagePBs !== 'undefined' && stagePBs) {
+    const _pbF = stagePBs[String(game.stage)];
+    if (typeof _pbF === 'number' && _pbF > 0) {
+      const _delta = game.stageFrames - _pbF;
+      const _absSec = Math.abs(_delta / 60);
+      const _txt = _delta < 0
+        ? 'PB -' + _absSec.toFixed(1) + 's'   // ahead of PB (good)
+        : 'PB +' + _absSec.toFixed(1) + 's';  // behind PB (over)
+      const _pbCol = _delta < 0 ? '#0cf' : '#f88';
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      drawRetroText(_txt, BASE_W - 5, 58, 4, _pbCol, 'right');
+      ctx.restore();
+    }
+  }
   // WORLD CORRUPTION HUD INDICATOR — small "CORR XX%" label when stage 30+ enters
   // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
   // pure context cue for late-game depth.
