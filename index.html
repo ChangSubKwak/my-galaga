@@ -12628,6 +12628,12 @@ function drawHUD() {
     ctx.globalAlpha = 0.85;
     ctx.fillRect(0, 0, Math.round(BASE_W * prog), 1);
     ctx.restore();
+    // STAGE PROGRESS PERCENT — small N% number once progress >= 25% so the
+    // player sees exact stage completion (helps "almost done" decisions).
+    if (!minimalHud && prog >= 0.25) {
+      const pct = Math.round(prog * 100);
+      drawRetroText(pct + '%', BASE_W/2, 4, 4, barCol, 'center');
+    }
   }
   // 1UP + PILOT callsign small line below (pilot identity persistent across runs)
   if (game.animFrame % 60 < 40) {
