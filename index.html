@@ -13211,6 +13211,13 @@ function drawStageIntro() {
       drawRetroText('PREV ' + game.lastStageGrade, BASE_W - 4, BASE_H/2 + 125, 4,
                     game.lastStageGradeCol || '#fff', 'right');
     }
+    // S GRADE TARGET HINT — show condition trio for top-tier rating, dim.
+    // Only on normal stages (boss/chall use different scoring). Skip stage 1.
+    if ((game.stage || 0) >= 2
+        && (game.stage % BOSS_STAGE_INTERVAL !== 0)
+        && (game.stage % 4 !== 0)) {
+      drawRetroText('S: 95% NO-DIE PB', BASE_W - 4, BASE_H/2 + 131, 3, '#666', 'right');
+    }
     // RUN ELAPSED PEEK — current run time in MM:SS when meaningful (>= 30s)
     if ((game.runFrames || 0) >= 1800) {
       const _rs = Math.floor(game.runFrames / 60);
