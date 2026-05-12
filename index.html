@@ -12459,9 +12459,12 @@ function drawTitleScreen() {
     }
     drawRetroText('UP DN  L R   ENTER OK   ESC', BASE_W/2, 244, 5, COL.gray);
   } else {
-    drawRetroText('PILOT [' + playerCallsign + ']', BASE_W/2, 222, 6, callsignColor());
+    // PILOT block relocated ABOVE the TOP SCORES header (y=218). Previously
+    // PILOT at y=222 and U CHANGE at y=230 sat ON the leaderboard rows (which
+    // begin at y=226) and overlapped row #1 / row #2 text.
+    drawRetroText('PILOT [' + playerCallsign + ']', BASE_W/2, 204, 6, callsignColor());
     if ((game.animFrame >> 5) % 2 === 0) {
-      drawRetroText('U CHANGE   O COLOR', BASE_W/2, 230, 5, COL.gray);
+      drawRetroText('U CHANGE   O COLOR', BASE_W/2, 211, 4, COL.gray);
     }
     // TIME-OF-DAY GREETING — small in-world salutation tied to the player's local
     // clock. Cycles between four watch windows so the title feels live across
@@ -12565,41 +12568,40 @@ function drawTitleScreen() {
   // DAILY MODIFIER preview — shows today's deterministic modifier so players know
   // what they're signing up for before pressing Start.
   if (dailyModeRequested) {
+    // Daily extras relocated to BELOW the TOP SCORES rows (which fill y=226-254)
+    // to avoid the previous overlap with the header (y=218) and row #1/#2.
     // Re-derive without game context (TITLE)
     const seed = (typeof dailySeed === 'function' ? dailySeed() : 0) | 0;
     const dailyMod = STAGE_MUTATIONS[seed % STAGE_MUTATIONS.length];
-    if (dailyMod) {
-      const blink = (game.animFrame >> 3) % 2 === 0 ? dailyMod.color : '#fff';
-      drawRetroText('TODAY: ' + dailyMod.label, BASE_W/2, 212, 5, blink);
-    }
-    // DAILY STREAK badge — shows consecutive-day count when > 0
+    // STREAK / TODAY block sits at y=197 (above PRESS SPACE-adjacent area)
     const streak = computeDailyStreak();
     if (streak >= 1) {
       const streakCol = streak >= 30 ? '#fc4' : streak >= 7 ? '#0f8' : '#cfc';
-      drawRetroText('STREAK ' + streak + ' DAY' + (streak !== 1 ? 'S' : ''), BASE_W/2, 206, 5, streakCol);
+      drawRetroText('STREAK ' + streak + 'D', BASE_W/2 - 40, 197, 4, streakCol, 'center');
     }
-    // DAILY SEED CODE — shareable 4-char hash of today's date so players can
-    // confirm they're comparing the same daily run with friends.
+    if (dailyMod) {
+      const blink = (game.animFrame >> 3) % 2 === 0 ? dailyMod.color : '#fff';
+      drawRetroText('TODAY ' + dailyMod.label, BASE_W/2 + 16, 197, 4, blink, 'center');
+    }
+    // SEED / MISSION / RESET below the score rows (y=226-254 end)
     if (typeof dailySeedCode === 'function') {
-      drawRetroText('SEED  ' + dailySeedCode(), BASE_W/2, 218, 4, '#f6f');
+      drawRetroText('SEED ' + dailySeedCode(), BASE_W/2 - 40, 261, 4, '#f6f', 'center');
     }
-    // DAILY MISSION preview — today's mission target + completion state
     if (typeof dailyMission === 'function') {
       const m = dailyMission();
       const done = (typeof isDailyMissionDoneToday === 'function') && isDailyMissionDoneToday();
-      const mLabel = (done ? 'DONE: ' : 'MISSION: ') + m.label;
+      const mLabel = (done ? 'DONE ' : 'GOAL ') + m.label;
       const mCol = done ? '#0f8' : '#fc4';
-      drawRetroText(mLabel, BASE_W/2, 224, 4, mCol);
+      drawRetroText(mLabel, BASE_W/2 + 20, 261, 4, mCol, 'center');
     }
-    // DAILY RESET COUNTDOWN — hours/minutes until local midnight rollover
     {
       const _now = new Date();
       const _next = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() + 1, 0, 0, 0, 0);
       const _ms = _next.getTime() - _now.getTime();
       const _hr = Math.floor(_ms / 3600000);
       const _mn = Math.floor((_ms % 3600000) / 60000);
-      const _cdStr = 'RESET IN ' + _hr + 'H ' + String(_mn).padStart(2, '0') + 'M';
-      drawRetroText(_cdStr, BASE_W/2, 230, 4, '#888');
+      const _cdStr = 'RESET ' + _hr + 'H' + String(_mn).padStart(2, '0');
+      drawRetroText(_cdStr, BASE_W/2, 267, 3, '#888');
     }
   }
   const topList = loadTopScores(showMode);
