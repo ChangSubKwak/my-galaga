@@ -12472,7 +12472,10 @@ function drawStageIntro() {
     if (m) {
       ctx.save();
       ctx.globalAlpha = 0.85;
-      drawRetroText('TODAY: ' + m.label, BASE_W/2, BASE_H - 8, 4, '#f6f');
+      // PROGRESS APPEND — small live progress fraction after the mission label
+      const _pStr = (typeof m.progress === 'function') ? m.progress(game) : '';
+      const _txt = _pStr ? ('TODAY: ' + m.label + '  ' + _pStr) : ('TODAY: ' + m.label);
+      drawRetroText(_txt, BASE_W/2, BASE_H - 8, 4, '#f6f');
       ctx.restore();
     }
   }
