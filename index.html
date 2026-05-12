@@ -11491,6 +11491,13 @@ function drawTitleScreen() {
       drawRetroText('ALL DIFFICULTIES', BASE_W/2, 51, 4, '#f88', 'center');
     }
   } catch (e) {}
+  // ALL BIOMES SEEN BADGE — if user has visited all 8 biomes, show.
+  try {
+    const _bsBadge = JSON.parse(localStorage.getItem('galagaBiomesSeen') || '[]');
+    if (Array.isArray(_bsBadge) && _bsBadge.length >= 8) {
+      drawRetroText('ALL BIOMES', BASE_W/2, 56, 4, '#9ef', 'center');
+    }
+  } catch (e) {}
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
