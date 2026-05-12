@@ -450,6 +450,15 @@ function markDailyMissionDone() {
     const todaySeed = dailySeed();
     const lastSeed = parseInt(localStorage.getItem('galagaDailyMissionLastSeed') || '0', 10) || 0;
     localStorage.setItem('galagaDailyMissionDone', String(todaySeed));
+    // HEATMAP MISSION DAYS — record completion day for heatmap gold tier
+    const mDaysRaw = localStorage.getItem('galagaDailyMissionDays') || '[]';
+    const mDays = JSON.parse(mDaysRaw);
+    if (Array.isArray(mDays) && mDays.indexOf(todaySeed) < 0) {
+      mDays.push(todaySeed);
+      // Keep only last 365 to bound storage
+      if (mDays.length > 365) mDays.splice(0, mDays.length - 365);
+      localStorage.setItem('galagaDailyMissionDays', JSON.stringify(mDays));
+    }
     const total = parseInt(localStorage.getItem('galagaDailyMissionTotal') || '0', 10) || 0;
     localStorage.setItem('galagaDailyMissionTotal', String(total + 1));
     if (typeof unlockAchievement === 'function') {
@@ -14249,6 +14258,8 @@ function drawStatsOverlay() {
       // glance below the streak line. Only renders when streak ≥ 1.
       try {
         const daysSet = new Set(JSON.parse(localStorage.getItem('galagaDailyDays') || '[]').map(String));
+        // HEATMAP MISSION DAYS — separate Set for days where mission was completed
+        const missionDaysSet = new Set(JSON.parse(localStorage.getItem('galagaDailyMissionDays') || '[]').map(String));
         const cellW = 6, cellH = 4, gap = 1;
         const cols = 6, rows = 5;
         const gridW = cols * cellW + (cols - 1) * gap;
@@ -14265,10 +14276,12 @@ function drawStatsOverlay() {
           const dd = String(d.getDate()).padStart(2, '0');
           const key = String(yyyy) + mm + dd;
           const played = daysSet.has(key);
+          const missionDone = missionDaysSet.has(key);
           const isToday = daysAgo === 0;
           const cx = gridX + (i % cols) * (cellW + gap);
           const cy = gridY + Math.floor(i / cols) * (cellH + gap);
-          ctx.fillStyle = played ? '#0f8' : '#222';
+          // Color tier: gold=mission complete / green=played but mission incomplete / dim=unplayed
+          ctx.fillStyle = missionDone ? '#fc4' : played ? '#0a4' : '#222';
           ctx.fillRect(cx, cy, cellW, cellH);
           if (isToday) {
             ctx.fillStyle = '#fff';
