@@ -15543,6 +15543,13 @@ function drawStatsOverlay() {
                         : _scTot >= 1000000 ? '#0ff'
                         : _scTot >= 100000 ? '#0f8' : '#cce';
         profileRow('LIFETIME SCORE', fmtScore(_scTot), _scTotCol);
+        // AVG SCORE PER RUN — derived from sessions across both modes
+        const _runs = (csN2.sessions || 0) + (csC2.sessions || 0);
+        if (_runs >= 3) {
+          const _avg = Math.round(_scTot / _runs);
+          const _avgCol = _avg >= 100000 ? '#fc4' : _avg >= 50000 ? '#0ff' : _avg >= 20000 ? '#0f8' : '#cce';
+          profileRow('AVG / RUN', fmtScore(_avg), _avgCol);
+        }
       }
       // PICKUP TYPE TOTALS — show top-collected pickup type (e.g., "TOP: S x42")
       const ptRaw = localStorage.getItem('galagaPickupTotals');
