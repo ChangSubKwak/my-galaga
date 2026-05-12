@@ -13314,6 +13314,23 @@ function drawStageIntro() {
         && (game.stage % 4 !== 0)) {
       drawRetroText('S: 95% NO-DIE PB', BASE_W - 4, BASE_H/2 + 131, 3, '#666', 'right');
     }
+    // PB STATUS HINT — show whether this stage has a stored PB. "FIRST PB" tag
+    // when missing (motivates discovery), "PB " + time when set. Only on
+    // normal stages (boss/challenge run different timing schemes).
+    if ((game.stage || 0) >= 1
+        && (game.stage % BOSS_STAGE_INTERVAL !== 0)
+        && (game.stage % 4 !== 0)
+        && typeof stagePBs !== 'undefined' && stagePBs) {
+      const _pbF2 = stagePBs[String(game.stage)];
+      if (typeof _pbF2 === 'number' && _pbF2 > 0
+          && typeof fmtFrameTime === 'function') {
+        drawRetroText('PB ' + fmtFrameTime(_pbF2), BASE_W - 4, BASE_H/2 + 137, 3, '#0cf', 'right');
+      } else {
+        const _blink = (game.animFrame >> 4) % 2 === 0;
+        drawRetroText('FIRST PB', BASE_W - 4, BASE_H/2 + 137, 3,
+                      _blink ? '#fc4' : '#fa8', 'right');
+      }
+    }
     // RUN ELAPSED PEEK — current run time in MM:SS when meaningful (>= 30s)
     if ((game.runFrames || 0) >= 1800) {
       const _rs = Math.floor(game.runFrames / 60);
