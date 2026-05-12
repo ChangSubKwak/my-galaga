@@ -2393,6 +2393,27 @@ function drawPlayerBullet(x, y, lvl, kind) {
 // Power-up capsule — gem orb with halo, type icon, and orbiting sparkle
 function drawPowerUp(p) {
   const x = p.x, y = p.y, t = game.animFrame;
+  // POWERUP PROXIMITY GLOW — small pulsing ring when player is within 30px.
+  // Helps targeting under bullet pressure. Skipped if magnetic perk active
+  // (its own dashed-line aura already telegraphs proximity).
+  if (game.playerAlive && game.activePerk !== 'magnetic') {
+    const _dxp = x - game.playerX;
+    const _dyp = y - game.playerY;
+    const _d2 = _dxp * _dxp + _dyp * _dyp;
+    if (_d2 < 900) { // <30 px
+      const _puCols = { S:'#0df', N:'#1e6', P:'#e3e', T:'#5af', R:'#fc4',
+                        W:'#f6a', H:'#0cf', B:'#f44', L:'#fff', E:'#4f8' };
+      const _glowCol = _puCols[p.type] || '#fff';
+      ctx.save();
+      ctx.globalAlpha = 0.30 + 0.20 * Math.sin(t * 0.30);
+      ctx.strokeStyle = _glowCol;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
   // POWERUP SHADOW — 1-2 px horizontal stripe at the floor (just above lives row)
   // showing the pickup's x position. Alpha proportional to distance from floor —
   // pickup near top = faint, near bottom = bright. Helps the player intercept.
