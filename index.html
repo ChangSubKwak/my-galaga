@@ -15203,6 +15203,19 @@ function drawGameOverScreen() {
 
   drawRetroText('BEST COMBO', BASE_W/2 - 40, cy + 26, 6, COL.cyan);
   drawRetroText(Math.floor((game.comboBest || 0) * tCombo).toString(), BASE_W/2 + 40, cy + 26, 7, COL.yellow, 'right');
+  // COMBO PB COMPARE — when count finishes show NEW BEST! or PB: N
+  if (tCombo >= 1) {
+    try {
+      const _cbE = parseInt(localStorage.getItem('galagaMaxComboEver') || '0', 10) || 0;
+      if (_cbE > 0) {
+        if ((game.comboBest || 0) >= _cbE) {
+          drawRetroText('NEW BEST!', BASE_W/2 + 40, cy + 32, 4, '#fc4', 'right');
+        } else {
+          drawRetroText('PB: x' + _cbE, BASE_W/2 + 40, cy + 32, 4, '#888', 'right');
+        }
+      }
+    } catch (e) {}
+  }
 
   const ts = Math.floor((game.runFrames || 0) / 60);
   const tsShown = Math.floor(ts * tTime);
