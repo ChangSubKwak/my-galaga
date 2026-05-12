@@ -12098,6 +12098,12 @@ function drawStageIntro() {
   if (slide >= 1) {
     const tier = Math.min(4, Math.floor((game.stage - 1) / 4));
     drawRetroText('TIER ' + tier, BASE_W - 4, BASE_H/2 - 22, 5, COL.gray, 'right');
+    // PILOT TITLE PEEK — small callsign + current rank near top-left corner so
+    // each intro reminds the player who they are.
+    if (playerCallsign && playerCallsign !== '???' && typeof computePilotTitle === 'function') {
+      drawRetroText('[' + playerCallsign + ']', 4, BASE_H/2 - 22, 5, '#888', 'left');
+      drawRetroText(computePilotTitle(), 4, BASE_H/2 - 15, 4, '#555', 'left');
+    }
   }
   // RUN QUICK STATS — single-line summary of in-progress run shown at stage 2+.
   // Combo / Score / Accuracy. Score-neutral context for player decisions.
