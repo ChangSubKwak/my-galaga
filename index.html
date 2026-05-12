@@ -12972,6 +12972,12 @@ function drawStageIntro() {
       const _bn = bossNameFor(game.stage + 1);
       if (_bn) drawRetroText(_bn, BASE_W/2, BASE_H - 30, 5, '#fc8');
     }
+  } else if (slide >= 1 && !isBoss && !isChallenge
+      && (game.stage + 1) % BOSS_STAGE_INTERVAL !== 0
+      && (game.stage + 1) % 4 === 0) {
+    // CHALLENGE NEXT — next stage is a challenging stage (every 4 except boss)
+    const _cnBlink = (game.animFrame >> 2) % 2 === 0;
+    drawRetroText('CHALLENGE NEXT', BASE_W/2, BASE_H - 38, 5, _cnBlink ? '#f6f' : '#fff');
   }
 
   // STAGE INTRO MARATHON PROGRESS — when no-death stage streak ≥ 2, show
