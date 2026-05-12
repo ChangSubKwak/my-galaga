@@ -12222,6 +12222,10 @@ function drawStageIntro() {
       const _accCol = _accInt >= 90 ? '#0f8' : _accInt >= 70 ? '#0ff' : _accInt >= 50 ? '#fc4' : '#f88';
       drawRetroText('ACC ' + _accInt + '%', BASE_W - 4, BASE_H/2 + 35, 4, _accCol, 'right');
     }
+    // ELITE COUNT PEEK — run elite kills counter when active.
+    if ((game.eliteKills || 0) >= 1) {
+      drawRetroText('EL x' + game.eliteKills, BASE_W - 4, BASE_H/2 + 41, 4, '#f44', 'right');
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
