@@ -11088,6 +11088,11 @@ function update() {
         // a single skill expression. Visual celebration (text + confetti + sfx) is enough.
         game.witchSaved = true;
         game.witchSaves = (game.witchSaves || 0) + 1;
+        // LIFETIME WITCH SAVES — persist for PROFILE medal
+        try {
+          const _wsT = parseInt(localStorage.getItem('galagaWitchSaves') || '0', 10) || 0;
+          localStorage.setItem('galagaWitchSaves', String(_wsT + 1));
+        } catch (e) {}
         game.floatTexts.push({
           x: BASE_W/2, y: BASE_H/2 - 8, text: 'WITCH TIME!',
           color: '#fff', life: 60, maxLife: 60, size: 12
@@ -17889,6 +17894,16 @@ function drawStatsOverlay() {
                       : '';
         profileRow('LAST STANDS', String(lastStands) + _lsTier,
                    lastStands >= 25 ? '#f44' : lastStands >= 10 ? '#fa8' : '#fc8');
+      }
+      // WITCH SAVES — lifetime count of slow-mo dash escapes
+      const witchSaves = parseInt(localStorage.getItem('galagaWitchSaves') || '0', 10);
+      if (witchSaves >= 1) {
+        const _wsTier = witchSaves >= 100 ? ' WITCH'
+                      : witchSaves >= 25  ? ' MYSTIC'
+                      : witchSaves >= 5   ? ' ADEPT'
+                      : '';
+        profileRow('WITCH SAVES', String(witchSaves) + _wsTier,
+                   witchSaves >= 100 ? '#fc4' : witchSaves >= 25 ? '#a8f' : '#caf');
       }
       // UNTOUCHED STAGES — lifetime count of zero-hit-attempt stage clears
       const untouchedStages = parseInt(localStorage.getItem('galagaUntouchedStages') || '0', 10);
