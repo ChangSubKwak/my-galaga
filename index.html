@@ -12293,6 +12293,16 @@ function drawStageIntro() {
     if ((game.eliteKills || 0) >= 1) {
       drawRetroText('EL x' + game.eliteKills, BASE_W - 4, BASE_H/2 + 41, 4, '#f44', 'right');
     }
+    // BIOMES SEEN PEEK — lifetime biomes encountered fraction.
+    try {
+      const _bsRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
+      const _bsArr = JSON.parse(_bsRaw);
+      const _bsCount = Array.isArray(_bsArr) ? _bsArr.length : 0;
+      if (_bsCount >= 1) {
+        const _bsCol = _bsCount === 8 ? '#fc4' : '#0cf';
+        drawRetroText('BIO ' + _bsCount + '/8', BASE_W - 4, BASE_H/2 + 47, 4, _bsCol, 'right');
+      }
+    } catch (e) {}
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
