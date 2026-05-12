@@ -4920,6 +4920,17 @@ function startStage() {
   // STAGE START GRACE — 60-frame invincibility so the player can settle position
   // without taking an immediate hit from a kamikaze / stray bullet at entry.
   game.invincibleTimer = Math.max(game.invincibleTimer || 0, 60);
+  // MISSION START BANNER — stage 1 entry signals a fresh run. Subtle cyan
+  // 'MISSION START' float text + tick SFX. Helps mark the new-run beat
+  // alongside score reset etc.
+  if (game.stage === 1 && (game.stats && (game.stats.kills || 0) === 0)) {
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 - 60,
+      text: 'MISSION START',
+      color: '#0cf', life: 90, maxLife: 90, size: 8
+    });
+    if (typeof playSound === 'function') playSound('tick');
+  }
   // QUARTER MILESTONE BANNER — at stage 25/50/75 entry, brief gold banner +
   // milestone SFX. Marks the long-arc progression beyond the 10-stage boss cadence.
   if (game.stage === 25 || game.stage === 50 || game.stage === 75) {
