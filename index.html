@@ -9077,6 +9077,30 @@ function checkStageComplete() {
                 const cur = parseInt(localStorage.getItem('galagaPerfectClears') || '0', 10) || 0;
                 localStorage.setItem('galagaPerfectClears', String(cur + 1));
               } catch (e) {}
+              // GOLDEN CLEAR — PERFECT CLEAR + new STAGE TIME PB on the same stage.
+              // Highest recognition tier: mastery of both precision AND speed.
+              // +1500 score + dramatic banner + persistent counter.
+              if (typeof pbResult !== 'undefined' && pbResult && pbResult.isNew) {
+                addScore(1500);
+                game.floatTexts.push({
+                  x: BASE_W/2, y: cy - 32, text: '★ GOLDEN CLEAR ★',
+                  color: '#fc4', life: 140, maxLife: 140, size: 13
+                });
+                game.floatTexts.push({
+                  x: BASE_W/2, y: cy - 20, text: 'PERFECT + PB! +1500',
+                  color: '#fff', life: 140, maxLife: 140, size: 7
+                });
+                spawnConfetti(24);
+                playSound('extraLife');
+                setTimeout(() => playSound('milestone'), 180);
+                game.flashTimer = Math.max(game.flashTimer || 0, 12);
+                game.flashColor = '#fc4';
+                rumble(360, 0.95, 0.6);
+                try {
+                  const gcCur = parseInt(localStorage.getItem('galagaGoldenClears') || '0', 10) || 0;
+                  localStorage.setItem('galagaGoldenClears', String(gcCur + 1));
+                } catch (e) {}
+              }
               // PERFECT STREAK — consecutive PERFECT CLEARs within a single run.
               // Resets when a stage fails the perfect condition. Milestone celebrations
               // at ×3 / ×5 / ×10 give escalating recognition + persistent best record.
@@ -13672,6 +13696,11 @@ function drawStatsOverlay() {
       const perfectClears = parseInt(localStorage.getItem('galagaPerfectClears') || '0', 10);
       if (perfectClears >= 1) {
         profileRow('PERFECT CLEARS', String(perfectClears), perfectClears >= 25 ? '#ff4' : '#fc8');
+      }
+      // GOLDEN CLEARS — perfect + new PB simultaneous mastery count
+      const goldenClears = parseInt(localStorage.getItem('galagaGoldenClears') || '0', 10);
+      if (goldenClears >= 1) {
+        profileRow('GOLDEN CLEARS', '★ ' + goldenClears, '#fc4');
       }
       // PERFECT STREAK best — longest consecutive PERFECT CLEARs in a single run
       const perfectStreakBest = parseInt(localStorage.getItem('galagaPerfectStreakBest') || '0', 10);
