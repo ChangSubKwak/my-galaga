@@ -6911,6 +6911,10 @@ function updatePowerUps() {
       game.powerUps.splice(i, 1);
       game.stagePowerUpsPicked = (game.stagePowerUpsPicked || 0) + 1;
       game.runPowerUps = (game.runPowerUps || 0) + 1;
+      // PICKUP HISTORY — last 5 drop types as small icon row; FIFO ring buffer
+      if (!game.pickupHistory) game.pickupHistory = [];
+      game.pickupHistory.unshift(p.type);
+      if (game.pickupHistory.length > 5) game.pickupHistory.length = 5;
       if (game.runPowerUps === 30) unlockAchievement('collector');
       // PICKUP TYPE TOTALS — track lifetime collection counts per pickup type
       try {
@@ -13261,6 +13265,25 @@ function drawHUD() {
   if (!minimalHud && (game.stagePowerUpsPicked || 0) >= 1
       && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
     drawRetroText('S:' + game.stagePowerUpsPicked, BASE_W - 5, 46, 4, '#fc8', 'right');
+  }
+
+  // PICKUP HISTORY TICKER — last 5 drop types as small colored letter chips at
+  // top-right (under S:N stage counter). Newest at right, oldest at left. Fades
+  // older entries (alpha drop). Surfaces only mid-stage when there's data.
+  if (!minimalHud && game.pickupHistory && game.pickupHistory.length > 0
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    const _pColors = { S:'#f44', N:'#0ff', P:'#f6f', T:'#8ff', R:'#fc4',
+                       W:'#6cf', H:'#0f8', L:'#f6c', B:'#fff', E:'#0f8' };
+    const _phHist = game.pickupHistory;
+    const _phY = 54;
+    for (let i = 0; i < _phHist.length; i++) {
+      const tp = _phHist[i];
+      const col = _pColors[tp] || '#aaa';
+      ctx.save();
+      ctx.globalAlpha = Math.max(0.3, 1 - i * 0.18);
+      drawRetroText(tp, BASE_W - 5 - i * 6, _phY, 4, col, 'right');
+      ctx.restore();
+    }
   }
 
   // POWER UP PITY INDICATOR — small 15-dot row near top-left showing pity progress
