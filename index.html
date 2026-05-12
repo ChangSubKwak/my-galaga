@@ -16994,7 +16994,14 @@ function drawStatsOverlay() {
     ctx.restore();
     drawRetroText('PROGRESSION', px + 8, y, 7, COL.cyan, 'left');
     y += 9;
-    profileRow('BESTIARY',     dexCount + ' / ' + dexTotal, dexCount === dexTotal ? '#0f8' : '#0ff');
+    {
+      const _dT = dexCount === dexTotal ? 'COMPLETE'
+                : dexCount >= Math.floor(dexTotal * 0.75) ? 'TRACKER'
+                : dexCount >= Math.floor(dexTotal * 0.5)  ? 'STUDIED'
+                : '';
+      profileRow('BESTIARY', dexCount + ' / ' + dexTotal + (_dT ? '  ' + _dT : ''),
+                 dexCount === dexTotal ? '#0f8' : '#0ff');
+    }
     // BIOMES SEEN — count of unique biomes visited across all runs
     try {
       const _bsRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
