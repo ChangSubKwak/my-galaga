@@ -6961,6 +6961,8 @@ function commitGameToCumStats() {
   s.perfectWavesTotal = (s.perfectWavesTotal || 0) + (game.perfectWavesRun || 0);
   // LONGEST SINGLE RUN — max frames in any one run (for marathon trophy)
   s.longestRun = Math.max(s.longestRun || 0, game.runFrames || 0);
+  // ALL-PERFECT STAGES LIFETIME
+  s.allPerfectStagesTotal = (s.allPerfectStagesTotal || 0) + (game.allPerfectStagesRun || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -8481,6 +8483,7 @@ function updateChallengeEnemies() {
         if (typeof spawnConfetti === 'function') spawnConfetti(20);
         game.flashTimer = Math.max(game.flashTimer || 0, 10);
         game.flashColor = '#fc4';
+        game.allPerfectStagesRun = (game.allPerfectStagesRun || 0) + 1;
       }
     } else {
       game.stagePerfectWaves = 0; // any escape breaks all-perfect streak
@@ -16104,6 +16107,12 @@ function drawStatsOverlay() {
       if (_pwTot >= 3) {
         const _pwCol = _pwTot >= 100 ? '#fc4' : _pwTot >= 30 ? '#0ff' : _pwTot >= 10 ? '#0f8' : '#cce';
         profileRow('PERFECT WAVES', String(_pwTot), _pwCol);
+      }
+      // ALL-PERFECT STAGES LIFETIME — entire CHALLENGING stages with no escapes
+      const _apTot = (csN2.allPerfectStagesTotal || 0) + (csC2.allPerfectStagesTotal || 0);
+      if (_apTot >= 1) {
+        const _apCol = _apTot >= 10 ? '#fc4' : _apTot >= 3 ? '#0ff' : '#0f8';
+        profileRow('ALL-PERFECT STAGES', String(_apTot), _apCol);
       }
       // AVG STAGE TIME — total play frames divided by stages cleared (>= 10
       // sample). Lower = more efficient runs.
