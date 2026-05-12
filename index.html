@@ -6926,11 +6926,17 @@ function saveCumStats(s, challenge) {
 function commitGameToCumStats() {
   if (!game || game.isDemo) return;
   // LAST RUN SUMMARY — save quick last-run snapshot for TITLE display.
+  // Includes wasPb flag computed against cumStats BEFORE this run is committed.
   try {
+    const _csNl = loadCumStats(false);
+    const _csCl = loadCumStats(true);
+    const _priorBest = Math.max(_csNl.bestStage || 0, _csCl.bestStage || 0);
+    const _thisStage = (game.stats && game.stats.maxStage) || game.stage || 1;
     localStorage.setItem('galagaLastRun', JSON.stringify({
-      stage: (game.stats && game.stats.maxStage) || game.stage || 1,
+      stage: _thisStage,
       score: game.score || 0,
-      combo: game.comboBest || 0
+      combo: game.comboBest || 0,
+      wasPb: _thisStage > _priorBest && _priorBest > 0
     }));
   } catch (e) {}
   // First commit ever — FRESH START achievement
@@ -11828,6 +11834,10 @@ function drawTitleScreen() {
       if (_lr && _lr.stage > 0) {
         const _lrStr = 'LAST  S' + _lr.stage + '  ' + fmtScore(_lr.score) + '  C×' + _lr.combo;
         drawRetroText(_lrStr, BASE_W/2, BASE_H - 14, 4, '#555', 'center');
+        if (_lr.wasPb) {
+          const _pbB = (t >> 2) % 2 === 0 ? '#fc4' : '#ff8';
+          drawRetroText('★ PB', BASE_W/2 + 60, BASE_H - 14, 4, _pbB, 'left');
+        }
       }
     }
   } catch (e) {}
