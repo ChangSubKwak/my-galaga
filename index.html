@@ -16172,6 +16172,8 @@ function drawGameOverScreen() {
     if (game.animFrame % 60 < 40) {
       drawRetroText('SPACE TITLE   R RETRY', BASE_W/2, cy + 54, 6, COL.cyan);
     }
+    // PROFILE TAB HINT — gray reminder you can dive into stats from TITLE
+    drawRetroText('TITLE → TAB PROFILE', BASE_W/2, cy + 60, 4, '#666');
     // Auto-retry countdown — always visible (no blink) so the second-counter doesn't jitter
     if (game.autoRestartTimer > 0) {
       const sec = Math.ceil(game.autoRestartTimer / 60);
