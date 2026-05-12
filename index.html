@@ -4350,6 +4350,25 @@ function updateOneMegaBoss(mb) {
               x: BASE_W/2, y: BASE_H/2, text: 'WRITE YOUR OWN MAPS',
               color: '#cfc', life: 240, maxLife: 240, size: 6
             });
+            // STAGE 80 ENDING SEQUENCE — +20000 mission-complete bonus + cinematic
+            // outro message that scales with repeat clears. First-time completion
+            // gets the canonical line; repeats get a runner-up message.
+            addScore(20000);
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 + 14, text: 'MISSION BONUS +20,000',
+              color: '#ff4', life: 240, maxLife: 240, size: 9
+            });
+            // Repeat-clear flavor text (varies with completion count)
+            try {
+              const cnt2 = parseInt(localStorage.getItem('galagaGameCompleteCount') || '1', 10) || 1;
+              const flavor = cnt2 === 1 ? 'THE FRONTIER IS YOURS NOW.'
+                          : cnt2 <= 3   ? 'AGAIN — THE WALL STILL FALLS.'
+                          :               'YOU ARE THE LIVING LEGEND. (×' + cnt2 + ')';
+              game.floatTexts.push({
+                x: BASE_W/2, y: BASE_H/2 + 26, text: flavor,
+                color: '#fc8', life: 240, maxLife: 240, size: 6
+              });
+            } catch (e) {}
             playSound('extraLife');
             setTimeout(() => playSound('dualFighter'), 220);
             setTimeout(() => playSound('milestoneStage'), 440);
