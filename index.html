@@ -11260,7 +11260,24 @@ function draw() {
     if (corr > 0) {
       ctx.save();
       const t = game.animFrame;
-      // BOSS LOW HP SCREEN PULSE — when any alive boss is under 25% HP, paint
+      // LAST LIFE HEARTBEAT — when lives === 1 in active gameplay, paint thin red
+  // top/bottom band synced to ~80bpm pulse. Reinforces existing dangerLives cue.
+  if (game.lives === 1
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    // 80bpm = 1.33 beats/sec at 60fps = 45 frames/beat; double-beat pattern
+    const _hbT = (game.animFrame % 45) / 45;
+    const _hbA = Math.max(0, 0.18 * (1 - Math.abs(_hbT - 0.15)) - 0.04
+                       + Math.max(0, 0.12 * (1 - Math.abs(_hbT - 0.35))));
+    if (_hbA > 0) {
+      ctx.save();
+      ctx.globalAlpha = _hbA;
+      ctx.fillStyle = '#f44';
+      ctx.fillRect(0, 0, BASE_W, 2);
+      ctx.fillRect(0, BASE_H - 2, BASE_W, 2);
+      ctx.restore();
+    }
+  }
+  // BOSS LOW HP SCREEN PULSE — when any alive boss is under 25% HP, paint
   // pulsing red edge bars to amplify decisive-blow tension.
   if (game.state === STATE.BOSS_STAGE && game.megaBosses
       && game.megaBosses.some(mb => mb.alive && mb.maxHp && mb.hp / mb.maxHp < 0.25)) {
