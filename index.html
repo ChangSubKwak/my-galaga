@@ -17595,6 +17595,34 @@ function drawStatsOverlay() {
       drawRetroText('NEXT', px + 8, y, 5, COL.gray, 'left');
       drawRetroText(_nextInfo.next + ' — ' + _nextInfo.label, px + panelW - 8, y, 5, '#fc8', 'right');
       y += 8;
+      // RANK PROGRESS BAR — derive current/target ratio from the gating metric.
+      // Recompute live values so the bar reflects real progress to the next tier.
+      try {
+        const _csNr = loadCumStats(false), _csCr = loadCumStats(true);
+        const _tRuns = (_csNr.sessions || 0) + (_csCr.sessions || 0);
+        const _tKills = (_csNr.kills || 0) + (_csCr.kills || 0);
+        const _bsR = Math.max(_csNr.bestStage || 0, _csCr.bestStage || 0);
+        const _dxC = (typeof dexUnlocked !== 'undefined') ? dexUnlocked.size : 0;
+        const _aC = (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements.size : 0;
+        const _aT = Object.keys(ACHIEVEMENTS || {}).length || 1;
+        const _aPct = (_aC / _aT) * 100;
+        let _rRatio = 0;
+        if (_nextInfo.next === 'PILOT')           _rRatio = _tRuns / 10;
+        else if (_nextInfo.next === 'VETERAN')    _rRatio = _tKills / 1000;
+        else if (_nextInfo.next === 'APEX SURVIVOR') _rRatio = _bsR / 30;
+        else if (_nextInfo.next === 'BESTIARY MASTER') _rRatio = _dxC / 8;
+        else if (_nextInfo.next === 'ACE PILOT')  _rRatio = _aPct / 80;
+        _rRatio = Math.max(0, Math.min(1, _rRatio));
+        const _rbX = px + 8, _rbW = panelW - 16;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(_rbX, y - 1, _rbW, 1);
+        ctx.fillStyle = _rRatio >= 0.85 ? '#0f8' : _rRatio >= 0.5 ? '#0cf' : '#fc8';
+        ctx.globalAlpha = 0.85;
+        ctx.fillRect(_rbX, y - 1, Math.round(_rbW * _rRatio), 1);
+        ctx.restore();
+        y += 3;
+      } catch (e) {}
     } else {
       drawRetroText('NEXT', px + 8, y, 5, COL.gray, 'left');
       drawRetroText(_nextInfo.label, px + panelW - 8, y, 5, '#fc4', 'right');
