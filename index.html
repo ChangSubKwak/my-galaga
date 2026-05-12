@@ -8664,6 +8664,27 @@ function updateCollisions() {
           }
           game.stats.kills++;
           game.stageKills = (game.stageKills || 0) + 1;
+          // SAME-TYPE KILL STREAK — track consecutive kills of same enemy type
+          if (game._lastKillType === e.type) {
+            game._sameTypeStreak = (game._sameTypeStreak || 1) + 1;
+          } else {
+            game._sameTypeStreak = 1;
+            game._lastKillType = e.type;
+          }
+          if (game._sameTypeStreak === 5 || game._sameTypeStreak === 10) {
+            const _typeColors = {
+              bee: '#fc4', butterfly: '#f48', boss: '#f8a', mirror: '#8ff',
+              splitter: '#0fc', shielded: '#4f8', ufo: '#f6f',
+              hoverer: '#fa0', kamikaze: '#f80', goldenBee: '#fc4', minibee: '#fa4'
+            };
+            game.floatTexts.push({
+              x: e.x, y: e.y - 18,
+              text: e.type.toUpperCase() + ' HUNT x' + game._sameTypeStreak,
+              color: _typeColors[e.type] || '#fff',
+              life: 50, maxLife: 50, size: 7
+            });
+            if (typeof playSound === 'function') playSound('tick');
+          }
           if (game.stats.kills === 1) {
             unlockAchievement('firstBlood');
             markTutorialDone(); // First kill = player understands fire
