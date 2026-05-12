@@ -6644,6 +6644,10 @@ function commitGameToCumStats() {
   s.bestStage  = Math.max(s.bestStage || 0, gs.maxStage || game.stage || 0);
   // PARRY STREAK BEST — track lifetime max consecutive parries across all runs
   s.parryStreakBest = Math.max(s.parryStreakBest || 0, game.parryStreakBest || 0);
+  // MULTIKILL BEST — track lifetime max same-frame kills (DOUBLE/TRIPLE/OVERKILL/OCTOKILL)
+  s.multiKillBest = Math.max(s.multiKillBest || 0, game.multiKillBest || 0);
+  // ACE STREAK BEST — consecutive S/A grades across run
+  s.aceStreakBest = Math.max(s.aceStreakBest || 0, game.aceStreakBest || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -11438,6 +11442,8 @@ function pickRunHighlights() {
   if (parryBest >= 3)     out.push({ label: 'PARRY CHAIN MAX', value: 'x' + parryBest,   prio: parryBest * 10, col: '#0cf' });
   const aceBest = game.aceStreakBest || 0;
   if (aceBest >= 3)       out.push({ label: 'ACE STREAK MAX', value: 'x' + aceBest,      prio: aceBest * 15, col: '#fc4' });
+  const mkBest = game.multiKillBest || 0;
+  if (mkBest >= 3)        out.push({ label: 'MULTIKILL MAX', value: 'x' + mkBest,        prio: mkBest * 20, col: '#fc4' });
   if (elites >= 1)        out.push({ label: 'ELITES SLAIN',  value: String(elites),       prio: elites * 18, col: '#f44' });
   if (stages >= 3)        out.push({ label: 'STAGES CLEARED', value: String(stages),     prio: stages * 8, col: '#fc4' });
   if (bosses >= 1)        out.push({ label: 'BOSSES DOWN',    value: String(bosses),     prio: bosses * 60, col: '#f8a' });
@@ -14880,6 +14886,18 @@ function drawStatsOverlay() {
       if (psBest >= 3) {
         const psCol = psBest >= 15 ? '#fc4' : psBest >= 8 ? '#0ff' : psBest >= 5 ? '#0f8' : '#cce';
         profileRow('PARRY CHAIN BEST', 'x' + psBest, psCol);
+      }
+      // MULTI KILL BEST — lifetime max same-frame kills
+      const mkBest = Math.max(csN2.multiKillBest || 0, csC2.multiKillBest || 0);
+      if (mkBest >= 3) {
+        const mkCol = mkBest >= 8 ? '#fc4' : mkBest >= 5 ? '#0ff' : '#cce';
+        profileRow('MULTIKILL BEST', 'x' + mkBest, mkCol);
+      }
+      // ACE STREAK BEST — lifetime max consecutive S/A grades
+      const asBest = Math.max(csN2.aceStreakBest || 0, csC2.aceStreakBest || 0);
+      if (asBest >= 3) {
+        const asCol = asBest >= 15 ? '#fc4' : asBest >= 10 ? '#0ff' : asBest >= 5 ? '#0f8' : '#cce';
+        profileRow('ACE STREAK BEST', 'x' + asBest, asCol);
       }
       // PICKUP TYPE TOTALS — show top-collected pickup type (e.g., "TOP: S x42")
       const ptRaw = localStorage.getItem('galagaPickupTotals');
