@@ -11207,6 +11207,24 @@ function drawStageIntro() {
   // from screen center outward. Reads as cinematic transition between stages.
   // Color picked from biome for cohesion (or default cyan).
   const introElapsed = 120 - game.stageTimer;
+  // STAGE INTRO PARTICLE STREAM — first 30 frames, small dots flow from screen
+  // edges toward the center stage label. Subtle motion that draws attention to
+  // the title sequence without competing with warp streaks.
+  if (introElapsed < 30) {
+    const psSeed = (game.stage * 73) % 8;
+    ctx.save();
+    ctx.fillStyle = '#0cf';
+    for (let k = 0; k < 6; k++) {
+      const ang = ((k + psSeed) / 6) * Math.PI * 2 + introElapsed * 0.03;
+      const ringR = 80 - introElapsed * 2.4;
+      const px = BASE_W/2 + Math.cos(ang) * ringR;
+      const py = BASE_H/2 + Math.sin(ang) * ringR;
+      ctx.globalAlpha = Math.max(0, ringR / 80) * 0.6;
+      ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+    }
+    ctx.restore();
+  }
+
   // BIOME ENTRY FLASH — 12-frame screen-wide tint matching the upcoming biome.
   // Fades from 0.25 alpha to 0 over the window. Reads as "we just arrived here".
   // BIOME TRANSITION FANFARE — if biome id changed from last stage, boost flash
