@@ -13794,6 +13794,28 @@ function drawHUD() {
     }
     ctx.restore();
   }
+  // STAGE PB PROGRESS BAR — 1px-tall bar showing current stage vs lifetime
+  // best across both modes. Hidden when not yet exceeded stage 3. Visible
+  // throughout gameplay so the chase is continuously felt.
+  if (!minimalHud
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    try {
+      const _csN3 = loadCumStats(false);
+      const _csC3 = loadCumStats(true);
+      const _pbBest = Math.max(_csN3.bestStage || 0, _csC3.bestStage || 0, 5);
+      if (game.stage >= 3 && _pbBest > 0) {
+        const _ratio = Math.min(1.2, (game.stage || 1) / _pbBest);
+        const _barX = BASE_W - 30, _barY = 53, _barW = 25;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(_barX, _barY, _barW, 1);
+        ctx.fillStyle = _ratio >= 1 ? '#fc4' : _ratio >= 0.7 ? '#0ff' : '#0f8';
+        ctx.globalAlpha = 0.85;
+        ctx.fillRect(_barX, _barY, Math.round(Math.min(_barW, _barW * _ratio)), 1);
+        ctx.restore();
+      }
+    } catch (e) {}
+  }
   // WORLD CORRUPTION HUD INDICATOR — small "CORR XX%" label when stage 30+ enters
   // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
   // pure context cue for late-game depth.
