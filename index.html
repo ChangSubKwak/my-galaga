@@ -12919,7 +12919,12 @@ function drawStageIntro() {
       const _ciC = computeCompositeCompletion();
       if (_ciC >= 5) {
         const _ciCol = _ciC >= 80 ? '#fc4' : _ciC >= 50 ? '#0ff' : _ciC >= 20 ? '#0f8' : '#888';
-        drawRetroText('CMPL ' + _ciC + '%', BASE_W - 4, BASE_H/2 - 30, 4, _ciCol, 'right');
+        const _ciTier = _ciC >= 100 ? ' COMP'
+                     : _ciC >= 80  ? ' ELITE'
+                     : _ciC >= 50  ? ' VET'
+                     : _ciC >= 20  ? ' EXPL'
+                     : '';
+        drawRetroText('CMPL ' + _ciC + '%' + _ciTier, BASE_W - 4, BASE_H/2 - 30, 4, _ciCol, 'right');
         // Mini progress bar (30px wide) right under the text
         ctx.save();
         const _ciBarX = BASE_W - 33, _ciBarY = BASE_H/2 - 25;
