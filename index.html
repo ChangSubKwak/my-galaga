@@ -4971,9 +4971,15 @@ function startStage() {
   // COMBO CARRY BANNER — surface when combo >= 5 carries into the new stage.
   // Reminds the player to keep killing fast to preserve the multiplier.
   if ((game.combo || 0) >= 5) {
+    // TIER NAME — same scale as HUD combo tier label
+    const _ctN = game.combo >= 30 ? 'MAX'
+              : game.combo >= 20 ? 'PLATINUM'
+              : game.combo >= 15 ? 'GOLD'
+              : game.combo >= 10 ? 'SILVER'
+              : 'BRONZE';
     game.floatTexts.push({
       x: BASE_W/2, y: BASE_H/2 + 50,
-      text: 'COMBO CARRIES x' + game.combo,
+      text: 'COMBO CARRIES x' + game.combo + ' (' + _ctN + ')',
       color: '#0ff', life: 80, maxLife: 80, size: 7
     });
   }
