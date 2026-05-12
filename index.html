@@ -10040,6 +10040,7 @@ function checkStageComplete() {
         // OBJECTIVE check on boss stage clear (Turn 183 extension)
         if (game.stageObjective) {
           if (game.stageObjective.met(game)) {
+            game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 + 32,
               text: 'OBJECTIVE COMPLETE!',
@@ -10107,6 +10108,7 @@ function checkStageComplete() {
       // OBJECTIVE check on challenging stage clear (Turn 183 extension)
       if (game.stageObjective) {
         if (game.stageObjective.met(game)) {
+          game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
           game.floatTexts.push({
             x: BASE_W/2, y: BASE_H/2 + 40,
             text: 'OBJECTIVE COMPLETE!',
@@ -10177,6 +10179,7 @@ function checkStageComplete() {
           spawnStageClear('STAGE CLEAR!', null);
           // SECONDARY OBJECTIVE check (visual reward when met, miss hint when not)
           if (game.stageObjective && game.stageObjective.met(game)) {
+            game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 + 32,
               text: 'OBJECTIVE COMPLETE!',
@@ -16049,7 +16052,11 @@ function drawGameOverScreen() {
   }
   // ACE STREAK BEST — best S/A grade streak this run
   if (tTime >= 1 && (game.aceStreakBest || 0) >= 3) {
-    drawRetroText('ACE x' + game.aceStreakBest, BASE_W/2, cy + 88, 4, '#fc4');
+    drawRetroText('ACE x' + game.aceStreakBest, BASE_W/2 - 30, cy + 88, 4, '#fc4');
+  }
+  // OBJECTIVES MET — secondary objectives completed this run
+  if (tTime >= 1 && (game.objectivesMetRun || 0) >= 1) {
+    drawRetroText('OBJ x' + game.objectivesMetRun, BASE_W/2 + 30, cy + 88, 4, '#0f8');
   }
   // MAX CORRUPTION REACHED — translate maxStage to corruption tier
   if (tTime >= 1) {
