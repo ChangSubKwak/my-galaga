@@ -10165,6 +10165,11 @@ function spawnStageClear(label, sub) {
       // LAST STAGE GRADE — surfaces in next STAGE_INTRO as self-comparison.
       game.lastStageGrade = _grade;
       game.lastStageGradeCol = _gCol;
+      // RECENT GRADE QUEUE — last 3 grades (oldest → newest). Surfaces in
+      // STAGE_INTRO as a 3-letter sequence so streaks read at a glance.
+      if (!Array.isArray(game.recentGrades)) game.recentGrades = [];
+      game.recentGrades.push(_grade);
+      if (game.recentGrades.length > 3) game.recentGrades.shift();
     }
   } catch (e) {}
   // STAGE CLEAR BIOME FLASH — brief biome-colored screen flash for environmental
@@ -13328,6 +13333,17 @@ function drawStageIntro() {
     if (game.lastStageGrade) {
       drawRetroText('PREV ' + game.lastStageGrade, BASE_W - 4, BASE_H/2 + 125, 4,
                     game.lastStageGradeCol || '#fff', 'right');
+    }
+    // RECENT GRADE QUEUE — last 3 grades, oldest → newest, colored per letter.
+    // Helps player feel streaks (e.g. "SSS" momentum, "DDC" recovery needed).
+    if (Array.isArray(game.recentGrades) && game.recentGrades.length >= 2) {
+      const _gqMap = { S: '#fc4', A: '#0f8', B: '#0cf', C: '#fff', D: '#f88' };
+      let _qx = BASE_W - 4;
+      for (let _qi = game.recentGrades.length - 1; _qi >= 0; _qi--) {
+        const _gL = game.recentGrades[_qi];
+        drawRetroText(_gL, _qx, BASE_H/2 + 119, 4, _gqMap[_gL] || '#fff', 'right');
+        _qx -= 5;
+      }
     }
     // S GRADE TARGET HINT — show condition trio for top-tier rating, dim.
     // Only on normal stages (boss/chall use different scoring). Skip stage 1.
