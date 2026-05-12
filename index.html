@@ -4343,11 +4343,14 @@ function updateOneMegaBoss(mb) {
           });
         }
         const mbBase = 5000 + game.stage * 500;
-        const mbBounty = Math.round(mbBase * comboMultiplier(game.combo));
+        let mbBounty = Math.round(mbBase * comboMultiplier(game.combo));
+        // PERK 'bountyHunter' — boss bounty +50%. Surfaced in the bounty banner.
+        const _bountyHunter = game.activePerk === 'bountyHunter';
+        if (_bountyHunter) mbBounty = Math.round(mbBounty * 1.5);
         addScore(mbBounty);
         // BOSS BOUNTY label — large yellow score popup at the boss kill site
         game.floatTexts.push({
-          x: mb.x, y: mb.y - 18, text: 'BOSS BOUNTY',
+          x: mb.x, y: mb.y - 18, text: _bountyHunter ? 'BOUNTY HUNTER' : 'BOSS BOUNTY',
           color: '#fc4', life: 90, maxLife: 90, size: 10
         });
         game.floatTexts.push({
@@ -5722,7 +5725,8 @@ const PERKS = {
   ghostWake:     { name: 'GHOST WAKE',      desc: 'GRAZE SCORE 3X',           col: '#cef' },
   vampire:       { name: 'VAMPIRE',         desc: '10-KILL → SHIELD +1',      col: '#f6f' },
   firebrand:     { name: 'FIREBRAND',       desc: 'BULLET SPEED +30%',         col: '#f44' },
-  scavenger:     { name: 'SCAVENGER',       desc: 'TIMER PICKUPS LAST 1.5X',   col: '#fa6' }
+  scavenger:     { name: 'SCAVENGER',       desc: 'TIMER PICKUPS LAST 1.5X',   col: '#fa6' },
+  bountyHunter:  { name: 'BOUNTY HUNTER',   desc: 'BOSS BOUNTY +50%',          col: '#fc4' }
 };
 const PERK_IDS = Object.keys(PERKS);
 const PERK_SELECT_FRAMES = 360;
