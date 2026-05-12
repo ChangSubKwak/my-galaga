@@ -17368,7 +17368,10 @@ function drawStatsOverlay() {
         const _lrSec = Math.floor((_longRun / 60) % 60);
         const _lrStr = _lrMin + ':' + String(_lrSec).padStart(2, '0');
         const _lrCol = _longRun >= 108000 ? '#fc4' : _longRun >= 54000 ? '#0ff' : '#0f8';
-        profileRow('LONGEST RUN', _lrStr, _lrCol);
+        const _lrN = _longRun >= 108000 ? ' MARATHONER'
+                   : _longRun >= 54000  ? ' VETERAN'
+                   : ' SURVIVOR';
+        profileRow('LONGEST RUN', _lrStr + _lrN, _lrCol);
       }
       // DASH TOTAL — lifetime dashes across both modes
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
