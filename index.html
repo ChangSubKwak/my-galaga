@@ -3698,6 +3698,10 @@ function createEnemy(type, col, row, overrideX, overrideY) {
 }
 
 function resetGame() {
+  // RUN-START COMPLETION SNAPSHOT — captured before this run begins so the
+  // game-over screen can show delta from this run's progression gains.
+  const _runStartCmp = (typeof computeCompositeCompletion === 'function')
+    ? computeCompositeCompletion() : 0;
   // Daily mode forces the ship by date hash before we capture shipAttrs()
   if (dailyModeRequested) {
     const ds = dailyShipFor(dailySeed());
@@ -3745,6 +3749,7 @@ function resetGame() {
     stage: Math.max(1, startStageRequested || 1),
     score: 0,
     scoreDisplay: 0,
+    runStartCmp: _runStartCmp,
     highScore: parseInt(localStorage.getItem('galagaHigh') || '0'),
     challengeMode: challengeModeRequested,
     dailyMode: dailyModeRequested,
@@ -15773,6 +15778,14 @@ function drawGameOverScreen() {
   const ssgo = String(tsShown % 60).padStart(2, '0');
   drawRetroText('TIME', BASE_W/2 - 40, cy + 34, 6, COL.cyan);
   drawRetroText(mmgo + ':' + ssgo, BASE_W/2 + 40, cy + 34, 7, COL.yellow, 'right');
+  // COMPLETION DELTA — show gain over the run when finishing tally completes
+  if (tTime >= 1 && typeof computeCompositeCompletion === 'function') {
+    const _endCmp = computeCompositeCompletion();
+    const _delta = _endCmp - (game.runStartCmp || 0);
+    if (_delta >= 1) {
+      drawRetroText('+' + _delta + '% PROGRESS', BASE_W/2 + 40, cy + 40, 4, '#fc4', 'right');
+    }
+  }
 
   // Tick sound for each row when it just begins counting
   // (uses gameOverTimer which decrements every tick)
