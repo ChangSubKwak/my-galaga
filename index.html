@@ -13112,7 +13112,21 @@ function drawHUD() {
   } else if ((game.comboLostFlashTimer || 0) > 0) {
     drawRetroText(fmtScore(game.score), 50, 17, 7, '#888', 'right');
   } else {
-    drawRetroText(fmtScore(game.score), 50, 17, 7, COL.white, 'right');
+    // SCORE TIER COLOR — dynamic color progression by score crossings
+    // 1M+: rainbow cycle | 500k+: magenta | 100k+: gold | 25k+: cyan | else: white
+    let _scCol = COL.white;
+    const _sc = game.score || 0;
+    if (_sc >= 1000000) {
+      const _rb = ['#f44', '#fc4', '#ff4', '#0f8', '#0cf', '#a8f'];
+      _scCol = _rb[Math.floor(game.animFrame / 6) % _rb.length];
+    } else if (_sc >= 500000) {
+      _scCol = '#f6f';
+    } else if (_sc >= 100000) {
+      _scCol = '#fc4';
+    } else if (_sc >= 25000) {
+      _scCol = COL.cyan;
+    }
+    drawRetroText(fmtScore(game.score), 50, 17, 7, _scCol, 'right');
   }
   // NEAR-BEST INDICATOR — small ▲ symbol next to the score when chasing the
   // best-ever (90-99% of highScore). Pulses faster as the player gets closer.
