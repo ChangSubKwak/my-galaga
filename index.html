@@ -12453,6 +12453,12 @@ function drawHUD() {
     if (!minimalHud && (game.runFrames || 0) > 0) {
       const runStr = fmtFrameTime(game.runFrames || 0);
       drawRetroText('R ' + runStr, BASE_W - 5, 28, 4, '#888', 'right');
+    // HUD DIFFICULTY — small label under run timer (non-default only)
+    if (typeof difficultyMode === 'string' && difficultyMode !== 'normal') {
+      const dCol = difficultyMode === 'hard' ? '#f44' : '#0f8';
+      const dTag = difficultyMode === 'hard' ? 'HARD' : 'EASY';
+      drawRetroText(dTag, BASE_W - 5, 33, 4, dCol, 'right');
+    }
     }
     // PB ALARM tick — once per second SFX while in alarm zone
     if (pbAlarm && game.animFrame % 60 === 0 && typeof playSound === 'function') {
