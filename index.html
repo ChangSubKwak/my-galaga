@@ -12370,6 +12370,19 @@ function drawStageIntro() {
       ctx.restore();
     }
   }
+  // DAILY/CHALLENGE INTRO BORDER — single-pixel full frame around intro when
+  // these modes are active. Daily green, Challenge red. Reinforces mode at
+  // every stage entry. Daily takes priority over challenge if both somehow set.
+  if (game.dailyMode || game.challengeMode) {
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = game.dailyMode ? COL.green : COL.red;
+    ctx.fillRect(0, 0, BASE_W, 1);
+    ctx.fillRect(0, BASE_H - 1, BASE_W, 1);
+    ctx.fillRect(0, 0, 1, BASE_H);
+    ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
+    ctx.restore();
+  }
   // HARD MODE BANDS — when difficultyMode === 'hard', paint left/right 1px
   // red bands across the entire intro to reinforce the chosen challenge.
   if (typeof difficultyMode !== 'undefined' && difficultyMode === 'hard') {
