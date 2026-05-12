@@ -6891,6 +6891,9 @@ function commitGameToCumStats() {
   s.bossKillsTotal = (s.bossKillsTotal || 0) + (game.bossesKilledThisRun || 0);
   // BOMBS USED LIFETIME — sum of B pickups detonated across runs
   s.bombsTotal = (s.bombsTotal || 0) + ((game.stats && game.stats.bombsUsed) || 0);
+  // STAGES CLEARED LIFETIME — every committed run contributes (maxStage - 1)
+  // since reaching stage N implies clearing N-1. Cap at 0 in case of bug.
+  s.stagesClearedTotal = (s.stagesClearedTotal || 0) + Math.max(0, (gs.maxStage || game.stage || 1) - 1);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -15746,6 +15749,12 @@ function drawStatsOverlay() {
       if (_bmTot >= 3) {
         const _bmCol = _bmTot >= 100 ? '#fc4' : _bmTot >= 30 ? '#f44' : '#fa8';
         profileRow('BOMBS USED', String(_bmTot), _bmCol);
+      }
+      // STAGES CLEARED LIFETIME — sum across both modes
+      const _stcTot = (csN2.stagesClearedTotal || 0) + (csC2.stagesClearedTotal || 0);
+      if (_stcTot >= 5) {
+        const _stcCol = _stcTot >= 1000 ? '#f6f' : _stcTot >= 500 ? '#fc4' : _stcTot >= 200 ? '#0ff' : _stcTot >= 50 ? '#0f8' : '#cce';
+        profileRow('STAGES CLEARED', String(_stcTot), _stcCol);
       }
       // DASH TOTAL — lifetime dashes across both modes
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
