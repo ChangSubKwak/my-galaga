@@ -9551,6 +9551,16 @@ function killPlayer(srcX, srcY, cause) {
       }
       game.state = STATE.GAME_OVER;
       game.gameOverTimer = 180;
+      // GAME OVER FANFARE TIER — SFX scaled by max stage reached so deeper
+      // runs end with more triumphant tone even at game over.
+      {
+        const _ms = (game.stats && game.stats.maxStage) || game.stage || 1;
+        const _fSfx = _ms >= 50 ? 'milestone'
+                    : _ms >= 30 ? 'powerUp'
+                    : _ms >= 10 ? 'tick'
+                    : 'lowLife';
+        if (typeof playSound === 'function') playSound(_fSfx);
+      }
       // GAME OVER BIOME FAREWELL FLASH — last biome col tinted screen flash
       // at game over entry. Atmospheric continuity from the place player died.
       if (typeof biomeForStage === 'function') {
