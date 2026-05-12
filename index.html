@@ -17035,7 +17035,10 @@ function drawStatsOverlay() {
     const _totalShots = (csN2.shotsFired || 0) + (csC2.shotsFired || 0);
     if (_totalShots >= 500) {
       const _sfCol = _totalShots >= 100000 ? '#fc4' : _totalShots >= 10000 ? '#0ff' : '#0f8';
-      profileRow('SHOTS FIRED', fmtScore(_totalShots), _sfCol);
+      const _sfN = _totalShots >= 100000 ? ' STORM'
+                 : _totalShots >= 10000  ? ' BARRAGE'
+                 : ' TRIGGER';
+      profileRow('SHOTS FIRED', fmtScore(_totalShots) + _sfN, _sfCol);
     }
     profileRow('PLAY TIME',   playTime, '#fff');
     profileRow('BEST STAGE',  String(Math.max(csN2.bestStage || 0, csC2.bestStage || 0)),
