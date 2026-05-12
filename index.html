@@ -17479,7 +17479,11 @@ function drawStatsOverlay() {
       const cTotal = cBul + cCol + (causes.unknown || 0);
       if (cTotal >= 1) {
         // TOTAL DEATHS — single line summary (memorial tone)
-        profileRow('TOTAL DEATHS', String(cTotal),
+        const _dN = cTotal >= 100 ? ' RELENTLESS'
+                  : cTotal >= 30  ? ' RESILIENT'
+                  : cTotal >= 5   ? ' PERSISTENT'
+                  : '';
+        profileRow('TOTAL DEATHS', String(cTotal) + _dN,
                    cTotal >= 100 ? '#f44' : cTotal >= 30 ? '#f88' : '#fc8');
       }
       if (cTotal >= 3) {
