@@ -5035,6 +5035,7 @@ function startStage() {
   game.stageShotsHit = 0;
   game.stagePowerUpsPicked = 0;
   game.stageScoreStart = game.score || 0;
+  game.stagePerfectWaves = 0;
   game.stageCloseCount = 0;
   game.lastStandAnnounced = false;
 
@@ -8466,7 +8467,23 @@ function updateChallengeEnemies() {
         color: '#fc4', life: 60, maxLife: 60, size: 8
       });
       game.perfectWavesRun = (game.perfectWavesRun || 0) + 1;
+      game.stagePerfectWaves = (game.stagePerfectWaves || 0) + 1;
       if (typeof playSound === 'function') playSound('milestone');
+      // ALL-PERFECT STAGE BANNER — all waves in this stage perfect (final wave).
+      if (game.challengeWaves
+          && (game.challengeWaveIdx + 1) === game.challengeWaves.length
+          && game.stagePerfectWaves === game.challengeWaves.length) {
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 + 8,
+          text: 'ALL-PERFECT STAGE!',
+          color: '#fc4', life: 110, maxLife: 110, size: 11
+        });
+        if (typeof spawnConfetti === 'function') spawnConfetti(20);
+        game.flashTimer = Math.max(game.flashTimer || 0, 10);
+        game.flashColor = '#fc4';
+      }
+    } else {
+      game.stagePerfectWaves = 0; // any escape breaks all-perfect streak
     }
     // WAVE CLEAR FEEDBACK — short tick on every wave clear (not just quick ones)
     // so the player gets immediate auditory confirmation. Skip on the FINAL wave
