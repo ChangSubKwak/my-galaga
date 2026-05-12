@@ -209,9 +209,10 @@ function diffSpeedMul() { return difficultyMode === 'easy' ? 0.85 : difficultyMo
 const SHIPS = {
   default: { name: 'GAM-42',  color: '#0cf', speedMul: 1.00, bulletCap: 2, dmgBonus: 0 },
   scout:   { name: 'SCOUT',   color: '#0ff', speedMul: 1.25, bulletCap: 3, dmgBonus: 0 },
-  bruiser: { name: 'BRUISER', color: '#f6f', speedMul: 0.85, bulletCap: 2, dmgBonus: 1 }
+  bruiser: { name: 'BRUISER', color: '#f6f', speedMul: 0.85, bulletCap: 2, dmgBonus: 1 },
+  spark:   { name: 'SPARK',   color: '#ff4', speedMul: 1.35, bulletCap: 2, dmgBonus: 0 }
 };
-const SHIP_ORDER = ['default', 'scout', 'bruiser'];
+const SHIP_ORDER = ['default', 'scout', 'bruiser', 'spark'];
 let selectedShip = (() => {
   const s = localStorage.getItem('galagaShip');
   return SHIPS[s] ? s : 'default';
@@ -10818,6 +10819,7 @@ function drawTitleScreen() {
     // Stat tag
     const tag = selectedShip === 'scout'   ? 'FAST  3 SHOTS'
               : selectedShip === 'bruiser' ? 'TANKY +DAMAGE'
+              : selectedShip === 'spark'   ? 'SPEED +35%'
                                             : 'BALANCED';
     drawRetroText(tag, BASE_W/2, 124, 5, COL.gray);
     // SHIP MASTERY — pull per-ship stats (kills/best stage). Cycles into view a second
