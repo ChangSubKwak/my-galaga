@@ -7192,7 +7192,11 @@ function submitTopScore(score, stage, accuracy) {
 
 function updatePowerUps() {
   // PERK 'magnetic' — doubles the magnet pickup range (36 → 72)
-  const MAGNET_RANGE = (game.activePerk === 'magnetic') ? 72 : 36;
+  // COMBO MAGNET BOOST — combo ≥ 30 adds +20 range, combo ≥ 60 adds +40.
+  // Rewards sustained combo with easier pickup catching. Stacks with perk.
+  const _baseRange = (game.activePerk === 'magnetic') ? 72 : 36;
+  const _comboBoost = (game.combo >= 60) ? 40 : (game.combo >= 30) ? 20 : 0;
+  const MAGNET_RANGE = _baseRange + _comboBoost;
   for (let i = game.powerUps.length - 1; i >= 0; i--) {
     const p = game.powerUps[i];
     p.y += p.vy;
@@ -7791,6 +7795,12 @@ function bumpCombo() {
       game.floatTexts.push({
         x: BASE_W/2, y: BASE_H/2 - 18, text: 'x3.0 ACTIVE',
         color: '#fff', life: 70, maxLife: 70, size: 6
+      });
+      // MAGNET FIELD CALLOUT — combo 30 unlocks the magnet range boost.
+      // Surface it so the player knows the reward, not just a multiplier.
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 6, text: '+ MAGNET FIELD',
+        color: '#0cf', life: 70, maxLife: 70, size: 5
       });
       if (typeof spawnConfetti === 'function') spawnConfetti(12);
       if (typeof playSound === 'function') playSound('milestone');
@@ -16626,6 +16636,23 @@ function drawBossStage() {
       } else {
         ctx.beginPath(); ctx.arc(game.playerX, game.playerY, _r, 0, Math.PI * 2); ctx.stroke();
       }
+      ctx.restore();
+    }
+    // MAGNET FIELD RING — combo ≥ 30 draws a faint pulsing cyan ring at the
+    // magnet range to visualize the pickup attraction zone. combo ≥ 60 doubles
+    // brightness. Draw BEFORE the ship so the ring sits underneath.
+    if (game.combo >= 30 && game.playerAlive) {
+      const _mr = 36 + ((game.combo >= 60) ? 40 : 20)
+                + ((game.activePerk === 'magnetic') ? 36 : 0);
+      const _pulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.18);
+      const _alpha = (game.combo >= 60 ? 0.18 : 0.10) * (0.6 + 0.4 * _pulse);
+      ctx.save();
+      ctx.globalAlpha = _alpha;
+      ctx.strokeStyle = '#0cf';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(game.playerX, game.playerY, _mr, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
     if (game.dualFighter) {
