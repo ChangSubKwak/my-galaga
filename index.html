@@ -12958,6 +12958,22 @@ function drawStageIntro() {
     const _csCol = _csNum === 1 ? '#fc4' : _csNum === 2 ? '#ff8' : '#888';
     drawRetroText(String(_csNum), BASE_W/2, BASE_H - 16, 9, _csCol);
   }
+  // PREV DEATH WARNING — if any of last 3 memorial entries died on this stage,
+  // show small 'PREV DEATH HERE' red label. Encourages caution at danger stages.
+  if (slide >= 1) {
+    try {
+      const _memRaw = localStorage.getItem('galagaDeathMemorials') || '[]';
+      const _mem = JSON.parse(_memRaw);
+      if (Array.isArray(_mem)) {
+        const _recent = _mem.slice(0, 3);
+        if (_recent.some(m => m && m.stage === game.stage)) {
+          const _pdBl = (game.animFrame >> 3) % 2 === 0;
+          drawRetroText('PREV DEATH HERE', BASE_W/2, BASE_H - 50, 5,
+                        _pdBl ? '#f44' : '#f88');
+        }
+      }
+    } catch (e) {}
+  }
   // CYCLE DOTS — 10-dot row showing position within current boss cycle.
   // Pos 0 = just-after-boss (stage 1/11/21...), pos 9 = next boss.
   // Dot colors: current = bright stage type col, past = dim, future = ghost.
