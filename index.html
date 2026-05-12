@@ -14510,6 +14510,19 @@ function drawStatsOverlay() {
             ctx.fillRect(cx, cy + cellH - 1, cellW, 1);
             ctx.fillRect(cx, cy, 1, cellH);
             ctx.fillRect(cx + cellW - 1, cy, 1, cellH);
+            // HEATMAP TODAY GOLD PULSE — when today's mission completed, add
+            // pulsing gold outer ring for extra recognition
+            if (missionDone) {
+              ctx.save();
+              const tPulse = 0.55 + 0.45 * Math.sin(game.animFrame * 0.18);
+              ctx.globalAlpha = tPulse;
+              ctx.fillStyle = '#fc4';
+              ctx.fillRect(cx - 1, cy - 1, cellW + 2, 1);
+              ctx.fillRect(cx - 1, cy + cellH, cellW + 2, 1);
+              ctx.fillRect(cx - 1, cy - 1, 1, cellH + 2);
+              ctx.fillRect(cx + cellW, cy - 1, 1, cellH + 2);
+              ctx.restore();
+            }
           }
         }
         y += (rows * (cellH + gap)) - 4; // advance below grid
