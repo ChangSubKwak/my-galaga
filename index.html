@@ -6894,6 +6894,8 @@ function commitGameToCumStats() {
   // STAGES CLEARED LIFETIME — every committed run contributes (maxStage - 1)
   // since reaching stage N implies clearing N-1. Cap at 0 in case of bug.
   s.stagesClearedTotal = (s.stagesClearedTotal || 0) + Math.max(0, (gs.maxStage || game.stage || 1) - 1);
+  // PERFECT WAVES LIFETIME — no-escape challenge waves across runs
+  s.perfectWavesTotal = (s.perfectWavesTotal || 0) + (game.perfectWavesRun || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -15802,6 +15804,12 @@ function drawStatsOverlay() {
       if (_stcTot >= 5) {
         const _stcCol = _stcTot >= 1000 ? '#f6f' : _stcTot >= 500 ? '#fc4' : _stcTot >= 200 ? '#0ff' : _stcTot >= 50 ? '#0f8' : '#cce';
         profileRow('STAGES CLEARED', String(_stcTot), _stcCol);
+      }
+      // PERFECT WAVES LIFETIME — no-escape challenge waves across both modes
+      const _pwTot = (csN2.perfectWavesTotal || 0) + (csC2.perfectWavesTotal || 0);
+      if (_pwTot >= 3) {
+        const _pwCol = _pwTot >= 100 ? '#fc4' : _pwTot >= 30 ? '#0ff' : _pwTot >= 10 ? '#0f8' : '#cce';
+        profileRow('PERFECT WAVES', String(_pwTot), _pwCol);
       }
       // DASH TOTAL — lifetime dashes across both modes
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
