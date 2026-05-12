@@ -5498,6 +5498,7 @@ function initInput() {
         const target = stageJumps[k];
         if (target !== game.stage) {
           game.stage = target;
+          game._stageJumpUsed = true;
           startStage();
           game.floatTexts.push({
             x: BASE_W/2, y: 50, text: 'JUMP → STAGE ' + target,
@@ -16186,6 +16187,8 @@ function drawGameOverScreen() {
     // at any point during this run.
     if (game._cheatUsedAtAnyTime) {
       drawRetroText('(GOD MODE USED)', BASE_W/2, cy + 66, 4, '#a88');
+    } else if (game._stageJumpUsed) {
+      drawRetroText('(STAGE JUMP USED)', BASE_W/2, cy + 66, 4, '#a88');
     }
     // Auto-retry countdown — always visible (no blink) so the second-counter doesn't jitter
     if (game.autoRestartTimer > 0) {
