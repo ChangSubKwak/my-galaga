@@ -17212,7 +17212,11 @@ function drawStatsOverlay() {
       const psBest = Math.max(csN2.parryStreakBest || 0, csC2.parryStreakBest || 0);
       if (psBest >= 3) {
         const psCol = psBest >= 15 ? '#fc4' : psBest >= 8 ? '#0ff' : psBest >= 5 ? '#0f8' : '#cce';
-        profileRow('PARRY CHAIN BEST', 'x' + psBest, psCol);
+        const _psN = psBest >= 15 ? ' GUARDIAN'
+                   : psBest >= 8  ? ' WARDEN'
+                   : psBest >= 5  ? ' DEFLECTOR'
+                   : '';
+        profileRow('PARRY CHAIN BEST', 'x' + psBest + _psN, psCol);
       }
       // COMBO LIFETIME BEST — peak combo across all sessions
       try {
