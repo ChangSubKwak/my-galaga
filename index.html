@@ -4472,6 +4472,31 @@ function updateOneMegaBoss(mb) {
         for (let i = 0; i < 6; i++) {
           game.explosions.push({x: mb.x + (Math.random()-0.5)*24, y: mb.y + (Math.random()-0.5)*16, timer: 0, maxTime: 28});
         }
+        // BOSS DEATH SHARDS — 10 large rotating jagged debris pieces flying outward
+        // from boss center. Distinct from the small gold rain by size + rotation +
+        // archetype-colored hue. Adds cinematic break-apart feel.
+        {
+          const _archCol = mb.archetype === 'horned'  ? '#f8a'
+                         : mb.archetype === 'tendril' ? '#0fa'
+                         : mb.archetype === 'crystal' ? '#0cf'
+                         : mb.archetype === 'phantom' ? '#a8f'
+                         : mb.archetype === 'rune'    ? '#fc8'
+                         : '#fc4';
+          for (let s = 0; s < 10; s++) {
+            const _ang = (s / 10) * Math.PI * 2 + Math.random() * 0.4;
+            const _sp = 0.6 + Math.random() * 1.4;
+            game.debris.push({
+              x: mb.x + Math.cos(_ang) * 4,
+              y: mb.y + Math.sin(_ang) * 4,
+              vx: Math.cos(_ang) * _sp,
+              vy: Math.sin(_ang) * _sp - 0.2,
+              life: -Math.floor(Math.random() * 12),
+              maxLife: 90 + Math.floor(Math.random() * 40),
+              color: _archCol,
+              size: 3 + Math.floor(Math.random() * 2)
+            });
+          }
+        }
         const PT = ['S', 'N', 'P'];
         for (let i = 0; i < 3; i++) {
           game.powerUps.push({x: mb.x + (i-1)*14, y: mb.y, vy: 0.7, type: PT[i]});
