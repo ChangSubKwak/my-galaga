@@ -4913,6 +4913,15 @@ function startStage() {
     if (typeof playSound === 'function') playSound('milestone');
     if (typeof spawnConfetti === 'function') spawnConfetti(12);
   }
+  // COMBO CARRY BANNER — surface when combo >= 5 carries into the new stage.
+  // Reminds the player to keep killing fast to preserve the multiplier.
+  if ((game.combo || 0) >= 5) {
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 + 50,
+      text: 'COMBO CARRIES x' + game.combo,
+      color: '#0ff', life: 80, maxLife: 80, size: 7
+    });
+  }
   // NEW PB STAGE BANNER — when entering a stage exceeding lifetime best across
   // both normal and challenge modes (one-shot per run via _stagePbFired flag).
   if (!game._stagePbFired) {
