@@ -9796,6 +9796,17 @@ function spawnStageClear(label, sub) {
     if (_bid && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_bid]) {
       game.flashTimer = Math.max(game.flashTimer || 0, 8);
       game.flashColor = BIOME_NAMES[_bid].col;
+      // BIOME PARTICLE BURST — 12 particles in biome color radially from center.
+      if (game.itemBursts) {
+        for (let _k = 0; _k < 12; _k++) {
+          const _a = (_k / 12) * Math.PI * 2;
+          game.itemBursts.push({
+            x: BASE_W/2 + Math.cos(_a) * 12,
+            y: BASE_H/2 + Math.sin(_a) * 12,
+            life: -_k, color: BIOME_NAMES[_bid].col
+          });
+        }
+      }
     }
   }
   if (sub) {
