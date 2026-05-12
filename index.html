@@ -13445,6 +13445,18 @@ function drawStageIntro() {
     }
   }
 
+  // BOSS COUNTDOWN PEEK — when next boss is 2-9 stages away, show dim
+  // "BOSS IN N" tag so the player can plan power-up retention. Lives at
+  // y = BASE_H - 30 so it doesn't conflict with BOSS NEXT / CHALL NEXT at -38.
+  if (slide >= 1 && !isBoss && !isBossNext) {
+    const _nextBossS = Math.ceil((game.stage + 1) / BOSS_STAGE_INTERVAL) * BOSS_STAGE_INTERVAL;
+    const _bossIn = _nextBossS - game.stage;
+    if (_bossIn >= 2 && _bossIn <= 9 && _nextBossS <= 80) {
+      const _biCol = _bossIn <= 2 ? '#fc8' : _bossIn <= 5 ? '#fc4' : '#888';
+      drawRetroText('BOSS IN ' + _bossIn, BASE_W/2, BASE_H - 30, 4, _biCol);
+    }
+  }
+
   // STAGE INTRO MARATHON PROGRESS — when no-death stage streak ≥ 2, show
   // current streak + distance to next milestone (5/10/20). Encourages
   // preservation by making progress visible at stage entry.
