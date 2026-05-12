@@ -9223,6 +9223,11 @@ function checkStageComplete() {
             x: BASE_W/2, y: BASE_H/2 + 16, text: txt,
             color: '#0f8', life: 90, maxLife: 90, size: 7
           });
+          // PB CELEBRATION ENHANCED — extra confetti + flash + rumble for boss stage PB
+          if (typeof spawnConfetti === 'function') spawnConfetti(12);
+          game.flashTimer = Math.max(game.flashTimer || 0, 6);
+          game.flashColor = '#0f8';
+          if (typeof rumble === 'function') rumble(200, 0.7, 0.4);
         }
         // Score PB — boss stage variant
         const sGained = (game.score || 0) - (game.stageStartScore || 0);
@@ -9287,6 +9292,11 @@ function checkStageComplete() {
             x: BASE_W/2, y: BASE_H/2 + 24, text: txt,
             color: '#0f8', life: 90, maxLife: 90, size: 7
           });
+          // PB CELEBRATION ENHANCED (challenge variant)
+          if (typeof spawnConfetti === 'function') spawnConfetti(12);
+          game.flashTimer = Math.max(game.flashTimer || 0, 6);
+          game.flashColor = '#0f8';
+          if (typeof rumble === 'function') rumble(200, 0.7, 0.4);
         }
         // Score PB — challenge stage variant
         const sGained = (game.score || 0) - (game.stageStartScore || 0);
@@ -9359,6 +9369,11 @@ function checkStageComplete() {
               color: '#0f8', life: 90, maxLife: 90, size: 7
             });
             playSound('extraLife');
+            // PB CELEBRATION ENHANCED (normal play variant)
+            if (typeof spawnConfetti === 'function') spawnConfetti(12);
+            game.flashTimer = Math.max(game.flashTimer || 0, 6);
+            game.flashColor = '#0f8';
+            if (typeof rumble === 'function') rumble(200, 0.7, 0.4);
           }
           // STAGE SCORE PB — score gained during this stage vs best
           const scoreGained = (game.score || 0) - (game.stageStartScore || 0);
