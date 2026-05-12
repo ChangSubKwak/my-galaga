@@ -7051,6 +7051,17 @@ function commitGameToCumStats() {
   // ALL-PERFECT STAGES LIFETIME
   s.allPerfectStagesTotal = (s.allPerfectStagesTotal || 0) + (game.allPerfectStagesRun || 0);
   saveCumStats(s, challenge);
+  // KILLS-BY-TYPE LIFETIME — batched write of session counts.
+  try {
+    if (game.killsByTypeRun) {
+      const _kbtRaw = localStorage.getItem('galagaKillsByType') || '{}';
+      const _kbt = JSON.parse(_kbtRaw);
+      for (const _kbtT in game.killsByTypeRun) {
+        _kbt[_kbtT] = (_kbt[_kbtT] || 0) + (game.killsByTypeRun[_kbtT] || 0);
+      }
+      localStorage.setItem('galagaKillsByType', JSON.stringify(_kbt));
+    }
+  } catch (e) {}
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
   // and "I've reached stage 28 with Bruiser" on the TITLE / PROFILE screens.
@@ -8760,6 +8771,11 @@ function updateCollisions() {
           // KILLED TYPES SET — track unique types killed this run (for variety peek)
           if (!game.killedTypes) game.killedTypes = new Set();
           game.killedTypes.add(e.type);
+          // KILLS-BY-TYPE SESSION TALLY — batched to localStorage at run end
+          // (commitGameToCumStats) to avoid hot-path localStorage writes that
+          // can stutter under dense bomb/laser kills.
+          if (!game.killsByTypeRun) game.killsByTypeRun = {};
+          game.killsByTypeRun[e.type] = (game.killsByTypeRun[e.type] || 0) + 1;
           // VARIETY HUNTER — one-shot banner when 8 unique types killed
           if (game.killedTypes.size === 8 && !game._varietyFired) {
             game._varietyFired = true;
@@ -16877,6 +16893,20 @@ function drawStatsOverlay() {
           profileRow('TOP PICKUP', topType + ' x' + topCount, ptCol);
         }
       }
+      // TOP ENEMY — most-killed enemy type across all runs.
+      try {
+        const _kbtRaw = localStorage.getItem('galagaKillsByType') || '{}';
+        const _kbt = JSON.parse(_kbtRaw);
+        let _topT = null, _topC = 0;
+        for (const _k in _kbt) {
+          if ((_kbt[_k] || 0) > _topC) { _topC = _kbt[_k]; _topT = _k; }
+        }
+        if (_topT && _topC >= 10) {
+          const _tCol = (typeof ENEMY_INFO !== 'undefined' && ENEMY_INFO[_topT])
+            ? ENEMY_INFO[_topT].col : '#fff';
+          profileRow('TOP ENEMY', _topT.toUpperCase() + ' x' + fmtScore(_topC), _tCol);
+        }
+      } catch (e) {}
       // TOP PERK — most-picked perk across all runs (single-line preview).
       // Full perk distribution surfaces visually below the row count list.
       try {
