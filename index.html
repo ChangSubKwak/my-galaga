@@ -15904,6 +15904,11 @@ function drawGameOverScreen() {
     const _kpmCol = _kpm >= 100 ? '#fc4' : _kpm >= 50 ? '#0ff' : _kpm >= 25 ? '#0f8' : '#888';
     drawRetroText('K/MIN ' + _kpm, BASE_W/2, cy + 52, 4, _kpmCol);
   }
+  // SHIP KILLS CONTRIBUTION — kills added to current ship mastery this run.
+  if (tTime >= 1 && (s.kills || 0) >= 10 && typeof selectedShip !== 'undefined') {
+    const _sCol2 = (game.ship && game.ship.color) || '#0cf';
+    drawRetroText('+' + fmtScore(s.kills) + ' SHIP KILLS', BASE_W/2, cy + 58, 4, _sCol2);
+  }
 
   // Tick sound for each row when it just begins counting
   // (uses gameOverTimer which decrements every tick)
