@@ -12858,6 +12858,13 @@ function drawStageIntro() {
     const _activePerk = PERKS[game.activePerk];
     drawRetroText('PERK: ' + _activePerk.name, BASE_W/2, BASE_H - 18, 4, _activePerk.col);
   }
+  // COUNTDOWN SECONDS — last ~1.5s of STAGE_INTRO countdown shown as 3/2/1
+  // bottom-center. Helps signal mission-imminent.
+  if (slide >= 1 && game.stageTimer > 0 && game.stageTimer <= 90) {
+    const _csNum = Math.ceil(game.stageTimer / 30);
+    const _csCol = _csNum === 1 ? '#fc4' : _csNum === 2 ? '#ff8' : '#888';
+    drawRetroText(String(_csNum), BASE_W/2, BASE_H - 16, 9, _csCol);
+  }
   // CYCLE DOTS — 10-dot row showing position within current boss cycle.
   // Pos 0 = just-after-boss (stage 1/11/21...), pos 9 = next boss.
   // Dot colors: current = bright stage type col, past = dim, future = ghost.
