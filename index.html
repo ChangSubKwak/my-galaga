@@ -13339,6 +13339,24 @@ function drawHUD() {
     }
     ctx.restore();
   }
+  // WORLD CORRUPTION HUD INDICATOR — small "CORR XX%" label when stage 30+ enters
+  // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
+  // pure context cue for late-game depth.
+  if (game.stage >= 30
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && !minimalHud) {
+    let _corr = 0;
+    if (game.stage >= 80)      _corr = 1.0;
+    else if (game.stage >= 70) _corr = 0.8;
+    else if (game.stage >= 60) _corr = 0.65;
+    else if (game.stage >= 50) _corr = 0.45;
+    else if (game.stage >= 40) _corr = 0.25;
+    else if (game.stage >= 30) _corr = 0.10;
+    const _pct = Math.round(_corr * 100);
+    const _shift = _corr >= 0.8 ? 1 : _corr >= 0.5 ? 2 : 3;
+    const _blink = (game.animFrame >> _shift) % 2 === 0 ? '#f48' : '#fff';
+    drawRetroText('CORR ' + _pct + '%', BASE_W - 5, 16, 4, _blink, 'right');
+  }
   // STAGE TIME CLOCK — real-time mm:ss.t timer + PB delta indicator. Only renders
   // during active gameplay states (no TITLE/INTRO/GAME_OVER pollution). Color shifts
   // green when ahead of PB, red when behind. PB compare requires existing record.
