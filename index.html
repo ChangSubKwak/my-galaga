@@ -7130,6 +7130,28 @@ function updatePlayerTrail() {
         dash: dashing
       });
     }
+    // ENGINE EXHAUST DUST — stage 70+ atmospheric drift trail behind the ship.
+    // Pure visual; tiny gray motes (vy slight) every 4 frames. Suppressed during
+    // dash (existing dash trail takes priority).
+    if (!dashing && game.stage >= 70 && (game.animFrame & 3) === 0) {
+      game.exhaustDust = game.exhaustDust || [];
+      game.exhaustDust.push({
+        x: game.playerX + (Math.random() * 4 - 2),
+        y: game.playerY + 4,
+        vy: 0.45 + Math.random() * 0.3,
+        life: 0, maxLife: 28 + Math.floor(Math.random() * 10)
+      });
+      if (game.exhaustDust.length > 24) game.exhaustDust.shift();
+    }
+  }
+  // Tick exhaust dust
+  if (game.exhaustDust && game.exhaustDust.length) {
+    for (let i = game.exhaustDust.length - 1; i >= 0; i--) {
+      const d = game.exhaustDust[i];
+      d.life++;
+      d.y += d.vy;
+      if (d.life >= d.maxLife) game.exhaustDust.splice(i, 1);
+    }
   }
   for (const t of game.playerTrail) t.age++;
   // Dash trail allowed to grow longer (8 ghosts vs 4) for richer afterimage
@@ -7138,6 +7160,19 @@ function updatePlayerTrail() {
   game.playerTrail = game.playerTrail.filter(t => t.age < 14);
 }
 
+// ENGINE EXHAUST DUST — small atmospheric motes drifting behind the ship at
+// stage 70+. Drawn before player trail so trail reads on top.
+function drawExhaustDust() {
+  if (!game.exhaustDust || !game.exhaustDust.length) return;
+  ctx.save();
+  ctx.fillStyle = '#666';
+  for (const d of game.exhaustDust) {
+    const ratio = 1 - d.life / d.maxLife;
+    ctx.globalAlpha = ratio * 0.5;
+    ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 1);
+  }
+  ctx.restore();
+}
 function drawPlayerTrail() {
   // Combo 50+ — rainbow trail cycling through 6 colors
   const rainbow = ['#f44', '#fa0', '#ff4', '#0f8', '#0cf', '#f6f'];
@@ -11749,6 +11784,7 @@ function drawGameplay() {
   for (const b of game.enemyBullets) drawEnemyBullet(b);
 
   // Engine trail (drawn before player so ship sits on top)
+  drawExhaustDust();
   drawPlayerTrail();
 
   // Shield ring while invincible (only when not from a brief dash — show >= 30 frames)
@@ -13508,6 +13544,7 @@ function drawBossStage() {
   for (const b of game.enemyBullets) drawEnemyBullet(b);
 
   // Engine trail
+  drawExhaustDust();
   drawPlayerTrail();
 
   // Player (blink during invincibility)
