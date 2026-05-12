@@ -12336,6 +12336,11 @@ function drawStageIntro() {
       drawRetroText('S' + game.lvl.S, 4, _plY, 4, '#f44', 'left');
       drawRetroText('N' + game.lvl.N, 14, _plY, 4, '#0ff', 'left');
       drawRetroText('P' + game.lvl.P, 24, _plY, 4, '#f6f', 'left');
+      // MAX BUILD BADGE — all three caps reached
+      if (typeof isPowerMaxed === 'function' && isPowerMaxed()) {
+        const _mxBl = (game.animFrame >> 3) % 2 === 0;
+        drawRetroText('MAX', 34, _plY, 4, _mxBl ? '#fc4' : '#fff', 'left');
+      }
     }
     // SHIELD CHARGES PEEK — small 'E xN' label at intro when any shield held.
     if ((game.shieldCharges || 0) > 0) {
