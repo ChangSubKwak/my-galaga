@@ -11799,6 +11799,25 @@ function drawTitleScreen() {
       drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
     }
   } catch (e) {}
+  // DIFFICULTIES DOTS — 3 dot row (green/white/red) above ships
+  try {
+    const _dRaw = localStorage.getItem('galagaDifficultiesUsed') || '[]';
+    const _dArr = JSON.parse(_dRaw);
+    if (Array.isArray(_dArr) && _dArr.length > 0) {
+      const _dOrd = ['easy', 'normal', 'hard'];
+      const _dCols = ['#0f8', '#fff', '#f44'];
+      const _dSet = new Set(_dArr);
+      const _dY = 76;
+      const _dStartX = BASE_W/2 - 4;
+      ctx.save();
+      for (let _di = 0; _di < 3; _di++) {
+        ctx.globalAlpha = _dSet.has(_dOrd[_di]) ? 0.85 : 0.20;
+        ctx.fillStyle = _dCols[_di];
+        ctx.fillRect(_dStartX + _di * 4, _dY, 2, 2);
+      }
+      ctx.restore();
+    }
+  } catch (e) {}
   // SHIPS DOTS — 4 dot row (color per ship) above bestiary
   try {
     const _spRaw = localStorage.getItem('galagaShipsUsed') || '[]';
