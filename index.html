@@ -17231,7 +17231,10 @@ function drawStatsOverlay() {
       const mkBest = Math.max(csN2.multiKillBest || 0, csC2.multiKillBest || 0);
       if (mkBest >= 3) {
         const mkCol = mkBest >= 8 ? '#fc4' : mkBest >= 5 ? '#0ff' : '#cce';
-        profileRow('MULTIKILL BEST', 'x' + mkBest, mkCol);
+        const _mkN = mkBest >= 8 ? ' OCTOKILL'
+                   : mkBest >= 5 ? ' OVERKILL'
+                   : ' TRIPLE';
+        profileRow('MULTIKILL BEST', 'x' + mkBest + _mkN, mkCol);
       }
       // ACE STREAK BEST — lifetime max consecutive S/A grades
       const asBest = Math.max(csN2.aceStreakBest || 0, csC2.aceStreakBest || 0);
