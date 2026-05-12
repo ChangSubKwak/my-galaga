@@ -11341,6 +11341,20 @@ function drawStageIntro() {
       : '~40 ENEMIES';
     const countCol = isBoss ? COL.red : isChallenge ? '#f6f' : COL.cyan;
     drawRetroText(countLabel, BASE_W/2 + offX, BASE_H/2 + 0, 6, countCol);
+    // CHALLENGE WAVE INTRO PIPS — 8 magenta dots showing upcoming wave count.
+    // Visual reinforcement of "8 WAVES" label for instant pattern recognition.
+    if (isChallenge) {
+      ctx.save();
+      ctx.fillStyle = '#f6f';
+      const totW = 8;
+      const sp = 5;
+      const startX = BASE_W/2 + offX - (totW - 1) * sp / 2;
+      for (let i = 0; i < totW; i++) {
+        ctx.globalAlpha = 0.55 + 0.25 * Math.sin(game.animFrame * 0.12 + i * 0.5);
+        ctx.fillRect(Math.round(startX + i * sp) - 1, BASE_H/2 + 8, 2, 2);
+      }
+      ctx.restore();
+    }
     // BIOME PREVIEW — tiny label of the upcoming environment (stage 8+ only)
     const biomeId = biomeForStage(game.stage);
     if (biomeId && BIOME_NAMES[biomeId]) {
