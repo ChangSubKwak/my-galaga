@@ -9123,6 +9123,23 @@ function checkStageComplete() {
     if (game.megaBosses && game.megaBosses.length > 0 && game.megaBosses.every(mb => !mb.alive) && explosionsClear) {
       if (game.stageEndGraceTimer === 0) {
         spawnStageClear('BOSS DOWN!', null);
+        // OBJECTIVE check on boss stage clear (Turn 183 extension)
+        if (game.stageObjective) {
+          if (game.stageObjective.met(game)) {
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 + 32,
+              text: 'OBJECTIVE COMPLETE!',
+              color: '#0f8', life: 100, maxLife: 100, size: 10
+            });
+            spawnConfetti(8);
+          } else {
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 + 32,
+              text: 'MISSED: ' + game.stageObjective.label,
+              color: '#fa8', life: 80, maxLife: 80, size: 6
+            });
+          }
+        }
         const pbResult = recordStagePB(game.stage, game.stageFrames);
         if (pbResult.isNew) {
           const sec = fmtFrameTime(game.stageFrames);
@@ -9168,6 +9185,23 @@ function checkStageComplete() {
       const bonus = perfect ? 10000 : game.challengeHits * 100;
       addScore(bonus);
       spawnStageClear(perfect ? 'PERFECT!' : 'BONUS', '+' + bonus);
+      // OBJECTIVE check on challenging stage clear (Turn 183 extension)
+      if (game.stageObjective) {
+        if (game.stageObjective.met(game)) {
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 + 40,
+            text: 'OBJECTIVE COMPLETE!',
+            color: '#0f8', life: 100, maxLife: 100, size: 10
+          });
+          spawnConfetti(8);
+        } else {
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 + 40,
+            text: 'MISSED: ' + game.stageObjective.label,
+            color: '#fa8', life: 80, maxLife: 80, size: 6
+          });
+        }
+      }
       // STAGE PB for challenging stage too
       {
         const pbResult = recordStagePB(game.stage, game.stageFrames);
