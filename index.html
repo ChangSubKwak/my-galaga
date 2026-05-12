@@ -17409,6 +17409,20 @@ function drawStatsOverlay() {
         }
       }
     } catch (e) {}
+    // PERSONALIZED PRACTICE TIP — find weakest tracked area and suggest
+    try {
+      const _parryT = parseInt(localStorage.getItem('galagaParryTotal') || '0', 10) || 0;
+      const _critT = parseInt(localStorage.getItem('galagaCritKills') || '0', 10) || 0;
+      const _bsBest = Math.max(csN2.bestStage || 0, csC2.bestStage || 0);
+      const _suggestions = [];
+      if (_parryT < 30) _suggestions.push('PARRY (DASH THRU BULLETS)');
+      if (_critT < 20) _suggestions.push('CRIT (LUCK +50% DMG)');
+      if (_bsBest < 10) _suggestions.push('REACH STAGE 10');
+      else if (_bsBest < 30) _suggestions.push('REACH STAGE 30');
+      if (_suggestions.length > 0) {
+        profileRow('PRACTICE', _suggestions[0], '#0ff');
+      }
+    } catch (e) {}
     // BOSSES DEFEATED — 8-boss checklist with ✓ / · for each
     try {
       const bossesRaw = localStorage.getItem('galagaBossesDefeated') || '{}';
