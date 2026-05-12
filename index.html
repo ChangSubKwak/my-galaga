@@ -8345,15 +8345,15 @@ function updateChallengeEnemies() {
       // Sine oscillation on x axis; movement is vertical
       e.sinPhase += 0.05;
       e.x = e.baseX + Math.sin(e.sinPhase) * e.sinAmp;
-      if (e.y >= BASE_H + 20) e.alive = false;
+      if (e.y >= BASE_H + 20) { e.alive = false; e.escaped = true; }
     } else if (e.pattern === 'diagonal') {
       // Straight diagonal — no sine; exit on any far edge or bottom
-      if (e.x <= -30 || e.x >= BASE_W + 30 || e.y >= BASE_H + 30) e.alive = false;
+      if (e.x <= -30 || e.x >= BASE_W + 30 || e.y >= BASE_H + 30) { e.alive = false; e.escaped = true; }
     } else {
       // Horizontal patterns (sweep_lr, sweep_rl, pincer, double_row)
       e.sinPhase += 0.05;
       e.y = e.baseY + Math.sin(e.sinPhase) * e.sinAmp;
-      if (e.x <= -20 || e.x >= BASE_W + 20) e.alive = false;
+      if (e.x <= -20 || e.x >= BASE_W + 20) { e.alive = false; e.escaped = true; }
     }
   }
 
@@ -8371,6 +8371,17 @@ function updateChallengeEnemies() {
         });
         playSound('powerUp');
       }
+    }
+    // PERFECT WAVE — every enemy killed (none escaped). Gold banner + SFX.
+    const _anyEscaped = wave.some(e => e.escaped);
+    if (!_anyEscaped) {
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 + 18,
+        text: 'PERFECT WAVE!',
+        color: '#fc4', life: 60, maxLife: 60, size: 8
+      });
+      game.perfectWavesRun = (game.perfectWavesRun || 0) + 1;
+      if (typeof playSound === 'function') playSound('milestone');
     }
     // WAVE CLEAR FEEDBACK — short tick on every wave clear (not just quick ones)
     // so the player gets immediate auditory confirmation. Skip on the FINAL wave
