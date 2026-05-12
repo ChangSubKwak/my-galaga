@@ -14283,6 +14283,11 @@ function drawHUD() {
     const blink = (game.animFrame >> 3) % 2 === 0;
     drawRetroText('DAILY  1.25x', BASE_W/2, 35, 6, blink ? COL.green : '#8c8');
   }
+  // HUD DIFFICULTY BADGE — small badge in lower-left when not on default 'normal'.
+  if (difficultyMode === 'hard' || difficultyMode === 'easy') {
+    const _diffCol = difficultyMode === 'hard' ? COL.red : COL.green;
+    drawRetroText(difficultyMode.toUpperCase(), 4, 30, 4, _diffCol, 'left');
+  }
 
   // Timed buff HUD: stacked countdown bars at top-center (most-recent on top).
   // Each bar: 60×3px, label below, fades the last 0.5s.
