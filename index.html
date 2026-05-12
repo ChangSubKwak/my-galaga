@@ -15580,6 +15580,12 @@ function drawStatsOverlay() {
         profileRow('GRADE  S/A/B/C/D',
                    gS + '/' + gA + '/' + gB + '/' + gC + '/' + gD,
                    gS >= 10 ? '#fc4' : '#0ff');
+        // S-RATIO — S grades as percent of all graded stages. Skill ceiling stat.
+        if (gTotal >= 10) {
+          const _sPct = Math.round((gS / gTotal) * 100);
+          const _sRatioCol = _sPct >= 30 ? '#fc4' : _sPct >= 15 ? '#0ff' : _sPct >= 5 ? '#0f8' : '#cce';
+          profileRow('S RATIO', _sPct + '%', _sRatioCol);
+        }
       }
     } catch (e) {}
     // BOSSES DEFEATED — 8-boss checklist with ✓ / · for each
