@@ -7762,18 +7762,34 @@ function bumpCombo() {
   // Same-frame kills increment counter; at 2+ trigger banner once per surge.
   if (game._mkFrame === game.animFrame) {
     game._mkCount = (game._mkCount || 1) + 1;
-    if (game._mkCount === 2 || game._mkCount === 3 || game._mkCount === 5 || game._mkCount === 8) {
-      const _mkLabel = game._mkCount >= 8 ? 'OCTOKILL'
-                     : game._mkCount >= 5 ? 'OVERKILL'
-                     : game._mkCount >= 3 ? 'TRIPLE'
+    if (game._mkCount === 2 || game._mkCount === 3 || game._mkCount === 5
+        || game._mkCount === 8 || game._mkCount === 10 || game._mkCount === 12) {
+      const _mkLabel = game._mkCount >= 12 ? 'GODLIKE'
+                     : game._mkCount >= 10 ? 'RAMPAGE'
+                     : game._mkCount >= 8  ? 'OCTOKILL'
+                     : game._mkCount >= 5  ? 'OVERKILL'
+                     : game._mkCount >= 3  ? 'TRIPLE'
                      : 'DOUBLE';
-      const _mkCol = game._mkCount >= 5 ? '#fc4' : '#0ff';
+      const _mkCol = game._mkCount >= 12 ? '#fff'
+                   : game._mkCount >= 10 ? '#f6f'
+                   : game._mkCount >= 5  ? '#fc4'
+                   : '#0ff';
+      const _mkSize = game._mkCount >= 10 ? 11 : 8;
       game.floatTexts.push({
         x: game.playerX, y: game.playerY - 26,
         text: _mkLabel + (game._mkCount >= 5 ? ' x' + game._mkCount : ''),
-        color: _mkCol, life: 50, maxLife: 50, size: 8
+        color: _mkCol, life: 60, maxLife: 60, size: _mkSize
       });
-      if (game._mkCount >= 5 && typeof spawnConfetti === 'function') spawnConfetti(4);
+      const _confettiN = game._mkCount >= 12 ? 16
+                       : game._mkCount >= 10 ? 10
+                       : game._mkCount >= 5  ? 4
+                       : 0;
+      if (_confettiN > 0 && typeof spawnConfetti === 'function') spawnConfetti(_confettiN);
+      if (game._mkCount >= 10) {
+        game.flashTimer = Math.max(game.flashTimer || 0, 6);
+        game.flashColor = _mkCol;
+        if (typeof playSound === 'function') playSound('milestone');
+      }
       game.multiKillsRun = (game.multiKillsRun || 0) + 1;
       if (game._mkCount > (game.multiKillBest || 0)) game.multiKillBest = game._mkCount;
     }
