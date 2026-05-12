@@ -17356,7 +17356,10 @@ function drawStatsOverlay() {
         if (_kTot >= 20) {
           const _kps = Math.round(_kTot / _stcSample);
           const _kpsCol = _kps >= 30 ? '#fc4' : _kps >= 15 ? '#0ff' : '#0f8';
-          profileRow('KILLS / STAGE', String(_kps), _kpsCol);
+          const _kpsN = _kps >= 30 ? ' EXTERMINATOR'
+                      : _kps >= 15 ? ' EFFICIENT'
+                      : ' STEADY';
+          profileRow('KILLS / STAGE', String(_kps) + _kpsN, _kpsCol);
         }
         // AVG SCORE PER STAGE
         const _scTotPS = (csN2.scoreTotal || 0) + (csC2.scoreTotal || 0);
