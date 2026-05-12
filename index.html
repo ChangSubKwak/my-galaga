@@ -7248,6 +7248,15 @@ function updatePowerUps() {
       game.powerUps.splice(i, 1);
       game.stagePowerUpsPicked = (game.stagePowerUpsPicked || 0) + 1;
       game.runPowerUps = (game.runPowerUps || 0) + 1;
+      // POWERUP COUNT MILESTONES — small gold banner at 5/10/20/50 pickups
+      if (game.runPowerUps === 5 || game.runPowerUps === 10 || game.runPowerUps === 20 || game.runPowerUps === 50) {
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 24,
+          text: 'PICKUPS x' + game.runPowerUps,
+          color: '#fc4', life: 60, maxLife: 60, size: 7
+        });
+        if (typeof playSound === 'function') playSound('tick');
+      }
       // PICKUP HISTORY — last 5 drop types as small icon row; FIFO ring buffer
       if (!game.pickupHistory) game.pickupHistory = [];
       game.pickupHistory.unshift(p.type);
