@@ -5392,6 +5392,10 @@ function addScore(pts) {
       spawnConfetti(20);
       game.flashTimer = Math.max(game.flashTimer || 0, 10);
       game.flashColor = '#fc4';
+      // DAILY MISSION CINEMATIC — letterbox bars + brief hit-stop for proper
+      // mission-complete weight. Mirrors boss-kill cinematic but shorter.
+      game.cinematicBars = Math.max(game.cinematicBars || 0, 50);
+      game.hitStopFrames = Math.max(game.hitStopFrames || 0, 6);
       playSound('extraLife');
       rumble(320, 0.9, 0.6);
     }
