@@ -7601,6 +7601,7 @@ function updateEnemies() {
   // mutation bug that drained the timer 2.4× on 144Hz monitors).
   for (const e of game.enemies) {
     if (e.criticalPulseTimer && e.criticalPulseTimer > 0) e.criticalPulseTimer--;
+    if (e.hitFlashTimer && e.hitFlashTimer > 0) e.hitFlashTimer--;
   }
 
   // LAST STAND ANNOUNCEMENT — one-shot "LAST ONE!" floatText when count crosses
@@ -8177,6 +8178,10 @@ function updateCollisions() {
         if (e.hp === 1 && _prevHp > 1) {
           e.criticalPulseTimer = 16;
         }
+        // ENEMY HIT FLASH — 4-frame white tint on non-fatal hit. Reads as
+        // "I damaged it" without needing to read sparks. Only meaningful when
+        // enemy still alive (skipped on kill — explosion takes over).
+        if (e.hp > 0) e.hitFlashTimer = 4;
         // GHOST REVEAL — first hit on a ghost variant reveals it (full alpha)
         if (e.ghost && !e.ghostRevealed) e.ghostRevealed = true;
         // Shield-break feedback (only when not killed in same hit)
@@ -12316,6 +12321,15 @@ function drawGameplay() {
         ctx.globalAlpha = 0.55;
         ctx.fillStyle = '#fff';
         ctx.fillRect(e.x, e.y, 1, 1);
+        ctx.restore();
+      }
+      // ENEMY HIT FLASH — 4-frame white tint after non-fatal damage. Sits on top
+      // of sprite + biome tint. Pure feedback: "I damaged it but not killed yet".
+      if ((e.hitFlashTimer || 0) > 0) {
+        ctx.save();
+        ctx.globalAlpha = (e.hitFlashTimer / 4) * 0.6;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(e.x - 8, e.y - 8, 16, 16);
         ctx.restore();
       }
       // CRITICAL HP PULSE — red ring around enemy when 1 hit from death.
