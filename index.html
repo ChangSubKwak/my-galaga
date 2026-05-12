@@ -15147,11 +15147,13 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(4, 28, 60, 9);
     ctx.fillStyle = col;
-    ctx.fillRect(4, 28, Math.round(60 * decay), 2);
+    // TIER HEIGHT — bar height 2 normally, 3 at combo >= 20 for high-tier weight
+    const _bH = game.combo >= 20 ? 3 : 2;
+    ctx.fillRect(4, 28, Math.round(60 * decay), _bH);
     if (decay > 0.92) {
       ctx.globalAlpha = (decay - 0.92) * 12;
       ctx.fillStyle = '#fff';
-      ctx.fillRect(4, 28, Math.round(60 * decay), 2);
+      ctx.fillRect(4, 28, Math.round(60 * decay), _bH);
     }
     ctx.restore();
     drawRetroText('×' + mult + ' COMBO ' + game.combo, 6, 33, 6, col, 'left');
