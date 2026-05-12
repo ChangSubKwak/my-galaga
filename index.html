@@ -4519,6 +4519,7 @@ function updateOneMegaBoss(mb) {
       if (mb.hp <= 0) {
         mb.alive = false;
         game.stats.kills++;
+        game.stageKills = (game.stageKills || 0) + 1;
         game.bossesKilledThisRun = (game.bossesKilledThisRun || 0) + 1;
         bumpCombo();
         unlockAchievement('bossSlayer');
@@ -5035,6 +5036,7 @@ function startStage() {
   game.stageShotsHit = 0;
   game.stagePowerUpsPicked = 0;
   game.stageScoreStart = game.score || 0;
+  game.stageKills = 0;
   game.stagePerfectWaves = 0;
   game.stageCloseCount = 0;
   game.lastStandAnnounced = false;
@@ -8646,6 +8648,7 @@ function updateCollisions() {
             game.critKillsRun = (game.critKillsRun || 0) + 1;
           }
           game.stats.kills++;
+          game.stageKills = (game.stageKills || 0) + 1;
           if (game.stats.kills === 1) {
             unlockAchievement('firstBlood');
             markTutorialDone(); // First kill = player understands fire
@@ -10129,6 +10132,14 @@ function checkStageComplete() {
             x: BASE_W/2, y: cy + 39, text: '', countTo: total, prefix: 'TOTAL +', countDuration: 50,
             color: '#ff4', life: 80, maxLife: 80, size: 9
           });
+          // STAGE KILLS COUNT — small label showing kills this stage
+          if ((game.stageKills || 0) >= 5) {
+            game.floatTexts.push({
+              x: BASE_W/2, y: cy + 60,
+              text: 'KILLS: ' + game.stageKills,
+              color: '#fc8', life: 100, maxLife: 100, size: 6
+            });
+          }
           // STAGE TOTAL TIER LABEL — big-windfall recognition tier
           if (total >= 10000) {
             const _tierTxt = total >= 50000 ? 'JACKPOT!'
