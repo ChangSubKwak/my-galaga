@@ -16015,6 +16015,13 @@ function drawGameOverScreen() {
                     _xed >= 100 ? '#fc4' : _xed >= 75 ? '#f6f' : _xed >= 50 ? '#0ff' : '#0f8',
                     'right');
     }
+    // CMPL TIER NAME — small tier name with %
+    const _gcTier = _endCmp >= 100 ? 'COMPLETED'
+                 : _endCmp >= 80 ? 'ELITE'
+                 : _endCmp >= 50 ? 'VETERAN'
+                 : _endCmp >= 20 ? 'EXPLORER'
+                 : 'BEGINNER';
+    drawRetroText('CMPL ' + _endCmp + '% ' + _gcTier, BASE_W/2 - 40, cy + 40, 4, '#888', 'left');
   }
   // DAILY MISSION DONE BADGE — if mission completed during this run
   if (tTime >= 1 && game.dailyMode && game._dailyMissionFired) {
