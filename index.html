@@ -17366,7 +17366,11 @@ function drawStatsOverlay() {
         if (_scTotPS >= 10000) {
           const _sps = Math.round(_scTotPS / _stcSample);
           const _spsCol = _sps >= 10000 ? '#fc4' : _sps >= 5000 ? '#0ff' : _sps >= 2000 ? '#0f8' : '#cce';
-          profileRow('SCORE / STAGE', fmtScore(_sps), _spsCol);
+          const _spsN = _sps >= 10000 ? ' PRODIGY'
+                      : _sps >= 5000  ? ' STRONG'
+                      : _sps >= 2000  ? ' STEADY'
+                      : '';
+          profileRow('SCORE / STAGE', fmtScore(_sps) + _spsN, _spsCol);
         }
       }
       // LONGEST SINGLE RUN — max frames in any one run across both modes.
