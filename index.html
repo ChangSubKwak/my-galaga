@@ -3663,6 +3663,7 @@ function resetGame() {
     state: STATE.TITLE,
     stage: Math.max(1, startStageRequested || 1),
     score: 0,
+    scoreDisplay: 0,
     highScore: parseInt(localStorage.getItem('galagaHigh') || '0'),
     challengeMode: challengeModeRequested,
     dailyMode: dailyModeRequested,
@@ -10253,6 +10254,15 @@ function update() {
     if ((game.zoomPulse || 0) > 0) game.zoomPulse--;
     if ((game.cinematicBars || 0) > 0) game.cinematicBars--;
     if ((game.lifeGainPulseTimer || 0) > 0) game.lifeGainPulseTimer--;
+    // SCORE ROLL — lerp scoreDisplay toward game.score (or jump if gap large).
+    // Faster ease near target keeps it from lingering on small diffs. Pure visual.
+    {
+      const _gap = (game.score || 0) - (game.scoreDisplay || 0);
+      if (_gap !== 0) {
+        const _step = Math.max(1, Math.ceil(Math.abs(_gap) * 0.18));
+        game.scoreDisplay = (game.scoreDisplay || 0) + Math.sign(_gap) * Math.min(_step, Math.abs(_gap));
+      }
+    }
     if (game.camNudgeX || game.camNudgeY) {
       game.camNudgeX = (game.camNudgeX || 0) * 0.78;
       game.camNudgeY = (game.camNudgeY || 0) * 0.78;
@@ -13378,10 +13388,10 @@ function drawHUD() {
     ctx.shadowColor = '#ff4';
     ctx.shadowBlur = 6 + 4 * Math.sin(game.animFrame * 0.3);
     const flick = (game.animFrame >> 2) % 2 === 0 ? '#ff4' : '#fff';
-    drawRetroText(fmtScore(game.score), 50, 17, 7, flick, 'right');
+    drawRetroText(fmtScore(game.scoreDisplay || 0), 50, 17, 7, flick, 'right');
     ctx.restore();
   } else if ((game.comboLostFlashTimer || 0) > 0) {
-    drawRetroText(fmtScore(game.score), 50, 17, 7, '#888', 'right');
+    drawRetroText(fmtScore(game.scoreDisplay || 0), 50, 17, 7, '#888', 'right');
   } else {
     // SCORE TIER COLOR — dynamic color progression by score crossings
     // 1M+: rainbow cycle | 500k+: magenta | 100k+: gold | 25k+: cyan | else: white
@@ -13397,7 +13407,7 @@ function drawHUD() {
     } else if (_sc >= 25000) {
       _scCol = COL.cyan;
     }
-    drawRetroText(fmtScore(game.score), 50, 17, 7, _scCol, 'right');
+    drawRetroText(fmtScore(game.scoreDisplay || 0), 50, 17, 7, _scCol, 'right');
   }
   // NEAR-BEST INDICATOR — small ▲ symbol next to the score when chasing the
   // best-ever (90-99% of highScore). Pulses faster as the player gets closer.
