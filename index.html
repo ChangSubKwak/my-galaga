@@ -11147,15 +11147,29 @@ function drawStageIntro() {
   const introElapsed = 120 - game.stageTimer;
   // BIOME ENTRY FLASH — 12-frame screen-wide tint matching the upcoming biome.
   // Fades from 0.25 alpha to 0 over the window. Reads as "we just arrived here".
-  if (introElapsed < 12) {
-    const flashFade = 1 - introElapsed / 12;
+  // BIOME TRANSITION FANFARE — if biome id changed from last stage, boost flash
+  // strength + extend window + play tick SFX once for emphasis.
+  if (introElapsed < 24) {
     const biomeId = typeof biomeForStage === 'function' ? biomeForStage(game.stage) : null;
     const flashCol = (biomeId && BIOME_NAMES[biomeId]) ? BIOME_NAMES[biomeId].col : '#0ff';
-    ctx.save();
-    ctx.globalAlpha = 0.25 * flashFade;
-    ctx.fillStyle = flashCol;
-    ctx.fillRect(0, 0, BASE_W, BASE_H);
-    ctx.restore();
+    const _isTransition = biomeId !== null && biomeId !== (game._lastBiomeId || null);
+    const winLen = _isTransition ? 24 : 12;
+    if (introElapsed < winLen) {
+      const flashFade = 1 - introElapsed / winLen;
+      ctx.save();
+      const baseAlpha = _isTransition ? 0.45 : 0.25;
+      ctx.globalAlpha = baseAlpha * flashFade;
+      ctx.fillStyle = flashCol;
+      ctx.fillRect(0, 0, BASE_W, BASE_H);
+      ctx.restore();
+    }
+    // One-shot SFX + flag update on first frame of transition
+    if (_isTransition && introElapsed === 0 && typeof playSound === 'function') {
+      playSound('milestone');
+      game._lastBiomeId = biomeId;
+    } else if (introElapsed === 0) {
+      game._lastBiomeId = biomeId;
+    }
   }
   if (introElapsed < 30) {
     const warpFade = 1 - introElapsed / 30;
