@@ -12637,6 +12637,14 @@ function drawHUD() {
       const pStr = (typeof m.progress === 'function') ? m.progress(game) : '';
       const label = pStr ? ('M: ' + m.label + ' ' + pStr) : ('M: ' + m.label);
       drawRetroText(label, BASE_W - 5, 44, 4, '#f6f', 'right');
+      // Small pulse dot to the left of the mission label — daily mode signal
+      ctx.save();
+      const dotPulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.18);
+      ctx.globalAlpha = dotPulse;
+      ctx.fillStyle = '#f6f';
+      const dotX = BASE_W - 5 - label.length * 4 - 5;
+      ctx.fillRect(dotX, 45, 2, 2);
+      ctx.restore();
     }
   }
 
