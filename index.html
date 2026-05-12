@@ -8393,7 +8393,7 @@ function updateCollisions() {
         if (tryTriggerWitchTime(b.x, b.y)) break;  // bullet not consumed; witch window opened
         const _bX = b.x, _bY = b.y;
         game.enemyBullets.splice(i, 1);
-        killPlayer(_bX, _bY);
+        killPlayer(_bX, _bY, 'bullet');
         break;
       }
     }
@@ -8410,7 +8410,7 @@ function updateCollisions() {
         e.alive = false;
         game.explosions.push({x: e.x, y: e.y, timer: 0, maxTime: 20});
         playSound('explode');
-        killPlayer(_eX, _eY);
+        killPlayer(_eX, _eY, 'collision');
         break;
       }
     }
@@ -8444,7 +8444,7 @@ function tryTriggerWitchTime(srcX, srcY) {
   return true;
 }
 
-function killPlayer(srcX, srcY) {
+function killPlayer(srcX, srcY, cause) {
   // DEATH POSTMORTEM — capture the offending hit source so the renderer can draw
   // a red expanding ring at the culprit for the next ~30 frames. Only set when a
   // source is supplied (witch/shield/cheat paths bail out before the visual).
@@ -8453,6 +8453,10 @@ function killPlayer(srcX, srcY) {
     game.deathSrcY = srcY;
     game.deathMarkerLife = 30;
   }
+  // DEATH CAUSE TALLY — accumulate per-cause death counts to localStorage.
+  // Only counted if the kill actually lands (witch/shield/cheat skip below).
+  // Stash on game; finalized in the lives-- branch where deathDidLand is known.
+  game._deathCausePending = cause || 'unknown';
   // Cheat: GOD MODE absorbs the hit. Brief flash + score-flick to make the save visible.
   if (game.cheatInvincible) {
     game.flashTimer = 4;
@@ -8548,6 +8552,17 @@ function killPlayer(srcX, srcY) {
     game.respawnTimer = 90;
   } else {
     game.lives--;
+    // DEATH CAUSE TALLY — record cause to localStorage (death landed)
+    if (game._deathCausePending) {
+      try {
+        const raw = localStorage.getItem('galagaDeathCauses') || '{}';
+        const tally = JSON.parse(raw);
+        const c = game._deathCausePending;
+        tally[c] = (tally[c] || 0) + 1;
+        localStorage.setItem('galagaDeathCauses', JSON.stringify(tally));
+      } catch (e) {}
+      game._deathCausePending = null;
+    }
     if (game.lives <= 0) {
       // Demo runs end silently and return to title
       if (game.isDemo) {
@@ -13831,6 +13846,15 @@ function drawStatsOverlay() {
       const ghostKills = parseInt(localStorage.getItem('galagaGhostKills') || '0', 10);
       if (ghostKills >= 1) {
         profileRow('GHOST KILLS', String(ghostKills), ghostKills >= 50 ? '#a8f' : '#cce');
+      }
+      // DEATH CAUSE TALLY — bullet vs collision lifetime breakdown
+      const causesRaw = localStorage.getItem('galagaDeathCauses') || '{}';
+      const causes = JSON.parse(causesRaw);
+      const cBul = causes.bullet || 0, cCol = causes.collision || 0;
+      const cTotal = cBul + cCol + (causes.unknown || 0);
+      if (cTotal >= 3) {
+        profileRow('DEATHS B/C', cBul + ' / ' + cCol,
+                   cBul > cCol * 2 ? '#f88' : cCol > cBul * 2 ? '#fc8' : '#aaa');
       }
       // PERFECT STREAK best — longest consecutive PERFECT CLEARs in a single run
       const perfectStreakBest = parseInt(localStorage.getItem('galagaPerfectStreakBest') || '0', 10);
