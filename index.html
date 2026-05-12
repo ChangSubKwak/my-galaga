@@ -13009,6 +13009,10 @@ function drawStageIntro() {
     if ((game.multiKillBest || 0) >= 3) {
       drawRetroText('MK x' + game.multiKillBest, BASE_W - 4, BASE_H/2 + 95, 4, '#fc4', 'right');
     }
+    // DASH COUNT PEEK — total dashes this run
+    if ((game.dashCount || 0) >= 5) {
+      drawRetroText('DS x' + game.dashCount, BASE_W - 4, BASE_H/2 + 101, 4, '#0ff', 'right');
+    }
     // RUN ELAPSED PEEK — current run time in MM:SS when meaningful (>= 30s)
     if ((game.runFrames || 0) >= 1800) {
       const _rs = Math.floor(game.runFrames / 60);
