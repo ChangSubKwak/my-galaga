@@ -4446,11 +4446,15 @@ function updateOneMegaBoss(mb) {
         if (b.kind === 'laser') dmgCol = '#f6c';
         else if (b.kind === 'wave' || b.kind === 'homing') dmgCol = '#6cf';
         else if (dmgDealt >= 2) dmgCol = '#fc4';
+        // BIG HIT TEXT — size scales with damage. 3+ = big bold, 2 = normal+,
+        // 1 = compact. Makes heavy-hit moments read at a glance.
+        const _dmgSize = dmgDealt >= 3 ? 9 : dmgDealt >= 2 ? 7 : 5;
         game.floatTexts.push({
           x: b.x + (Math.random() * 6 - 3),
           y: b.y - 4,
           text: '-' + dmgDealt,
-          color: dmgCol, life: 28, maxLife: 28, size: 6
+          color: dmgCol, life: dmgDealt >= 3 ? 40 : 28, maxLife: dmgDealt >= 3 ? 40 : 28,
+          size: _dmgSize
         });
         game._dmgNumThisFrame++;
       }
