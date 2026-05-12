@@ -15912,6 +15912,18 @@ function drawGameOverScreen() {
     const _sCol2 = (game.ship && game.ship.color) || '#0cf';
     drawRetroText('+' + fmtScore(s.kills) + ' SHIP KILLS', BASE_W/2, cy + 58, 4, _sCol2);
   }
+  // TOP RUN ENEMY — most-killed type this run when meaningful
+  if (tTime >= 1 && game.killsByTypeRun) {
+    let _tT = null, _tC = 0;
+    for (const _k in game.killsByTypeRun) {
+      if ((game.killsByTypeRun[_k] || 0) > _tC) { _tC = game.killsByTypeRun[_k]; _tT = _k; }
+    }
+    if (_tT && _tC >= 10) {
+      const _tCol2 = (typeof ENEMY_INFO !== 'undefined' && ENEMY_INFO[_tT])
+        ? ENEMY_INFO[_tT].col : '#fff';
+      drawRetroText('TOP: ' + _tT.toUpperCase() + ' x' + _tC, BASE_W/2, cy + 64, 4, _tCol2);
+    }
+  }
 
   // Tick sound for each row when it just begins counting
   // (uses gameOverTimer which decrements every tick)
