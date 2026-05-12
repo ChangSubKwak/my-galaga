@@ -3368,6 +3368,23 @@ function pickAmbientEvent() {
 }
 function startAmbientEvent(type) {
   if (!type) { game.ambientEvent = null; return; }
+  // AMBIENT EVENT ENTRY BANNER — brief atmospheric label so the player notices
+  // the event onset. Faded gray to keep ambient tone, not gameplay alarm.
+  const _evLabels = {
+    cargoShip: 'CARGO TRANSIT',
+    supernova: 'DISTANT SUPERNOVA',
+    satellite: 'SATELLITE PASS',
+    comet:     'COMET DRIFT',
+    pulsar:    'PULSAR PULSE',
+    meteorShower: 'METEOR SHOWER'
+  };
+  const _lab = _evLabels[type];
+  if (_lab && game.floatTexts) {
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H - 50, text: _lab,
+      color: '#888', life: 50, maxLife: 50, size: 4
+    });
+  }
   if (type === 'cargoShip') {
     const fromLeft = Math.random() < 0.5;
     game.ambientEvent = {
