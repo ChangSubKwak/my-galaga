@@ -7831,6 +7831,26 @@ function updateCollisions() {
         }
         if (e.hp <= 0) {
           e.alive = false;
+          // CRIT KILL CINEMATIC — when a crit bullet lands the killing blow,
+          // award gold sparkle ring + 'CRIT KILL!' text + persistent counter.
+          if (b.crit) {
+            for (let k = 0; k < 8; k++) {
+              const a = (k / 8) * Math.PI * 2;
+              game.itemBursts.push({
+                x: e.x + Math.cos(a) * 6,
+                y: e.y + Math.sin(a) * 6,
+                life: -k, color: '#fc4'
+              });
+            }
+            game.floatTexts.push({
+              x: e.x, y: e.y - 14, text: 'CRIT KILL!',
+              color: '#fc4', life: 42, maxLife: 42, size: 7
+            });
+            try {
+              const ck = parseInt(localStorage.getItem('galagaCritKills') || '0', 10) || 0;
+              localStorage.setItem('galagaCritKills', String(ck + 1));
+            } catch (e) {}
+          }
           game.stats.kills++;
           if (game.stats.kills === 1) {
             unlockAchievement('firstBlood');
@@ -13928,6 +13948,11 @@ function drawStatsOverlay() {
       const ghostKills = parseInt(localStorage.getItem('galagaGhostKills') || '0', 10);
       if (ghostKills >= 1) {
         profileRow('GHOST KILLS', String(ghostKills), ghostKills >= 50 ? '#a8f' : '#cce');
+      }
+      // CRIT KILLS — lifetime count of critical-hit killing blows
+      const critKills = parseInt(localStorage.getItem('galagaCritKills') || '0', 10);
+      if (critKills >= 1) {
+        profileRow('CRIT KILLS', String(critKills), critKills >= 100 ? '#fc4' : '#fc8');
       }
       // DEATH CAUSE TALLY — bullet vs collision lifetime breakdown
       const causesRaw = localStorage.getItem('galagaDeathCauses') || '{}';
