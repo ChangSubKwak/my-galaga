@@ -5627,6 +5627,7 @@ function addScore(pts) {
   // Extra life every 30000 — disabled in challenge mode (hardcore = 1 life)
   if (!game.challengeMode && Math.floor(old / 30000) < Math.floor(game.score / 30000)) {
     game.lives++;
+    game.lifeGainPulseTimer = 30;
     playSound('extraLife');
     // EXTRA LIFE BANNER — celebrate threshold crossing with banner + confetti
     if (game && game.floatTexts) {
@@ -7387,6 +7388,8 @@ function bumpCombo() {
       addScore(5000);
     } else {
       game.lives++;
+      // LIFE GAIN PULSE — flag for HUD lives row to pulse gold for 30 frames
+      game.lifeGainPulseTimer = 30;
     }
     playSound('extraLife');
     game.floatTexts.push({
@@ -10161,6 +10164,7 @@ function update() {
     // 14-frame zoom pulse was burning out in ~95ms instead of 233ms.
     if ((game.zoomPulse || 0) > 0) game.zoomPulse--;
     if ((game.cinematicBars || 0) > 0) game.cinematicBars--;
+    if ((game.lifeGainPulseTimer || 0) > 0) game.lifeGainPulseTimer--;
     if (game.camNudgeX || game.camNudgeY) {
       game.camNudgeX = (game.camNudgeX || 0) * 0.78;
       game.camNudgeY = (game.camNudgeY || 0) * 0.78;
@@ -13617,11 +13621,29 @@ function drawHUD() {
   }
   // Lives — pulse red and add LAST LIFE warning when down to one
   const dangerLives = game.lives === 1;
+  // LIFE GAIN PULSE — when lives++ just fired, overlay gold flash on row.
+  const _lifePulse = (game.lifeGainPulseTimer || 0) > 0;
+  const _lifePulseCol = (game.animFrame >> 1) % 2 === 0 ? '#fc4' : '#fff';
   const lifeCol = dangerLives
     ? ((game.animFrame >> 3) % 2 === 0 ? COL.red : '#fa8')
-    : ((game.ship && game.ship.color) || '#0cf');
+    : (_lifePulse ? _lifePulseCol : ((game.ship && game.ship.color) || '#0cf'));
   for (let i = 0; i < Math.min(game.lives, 5); i++) {
     drawPlayer(15 + i * 16, BASE_H - 8, lifeCol);
+  }
+  // Ring glow under newly-gained life ship (the rightmost ship in row)
+  if (_lifePulse) {
+    const _rightI = Math.min(game.lives, 5) - 1;
+    if (_rightI >= 0) {
+      const _rx = 15 + _rightI * 16, _ry = BASE_H - 8;
+      ctx.save();
+      ctx.globalAlpha = (game.lifeGainPulseTimer / 30) * 0.7;
+      ctx.strokeStyle = '#fc4';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(_rx, _ry, 10 + (30 - game.lifeGainPulseTimer) * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
   if (game.lives > 5) {
     drawRetroText('+' + (game.lives - 5), 15 + 5 * 16, BASE_H - 8, 6, COL.white, 'left');
