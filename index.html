@@ -15843,6 +15843,17 @@ function drawGameOverScreen() {
     if (_delta >= 1) {
       drawRetroText('+' + _delta + '% PROGRESS', BASE_W/2 + 40, cy + 40, 4, '#fc4', 'right');
     }
+    // TIER CROSSING — when CMPL crossed 25/50/75/100 this run
+    const _tiers = [25, 50, 75, 100];
+    let _xed = 0;
+    for (const _tt of _tiers) {
+      if ((game.runStartCmp || 0) < _tt && _endCmp >= _tt) _xed = _tt;
+    }
+    if (_xed > 0) {
+      drawRetroText(_xed + '% TIER CROSSED', BASE_W/2 + 40, cy + 46, 4,
+                    _xed >= 100 ? '#fc4' : _xed >= 75 ? '#f6f' : _xed >= 50 ? '#0ff' : '#0f8',
+                    'right');
+    }
   }
   // DAILY MISSION DONE BADGE — if mission completed during this run
   if (tTime >= 1 && game.dailyMode && game._dailyMissionFired) {
