@@ -6796,6 +6796,13 @@ function updatePowerUps() {
       game.stagePowerUpsPicked = (game.stagePowerUpsPicked || 0) + 1;
       game.runPowerUps = (game.runPowerUps || 0) + 1;
       if (game.runPowerUps === 30) unlockAchievement('collector');
+      // PICKUP TYPE TOTALS — track lifetime collection counts per pickup type
+      try {
+        const raw = localStorage.getItem('galagaPickupTotals') || '{}';
+        const tot = JSON.parse(raw);
+        tot[p.type] = (tot[p.type] || 0) + 1;
+        localStorage.setItem('galagaPickupTotals', JSON.stringify(tot));
+      } catch (e) {}
       // PICKUP STREAK — consecutive pickups without dying. Milestone bonuses at
       // 5/10/15 give modest reward + visual. Resets in killPlayer.
       game.pickupStreak = (game.pickupStreak || 0) + 1;
@@ -14111,6 +14118,19 @@ function drawStatsOverlay() {
       const critKills = parseInt(localStorage.getItem('galagaCritKills') || '0', 10);
       if (critKills >= 1) {
         profileRow('CRIT KILLS', String(critKills), critKills >= 100 ? '#fc4' : '#fc8');
+      }
+      // PICKUP TYPE TOTALS — show top-collected pickup type (e.g., "TOP: S x42")
+      const ptRaw = localStorage.getItem('galagaPickupTotals');
+      if (ptRaw) {
+        const ptTot = JSON.parse(ptRaw);
+        let topType = null, topCount = 0;
+        for (const k in ptTot) {
+          if ((ptTot[k] || 0) > topCount) { topCount = ptTot[k]; topType = k; }
+        }
+        if (topType && topCount >= 5) {
+          const ptCol = POWERUP_COL[topType] || '#fff';
+          profileRow('TOP PICKUP', topType + ' x' + topCount, ptCol);
+        }
       }
       // DEATH CAUSE TALLY — bullet vs collision lifetime breakdown
       const causesRaw = localStorage.getItem('galagaDeathCauses') || '{}';
