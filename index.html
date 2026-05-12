@@ -17493,7 +17493,13 @@ function drawStatsOverlay() {
       // PERFECT STREAK best — longest consecutive PERFECT CLEARs in a single run
       const perfectStreakBest = parseInt(localStorage.getItem('galagaPerfectStreakBest') || '0', 10);
       if (perfectStreakBest >= 2) {
-        profileRow('PERFECT STREAK', '×' + perfectStreakBest, perfectStreakBest >= 10 ? '#fc4' : perfectStreakBest >= 5 ? '#0f8' : '#fc8');
+        {
+          const _psbN = perfectStreakBest >= 10 ? ' UNTOUCHABLE'
+                      : perfectStreakBest >= 5  ? ' UNYIELDING'
+                      : ' STEADFAST';
+          profileRow('PERFECT STREAK', '×' + perfectStreakBest + _psbN,
+                     perfectStreakBest >= 10 ? '#fc4' : perfectStreakBest >= 5 ? '#0f8' : '#fc8');
+        }
       }
       // MAX POWER REACHED — cumulative count of S5+N3+P3 first-touches across runs
       const maxPowerReached = parseInt(localStorage.getItem('galagaMaxPowerReached') || '0', 10);
