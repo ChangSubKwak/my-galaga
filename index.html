@@ -14406,6 +14406,19 @@ function drawGameplay() {
       ctx.lineTo(Math.round(b.tgtX), Math.round(b.tgtY));
       ctx.stroke();
       ctx.restore();
+      // HOMING TARGET RETICLE — small 4-corner bracket around target enemy.
+      // Pulses subtly with animFrame so lock-on reads clearly even amid chaos.
+      const _tx = Math.round(b.tgtX), _ty = Math.round(b.tgtY);
+      const _rpulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.4);
+      ctx.save();
+      ctx.globalAlpha = 0.40 + 0.30 * _rpulse;
+      ctx.fillStyle = '#0f8';
+      // Four 2-pixel L brackets at ±5 from target center
+      ctx.fillRect(_tx - 5, _ty - 5, 2, 1); ctx.fillRect(_tx - 5, _ty - 5, 1, 2);
+      ctx.fillRect(_tx + 4, _ty - 5, 2, 1); ctx.fillRect(_tx + 5, _ty - 5, 1, 2);
+      ctx.fillRect(_tx - 5, _ty + 5, 2, 1); ctx.fillRect(_tx - 5, _ty + 4, 1, 2);
+      ctx.fillRect(_tx + 4, _ty + 5, 2, 1); ctx.fillRect(_tx + 5, _ty + 4, 1, 2);
+      ctx.restore();
     }
     // HOMING TRAIL — fade-out green dot trail showing recent path of homing bullets
     // WAVE TRAIL — same pattern for zigzag wave-mode bullets, cyan color
