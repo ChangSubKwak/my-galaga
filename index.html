@@ -13853,6 +13853,14 @@ function drawStageIntro() {
   if (game.activePerk && PERKS[game.activePerk] && slide >= 1) {
     const _activePerk = PERKS[game.activePerk];
     drawRetroText('PERK: ' + _activePerk.name, BASE_W/2, BASE_H - 18, 4, _activePerk.col);
+    // PERK EFFECT DESCRIPTION — surface the perk's actual bonus so the player
+    // re-reads the active modifier each stage entry. Drawn smaller below name.
+    if (_activePerk.desc) {
+      ctx.save();
+      ctx.globalAlpha = 0.65;
+      drawRetroText(_activePerk.desc, BASE_W/2, BASE_H - 12, 3, '#aaa');
+      ctx.restore();
+    }
   }
   // COUNTDOWN SECONDS — last ~1.5s of STAGE_INTRO countdown shown as 3/2/1
   // bottom-center. Helps signal mission-imminent.
