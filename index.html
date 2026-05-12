@@ -8294,6 +8294,12 @@ function updateCollisions() {
               if (pick < acc) { type = k; break; }
             }
             game.powerUps.push({x: e.x, y: e.y, vy: 0.6, type});
+            // POWERUP DROP CUE — type-aware spawn SFX so the player can hear
+            // what's incoming before looking. Rare types get a stronger cue.
+            const dropSfx = (type === 'L' || type === 'B') ? 'milestone'
+                          : (type === 'H' || type === 'W') ? 'tick'
+                          : 'tick';
+            playSound(dropSfx);
           }
 
           // Splitter splits into 2 mini-bees on death
