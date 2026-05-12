@@ -9473,6 +9473,15 @@ function killPlayer(srcX, srcY, cause) {
       }
       game.state = STATE.GAME_OVER;
       game.gameOverTimer = 180;
+      // GAME OVER BIOME FAREWELL FLASH — last biome col tinted screen flash
+      // at game over entry. Atmospheric continuity from the place player died.
+      if (typeof biomeForStage === 'function') {
+        const _gBid = biomeForStage(game.stage || 1);
+        if (_gBid && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_gBid]) {
+          game.flashTimer = Math.max(game.flashTimer || 0, 14);
+          game.flashColor = BIOME_NAMES[_gBid].col;
+        }
+      }
       // DEATH MEMORIAL — append final death event to a rolling 5-entry log so the
       // PROFILE page can show recent run memorials. Skipped in demo / challenge
       // tests where deaths are scripted or transient.
