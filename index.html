@@ -5843,6 +5843,10 @@ function updateBullets() {
       if (b.kind === 'wave') {
         const elapsed = game.animFrame - (b.spawnFrame || 0);
         b.x = (b.spawnX || b.x) + Math.sin(elapsed * 0.28) * 7;
+        // WAVE BULLET TRAIL — record last 5 positions for zigzag visualization
+        if (!b.trail) b.trail = [];
+        b.trail.unshift({ x: b.x, y: b.y });
+        if (b.trail.length > 5) b.trail.length = 5;
       }
     }
     if (b.y < -5 || b.y > BASE_H + 5 || b.x < -5 || b.x > BASE_W + 5) game.bullets.splice(i, 1);
@@ -12414,9 +12418,10 @@ function drawGameplay() {
   // Draw player bullets — GAM-42 tier visuals (Sleek / Nova / Shard)
   for (const b of game.bullets) {
     // HOMING TRAIL — fade-out green dot trail showing recent path of homing bullets
-    if (b.kind === 'homing' && b.trail && b.trail.length > 0) {
+    // WAVE TRAIL — same pattern for zigzag wave-mode bullets, cyan color
+    if (b.trail && b.trail.length > 0 && (b.kind === 'homing' || b.kind === 'wave')) {
       ctx.save();
-      ctx.fillStyle = '#0f8';
+      ctx.fillStyle = b.kind === 'wave' ? '#6cf' : '#0f8';
       for (let ti = 0; ti < b.trail.length; ti++) {
         const tp = b.trail[ti];
         ctx.globalAlpha = (1 - ti / b.trail.length) * 0.6;
