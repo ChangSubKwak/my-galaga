@@ -5090,6 +5090,24 @@ function initInput() {
         game.invincibleTimer = Math.max(game.invincibleTimer, 14);
         game.dashCount = (game.dashCount || 0) + 1;
         if (game.dashCount === 30) unlockAchievement('dashMaster');
+        // DASH START BURST — small cyan shockwave + 8 radial sparks at the
+        // dash origin so the launch reads as a deliberate kinetic event.
+        if (game.shockwaves) {
+          game.shockwaves.push({
+            x: game.playerX, y: game.playerY,
+            life: 0, maxLife: 14, maxR: 16, color: '#0ff'
+          });
+        }
+        if (game.itemBursts) {
+          for (let k = 0; k < 8; k++) {
+            const _a = (k / 8) * Math.PI * 2;
+            game.itemBursts.push({
+              x: game.playerX + Math.cos(_a) * 5,
+              y: game.playerY + Math.sin(_a) * 5,
+              life: -k, color: k & 1 ? '#0ff' : '#fff'
+            });
+          }
+        }
         playSound('powerUp');
         rumble(80, 0.5, 0.2);
       }
