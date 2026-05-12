@@ -8674,6 +8674,16 @@ function updateCollisions() {
           // KILLED TYPES SET — track unique types killed this run (for variety peek)
           if (!game.killedTypes) game.killedTypes = new Set();
           game.killedTypes.add(e.type);
+          // VARIETY HUNTER — one-shot banner when 8 unique types killed
+          if (game.killedTypes.size === 8 && !game._varietyFired) {
+            game._varietyFired = true;
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 - 30, text: 'VARIETY HUNTER',
+              color: '#fc4', life: 90, maxLife: 90, size: 9
+            });
+            if (typeof spawnConfetti === 'function') spawnConfetti(10);
+            if (typeof playSound === 'function') playSound('milestone');
+          }
           if (game._sameTypeStreak === 5 || game._sameTypeStreak === 10) {
             const _typeColors = {
               bee: '#fc4', butterfly: '#f48', boss: '#f8a', mirror: '#8ff',
