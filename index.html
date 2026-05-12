@@ -14858,6 +14858,25 @@ function drawCrown(x, y, color) {
 }
 
 function drawHUD() {
+  // BULLET HELL EDGE WARNING — pulsing red top/bottom bands when enemy bullet
+  // count is high. Reads as "screen pressure" — pushes player to evade/clear.
+  // Threshold raised for boss stages (naturally bullet-dense).
+  if (game && game.enemyBullets
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    const _bhThresh = game.state === STATE.BOSS_STAGE ? 22 : 15;
+    const _bhN = game.enemyBullets.length;
+    if (_bhN >= _bhThresh) {
+      const _bhOver = Math.min(1, (_bhN - _bhThresh) / 12);  // 0 at threshold, 1 at +12
+      const _bhPulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.25);
+      const _bhAlpha = 0.15 + 0.35 * _bhOver * _bhPulse;
+      ctx.save();
+      ctx.globalAlpha = _bhAlpha;
+      ctx.fillStyle = '#f44';
+      ctx.fillRect(0, 0, BASE_W, 2);
+      ctx.fillRect(0, BASE_H - 2, BASE_W, 2);
+      ctx.restore();
+    }
+  }
   // PLAYER EDGE VIGNETTE — faint cyan band on left/right when player is within
   // 20px of that edge. Alpha grows as player approaches the wall, peaking at
   // touching. Helps spatial awareness without compromising the playfield read.
