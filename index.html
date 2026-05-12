@@ -4024,7 +4024,7 @@ function setupChallengingStage() {
 // Layered ON TOP of existing super/double semantics so HP/scale/duo logic untouched.
 function archetypeFor(stage) {
   const idx = Math.max(0, Math.floor(stage / BOSS_STAGE_INTERVAL) - 1);
-  return ['standard', 'horned', 'tendril', 'crystal', 'phantom'][idx % 5];
+  return ['standard', 'horned', 'tendril', 'crystal', 'phantom', 'rune'][idx % 6];
 }
 
 function makeMegaBoss(s, opts) {
@@ -11430,11 +11430,13 @@ function drawStageIntro() {
                        : arch === 'tendril' ? 'TYPE — TENDRIL'
                        : arch === 'crystal' ? 'TYPE — CRYSTAL'
                        : arch === 'phantom' ? 'TYPE — PHANTOM'
+                       : arch === 'rune'    ? 'TYPE — RUNE'
                        : 'TYPE — STANDARD';
       const archCol = arch === 'horned'  ? '#f86'
                      : arch === 'tendril' ? '#8af'
                      : arch === 'crystal' ? '#cef'
                      : arch === 'phantom' ? '#a8f'
+                     : arch === 'rune'    ? '#a4f'
                      : '#fc4';
       drawRetroText(archLabel, BASE_W/2 + offX, BASE_H/2 + 58, 5, archCol);
     }
@@ -13899,6 +13901,21 @@ function drawBossStage() {
       }
     } else {
       renderBoss(mb.hitFlash > 0);
+    }
+    // RUNE archetype — 8 rotating violet glyphs orbiting the boss for visual ID
+    if (mb.archetype === 'rune') {
+      const t = game.animFrame;
+      ctx.save();
+      const orbitR = 22;
+      ctx.fillStyle = '#a4f';
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + t * 0.02;
+        const rx = Math.round(mb.x + Math.cos(a) * orbitR);
+        const ry = Math.round(mb.y + Math.sin(a) * orbitR);
+        ctx.globalAlpha = 0.45 + 0.25 * Math.sin(t * 0.10 + k * 0.6);
+        ctx.fillRect(rx - 1, ry - 1, 2, 2);
+      }
+      ctx.restore();
     }
     // TAUNT BUBBLE — speech above boss when tauntLife > 0. Fades over its lifetime.
     // Position: above boss (y - 30 ish, scaled with boss size). Width auto-fits text.
