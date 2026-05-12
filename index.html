@@ -5946,6 +5946,7 @@ function updatePlayer() {
     const laser = (game.laserTimer || 0) > 0;
     const offsets = n === 1 ? [0] : n === 2 ? [-4, 4] : [-6, 0, 6];
     const pods = game.dualFighter ? [game.playerX - 8, game.playerX + 8] : [game.playerX];
+    let _critFiredThisShot = false;
     for (const cx of pods) {
       for (const ox of offsets) {
         const bx = cx + ox;
@@ -5963,6 +5964,7 @@ function updatePlayer() {
         if (!laser && Math.random() < 0.04) {
           b.crit = true;
           b.dmg = Math.max(b.dmg + 1, Math.round(b.dmg * 1.5));
+          _critFiredThisShot = true;
         }
         game.bullets.push(b);
         game.stats.shotsFired++;
@@ -6002,6 +6004,10 @@ function updatePlayer() {
       }
     }
     playSound('shoot');
+    // CRIT FIRE AUDIO CUE — single 'tick' ping when at least one crit bullet
+    // was fired this shot. Caps to once-per-shot regardless of pods × offsets
+    // to avoid SFX stacking at multi-pod fire.
+    if (_critFiredThisShot) playSound('tick');
   }
 }
 
