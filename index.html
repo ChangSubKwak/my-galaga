@@ -13432,7 +13432,28 @@ function drawHUD() {
   // PILOT TITLE under callsign — cached once per second to avoid recomputing each frame
   if (!game._titleCacheFrame || (game.animFrame - game._titleCacheFrame) > 60) {
     game._titleCacheFrame = game.animFrame;
-    game._titleCache = computePilotTitle();
+    const _newTitle = computePilotTitle();
+    // PILOT PROMOTION DETECTION — compare to last seen title persisted in
+    // localStorage. On change to a new tier, fire banner + SFX once. Skips
+    // first observation (no prior 'seen' value) — treats it as baseline.
+    try {
+      const _prevSeen = localStorage.getItem('galagaTitleSeen');
+      if (_prevSeen != null && _prevSeen !== _newTitle && !game._titlePromoFired) {
+        game._titlePromoFired = true;
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 50, text: 'PROMOTED',
+          color: '#fff', life: 100, maxLife: 100, size: 7
+        });
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 38, text: _newTitle,
+          color: '#fc4', life: 110, maxLife: 110, size: 11
+        });
+        if (typeof playSound === 'function') playSound('milestone');
+        if (typeof spawnConfetti === 'function') spawnConfetti(14);
+      }
+      localStorage.setItem('galagaTitleSeen', _newTitle);
+    } catch (e) {}
+    game._titleCache = _newTitle;
   }
   drawRetroText(game._titleCache, 28, 21, 4, COL.gray, 'center');
 
