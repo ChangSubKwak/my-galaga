@@ -4531,6 +4531,17 @@ function updateOneMegaBoss(mb) {
         }
         if (game.megaBosses && game.megaBosses.length === 2 && game.megaBosses.every(b => !b.alive)) {
           unlockAchievement('doubleBeat');
+          // DOUBLE KO BANNER — both bosses cleared. Surface as gold banner +
+          // confetti + milestone SFX for the rare double-stage moment.
+          if (!game._doubleKoFired) {
+            game._doubleKoFired = true;
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 - 60, text: 'DOUBLE KO!',
+              color: '#fc4', life: 110, maxLife: 110, size: 12
+            });
+            if (typeof spawnConfetti === 'function') spawnConfetti(16);
+            if (typeof playSound === 'function') playSound('milestone');
+          }
         }
         rumble(500, 0.9, 0.7);
         game.hitStopFrames = Math.max(game.hitStopFrames || 0, 14);
