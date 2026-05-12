@@ -7827,6 +7827,29 @@ function updateCollisions() {
               color: ksCol, life: 22, maxLife: 22, size: pts >= 1000 ? 7 : 5
             });
           }
+          if (e.ghost) {
+            // GHOST KILL CELEBRATION — purple sparkle burst + banner + persistent counter
+            game.floatTexts.push({
+              x: e.x, y: e.y - 12, text: 'GHOST KILL!',
+              color: '#a8f', life: 50, maxLife: 50, size: 8
+            });
+            if (game.shockwaves) {
+              game.shockwaves.push({ x: e.x, y: e.y, life: 0, maxLife: 18, maxR: 16, color: '#a8f' });
+            }
+            for (let k = 0; k < 8; k++) {
+              const a = (k / 8) * Math.PI * 2;
+              game.itemBursts.push({
+                x: e.x + Math.cos(a) * 6,
+                y: e.y + Math.sin(a) * 6,
+                life: -k, color: '#a8f'
+              });
+            }
+            playSound('powerUp');
+            try {
+              const gk = parseInt(localStorage.getItem('galagaGhostKills') || '0', 10) || 0;
+              localStorage.setItem('galagaGhostKills', String(gk + 1));
+            } catch (e) {}
+          }
           if (e.elite) {
             game.eliteKills = (game.eliteKills || 0) + 1;
             // Brief floating "ELITE!" tag so the kill reads as more meaningful
@@ -13782,6 +13805,11 @@ function drawStatsOverlay() {
       const goldenClears = parseInt(localStorage.getItem('galagaGoldenClears') || '0', 10);
       if (goldenClears >= 1) {
         profileRow('GOLDEN CLEARS', '★ ' + goldenClears, '#fc4');
+      }
+      // GHOST KILLS — count of invisible variant takedowns
+      const ghostKills = parseInt(localStorage.getItem('galagaGhostKills') || '0', 10);
+      if (ghostKills >= 1) {
+        profileRow('GHOST KILLS', String(ghostKills), ghostKills >= 50 ? '#a8f' : '#cce');
       }
       // PERFECT STREAK best — longest consecutive PERFECT CLEARs in a single run
       const perfectStreakBest = parseInt(localStorage.getItem('galagaPerfectStreakBest') || '0', 10);
