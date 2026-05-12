@@ -15151,6 +15151,39 @@ function drawHUD() {
       ctx.restore();
     }
   }
+  // ACTIVE BUFF TIMER BARS — vertical mini-bar stack for live timer countdowns.
+  // Each bar: 26px wide × 2px tall, color-coded by buff. Hidden when timer == 0.
+  // Placed right-side under PB pace indicator so the right column reads:
+  //   stage / icon / PB-bar / PB-pace / [buff bars stack]
+  if (!minimalHud
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    const _buffs = [
+      { t: game.laserTimer || 0,  d: LASER_DURATION,  c: '#f6c', lbl: 'L' },
+      { t: game.homingTimer || 0, d: HOMING_DURATION, c: '#0f8', lbl: 'H' },
+      { t: game.waveTimer || 0,   d: WAVE_DURATION,   c: '#6cf', lbl: 'W' },
+      { t: game.rapidTimer || 0,  d: RAPID_DURATION,  c: '#fc4', lbl: 'R' },
+      { t: game.slowTimer || 0,   d: SLOW_DURATION,   c: '#8ff', lbl: 'T' }
+    ];
+    let _by = 64;
+    for (const _b of _buffs) {
+      if (_b.t <= 0) continue;
+      const _bw = 26;
+      const _bx = BASE_W - 5 - _bw;
+      // Track (dim)
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = _b.c;
+      ctx.fillRect(_bx, _by, _bw, 2);
+      // Filled remaining
+      const _ratio = Math.max(0, Math.min(1, _b.t / _b.d));
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(_bx, _by, Math.round(_bw * _ratio), 2);
+      ctx.restore();
+      // Tiny label letter to the left
+      drawRetroText(_b.lbl, _bx - 2, _by + 1, 3, _b.c, 'right');
+      _by += 4;
+    }
+  }
   // WORLD CORRUPTION HUD INDICATOR — small "CORR XX%" label when stage 30+ enters
   // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
   // pure context cue for late-game depth.
