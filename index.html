@@ -8565,6 +8565,33 @@ function updateCollisions() {
               if (pick < acc) { type = k; break; }
             }
             game.powerUps.push({x: e.x, y: e.y, vy: 0.6, type});
+            // POWERUP SPAWN BURST — small ring + 6-particle starburst at the drop
+            // origin so the player visually catches the moment a pickup appears.
+            // Rare types (L/B) get a stronger 2x-radius gold ring for emphasis.
+            {
+              const _puCols = { S:'#f44', N:'#0ff', P:'#f6f', T:'#8ff', R:'#fc4',
+                                W:'#6cf', H:'#0f8', L:'#f6c', B:'#fff', E:'#0f8' };
+              const _puCol = _puCols[type] || '#fff';
+              const _rare = (type === 'L' || type === 'B');
+              if (game.shockwaves) {
+                game.shockwaves.push({
+                  x: e.x, y: e.y, life: 0,
+                  maxLife: _rare ? 24 : 16,
+                  maxR: _rare ? 18 : 12,
+                  color: _rare ? '#fc4' : _puCol
+                });
+              }
+              if (game.itemBursts) {
+                for (let k = 0; k < 6; k++) {
+                  const _a = (k / 6) * Math.PI * 2;
+                  game.itemBursts.push({
+                    x: e.x + Math.cos(_a) * 4,
+                    y: e.y + Math.sin(_a) * 4,
+                    life: -k, color: _puCol
+                  });
+                }
+              }
+            }
             // POWERUP DROP CUE — type-aware spawn SFX so the player can hear
             // what's incoming before looking. Rare types get a stronger cue.
             const dropSfx = (type === 'L' || type === 'B') ? 'milestone'
