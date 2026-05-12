@@ -12479,6 +12479,14 @@ function drawStageIntro() {
     if ((game.critKillsRun || 0) >= 3) {
       drawRetroText('CR x' + game.critKillsRun, BASE_W - 4, BASE_H/2 + 53, 4, '#fc4', 'right');
     }
+    // RUN ELAPSED PEEK — current run time in MM:SS when meaningful (>= 30s)
+    if ((game.runFrames || 0) >= 1800) {
+      const _rs = Math.floor(game.runFrames / 60);
+      const _rm = Math.floor(_rs / 60);
+      const _rss = _rs % 60;
+      drawRetroText('T ' + _rm + ':' + String(_rss).padStart(2, '0'),
+                    BASE_W - 4, BASE_H/2 + 59, 4, '#888', 'right');
+    }
     // BIOMES SEEN PEEK — lifetime biomes encountered fraction.
     try {
       const _bsRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
