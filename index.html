@@ -5096,7 +5096,27 @@ function startStage() {
     if (_bid) {
       // PER-RUN BIOMES SET — track distinct biomes this run for intro peek
       if (!game.runBiomesSeen) game.runBiomesSeen = new Set();
+      const _firstBiomeThisRun = !game.runBiomesSeen.has(_bid);
       game.runBiomesSeen.add(_bid);
+      // FIRST BIOME BANNER — when this biome enters for the first time this run,
+      // surface a big cinematic name banner. Skipped on stages 1-7 (no biome)
+      // and on the very first biome seen (covered by stage intro itself).
+      if (_firstBiomeThisRun
+          && BIOME_NAMES && BIOME_NAMES[_bid]
+          && game.runBiomesSeen.size >= 2) {
+        const _bn = BIOME_NAMES[_bid].name || _bid.toUpperCase();
+        const _bc = BIOME_NAMES[_bid].col || '#0cf';
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 50, text: 'BIOME SHIFT',
+          color: '#fff', life: 90, maxLife: 90, size: 6
+        });
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 38, text: _bn,
+          color: _bc, life: 100, maxLife: 100, size: 12
+        });
+        game.flashTimer = Math.max(game.flashTimer || 0, 6);
+        game.flashColor = _bc;
+      }
       // BIOME VISIT COUNT — per-biome counter (write once per stage entry)
       try {
         const _bvRaw = localStorage.getItem('galagaBiomeVisits') || '{}';
