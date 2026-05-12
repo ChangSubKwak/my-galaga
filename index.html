@@ -6885,6 +6885,8 @@ function commitGameToCumStats() {
   s.scoreTotal = (s.scoreTotal || 0) + (game.score || 0);
   // DASH TOTAL — sum of every dash activated across runs
   s.dashTotal = (s.dashTotal || 0) + (game.dashCount || 0);
+  // PICKUP STREAK BEST — max consecutive no-death pickups in a single run
+  s.pickupStreakBest = Math.max(s.pickupStreakBest || 0, game.pickupStreakBest || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -7261,6 +7263,7 @@ function updatePowerUps() {
       // PICKUP STREAK — consecutive pickups without dying. Milestone bonuses at
       // 5/10/15 give modest reward + visual. Resets in killPlayer.
       game.pickupStreak = (game.pickupStreak || 0) + 1;
+      if (game.pickupStreak > (game.pickupStreakBest || 0)) game.pickupStreakBest = game.pickupStreak;
       const _streakBonus = game.pickupStreak === 5  ? 200
                          : game.pickupStreak === 10 ? 500
                          : game.pickupStreak === 15 ? 1000
@@ -15640,6 +15643,12 @@ function drawStatsOverlay() {
       if (lpBest >= 3) {
         const lpCol = lpBest >= 10 ? '#fc4' : lpBest >= 6 ? '#0ff' : '#f6c';
         profileRow('LASER PIERCE BEST', 'x' + lpBest, lpCol);
+      }
+      // PICKUP STREAK BEST — max consecutive no-death pickups in a single run
+      const _psBest = Math.max(csN2.pickupStreakBest || 0, csC2.pickupStreakBest || 0);
+      if (_psBest >= 5) {
+        const _psCol = _psBest >= 25 ? '#fc4' : _psBest >= 15 ? '#0ff' : _psBest >= 10 ? '#0f8' : '#cce';
+        profileRow('PICKUP STREAK BEST', 'x' + _psBest, _psCol);
       }
       // DASH TOTAL — lifetime dashes across both modes
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
