@@ -15992,7 +15992,13 @@ function drawGameOverScreen() {
     const _mins = (game.runFrames || 1) / 3600;
     const _kpm = Math.round((s.kills || 0) / _mins);
     const _kpmCol = _kpm >= 100 ? '#fc4' : _kpm >= 50 ? '#0ff' : _kpm >= 25 ? '#0f8' : '#888';
-    drawRetroText('K/MIN ' + _kpm, BASE_W/2, cy + 52, 4, _kpmCol);
+    drawRetroText('K/MIN ' + _kpm, BASE_W/2 - 30, cy + 52, 4, _kpmCol);
+    // SCORE/MIN — symmetric efficiency metric
+    if ((game.score || 0) >= 1000) {
+      const _spm = Math.round((game.score || 0) / _mins);
+      const _spmCol = _spm >= 50000 ? '#fc4' : _spm >= 20000 ? '#0ff' : _spm >= 5000 ? '#0f8' : '#888';
+      drawRetroText('S/MIN ' + fmtScore(_spm), BASE_W/2 + 30, cy + 52, 4, _spmCol);
+    }
   }
   // SHIP KILLS CONTRIBUTION — kills added to current ship mastery this run.
   if (tTime >= 1 && (s.kills || 0) >= 10 && typeof selectedShip !== 'undefined') {
