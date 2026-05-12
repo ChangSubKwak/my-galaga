@@ -13108,6 +13108,12 @@ function drawHUD() {
     if (accum > 0) {
       drawRetroText('+' + fmtScore(accum), 6, 39, 5, '#ff4', 'left');
     }
+    // COMBO DECAY SECONDS — when timer drops below 1s (60 frames), show countdown
+    // text to the right of combo bar so the player sees how much time is left.
+    if (game.comboTimer < 60 && game.comboTimer > 0) {
+      const secs = (game.comboTimer / 60).toFixed(1);
+      drawRetroText(secs + 's', 66, 33, 5, '#f44', 'left');
+    }
     // COMBO MILESTONE PROGRESS — find next unclaimed arsenal tier and draw a tiny
     // bar showing distance-to-next-unlock. Bar at y=45, 60px wide.
     const arsenalTiers = [25, 50, 75, 100];
