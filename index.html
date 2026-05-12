@@ -15226,6 +15226,18 @@ function drawHUD() {
       ctx.restore();
     }
   }
+  // LIVE STAGE CLOCK — current stageFrames as mm:ss.d. Shown for all stages
+  // including first-ever attempts where PB pace is hidden. Sits just above
+  // the PB pace line at right side, dim so it doesn't compete with score.
+  if (!minimalHud
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (game.stageFrames || 0) > 0
+      && typeof fmtFrameTime === 'function') {
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    drawRetroText('T ' + fmtFrameTime(game.stageFrames), BASE_W - 5, 50, 4, '#888', 'right');
+    ctx.restore();
+  }
   // ACTIVE BUFF TIMER BARS — vertical mini-bar stack for live timer countdowns.
   // Each bar: 26px wide × 2px tall, color-coded by buff. Hidden when timer == 0.
   // Placed right-side under PB pace indicator so the right column reads:
