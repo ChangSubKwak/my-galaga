@@ -10969,6 +10969,9 @@ function drawStageIntro() {
   const isBoss = game.stage % BOSS_STAGE_INTERVAL === 0;
   const isChallenge = !isBoss && game.stage % 4 === 0;
   const isMilestone = MILESTONE_STAGES.indexOf(game.stage) >= 0;
+  // BOSS APPROACH WARNING — stage 9/19/29/.../79 are one stage before a boss.
+  // Surface "BOSS NEXT" text on the intro so the player knows to prep.
+  const isBossNext = !isBoss && (game.stage + 1) % BOSS_STAGE_INTERVAL === 0 && (game.stage + 1) <= 80;
   // Variant formation only matters for non-boss/non-challenge stages
   const variant = (!isBoss && !isChallenge) ? pickFormationVariant() : 'grid';
   const isVariant = variant !== 'grid';
@@ -11224,6 +11227,13 @@ function drawStageIntro() {
       const synBlink = (game.animFrame >> 2) % 2 === 0 ? synergyCol : '#fff';
       drawRetroText(synergyLabel + ' BUILD', BASE_W/2, pcY + 7, 5, synBlink);
     }
+  }
+
+  // BOSS APPROACH WARNING — when this stage's clear will be followed by a boss
+  // stage, paint a small red 'BOSS NEXT' tag near the bottom-center of the intro.
+  if (isBossNext && slide >= 1) {
+    const blink = (game.animFrame >> 2) % 2 === 0;
+    drawRetroText('BOSS NEXT', BASE_W/2, BASE_H - 38, 6, blink ? '#f44' : '#fff');
   }
 
   // STAGE INTRO ACTIVE PERK — if a perk is currently active (from prior boss),
