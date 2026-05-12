@@ -8607,6 +8607,8 @@ function updateCollisions() {
               const ck = parseInt(localStorage.getItem('galagaCritKills') || '0', 10) || 0;
               localStorage.setItem('galagaCritKills', String(ck + 1));
             } catch (e) {}
+            // Session counter for intro peek
+            game.critKillsRun = (game.critKillsRun || 0) + 1;
           }
           game.stats.kills++;
           if (game.stats.kills === 1) {
@@ -12353,6 +12355,10 @@ function drawStageIntro() {
     // ELITE COUNT PEEK — run elite kills counter when active.
     if ((game.eliteKills || 0) >= 1) {
       drawRetroText('EL x' + game.eliteKills, BASE_W - 4, BASE_H/2 + 41, 4, '#f44', 'right');
+    }
+    // CRIT KILLS PEEK — run crit kill counter when active.
+    if ((game.critKillsRun || 0) >= 3) {
+      drawRetroText('CR x' + game.critKillsRun, BASE_W - 4, BASE_H/2 + 53, 4, '#fc4', 'right');
     }
     // BIOMES SEEN PEEK — lifetime biomes encountered fraction.
     try {
