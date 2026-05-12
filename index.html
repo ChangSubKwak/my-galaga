@@ -16827,7 +16827,15 @@ function drawStatsOverlay() {
                   : '';
     row('SESSIONS', _ss + (_ssTier ? ' ' + _ssTier : ''), COL.cyan);
   }
-  row('PLAY TIME',   playTime, '#fff');
+  {
+    const _hours = (cs.runFrames || 0) / 3600 / 60;
+    const _ptTier = _hours >= 50 ? 'OBSESSED'
+                  : _hours >= 10 ? 'DEVOTED'
+                  : _hours >= 5  ? 'SERIOUS'
+                  : _hours >= 1  ? 'WARMED UP'
+                  : '';
+    row('PLAY TIME', playTime + (_ptTier ? ' ' + _ptTier : ''), '#fff');
+  }
   {
     const _tk = cs.kills || 0;
     const _tkTier = _tk >= 10000 ? 'LEGENDARY'
