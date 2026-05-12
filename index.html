@@ -2656,11 +2656,20 @@ function drawEnemyBullet(b) {
                   : (game.stage >= 50) ? 5
                   : (game.stage >= 25) ? 4 : 3;
 
+  // BIOME-TINTED TRAIL — at biome-active stages, paint the FARTHEST trail
+  // echo with biome color so the trail fades from biome→bullet color. Subtle
+  // identity hint without compromising readability of bullet head.
+  let _biomeTrailCol = null;
+  if (typeof biomeForStage === 'function') {
+    const _bid = biomeForStage(game.stage || 1);
+    if (_bid && BIOME_NAMES && BIOME_NAMES[_bid]) _biomeTrailCol = BIOME_NAMES[_bid].col;
+  }
   ctx.save();
   // Trail (1 or 3 fading echoes behind the bullet, depending on density)
   for (let i = 1; i <= trailLen; i++) {
     ctx.globalAlpha = (0.32 - i * 0.08) * _fadeIn;
-    ctx.fillStyle = C.trail;
+    // Last echo (farthest) uses biome color when active, otherwise default
+    ctx.fillStyle = (_biomeTrailCol && i === trailLen) ? _biomeTrailCol : C.trail;
     const tx = b.x + ux * i * 2.2;
     const ty = b.y + uy * i * 2.2;
     const sz = 4 - i;
