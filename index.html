@@ -16546,6 +16546,12 @@ function drawStatsOverlay() {
       drawRetroText(v, px + panelW - 8, y, 6, col || COL.yellow, 'right');
       y += 8;
     }
+    // COMPLETION % — top-level composite progression metric
+    if (typeof computeCompositeCompletion === 'function') {
+      const _pcmp = computeCompositeCompletion();
+      const _pcCol = _pcmp >= 80 ? '#fc4' : _pcmp >= 50 ? '#0ff' : _pcmp >= 20 ? '#0f8' : COL.white;
+      profileRow('COMPLETION', _pcmp + '%', _pcCol);
+    }
     profileRow('RUNS',       fmtScore(totalRuns));
     profileRow('TOTAL KILLS', fmtScore(totalKills));
     // LIFETIME SHOTS FIRED — sum across both modes, threshold 500
