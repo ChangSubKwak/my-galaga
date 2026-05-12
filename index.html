@@ -11405,6 +11405,15 @@ function drawStageIntro() {
     }
   }
 
+  // STAGE 100+ ENDLESS BANNER — major milestone in endless mode. Stage 100/150/200
+  // get a special "ENDLESS LEGEND" gold blink at top so the player knows they
+  // crossed a marathon threshold beyond the canonical 80-stage arc.
+  if (slide >= 1 && (game.stage === 100 || game.stage === 150 || game.stage === 200)) {
+    const eb = (game.animFrame >> 2) % 2 === 0;
+    drawRetroText('★ ENDLESS LEGEND ★', BASE_W/2, 18, 7, eb ? '#fc4' : '#fff');
+    drawRetroText('STAGE ' + game.stage, BASE_W/2, 27, 5, '#888');
+  }
+
   // BOSS APPROACH WARNING — when this stage's clear will be followed by a boss
   // stage, paint a small red 'BOSS NEXT' tag near the bottom-center of the intro.
   if (isBossNext && slide >= 1) {
