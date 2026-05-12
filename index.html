@@ -15890,6 +15890,20 @@ function drawGameOverScreen() {
 
   drawRetroText('BEST COMBO', BASE_W/2 - 40, cy + 26, 6, COL.cyan);
   drawRetroText(Math.floor((game.comboBest || 0) * tCombo).toString(), BASE_W/2 + 40, cy + 26, 7, COL.yellow, 'right');
+  // COMBO TIER LABEL — after count completes
+  if (tCombo >= 1) {
+    const _cb = game.comboBest || 0;
+    const _cT = _cb >= 30 ? 'MAX'
+             : _cb >= 20 ? 'PLATINUM'
+             : _cb >= 15 ? 'GOLD'
+             : _cb >= 10 ? 'SILVER'
+             : _cb >= 5  ? 'BRONZE'
+             : null;
+    if (_cT) {
+      const _cTcol = _cb >= 30 ? '#fc4' : _cb >= 20 ? '#f6f' : _cb >= 15 ? '#ff8' : _cb >= 10 ? '#0ff' : '#0f8';
+      drawRetroText(_cT, BASE_W/2 - 40, cy + 32, 4, _cTcol, 'left');
+    }
+  }
   // COMBO PB COMPARE — when count finishes show NEW BEST! or PB: N
   if (tCombo >= 1) {
     try {
