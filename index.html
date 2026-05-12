@@ -2010,8 +2010,11 @@ function drawStar(s) {
   const flick = (1 - twinkleAmp) + twinkleAmp * Math.sin(s.twinklePhase);
   const a = s.brightness * flick;
   ctx.globalAlpha = a;
-  // Far stars get a cooler tint to convey depth
-  ctx.fillStyle = s.layer === 'far' ? '#9ac' : s.color;
+  // WITCH STAR HUE SHIFT — when witch slow is active, stars shift to cool blue
+  // for a "time stopped" atmospheric beat. Overrides the layer color briefly.
+  const _witchActive = game && (game.witchTimer || 0) > 0;
+  // Far stars get a cooler tint to convey depth (witch overrides with deep cyan)
+  ctx.fillStyle = _witchActive ? '#5cf' : (s.layer === 'far' ? '#9ac' : s.color);
   ctx.fillRect(s.x, s.y, 1, 1);
   // BIOME STARFIELD TINT — near-layer stars overlay a faint biome color so the
   // sky cohesion shifts with biome (ice = cool blue stars, corona = warm, etc.).
