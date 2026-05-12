@@ -13013,6 +13013,10 @@ function drawStageIntro() {
     if ((game.dashCount || 0) >= 5) {
       drawRetroText('DS x' + game.dashCount, BASE_W - 4, BASE_H/2 + 101, 4, '#0ff', 'right');
     }
+    // PICKUP STREAK BEST RUN PEEK — best no-death pickup streak this run
+    if ((game.pickupStreakBest || 0) >= 3) {
+      drawRetroText('PS x' + game.pickupStreakBest, BASE_W - 4, BASE_H/2 + 107, 4, '#0cf', 'right');
+    }
     // RUN ELAPSED PEEK — current run time in MM:SS when meaningful (>= 30s)
     if ((game.runFrames || 0) >= 1800) {
       const _rs = Math.floor(game.runFrames / 60);
