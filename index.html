@@ -16838,6 +16838,15 @@ function drawStatsOverlay() {
     } catch (e) {}
     profileRow('STAGE TIME PBS', String(stagePBCount), '#0f8');
     profileRow('STAGE SCORE PBS', String(scorePBCount), '#ff4');
+    // STAGE SCORE PB SUM — sum of all stage-PB scores (cumulative best moments)
+    try {
+      let _scPbSum = 0;
+      for (const _k in (stageScorePBs || {})) _scPbSum += (stageScorePBs[_k] || 0);
+      if (_scPbSum >= 10000) {
+        const _scPbCol = _scPbSum >= 10000000 ? '#fc4' : _scPbSum >= 1000000 ? '#0ff' : _scPbSum >= 100000 ? '#0f8' : '#cce';
+        profileRow('STAGE PB SUM', fmtScore(_scPbSum), _scPbCol);
+      }
+    } catch (e) {}
     profileRow('ACHIEVEMENTS', achCount + ' / ' + achTotal + '  ' + achPct + '%',
                achPct >= 80 ? COL.green : COL.magenta);
     // Daily streak (only if active)
