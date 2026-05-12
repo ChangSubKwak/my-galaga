@@ -11592,6 +11592,15 @@ function drawTitleScreen() {
     const _achBlink = (t >> 2) % 4 !== 0 ? '#fc4' : '#ff8';
     drawRetroText('100% ★', BASE_W/2, 66, 5, _achBlink, 'center');
   }
+  // PARRY MASTER BADGE — when lifetime parryStreakBest >= 10
+  try {
+    const _csNp = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
+    const _csCp = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
+    const _psPm = Math.max(_csNp.parryStreakBest || 0, _csCp.parryStreakBest || 0);
+    if (_psPm >= 10) {
+      drawRetroText('PARRY MASTER', BASE_W/2, 71, 4, '#0cf', 'center');
+    }
+  } catch (e) {}
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
