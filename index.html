@@ -15842,6 +15842,14 @@ function drawStatsOverlay() {
         const _pwCol = _pwTot >= 100 ? '#fc4' : _pwTot >= 30 ? '#0ff' : _pwTot >= 10 ? '#0f8' : '#cce';
         profileRow('PERFECT WAVES', String(_pwTot), _pwCol);
       }
+      // AVG STAGE TIME — total play frames divided by stages cleared (>= 10
+      // sample). Lower = more efficient runs.
+      const _stcSample = (csN2.stagesClearedTotal || 0) + (csC2.stagesClearedTotal || 0);
+      const _runFr = (csN2.runFrames || 0) + (csC2.runFrames || 0);
+      if (_stcSample >= 10 && _runFr > 0) {
+        const _avgSec = ((_runFr / _stcSample) / 60).toFixed(1);
+        profileRow('AVG STAGE TIME', _avgSec + 's', '#0ff');
+      }
       // DASH TOTAL — lifetime dashes across both modes
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
       if (_dTot >= 10) {
