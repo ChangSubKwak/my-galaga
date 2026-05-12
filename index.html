@@ -5809,6 +5809,10 @@ function updateBullets() {
       }
       b.x += b.vx;
       b.y += b.vy;
+      // HOMING TRAIL — record up to 5 prev positions for path visualization
+      if (!b.trail) b.trail = [];
+      b.trail.unshift({ x: b.x, y: b.y });
+      if (b.trail.length > 5) b.trail.length = 5;
     } else {
       b.y += b.vy;
       if (b.kind === 'wave') {
@@ -12335,6 +12339,17 @@ function drawGameplay() {
 
   // Draw player bullets — GAM-42 tier visuals (Sleek / Nova / Shard)
   for (const b of game.bullets) {
+    // HOMING TRAIL — fade-out green dot trail showing recent path of homing bullets
+    if (b.kind === 'homing' && b.trail && b.trail.length > 0) {
+      ctx.save();
+      ctx.fillStyle = '#0f8';
+      for (let ti = 0; ti < b.trail.length; ti++) {
+        const tp = b.trail[ti];
+        ctx.globalAlpha = (1 - ti / b.trail.length) * 0.6;
+        ctx.fillRect(Math.round(tp.x), Math.round(tp.y), 1, 1);
+      }
+      ctx.restore();
+    }
     // CRITICAL HIT outline — pre-render gold halo for crit bullets so the
     // player anticipates the +50% damage hit before it lands.
     if (b.crit) {
