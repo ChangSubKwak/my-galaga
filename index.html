@@ -390,18 +390,40 @@ function dailyLabel() {
 // rewards +5000 score and persists per-day completion flag so it triggers only
 // once per day per player. Read by TITLE + STAGE_INTRO + check sites in update.
 const DAILY_MISSIONS = [
-  { id: 'reach10',   label: 'REACH STAGE 10',         check: g => (g.stats.maxStage || 0) >= 10 },
-  { id: 'reach20',   label: 'REACH STAGE 20',         check: g => (g.stats.maxStage || 0) >= 20 },
-  { id: 'score100k', label: 'SCORE 100,000',          check: g => (g.score || 0) >= 100000 },
-  { id: 'kill200',   label: '200 KILLS',              check: g => (g.stats.kills || 0) >= 200 },
-  { id: 'parry20',   label: '20 PARRIES',             check: g => (g.parryCount || 0) >= 20 },
-  { id: 'graze30',   label: '30 CLOSE PASSES',        check: g => (g.stageCloseCount || 0) + (g._dailyGrazeAcc || 0) >= 30 },
-  { id: 'perfect3',  label: '3 PERFECT CLEARS',       check: g => (g.perfectStreak || 0) >= 3 },
+  { id: 'reach10',   label: 'REACH STAGE 10',
+    check: g => (g.stats.maxStage || 0) >= 10,
+    progress: g => Math.min(10, g.stats.maxStage || 0) + '/10' },
+  { id: 'reach20',   label: 'REACH STAGE 20',
+    check: g => (g.stats.maxStage || 0) >= 20,
+    progress: g => Math.min(20, g.stats.maxStage || 0) + '/20' },
+  { id: 'score100k', label: 'SCORE 100,000',
+    check: g => (g.score || 0) >= 100000,
+    progress: g => Math.min(100, Math.floor((g.score || 0) / 1000)) + 'K/100K' },
+  { id: 'kill200',   label: '200 KILLS',
+    check: g => (g.stats.kills || 0) >= 200,
+    progress: g => Math.min(200, g.stats.kills || 0) + '/200' },
+  { id: 'parry20',   label: '20 PARRIES',
+    check: g => (g.parryCount || 0) >= 20,
+    progress: g => Math.min(20, g.parryCount || 0) + '/20' },
+  { id: 'graze30',   label: '30 CLOSE PASSES',
+    check: g => (g.stageCloseCount || 0) + (g._dailyGrazeAcc || 0) >= 30,
+    progress: g => Math.min(30, (g.stageCloseCount || 0) + (g._dailyGrazeAcc || 0)) + '/30' },
+  { id: 'perfect3',  label: '3 PERFECT CLEARS',
+    check: g => (g.perfectStreak || 0) >= 3,
+    progress: g => Math.min(3, g.perfectStreak || 0) + '/3' },
   // Expansion — Turn 132: cover additional mechanics for variety
-  { id: 'bosses2',   label: 'DEFEAT 2 BOSSES',        check: g => (g.bossesKilledThisRun || 0) >= 2 },
-  { id: 'maxPower',  label: 'REACH MAX POWER',        check: g => !!g.maxPowerRevealed },
-  { id: 'dual',      label: 'RESCUE A SHIP',          check: g => !!g.dualFighter },
-  { id: 'elite5',    label: '5 ELITE KILLS',          check: g => (g.eliteKills || 0) >= 5 }
+  { id: 'bosses2',   label: 'DEFEAT 2 BOSSES',
+    check: g => (g.bossesKilledThisRun || 0) >= 2,
+    progress: g => Math.min(2, g.bossesKilledThisRun || 0) + '/2' },
+  { id: 'maxPower',  label: 'REACH MAX POWER',
+    check: g => !!g.maxPowerRevealed,
+    progress: g => g.maxPowerRevealed ? '✓' : '—' },
+  { id: 'dual',      label: 'RESCUE A SHIP',
+    check: g => !!g.dualFighter,
+    progress: g => g.dualFighter ? '✓' : '—' },
+  { id: 'elite5',    label: '5 ELITE KILLS',
+    check: g => (g.eliteKills || 0) >= 5,
+    progress: g => Math.min(5, g.eliteKills || 0) + '/5' }
 ];
 function dailyMission() {
   const s = dailySeed() | 0;
@@ -12447,14 +12469,16 @@ function drawHUD() {
 
   // DAILY MISSION HUD — small label during daily-mode runs reminding the player
   // of today's objective. Only shows when mission is incomplete + during active
-  // gameplay. Provides progress hint (X/Y) for countable missions.
+  // gameplay. Provides live progress (X/Y or ✓/—) via mission.progress(g).
   if (game.dailyMode && typeof dailyMission === 'function'
       && !game._dailyMissionFired
       && !(typeof isDailyMissionDoneToday === 'function' && isDailyMissionDoneToday())
       && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
     const m = dailyMission();
     if (m) {
-      drawRetroText('M: ' + m.label, BASE_W - 5, 44, 4, '#f6f', 'right');
+      const pStr = (typeof m.progress === 'function') ? m.progress(game) : '';
+      const label = pStr ? ('M: ' + m.label + ' ' + pStr) : ('M: ' + m.label);
+      drawRetroText(label, BASE_W - 5, 44, 4, '#f6f', 'right');
     }
   }
 
