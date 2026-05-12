@@ -12832,6 +12832,9 @@ function drawStageIntro() {
     if (_biomeId && BIOME_NAMES[_biomeId]) {
       const bInfo = BIOME_NAMES[_biomeId];
       drawRetroText('— ' + bInfo.label + ' —', BASE_W/2 + offX, BASE_H/2 + 2, 5, bInfo.col);
+      // BIOME CYCLE INDEX — 1-based position within the 8-biome cycle
+      const _bIdx = Math.floor((game.stage - 8) / 4) % 8;
+      drawRetroText('(' + (_bIdx + 1) + ' / 8)', BASE_W/2 + offX, BASE_H/2 - 4, 3, '#555');
       // BIOME WHISPER — atmospheric one-liner under biome label, last 75 frames of
       // intro only (after the warp settles). Color softened from biome col.
       if (typeof BIOME_WHISPERS !== 'undefined' && BIOME_WHISPERS[_biomeId] && introElapsed > 45) {
