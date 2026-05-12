@@ -17252,7 +17252,12 @@ function drawStatsOverlay() {
                         : _scTot >= 10000000 ? '#fc4'
                         : _scTot >= 1000000 ? '#0ff'
                         : _scTot >= 100000 ? '#0f8' : '#cce';
-        profileRow('LIFETIME SCORE', fmtScore(_scTot), _scTotCol);
+        const _scTotTier = _scTot >= 100000000 ? 'MYTHIC'
+                         : _scTot >= 10000000  ? 'LEGEND'
+                         : _scTot >= 1000000   ? 'CHAMPION'
+                         : _scTot >= 100000    ? 'ACE'
+                         : '';
+        profileRow('LIFETIME SCORE', fmtScore(_scTot) + (_scTotTier ? ' ' + _scTotTier : ''), _scTotCol);
         // AVG SCORE PER RUN — derived from sessions across both modes
         const _runs = (csN2.sessions || 0) + (csC2.sessions || 0);
         if (_runs >= 3) {
