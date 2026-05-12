@@ -6887,6 +6887,8 @@ function commitGameToCumStats() {
   s.dashTotal = (s.dashTotal || 0) + (game.dashCount || 0);
   // PICKUP STREAK BEST — max consecutive no-death pickups in a single run
   s.pickupStreakBest = Math.max(s.pickupStreakBest || 0, game.pickupStreakBest || 0);
+  // BOSS KILLS LIFETIME — sum of all bosses defeated across runs
+  s.bossKillsTotal = (s.bossKillsTotal || 0) + (game.bossesKilledThisRun || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -15705,6 +15707,12 @@ function drawStatsOverlay() {
       if (_psBest >= 5) {
         const _psCol = _psBest >= 25 ? '#fc4' : _psBest >= 15 ? '#0ff' : _psBest >= 10 ? '#0f8' : '#cce';
         profileRow('PICKUP STREAK BEST', 'x' + _psBest, _psCol);
+      }
+      // BOSS KILLS LIFETIME — sum across both modes
+      const _bkTot = (csN2.bossKillsTotal || 0) + (csC2.bossKillsTotal || 0);
+      if (_bkTot >= 1) {
+        const _bkCol = _bkTot >= 100 ? '#fc4' : _bkTot >= 30 ? '#0ff' : _bkTot >= 10 ? '#0f8' : '#f8a';
+        profileRow('BOSS KILLS', String(_bkTot), _bkCol);
       }
       // DASH TOTAL — lifetime dashes across both modes
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
