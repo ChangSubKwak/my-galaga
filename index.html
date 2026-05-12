@@ -11799,6 +11799,27 @@ function drawTitleScreen() {
       drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
     }
   } catch (e) {}
+  // PERKS DOTS — 10 dots showing perks tried at least once (lifetime).
+  try {
+    const _pkRaw = localStorage.getItem('galagaPerkPicks') || '{}';
+    const _pkTot = JSON.parse(_pkRaw);
+    if (typeof PERK_IDS !== 'undefined' && PERK_IDS && PERK_IDS.length > 0) {
+      const _hasAny = PERK_IDS.some(id => (_pkTot[id] || 0) >= 1);
+      if (_hasAny) {
+        const _pY = 72;
+        const _pStartX = BASE_W/2 - (PERK_IDS.length * 4) / 2;
+        ctx.save();
+        for (let _pi = 0; _pi < PERK_IDS.length; _pi++) {
+          const _pId = PERK_IDS[_pi];
+          const _pCol = (typeof PERKS !== 'undefined' && PERKS[_pId]) ? PERKS[_pId].col : '#fff';
+          ctx.globalAlpha = (_pkTot[_pId] || 0) >= 1 ? 0.85 : 0.20;
+          ctx.fillStyle = _pCol;
+          ctx.fillRect(_pStartX + _pi * 4, _pY, 2, 2);
+        }
+        ctx.restore();
+      }
+    }
+  } catch (e) {}
   // DIFFICULTIES DOTS — 3 dot row (green/white/red) above ships
   try {
     const _dRaw = localStorage.getItem('galagaDifficultiesUsed') || '[]';
