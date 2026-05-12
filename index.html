@@ -14870,6 +14870,14 @@ function drawLastEnemyAlert() {
   // Only when formation is fully entered to avoid alerting during entrance
   if (!game.allEntered) return;
   const alive = (game.enemies || []).filter(e => e.alive);
+  // STAGE END COUNTDOWN — when 2-5 enemies remain, show small "N LEFT" tag
+  // top-center so the player can plan their last sweeps. Skipped at 1 (LAST!
+  // takes over) and >5 (too early to nudge).
+  if (alive.length >= 2 && alive.length <= 5) {
+    const _cBlink = (game.animFrame >> 3) % 2 === 0;
+    drawRetroText(alive.length + ' LEFT', BASE_W/2, BASE_H - 24, 5,
+                  _cBlink ? '#fc8' : '#fff', 'center');
+  }
   if (alive.length !== 1) return;
   const e = alive[0];
   const t = game.animFrame;
