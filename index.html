@@ -7578,6 +7578,20 @@ function updateFormationBreathing() {
           e.pathProgress = 0;
           e.pathSpeed = 0.012 + game.stage * 0.002;
           e.previewPath = null;
+          // DIVE PATH PREVIEW — sample first segment into 14 fading dots so the
+          // player can read the dive trajectory before it commits. Stored on the
+          // enemy and ticked down each frame in updateEnemies.
+          if (e.pathSegments && e.pathSegments[0]) {
+            const seg = e.pathSegments[0];
+            const dots = [];
+            for (let pp = 1; pp <= 14; pp++) {
+              const tt = pp / 14;
+              const pt = bezierPoint(seg.p0, seg.p1, seg.p2, seg.p3, tt);
+              dots.push({ x: pt.x, y: pt.y, t: tt });
+            }
+            e.divePathDots = dots;
+            e.divePathLife = 22;
+          }
           _diveStartCount++;
         }
       }
@@ -7602,6 +7616,10 @@ function updateEnemies() {
   for (const e of game.enemies) {
     if (e.criticalPulseTimer && e.criticalPulseTimer > 0) e.criticalPulseTimer--;
     if (e.hitFlashTimer && e.hitFlashTimer > 0) e.hitFlashTimer--;
+    if (e.divePathLife && e.divePathLife > 0) {
+      e.divePathLife--;
+      if (e.divePathLife <= 0) { e.divePathDots = null; }
+    }
   }
 
   // LAST STAND ANNOUNCEMENT — one-shot "LAST ONE!" floatText when count crosses
@@ -12214,6 +12232,22 @@ function drawGameplay() {
         ctx.fillStyle = '#888';
         // Simple 7×6 silhouette box at home position
         ctx.fillRect(ai.x - 4, ai.y - 4, 9, 9);
+      }
+      ctx.restore();
+    }
+    // DIVE PATH PREVIEW — render fading dots along upcoming dive trajectory so
+    // the player can read it before the enemy commits. Faded by global lifetime
+    // (divePathLife). Drawn before the sprite so the enemy reads above its own path.
+    {
+      ctx.save();
+      ctx.fillStyle = '#f44';
+      for (const e of game.enemies) {
+        if (!e.alive || !e.divePathDots || (e.divePathLife || 0) <= 0) continue;
+        const lifeFrac = e.divePathLife / 22;
+        for (const d of e.divePathDots) {
+          ctx.globalAlpha = (1 - d.t) * 0.55 * lifeFrac + 0.05 * lifeFrac;
+          ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 1);
+        }
       }
       ctx.restore();
     }
