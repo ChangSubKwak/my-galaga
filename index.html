@@ -12538,6 +12538,10 @@ function drawStageIntro() {
         drawRetroText('D' + _dStreak, BASE_W - 4, BASE_H/2 + 71, 4, _dsCol, 'right');
       }
     }
+    // BOSS COUNT PEEK — bosses defeated this run.
+    if ((game.bossesKilledThisRun || 0) >= 1) {
+      drawRetroText('BS x' + game.bossesKilledThisRun, BASE_W - 4, BASE_H/2 + 77, 4, '#f8a', 'right');
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
