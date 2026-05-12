@@ -12408,6 +12408,17 @@ function drawStageIntro() {
     if (game.ship && game.ship.name) {
       drawRetroText(game.ship.name, BASE_W - 4, BASE_H/2 - 9, 4, game.ship.color || '#0cf', 'right');
     }
+    // LIFETIME SCORE PEEK — total score across all runs as K format
+    try {
+      const _csNs = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
+      const _csCs = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
+      const _scT = (_csNs.scoreTotal || 0) + (_csCs.scoreTotal || 0);
+      if (_scT >= 10000) {
+        const _scK = _scT >= 1000000 ? (Math.floor(_scT / 100000) / 10) + 'M'
+                   : Math.floor(_scT / 1000) + 'K';
+        drawRetroText('Σ ' + _scK, 4, BASE_H/2 + 12, 4, '#888', 'left');
+      }
+    } catch (e) {}
     // SHIP SPRITE PREVIEW — small ship icon next to TIER label so the player
     // sees the active ship at every intro entry. Reuses drawPlayer with lvl
     // to show current build state.
