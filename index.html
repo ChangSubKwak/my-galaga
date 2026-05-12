@@ -9762,7 +9762,15 @@ function spawnDebris(x, y, type) {
 }
 
 function spawnConfetti(count) {
-  const cols = ['#ff4', '#0ff', '#f6f', '#0f8', '#fa0', '#fff'];
+  // BIOME-TINTED CONFETTI — replace one slot in the palette with active biome
+  // color so celebrations carry environment hue at biome stages.
+  let cols = ['#ff4', '#0ff', '#f6f', '#0f8', '#fa0', '#fff'];
+  if (game && typeof biomeForStage === 'function') {
+    const _cid = biomeForStage(game.stage || 1);
+    if (_cid && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_cid]) {
+      cols = ['#ff4', '#0ff', '#f6f', BIOME_NAMES[_cid].col, '#fa0', '#fff'];
+    }
+  }
   for (let i = 0; i < count; i++) {
     game.itemBursts.push({
       x: 30 + Math.random() * (BASE_W - 60),
