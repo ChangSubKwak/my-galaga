@@ -10092,6 +10092,8 @@ function spawnStageClear(label, sub) {
         _gT[_grade] = (_gT[_grade] || 0) + 1;
         localStorage.setItem('galagaStageGrades', JSON.stringify(_gT));
       } catch (e) {}
+      // PER-RUN S GRADE COUNTER — feeds into GAME_OVER run highlights
+      if (_grade === 'S') game.runSGrades = (game.runSGrades || 0) + 1;
     }
   } catch (e) {}
   // STAGE CLEAR BIOME FLASH — brief biome-colored screen flash for environmental
@@ -12685,6 +12687,8 @@ function pickRunHighlights() {
   const ckRun = game.critKillsRun || 0;
   if (ckRun >= 5)         out.push({ label: 'CRIT KILLS',    value: String(ckRun),       prio: ckRun * 5, col: '#fc4' });
   if (elites >= 1)        out.push({ label: 'ELITES SLAIN',  value: String(elites),       prio: elites * 18, col: '#f44' });
+  const sGr = game.runSGrades || 0;
+  if (sGr >= 1)           out.push({ label: 'S GRADES',      value: '★ ' + sGr,           prio: sGr * 40, col: '#fc4' });
   if (stages >= 3)        out.push({ label: 'STAGES CLEARED', value: String(stages),     prio: stages * 8, col: '#fc4' });
   if (bosses >= 1)        out.push({ label: 'BOSSES DOWN',    value: String(bosses),     prio: bosses * 60, col: '#f8a' });
   if (rescues >= 1)       out.push({ label: 'SELF RESCUE',    value: String(rescues),    prio: rescues * 30, col: '#fc4' });
