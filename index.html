@@ -11574,6 +11574,18 @@ function drawStageIntro() {
     drawRetroText('BOSS NEXT', BASE_W/2, BASE_H - 38, 6, blink ? '#f44' : '#fff');
   }
 
+  // STAGE INTRO MARATHON PROGRESS — when no-death stage streak ≥ 2, show
+  // current streak + distance to next milestone (5/10/20). Encourages
+  // preservation by making progress visible at stage entry.
+  if (slide >= 1 && (game.zenStreak || 0) >= 2) {
+    const zs = game.zenStreak;
+    const nextMilestone = zs < 5 ? 5 : zs < 10 ? 10 : zs < 20 ? 20 : null;
+    const label = nextMilestone
+                ? 'MARATHON x' + zs + ' → x' + nextMilestone
+                : 'MARATHON x' + zs;
+    drawRetroText(label, BASE_W/2, BASE_H - 28, 4, '#fc4');
+  }
+
   // STAGE INTRO ACTIVE PERK — if a perk is currently active (from prior boss),
   // surface it in the intro so the player knows their build going into the
   // next stage. Reminder fades in with the rest of the intro content.
