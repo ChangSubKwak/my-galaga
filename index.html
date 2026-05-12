@@ -5860,12 +5860,12 @@ function updateBullets() {
       // Filter out targets BEHIND the bullet (y > bullet.y + slack) — without this, a homing
       // bullet that locks on a low-flying diver curves DOWN past the player, missing entirely.
       // Also re-normalize velocity each frame so repeated lerps don't drift the bullet's speed.
-      let nx = 0, ny = 0, found = false, bestD = 1e9;
+      let nx = 0, ny = 0, found = false, bestD = 1e9, tgtX = 0, tgtY = 0;
       const consider = (e) => {
         if (e.y > b.y + 16) return;
         const dx = e.x - b.x, dy = e.y - b.y;
         const d2 = dx * dx + dy * dy;
-        if (d2 < bestD) { bestD = d2; nx = dx; ny = dy; found = true; }
+        if (d2 < bestD) { bestD = d2; nx = dx; ny = dy; found = true; tgtX = e.x; tgtY = e.y; }
       };
       for (const en of (game.enemies || [])) if (en.alive) consider(en);
       for (const mb of (game.megaBosses || [])) if (mb.alive) consider(mb);
@@ -5873,6 +5873,9 @@ function updateBullets() {
         const cw = (game.challengeWaves && game.challengeWaves[game.challengeWaveIdx]) || [];
         for (const en of cw) if (en.alive) consider(en);
       }
+      // HOMING TARGET LINE — stamp current lock position for draw-side rendering
+      if (found) { b.tgtX = tgtX; b.tgtY = tgtY; }
+      else { b.tgtX = null; b.tgtY = null; }
       const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 5;
       if (found) {
         const d = Math.sqrt(bestD) || 1;
@@ -12567,6 +12570,18 @@ function drawGameplay() {
 
   // Draw player bullets — GAM-42 tier visuals (Sleek / Nova / Shard)
   for (const b of game.bullets) {
+    // HOMING TARGET LINE — faint 1px line from bullet to current lock-on target
+    if (b.kind === 'homing' && b.tgtX != null && b.tgtY != null) {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = '#0f8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(b.x), Math.round(b.y));
+      ctx.lineTo(Math.round(b.tgtX), Math.round(b.tgtY));
+      ctx.stroke();
+      ctx.restore();
+    }
     // HOMING TRAIL — fade-out green dot trail showing recent path of homing bullets
     // WAVE TRAIL — same pattern for zigzag wave-mode bullets, cyan color
     if (b.trail && b.trail.length > 0 && (b.kind === 'homing' || b.kind === 'wave')) {
