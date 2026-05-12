@@ -12806,6 +12806,15 @@ function drawStageIntro() {
       if (_ciC >= 5) {
         const _ciCol = _ciC >= 80 ? '#fc4' : _ciC >= 50 ? '#0ff' : _ciC >= 20 ? '#0f8' : '#888';
         drawRetroText('CMPL ' + _ciC + '%', BASE_W - 4, BASE_H/2 - 30, 4, _ciCol, 'right');
+        // Mini progress bar (30px wide) right under the text
+        ctx.save();
+        const _ciBarX = BASE_W - 33, _ciBarY = BASE_H/2 - 25;
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(_ciBarX, _ciBarY, 30, 1);
+        ctx.fillStyle = _ciCol;
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(_ciBarX, _ciBarY, Math.round(30 * _ciC / 100), 1);
+        ctx.restore();
       }
     }
     // SHIP MASTERY PEEK — lifetime kills with current ship (above name)
