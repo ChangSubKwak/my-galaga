@@ -12784,6 +12784,10 @@ function pickRunHighlights() {
   if (elites >= 1)        out.push({ label: 'ELITES SLAIN',  value: String(elites),       prio: elites * 18, col: '#f44' });
   const sGr = game.runSGrades || 0;
   if (sGr >= 1)           out.push({ label: 'S GRADES',      value: '★ ' + sGr,           prio: sGr * 40, col: '#fc4' });
+  const untRun = game.runUntouched || 0;
+  if (untRun >= 1)        out.push({ label: 'UNTOUCHED',     value: String(untRun),       prio: untRun * 28, col: '#0ff' });
+  const lsRun = game.runLastStands || 0;
+  if (lsRun >= 1)         out.push({ label: 'LAST STANDS',   value: String(lsRun),        prio: lsRun * 35, col: '#f44' });
   if (stages >= 3)        out.push({ label: 'STAGES CLEARED', value: String(stages),     prio: stages * 8, col: '#fc4' });
   if (bosses >= 1)        out.push({ label: 'BOSSES DOWN',    value: String(bosses),     prio: bosses * 60, col: '#f8a' });
   if (rescues >= 1)       out.push({ label: 'SELF RESCUE',    value: String(rescues),    prio: rescues * 30, col: '#fc4' });
@@ -17602,6 +17606,16 @@ function drawStatsOverlay() {
                       : '';
         profileRow('LAST STANDS', String(lastStands) + _lsTier,
                    lastStands >= 25 ? '#f44' : lastStands >= 10 ? '#fa8' : '#fc8');
+      }
+      // UNTOUCHED STAGES — lifetime count of zero-hit-attempt stage clears
+      const untouchedStages = parseInt(localStorage.getItem('galagaUntouchedStages') || '0', 10);
+      if (untouchedStages >= 1) {
+        const _utTier = untouchedStages >= 50 ? ' UNTOUCHABLE'
+                      : untouchedStages >= 25 ? ' GHOST'
+                      : untouchedStages >= 10 ? ' EVADER'
+                      : '';
+        profileRow('UNTOUCHED', String(untouchedStages) + _utTier,
+                   untouchedStages >= 50 ? '#fc4' : untouchedStages >= 10 ? '#0ff' : '#cef');
       }
       // STAGE GRADES — lifetime tally of S/A/B/C/D letter grades. Surfaces S
       // (top-tier mastery: 95%+ acc + no-death + PB beat). Shown only when S ≥ 1.
