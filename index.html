@@ -12176,66 +12176,48 @@ function drawTitleScreen() {
     }
   }
 
-  // GAME COMPLETE STAR — if user has ever beaten stage 80, show gold ★ above
-  // the logo as a permanent badge of honor. Read from localStorage.
+  // TROPHY ROW — single horizontal badge strip at y=22 (above top dashed
+  // border, below greeting). Previously badges stacked at y=40-76 *inside*
+  // the GALAGA logo zone and overlapped the rainbow letters. Now compact
+  // 2-letter codes on one row. ALL SHIPS / ALL DIFFICULTIES / ALL BIOMES /
+  // BESTIARY text labels removed — the colored dot rows below the logo
+  // already communicate that progression visually, avoiding duplication.
   try {
     const _gcCnt = parseInt(localStorage.getItem('galagaGameCompleteCount') || '0', 10) || 0;
-    if (_gcCnt > 0) {
-      const _gcBlink = (t >> 3) % 4 !== 0 ? '#fc4' : '#ff8';
-      const _gcLabel = _gcCnt >= 5 ? '★ ★ ★' : _gcCnt >= 2 ? '★ ★' : '★';
-      drawRetroText(_gcLabel, BASE_W/2, 40, 6, _gcBlink, 'center');
-    }
-  } catch (e) {}
-  // ALL SHIPS USED BADGE — if user has piloted all 4 ships, show 'ALL SHIPS'
-  // ribbon. Reads galagaShipsUsed set.
-  try {
-    const _shipsUsed = JSON.parse(localStorage.getItem('galagaShipsUsed') || '[]');
-    if (Array.isArray(_shipsUsed) && _shipsUsed.length >= 4) {
-      drawRetroText('ALL SHIPS', BASE_W/2, 46, 4, '#0cf', 'center');
-    }
-  } catch (e) {}
-  // ALL DIFFICULTIES USED BADGE — if user has tried easy/normal/hard, show.
-  try {
-    const _difsUsed = JSON.parse(localStorage.getItem('galagaDifficultiesUsed') || '[]');
-    if (Array.isArray(_difsUsed) && _difsUsed.length >= 3) {
-      drawRetroText('ALL DIFFICULTIES', BASE_W/2, 51, 4, '#f88', 'center');
-    }
-  } catch (e) {}
-  // ALL BIOMES SEEN BADGE — if user has visited all 8 biomes, show.
-  try {
-    const _bsBadge = JSON.parse(localStorage.getItem('galagaBiomesSeen') || '[]');
-    if (Array.isArray(_bsBadge) && _bsBadge.length >= 8) {
-      drawRetroText('ALL BIOMES', BASE_W/2, 56, 4, '#9ef', 'center');
-    }
-  } catch (e) {}
-  // BESTIARY COMPLETE BADGE — if dexUnlocked has all enemy types
-  if (typeof dexUnlocked !== 'undefined' && dexUnlocked.size >= 8) {
-    drawRetroText('BESTIARY', BASE_W/2, 61, 4, '#f6f', 'center');
-  }
-  // 100% ACHIEVEMENT BADGE — if all achievements unlocked, pulsing gold.
-  if (typeof unlockedAchievements !== 'undefined' && typeof ACHIEVEMENTS !== 'undefined'
-      && unlockedAchievements.size >= Object.keys(ACHIEVEMENTS).length) {
-    const _achBlink = (t >> 2) % 4 !== 0 ? '#fc4' : '#ff8';
-    drawRetroText('100% ★', BASE_W/2, 66, 5, _achBlink, 'center');
-  }
-  // PARRY MASTER BADGE — when lifetime parryStreakBest >= 10
-  try {
+    const _achAll = (typeof unlockedAchievements !== 'undefined' && typeof ACHIEVEMENTS !== 'undefined'
+                    && unlockedAchievements.size >= Object.keys(ACHIEVEMENTS).length);
     const _csNp = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
     const _csCp = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
     const _psPm = Math.max(_csNp.parryStreakBest || 0, _csCp.parryStreakBest || 0);
-    if (_psPm >= 10) {
-      drawRetroText('PARRY MASTER', BASE_W/2, 71, 4, '#0cf', 'center');
-    }
-  } catch (e) {}
-  // COMBO LEGEND BADGE — galagaMaxComboEver >= 50
-  try {
     const _cbEver = parseInt(localStorage.getItem('galagaMaxComboEver') || '0', 10) || 0;
-    if (_cbEver >= 50) {
-      const _clCol = _cbEver >= 100 ? '#fc4' : '#0ff';
-      const _clLabel = _cbEver >= 100 ? 'COMBO GOD' : 'COMBO LEGEND';
-      drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
+    const _lr = Math.max(_csNp.longestRun || 0, _csCp.longestRun || 0);
+    const _trophies = [];
+    if (_gcCnt > 0) {
+      const _gcBlink = (t >> 3) % 4 !== 0 ? '#fc4' : '#ff8';
+      _trophies.push({ text: _gcCnt >= 5 ? '★3' : _gcCnt >= 2 ? '★2' : '★', col: _gcBlink });
+    }
+    if (_achAll) {
+      const _achBlink = (t >> 2) % 4 !== 0 ? '#fc4' : '#ff8';
+      _trophies.push({ text: '100%', col: _achBlink });
+    }
+    if (_psPm >= 10) _trophies.push({ text: 'PM', col: '#0cf' });
+    if (_cbEver >= 50) _trophies.push({ text: _cbEver >= 100 ? 'CG' : 'CL', col: _cbEver >= 100 ? '#fc4' : '#0ff' });
+    if (_lr >= 54000) _trophies.push({ text: _lr >= 216000 ? 'IP' : _lr >= 108000 ? 'MR' : 'LR',
+                                        col: _lr >= 216000 ? '#fc4' : _lr >= 108000 ? '#0ff' : '#0f8' });
+    if (_trophies.length > 0) {
+      const _gap = 8;
+      const _slotW = 16;  // fixed slot width keeps spacing uniform
+      const _trTotal = _trophies.length * _slotW + (_trophies.length - 1) * _gap;
+      let _trX = BASE_W/2 - _trTotal/2 + _slotW/2;
+      for (const _e of _trophies) {
+        drawRetroText(_e.text, _trX, 22, 5, _e.col, 'center');
+        _trX += _slotW + _gap;
+      }
     }
   } catch (e) {}
+  // (ALL SHIPS / ALL DIFFICULTIES / ALL BIOMES / BESTIARY / 100% ACH /
+  // PARRY MASTER / COMBO LEGEND text badges removed — consolidated into the
+  // trophy row above. Dot rows below still cover the categorical progression.)
   // COMPOSITE COMPLETION % — weighted aggregate via shared helper.
   if (typeof computeCompositeCompletion === 'function') {
     const _comp = computeCompositeCompletion();
@@ -12351,17 +12333,8 @@ function drawTitleScreen() {
       ctx.restore();
     }
   } catch (e) {}
-  // MARATHONER BADGE — longest single run tier (15/30/60 min)
-  try {
-    const _csNm = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
-    const _csCm = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
-    const _lr = Math.max(_csNm.longestRun || 0, _csCm.longestRun || 0);
-    if (_lr >= 54000) { // 15 min+
-      const _mLabel = _lr >= 216000 ? 'IRON PILOT' : _lr >= 108000 ? 'MARATHONER' : 'LONG RUNNER';
-      const _mCol = _lr >= 216000 ? '#fc4' : _lr >= 108000 ? '#0ff' : '#0f8';
-      drawRetroText(_mLabel, BASE_W/2, 81, 4, _mCol, 'center');
-    }
-  } catch (e) {}
+  // (MARATHONER badge consolidated into the trophy row at y=22 above —
+  // 'LR' / 'MR' / 'IP' code by tier.)
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
@@ -13691,11 +13664,14 @@ function drawStageIntro() {
 
   // TRANSMISSION LOG — narrative beat for milestone-tier stages. Drawn after the
   // banner slide-in so player sees stage label first, then the world reveals itself.
-  // Typewriter reveal: each character appears every ~2 frames.
+  // Typewriter reveal: each character appears every frame (was 2 — caused most
+  // transmissions to be cut off before stage start since logs run ~90 chars and
+  // available frames after slide-in were ~90). Now charsPer=1 fits ~90 chars
+  // within the 120-frame intro window.
   const log = TRANSMISSION_LOGS[game.stage];
   if (log && slide >= 1) {
-    const tStart = 30;                         // begin reveal once banner has slid in
-    const charsPer = 2;                        // ~30 chars/sec, feels like CRT terminal
+    const tStart = 20;                         // begin reveal sooner — more frames for text
+    const charsPer = 1;                        // ~60 chars/sec, fits within 120-frame intro
     const fullChars = log.reduce((s, line) => s + line.length, 0) + log.length;
     const revealed = Math.max(0, Math.min(fullChars, Math.floor((elapsed - tStart) / charsPer)));
     if (revealed > 0) {
