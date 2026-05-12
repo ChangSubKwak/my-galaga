@@ -16055,7 +16055,11 @@ function drawGameOverScreen() {
   // SHIP KILLS CONTRIBUTION — kills added to current ship mastery this run.
   if (tTime >= 1 && (s.kills || 0) >= 10 && typeof selectedShip !== 'undefined') {
     const _sCol2 = (game.ship && game.ship.color) || '#0cf';
-    drawRetroText('+' + fmtScore(s.kills) + ' SHIP KILLS', BASE_W/2, cy + 58, 4, _sCol2);
+    const _skN = (s.kills) >= 500 ? ' CHAMPION'
+              : (s.kills) >= 200 ? ' ACE'
+              : (s.kills) >= 50  ? ' PILOT'
+              : '';
+    drawRetroText('+' + fmtScore(s.kills) + ' SHIP KILLS' + _skN, BASE_W/2, cy + 58, 4, _sCol2);
   }
   // EXTRA SHIPS EARNED — count of extra lives gained this run
   if (tTime >= 1 && (game.extraShipsRun || 0) >= 1) {
