@@ -5053,6 +5053,9 @@ function startStage() {
   try {
     const _bid = typeof biomeForStage === 'function' ? biomeForStage(game.stage) : null;
     if (_bid) {
+      // PER-RUN BIOMES SET — track distinct biomes this run for intro peek
+      if (!game.runBiomesSeen) game.runBiomesSeen = new Set();
+      game.runBiomesSeen.add(_bid);
       // BIOME VISIT COUNT — per-biome counter (write once per stage entry)
       try {
         const _bvRaw = localStorage.getItem('galagaBiomeVisits') || '{}';
@@ -13073,6 +13076,10 @@ function drawStageIntro() {
     // EXTRA SHIPS PEEK — count of extra lives earned this run
     if ((game.extraShipsRun || 0) >= 1) {
       drawRetroText('+SHIP x' + game.extraShipsRun, BASE_W - 4, BASE_H/2 + 113, 4, '#ff4', 'right');
+    }
+    // RUN BIOMES PEEK — distinct biomes visited this run
+    if (game.runBiomesSeen && game.runBiomesSeen.size >= 2) {
+      drawRetroText('B ' + game.runBiomesSeen.size + '/8', BASE_W - 4, BASE_H/2 + 119, 4, '#9ef', 'right');
     }
     // RUN ELAPSED PEEK — current run time in MM:SS when meaningful (>= 30s)
     if ((game.runFrames || 0) >= 1800) {
