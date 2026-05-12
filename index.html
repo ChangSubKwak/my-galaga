@@ -5986,6 +5986,16 @@ function updatePlayer() {
         game.bullets.push(b);
         game.stats.shotsFired++;
         game.stageShotsFired++;
+        // SHOTS FIRED MILESTONES — small gray banner at 100/500/1000/2000 to
+        // surface long-run sustainment. One-shot via === check.
+        const _sf = game.stats.shotsFired;
+        if (_sf === 100 || _sf === 500 || _sf === 1000 || _sf === 2000) {
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 + 30,
+            text: 'SHOTS ' + _sf,
+            color: '#888', life: 40, maxLife: 40, size: 5
+          });
+        }
         // MARKSMAN MILESTONE — once per run, when 50+ shots fired AND accuracy
         // >= 90%, surface banner. Skill recognition without score inflation.
         if (!game._marksmanFired && game.stats.shotsFired >= 50) {
