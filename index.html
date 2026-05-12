@@ -12510,6 +12510,22 @@ function drawHUD() {
     if (!minimalHud && (game.runFrames || 0) > 0) {
       const runStr = fmtFrameTime(game.runFrames || 0);
       drawRetroText('R ' + runStr, BASE_W - 5, 28, 4, '#888', 'right');
+    // EXTRA LIFE PROGRESS — 30px green bar showing distance to next 30K threshold.
+    // Skipped in challenge mode (hardcore = 1 life, no extras). Pulse at >=90%.
+    if (!game.challengeMode && !minimalHud) {
+      const intoNext = (game.score || 0) % 30000;
+      const elRatio = intoNext / 30000;
+      const barW = 30;
+      const bx = BASE_W - 5 - barW;
+      const by = 39;
+      ctx.save();
+      ctx.fillStyle = '#020';
+      ctx.fillRect(bx, by, barW, 2);
+      ctx.fillStyle = elRatio >= 0.9 ? '#0f8' : '#0a4';
+      if (elRatio >= 0.9) ctx.globalAlpha = 0.5 + 0.5 * Math.sin(game.animFrame * 0.3);
+      ctx.fillRect(bx, by, Math.round(barW * elRatio), 2);
+      ctx.restore();
+    }
     // HUD DIFFICULTY — small label under run timer (non-default only)
     if (typeof difficultyMode === 'string' && difficultyMode !== 'normal') {
       const dCol = difficultyMode === 'hard' ? '#f44' : '#0f8';
