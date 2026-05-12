@@ -5103,6 +5103,8 @@ function startStage() {
   game.stageScoreStart = game.score || 0;
   game.stageKills = 0;
   game.stagePerfectWaves = 0;
+  game.stageInterceptCount = 0;
+  game._openingSalvoFired = false;
   game.stageCloseCount = 0;
   game.lastStandAnnounced = false;
 
@@ -8869,10 +8871,31 @@ function updateCollisions() {
           if (isIntercept) {
             addScore(50);
             game.interceptCount = (game.interceptCount || 0) + 1;
+            game.stageInterceptCount = (game.stageInterceptCount || 0) + 1;
             game.floatTexts.push({
               x: e.x, y: e.y - 14, text: 'INTERCEPT +50',
               color: '#0ff', life: 30, maxLife: 30, size: 5
             });
+            // OPENING SALVO — first 5 intercepts within first 180 frames of a
+            // stage. Bonus banner + score on the 5th intercept of the stage.
+            if (game.stageInterceptCount === 5
+                && (game.stageFrames || 0) <= 180
+                && !game._openingSalvoFired) {
+              game._openingSalvoFired = true;
+              addScore(500);
+              game.floatTexts.push({
+                x: BASE_W/2, y: BASE_H/2 - 20, text: 'OPENING SALVO',
+                color: '#ff4', life: 70, maxLife: 70, size: 11
+              });
+              game.floatTexts.push({
+                x: BASE_W/2, y: BASE_H/2 - 8, text: '+500',
+                color: '#fff', life: 70, maxLife: 70, size: 6
+              });
+              game.flashTimer = Math.max(game.flashTimer || 0, 5);
+              game.flashColor = '#ff4';
+              if (typeof spawnConfetti === 'function') spawnConfetti(8);
+              if (typeof playSound === 'function') playSound('milestone');
+            }
           }
           game.comboBonusAccum = (game.comboBonusAccum || 0) + pts;
           // KILL SCORE FLOATER — per-kill "+N" at the kill site for kills that
