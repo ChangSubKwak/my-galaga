@@ -16063,6 +16063,10 @@ function drawGameOverScreen() {
   if (tTime >= 1 && (game.objectivesMetRun || 0) >= 1) {
     drawRetroText('OBJ x' + game.objectivesMetRun, BASE_W/2 + 30, cy + 88, 4, '#0f8');
   }
+  // PARRY CHAIN BEST — best parry streak this run
+  if (tTime >= 1 && (game.parryStreakBest || 0) >= 3) {
+    drawRetroText('PARRY x' + game.parryStreakBest, BASE_W/2, cy + 94, 4, '#0cf');
+  }
   // MAX CORRUPTION REACHED — translate maxStage to corruption tier
   if (tTime >= 1) {
     const _msC = (s.maxStage || 0);
