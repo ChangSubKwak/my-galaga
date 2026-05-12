@@ -9710,6 +9710,15 @@ function spawnStageClear(label, sub) {
     x: BASE_W/2, y: BASE_H/2 - 10, text: label,
     color: '#ff4', life: 90, maxLife: 90, size: 14
   });
+  // STAGE CLEAR BIOME FLASH — brief biome-colored screen flash for environmental
+  // continuity. Falls back to green default when no biome (stage 1-7).
+  if (typeof biomeForStage === 'function') {
+    const _bid = biomeForStage(game.stage || 1);
+    if (_bid && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_bid]) {
+      game.flashTimer = Math.max(game.flashTimer || 0, 8);
+      game.flashColor = BIOME_NAMES[_bid].col;
+    }
+  }
   if (sub) {
     game.floatTexts.push({
       x: BASE_W/2, y: BASE_H/2 + 6, text: sub,
