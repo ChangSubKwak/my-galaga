@@ -4973,6 +4973,7 @@ function startStage() {
   game.stageShotsFired = 0;
   game.stageShotsHit = 0;
   game.stagePowerUpsPicked = 0;
+  game.stageScoreStart = game.score || 0;
   game.stageCloseCount = 0;
   game.lastStandAnnounced = false;
 
@@ -14087,6 +14088,16 @@ function drawHUD() {
     }
   }
 
+  // HUD STAGE SCORE EARNED — '+N' label below main score showing what was
+  // gained THIS stage. Helps player gauge per-stage performance. Hidden when
+  // minimal HUD or stage just started (delta 0).
+  if (!minimalHud
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    const _stgScore = (game.score || 0) - (game.stageScoreStart || 0);
+    if (_stgScore >= 100) {
+      drawRetroText('+' + fmtScore(_stgScore), 50, 25, 4, '#888', 'right');
+    }
+  }
   // HUD PICKUP STREAK — small "P×N" cyan counter when consecutive no-death
   // pickups reach 2+. Hides on death (streak resets). Visible in normal HUD only.
   if (!minimalHud && (game.pickupStreak || 0) >= 2
