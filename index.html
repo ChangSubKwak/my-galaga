@@ -16072,7 +16072,12 @@ function drawGameOverScreen() {
   }
   // LASER PIERCE BEST — biggest single-bullet pierce count this run
   if (tTime >= 1 && (game.laserPierceBest || 0) >= 3) {
-    drawRetroText('PIERCE x' + game.laserPierceBest, BASE_W/2 + 30, cy + 82, 4, '#f6c');
+    const _lpb = game.laserPierceBest;
+    const _lpN = _lpb >= 10 ? ' LANCE'
+              : _lpb >= 6  ? ' SPEAR'
+              : _lpb >= 3  ? ' PIERCER'
+              : '';
+    drawRetroText('PIERCE x' + _lpb + _lpN, BASE_W/2 + 30, cy + 82, 4, '#f6c');
   }
   // ACE STREAK BEST — best S/A grade streak this run
   if (tTime >= 1 && (game.aceStreakBest || 0) >= 3) {
