@@ -12988,6 +12988,22 @@ function drawStageIntro() {
     if ((game.shieldCharges || 0) > 0) {
       drawRetroText('E x' + game.shieldCharges, 4, BASE_H/2 - 1, 4, '#0f8', 'left');
     }
+    // ARSENAL TIER PIPS — 4-dot row showing claimed combo arsenal tiers
+    if (game.comboArsenalClaimed) {
+      const _arT = [25, 50, 75, 100];
+      const _arC = ['#fc4', '#f8a', '#0ef', '#fff'];
+      let _anyClaimed = false;
+      for (const _t of _arT) if (game.comboArsenalClaimed[_t]) { _anyClaimed = true; break; }
+      if (_anyClaimed) {
+        ctx.save();
+        for (let _ai = 0; _ai < 4; _ai++) {
+          ctx.globalAlpha = game.comboArsenalClaimed[_arT[_ai]] ? 0.85 : 0.20;
+          ctx.fillStyle = _arC[_ai];
+          ctx.fillRect(4 + _ai * 4, BASE_H/2 + 18, 2, 2);
+        }
+        ctx.restore();
+      }
+    }
     // LIVES PEEK — small lives count near power peek so the player sees how
     // many ships remain entering this stage. Red when last life.
     {
