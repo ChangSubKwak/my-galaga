@@ -14273,6 +14273,12 @@ function drawHUD() {
         // Letter label (slot icon)
         const lowFlash = ratio < 0.2 && (game.animFrame >> 2) % 2 === 0;
         drawRetroText(s.label, sx + 6, stripY, 6, lowFlash ? '#f44' : s.col, 'center');
+        // COUNTDOWN SECONDS — when timer < 1.5s, show '1s' / '0s' at top right
+        // of letter so the player gets exact remaining seconds for last calls.
+        if (s.t > 0 && s.t < 90) {
+          const _sec = Math.ceil(s.t / 60);
+          drawRetroText(_sec + 's', sx + slotW - 1, stripY - 4, 4, '#fff', 'right');
+        }
         // 1px progress bar under label
         ctx.fillStyle = s.col;
         ctx.globalAlpha = 0.3;
