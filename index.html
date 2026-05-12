@@ -17001,7 +17001,14 @@ function drawStatsOverlay() {
       const _bsArr = JSON.parse(_bsRaw);
       const bsCount = Array.isArray(_bsArr) ? _bsArr.length : 0;
       if (bsCount >= 1) {
-        profileRow('BIOMES SEEN', bsCount + ' / 8', bsCount === 8 ? '#0f8' : '#0cf');
+        {
+          const _bsT = bsCount === 8 ? 'COMPLETE'
+                     : bsCount >= 6  ? 'EXPLORER'
+                     : bsCount >= 4  ? 'WANDERER'
+                     : '';
+          profileRow('BIOMES SEEN', bsCount + ' / 8' + (_bsT ? '  ' + _bsT : ''),
+                     bsCount === 8 ? '#0f8' : '#0cf');
+        }
       }
     } catch (e) {}
     profileRow('STAGE TIME PBS', String(stagePBCount), '#0f8');
