@@ -10572,7 +10572,7 @@ function update() {
     if (game.stage >= 50 && game.playerAlive
         && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
       // Spawn chance ramps from 0.0008 at stage 50 to 0.004 at stage 80 (~once per 4-15s)
-      const _voiceChance = Math.min(0.004, 0.0008 + (game.stage - 50) * 0.0001);
+      const _voiceChance = Math.min(0.006, 0.0008 + (game.stage - 50) * 0.00013);
       if (Math.random() < _voiceChance) {
         const _voiceWords = ['STATIC', 'WHO?', 'WAKE.', 'WRONG', 'ECHO', 'HOLLOW',
                              'TURN BACK', 'REMEMBER', '01010', 'INSIDE', 'NULL',
