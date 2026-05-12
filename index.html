@@ -15794,6 +15794,12 @@ function drawGameOverScreen() {
   const goSy = (Math.random() - 0.5) * goShake;
   drawRetroText('GAME OVER', BASE_W/2 + goSx, cy - 35 + goSy, 16, COL.red);
   ctx.restore();
+  // PILOT TITLE LABEL — '[CSN] TITLE' below GAME OVER
+  if (playerCallsign && playerCallsign !== '???' && typeof computePilotTitle === 'function') {
+    const _csCol = (typeof callsignColor === 'function') ? callsignColor() : '#888';
+    drawRetroText('[' + playerCallsign + ']  ' + computePilotTitle(),
+                  BASE_W/2, cy - 28, 5, _csCol);
+  }
 
   // Ship + mode badge (between title and SCORE row)
   {
