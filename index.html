@@ -11476,6 +11476,14 @@ function drawTitleScreen() {
       drawRetroText(_gcLabel, BASE_W/2, 40, 6, _gcBlink, 'center');
     }
   } catch (e) {}
+  // ALL SHIPS USED BADGE — if user has piloted all 4 ships, show 'ALL SHIPS'
+  // ribbon. Reads galagaShipsUsed set.
+  try {
+    const _shipsUsed = JSON.parse(localStorage.getItem('galagaShipsUsed') || '[]');
+    if (Array.isArray(_shipsUsed) && _shipsUsed.length >= 4) {
+      drawRetroText('ALL SHIPS', BASE_W/2, 46, 4, '#0cf', 'center');
+    }
+  } catch (e) {}
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
