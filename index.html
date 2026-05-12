@@ -15343,6 +15343,18 @@ function drawHUD() {
     drawRetroText('T ' + fmtFrameTime(game.stageFrames), BASE_W - 5, 50, 4, '#888', 'right');
     ctx.restore();
   }
+  // CHALLENGE WAVE INDICATOR — "WAVE N/8" label so the player tracks progress
+  // through the 8-wave bonus structure. Only during CHALLENGING state.
+  if (!minimalHud
+      && game.state === STATE.CHALLENGING
+      && game.challengeWaves) {
+    const _cwTotal = game.challengeWaves.length;
+    const _cwCur = Math.min(_cwTotal, (game.challengeWaveIdx || 0) + 1);
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    drawRetroText('WAVE ' + _cwCur + '/' + _cwTotal, BASE_W - 5, 44, 5, '#f6f', 'right');
+    ctx.restore();
+  }
   // ACTIVE BUFF TIMER BARS — vertical mini-bar stack for live timer countdowns.
   // Each bar: 26px wide × 2px tall, color-coded by buff. Hidden when timer == 0.
   // Placed right-side under PB pace indicator so the right column reads:
