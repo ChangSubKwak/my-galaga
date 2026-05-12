@@ -413,12 +413,40 @@ function isDailyMissionDoneToday() {
     return raw === String(dailySeed());
   } catch (e) { return false; }
 }
+// Yesterday's seed for streak detection. UTC-anchored to match dailySeed().
+function dailySeedYesterday() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
 function markDailyMissionDone() {
   try {
-    localStorage.setItem('galagaDailyMissionDone', String(dailySeed()));
+    const todaySeed = dailySeed();
+    const lastSeed = parseInt(localStorage.getItem('galagaDailyMissionLastSeed') || '0', 10) || 0;
+    localStorage.setItem('galagaDailyMissionDone', String(todaySeed));
     const total = parseInt(localStorage.getItem('galagaDailyMissionTotal') || '0', 10) || 0;
     localStorage.setItem('galagaDailyMissionTotal', String(total + 1));
     if (total + 1 >= 10 && typeof unlockAchievement === 'function') unlockAchievement('dailyTen');
+    // DAILY MISSION STREAK — increment if last completion was yesterday, else
+    // reset to 1. Stored separately from total to track *consecutive* days.
+    const streakPrev = parseInt(localStorage.getItem('galagaDailyMissionStreak') || '0', 10) || 0;
+    const yesterdaySeed = dailySeedYesterday();
+    const newStreak = (lastSeed === yesterdaySeed) ? streakPrev + 1 : 1;
+    localStorage.setItem('galagaDailyMissionStreak', String(newStreak));
+    localStorage.setItem('galagaDailyMissionLastSeed', String(todaySeed));
+    // Best streak tracking
+    const bestStreak = parseInt(localStorage.getItem('galagaDailyMissionStreakBest') || '0', 10) || 0;
+    if (newStreak > bestStreak) {
+      localStorage.setItem('galagaDailyMissionStreakBest', String(newStreak));
+    }
+    // Streak milestone celebrations: 3/7/30 days (game.floatTexts trigger)
+    if (game && (newStreak === 3 || newStreak === 7 || newStreak === 30)) {
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 + 18, text: 'STREAK ' + newStreak + ' DAYS!',
+        color: '#fc4', life: 120, maxLife: 120, size: 10
+      });
+      if (typeof spawnConfetti === 'function') spawnConfetti(14);
+    }
   } catch (e) {}
 }
 // DAILY SEED CODE — 4-char alphanumeric hash of today's date for community
@@ -13758,6 +13786,16 @@ function drawStatsOverlay() {
                     : dmTotal >= 30  ? '#0f8'
                     : dmTotal >= 10  ? '#f6f' : '#cfc';
         profileRow('DAILY MISSIONS', String(dmTotal), dmCol);
+      }
+      // DAILY MISSION STREAK — current consecutive-day streak + best
+      const dmStreak = parseInt(localStorage.getItem('galagaDailyMissionStreak') || '0', 10);
+      const dmBest = parseInt(localStorage.getItem('galagaDailyMissionStreakBest') || '0', 10);
+      if (dmStreak >= 1 || dmBest >= 1) {
+        const sCol = dmStreak >= 30 ? '#fc4' : dmStreak >= 7 ? '#0f8' : '#cfc';
+        const label = dmBest > dmStreak
+                    ? dmStreak + ' DAYS (BEST ' + dmBest + ')'
+                    : dmStreak + ' DAYS';
+        profileRow('MISSION STREAK', label, sCol);
       }
       // FAVORITE PERK — most-picked perk across runs
       const perkRaw = localStorage.getItem('galagaPerkPicks');
