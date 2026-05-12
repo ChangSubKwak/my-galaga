@@ -16059,7 +16059,11 @@ function drawGameOverScreen() {
   }
   // EXTRA SHIPS EARNED — count of extra lives gained this run
   if (tTime >= 1 && (game.extraShipsRun || 0) >= 1) {
-    drawRetroText('+' + game.extraShipsRun + ' SHIPS EARNED', BASE_W/2, cy + 70, 4, '#ff4');
+    const _es = game.extraShipsRun;
+    const _esN = _es >= 5 ? ' ARMADA'
+              : _es >= 3 ? ' FLEET'
+              : ' REINFORCED';
+    drawRetroText('+' + _es + ' SHIPS EARNED' + _esN, BASE_W/2, cy + 70, 4, '#ff4');
   }
   // MULTIKILL BEST — biggest same-frame kill count this run
   if (tTime >= 1 && (game.multiKillBest || 0) >= 3) {
