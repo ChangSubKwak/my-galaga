@@ -11407,6 +11407,16 @@ function drawTitleScreen() {
     }
   }
 
+  // GAME COMPLETE STAR — if user has ever beaten stage 80, show gold ★ above
+  // the logo as a permanent badge of honor. Read from localStorage.
+  try {
+    const _gcCnt = parseInt(localStorage.getItem('galagaGameCompleteCount') || '0', 10) || 0;
+    if (_gcCnt > 0) {
+      const _gcBlink = (t >> 3) % 4 !== 0 ? '#fc4' : '#ff8';
+      const _gcLabel = _gcCnt >= 5 ? '★ ★ ★' : _gcCnt >= 2 ? '★ ★' : '★';
+      drawRetroText(_gcLabel, BASE_W/2, 40, 6, _gcBlink, 'center');
+    }
+  } catch (e) {}
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
