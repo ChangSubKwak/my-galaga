@@ -4537,6 +4537,24 @@ function updateOneMegaBoss(mb) {
           mb.tauntMax  = 90;
           mb.tauntCooldown = 0;
         }
+        // BOSS DEATH WHISPER — atmospheric closing line layered over the taunt.
+        // Archetype-themed cosmic farewell. Faded gold/white tone, distinct
+        // from the boss's own death taunt color. Adds narrative weight to the kill.
+        const _BOSS_FAREWELLS = {
+          standard: ['THE LINE HOLDS NO MORE', 'COLUMN BREAKS'],
+          horned:   ['THE CROWN FALLS', 'NO HEIRS REMAIN'],
+          tendril:  ['THE WEAVE UNRAVELS', 'STRANDS GO DARK'],
+          crystal:  ['THE FACETS SHATTER', 'LIGHT ESCAPES THE PRISM'],
+          phantom:  ['THE ECHO FADES', 'NO MORE WHISPERS'],
+          rune:     ['THE GLYPHS DIM', 'WORDS LOSE MEANING']
+        };
+        const _far = _BOSS_FAREWELLS[mb.archetype] || _BOSS_FAREWELLS.standard;
+        const _fLine = _far[Math.floor(Math.random() * _far.length)];
+        game.floatTexts.push({
+          x: mb.x, y: mb.y + 18,
+          text: _fLine, color: '#fc8',
+          life: 100, maxLife: 100, size: 5
+        });
         // Only clear bullets when the LAST boss falls (otherwise remaining boss is unfairly defanged)
         if (!game.megaBosses || game.megaBosses.every(x => !x.alive)) {
           game.enemyBullets = [];
