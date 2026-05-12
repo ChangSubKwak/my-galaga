@@ -8312,6 +8312,23 @@ function updateCollisions() {
         // "I damaged it" without needing to read sparks. Only meaningful when
         // enemy still alive (skipped on kill — explosion takes over).
         if (e.hp > 0) e.hitFlashTimer = 4;
+        // CRIT NON-KILL FLAIR — even if crit didn't finish the enemy, mark
+        // the moment with a small gold spark trio + 'CRIT' text so the player
+        // sees the +50% damage land. Kill-crit cinematic stays untouched below.
+        if (b.crit && e.hp > 0) {
+          for (let k = 0; k < 3; k++) {
+            const _a = (k / 3) * Math.PI * 2 + Math.random() * 0.5;
+            game.itemBursts.push({
+              x: e.x + Math.cos(_a) * 5,
+              y: e.y + Math.sin(_a) * 5,
+              life: -k, color: '#fc4'
+            });
+          }
+          game.floatTexts.push({
+            x: e.x, y: e.y - 10, text: 'CRIT',
+            color: '#fc4', life: 28, maxLife: 28, size: 5
+          });
+        }
         // GHOST REVEAL — first hit on a ghost variant reveals it (full alpha)
         if (e.ghost && !e.ghostRevealed) e.ghostRevealed = true;
         // Shield-break feedback (only when not killed in same hit)
