@@ -11514,6 +11514,24 @@ function drawStageIntro() {
     }
   }
 
+  // SYNERGY DISTANCE HINT — show OVERLOAD/BLINK/HEAVY distance when no synergy
+  // is active. Helps the player prioritize pickups (e.g., "OVERLOAD: +1 N").
+  if (slide >= 1 && game.lvl && !game.activeSynergy) {
+    const lvS = game.lvl.S || 1, lvN = game.lvl.N || 1, lvP = game.lvl.P || 1;
+    // Compute distances; only show if very close (need ≤2 total upgrades)
+    const distOverload = Math.max(0, 5 - lvS) + Math.max(0, 3 - lvN) + Math.max(0, 3 - lvP);
+    const distBlink    = Math.max(0, 5 - lvS) + Math.max(0, lvN - 1) + Math.max(0, lvP - 1);
+    const distHeavy    = Math.max(0, lvS - 1) + Math.max(0, lvN - 1) + Math.max(0, 3 - lvP);
+    let closest = null, closeName = '', closeDist = 99;
+    if (distOverload < closeDist) { closest = 'OVERLOAD'; closeDist = distOverload; closeName = 'OVERLOAD'; }
+    if (distBlink < closeDist)    { closest = 'BLINK';    closeDist = distBlink;    closeName = 'BLINK'; }
+    if (distHeavy < closeDist)    { closest = 'HEAVY';    closeDist = distHeavy;    closeName = 'HEAVY'; }
+    if (closest && closeDist > 0 && closeDist <= 2) {
+      const sCol = closest === 'OVERLOAD' ? '#fc4' : closest === 'BLINK' ? '#0ff' : '#f8a';
+      drawRetroText(closeName + ' IN ' + closeDist + ' MORE', BASE_W/2, BASE_H - 52, 4, sCol);
+    }
+  }
+
   // POWER CARRY-OVER — small S/N/P readout + active WEAPON SYNERGY label so the
   // player can plan pickup priorities for the new stage from the intro alone.
   // Drawn above the pilot quote band, fades in with same slide timing.
