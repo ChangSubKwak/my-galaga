@@ -7489,6 +7489,9 @@ function updatePowerUps() {
       game.powerUps.splice(i, 1);
       game.stagePowerUpsPicked = (game.stagePowerUpsPicked || 0) + 1;
       game.runPowerUps = (game.runPowerUps || 0) + 1;
+      // PER-TYPE PICKUP TALLY — feeds GAME_OVER "FAVORITE" highlight.
+      if (!game.pickupTypesRun) game.pickupTypesRun = {};
+      game.pickupTypesRun[p.type] = (game.pickupTypesRun[p.type] || 0) + 1;
       // POWERUP COUNT MILESTONES — small gold banner at 5/10/20/50 pickups
       if (game.runPowerUps === 5 || game.runPowerUps === 10 || game.runPowerUps === 20 || game.runPowerUps === 50) {
         game.floatTexts.push({
@@ -12832,6 +12835,21 @@ function pickRunHighlights() {
   if (lsRun >= 1)         out.push({ label: 'LAST STANDS',   value: String(lsRun),        prio: lsRun * 35, col: '#f44' });
   const ppRun = game.perfectParries || 0;
   if (ppRun >= 1)         out.push({ label: 'PERFECT PARRY', value: String(ppRun),        prio: ppRun * 22, col: '#fc4' });
+  // PICKUP FAVORITE — most-collected powerup type this run (needs >= 3 of it)
+  if (game.pickupTypesRun) {
+    let _favT = null, _favC = 0;
+    for (const _k in game.pickupTypesRun) {
+      const _v = game.pickupTypesRun[_k] || 0;
+      if (_v > _favC) { _favC = _v; _favT = _k; }
+    }
+    if (_favT && _favC >= 3) {
+      const _favLbl = { S:'SHOT', N:'NUKE', P:'PIERCE', T:'SLOW', R:'RAPID',
+                        W:'WAVE', H:'HOMING', L:'LASER', B:'BOMB', E:'SHIELD' }[_favT] || _favT;
+      const _favCol = { S:'#0df', N:'#1e6', P:'#e3e', T:'#5af', R:'#fc4',
+                        W:'#f6a', H:'#0cf', L:'#f6c', B:'#f44', E:'#4f8' }[_favT] || '#fff';
+      out.push({ label: 'FAVORITE', value: _favLbl + ' x' + _favC, prio: 65, col: _favCol });
+    }
+  }
   if (stages >= 3)        out.push({ label: 'STAGES CLEARED', value: String(stages),     prio: stages * 8, col: '#fc4' });
   if (bosses >= 1)        out.push({ label: 'BOSSES DOWN',    value: String(bosses),     prio: bosses * 60, col: '#f8a' });
   if (rescues >= 1)       out.push({ label: 'SELF RESCUE',    value: String(rescues),    prio: rescues * 30, col: '#fc4' });
