@@ -4903,6 +4903,29 @@ function startStage() {
       if (Array.isArray(arr) && arr.indexOf(_bid) < 0) {
         arr.push(_bid);
         localStorage.setItem('galagaBiomesSeen', JSON.stringify(arr));
+        // FIRST BIOME DISCOVERY BANNER — celebrate first encounter with a biome
+        // across all sessions. Score-neutral; pure progression marker.
+        if (BIOME_NAMES && BIOME_NAMES[_bid]) {
+          const _bN = BIOME_NAMES[_bid];
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 - 70, text: 'NEW BIOME',
+            color: '#fff', life: 110, maxLife: 110, size: 6
+          });
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 - 60, text: _bN.label,
+            color: _bN.col, life: 110, maxLife: 110, size: 9
+          });
+          if (typeof playSound === 'function') playSound('milestone');
+          if (typeof spawnConfetti === 'function') spawnConfetti(8);
+          if (arr.length === 8) {
+            // All 8 biomes seen — extra completion banner
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 - 46, text: 'ALL BIOMES SEEN',
+              color: '#fc4', life: 120, maxLife: 120, size: 7
+            });
+            if (typeof spawnConfetti === 'function') spawnConfetti(20);
+          }
+        }
       }
     }
   } catch (e) {}
