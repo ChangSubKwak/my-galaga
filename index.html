@@ -6100,6 +6100,7 @@ const ACHIEVEMENTS = {
   // didn't have a discrete trophy yet.
   parryChain:    { name: 'PARRY CHAIN',     desc: 'Parry streak ×5 in a row' },
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
+  marathonMaster:{ name: 'MARATHON MASTER',  desc: '20 no-death stages in a row' },
   parry200:      { name: 'PARRY 200',       desc: '200 parries lifetime' },
   parry500:      { name: 'PARRY 500',       desc: '500 parries lifetime' },
   dailyTen:      { name: 'DAILY DEVOTED',   desc: 'Complete 10 daily missions' },
@@ -9352,6 +9353,8 @@ function checkStageComplete() {
               spawnConfetti(10);
               playSound('milestone');
             }
+            // MARATHON MASTER trophy at 20-stage no-death streak
+            if (game.zenStreak >= 20) unlockAchievement('marathonMaster');
           } else {
             game.zenStreak = 0;
           }
