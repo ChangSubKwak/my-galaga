@@ -14554,6 +14554,12 @@ function drawBossStage() {
         ctx.fillRect(10 + Math.round(barW * acc) - 1, barY, 1, 5);
       }
     }
+    // HP SEGMENT DIVIDERS — 10 evenly-spaced 1px tick marks across the bar so
+    // damage progress reads as discrete chunks. Sits on top of fill, under stroke.
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    for (let _s = 1; _s < 10; _s++) {
+      ctx.fillRect(10 + Math.round(barW * _s / 10), barY, 1, 5);
+    }
     ctx.strokeStyle = COL.white;
     ctx.lineWidth = 0.5;
     ctx.strokeRect(10, barY, barW, 5);
