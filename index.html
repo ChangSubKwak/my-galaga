@@ -10094,6 +10094,9 @@ function spawnStageClear(label, sub) {
       } catch (e) {}
       // PER-RUN S GRADE COUNTER — feeds into GAME_OVER run highlights
       if (_grade === 'S') game.runSGrades = (game.runSGrades || 0) + 1;
+      // LAST STAGE GRADE — surfaces in next STAGE_INTRO as self-comparison.
+      game.lastStageGrade = _grade;
+      game.lastStageGradeCol = _gCol;
     }
   } catch (e) {}
   // STAGE CLEAR BIOME FLASH — brief biome-colored screen flash for environmental
@@ -13202,6 +13205,11 @@ function drawStageIntro() {
     // RUN BIOMES PEEK — distinct biomes visited this run
     if (game.runBiomesSeen && game.runBiomesSeen.size >= 2) {
       drawRetroText('B ' + game.runBiomesSeen.size + '/8', BASE_W - 4, BASE_H/2 + 119, 4, '#9ef', 'right');
+    }
+    // LAST STAGE GRADE PEEK — directly compare last grade to current run target
+    if (game.lastStageGrade) {
+      drawRetroText('PREV ' + game.lastStageGrade, BASE_W - 4, BASE_H/2 + 125, 4,
+                    game.lastStageGradeCol || '#fff', 'right');
     }
     // RUN ELAPSED PEEK — current run time in MM:SS when meaningful (>= 30s)
     if ((game.runFrames || 0) >= 1800) {
