@@ -12254,6 +12254,14 @@ function drawStageIntro() {
     ctx.fillRect(0, 0, 1, BASE_H);
     ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
     ctx.restore();
+  } else if (typeof difficultyMode !== 'undefined' && difficultyMode === 'easy') {
+    // EASY MODE BANDS — softer green bands so the mode reads at a glance.
+    ctx.save();
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = '#0f8';
+    ctx.fillRect(0, 0, 1, BASE_H);
+    ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
+    ctx.restore();
   }
   // STAGE TYPE BG TINT — faint 4-frame edge band by stage type so the player
   // instantly reads what kind of stage is starting. Boss/challenge get the
