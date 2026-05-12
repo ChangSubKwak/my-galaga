@@ -4762,6 +4762,16 @@ function startStage() {
   // STAGE START GRACE — 60-frame invincibility so the player can settle position
   // without taking an immediate hit from a kamikaze / stray bullet at entry.
   game.invincibleTimer = Math.max(game.invincibleTimer || 0, 60);
+  // QUARTER MILESTONE BANNER — at stage 25/50/75 entry, brief gold banner +
+  // milestone SFX. Marks the long-arc progression beyond the 10-stage boss cadence.
+  if (game.stage === 25 || game.stage === 50 || game.stage === 75) {
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 - 50, text: 'QUARTER POINT ★ ' + game.stage,
+      color: '#fc4', life: 120, maxLife: 120, size: 10
+    });
+    if (typeof playSound === 'function') playSound('milestone');
+    if (typeof spawnConfetti === 'function') spawnConfetti(12);
+  }
   // BIOME EXPLORATION — track biome IDs the player has visited across all runs
   // for PROFILE + STAGE_INTRO "N/8" stat. Single-write per stage entry.
   try {
