@@ -5899,6 +5899,7 @@ function addScore(pts) {
   if (!game.challengeMode && Math.floor(old / 30000) < Math.floor(game.score / 30000)) {
     game.lives++;
     game.lifeGainPulseTimer = 30;
+    game.extraShipsRun = (game.extraShipsRun || 0) + 1;
     playSound('extraLife');
     // EXTRA LIFE BANNER — celebrate threshold crossing with banner + confetti
     if (game && game.floatTexts) {
@@ -7822,6 +7823,7 @@ function bumpCombo() {
       addScore(5000);
     } else {
       game.lives++;
+      game.extraShipsRun = (game.extraShipsRun || 0) + 1;
       // LIFE GAIN PULSE — flag for HUD lives row to pulse gold for 30 frames
       game.lifeGainPulseTimer = 30;
     }
@@ -16004,6 +16006,10 @@ function drawGameOverScreen() {
   if (tTime >= 1 && (s.kills || 0) >= 10 && typeof selectedShip !== 'undefined') {
     const _sCol2 = (game.ship && game.ship.color) || '#0cf';
     drawRetroText('+' + fmtScore(s.kills) + ' SHIP KILLS', BASE_W/2, cy + 58, 4, _sCol2);
+  }
+  // EXTRA SHIPS EARNED — count of extra lives gained this run
+  if (tTime >= 1 && (game.extraShipsRun || 0) >= 1) {
+    drawRetroText('+' + game.extraShipsRun + ' SHIPS EARNED', BASE_W/2, cy + 70, 4, '#ff4');
   }
   // TOP RUN ENEMY — most-killed type this run when meaningful
   if (tTime >= 1 && game.killsByTypeRun) {
