@@ -16855,6 +16855,22 @@ function drawBossStage() {
       drawShipTraitAura(game.playerX, game.playerY, selectedShip);
       drawPlayer(game.playerX, game.playerY, pcol, game.lvl);
     }
+    // DASH COOLDOWN BAR — small cyan progress strip under the ship while
+    // dash cooldown is active. Fills empty→full as cooldown counts down so
+    // ready state corresponds to "bar full." 60-frame cooldown total.
+    if ((game.dashCooldown || 0) > 0) {
+      const _dcW = 14;
+      const _dcRatio = 1 - (game.dashCooldown / 60);
+      const _dcY = game.playerY + 7;
+      const _dcX = game.playerX - _dcW / 2;
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = '#0cf';
+      ctx.fillRect(_dcX, _dcY, _dcW, 1);
+      ctx.globalAlpha = 0.95;
+      ctx.fillRect(_dcX, _dcY, Math.round(_dcW * _dcRatio), 1);
+      ctx.restore();
+    }
   }
 
   // Explosions
