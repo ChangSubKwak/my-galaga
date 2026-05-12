@@ -13222,6 +13222,11 @@ function drawHUD() {
     const psCol = game.pickupStreak >= 10 ? '#fc4' : '#0ff';
     drawRetroText(psStr, BASE_W - 5, 38, 4, psCol, 'right');
   }
+  // HUD STAGE PICKUP COUNTER — stage-level pickup count for thrifty awareness
+  if (!minimalHud && (game.stagePowerUpsPicked || 0) >= 1
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    drawRetroText('S:' + game.stagePowerUpsPicked, BASE_W - 5, 46, 4, '#fc8', 'right');
+  }
 
   // POWER UP PITY INDICATOR — small 15-dot row near top-left showing pity progress
   // (kills without a drop). Filled dots = kills accumulated; empty = headroom.
