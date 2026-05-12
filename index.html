@@ -12040,6 +12040,23 @@ function drawGameplay() {
       && game.enemies.filter(en => en.alive).length === 1;
     for (const e of game.enemies) {
       if (!e.alive) continue;
+      // KAMIKAZE LEAD INDICATOR — predict landing X by extrapolating velocity to player Y.
+      // Helps player read incoming straight-dive threats early and pre-commit to a side.
+      if (e.state === 'kamikaze' && e.vy > 0.1 && game.playerAlive && e.y < game.playerY - 24) {
+        const dt = (game.playerY - e.y) / e.vy;
+        const leadX = e.x + e.vx * dt;
+        if (leadX >= 4 && leadX <= BASE_W - 4) {
+          ctx.save();
+          const _blk = (game.animFrame >> 2) % 2 === 0;
+          ctx.globalAlpha = _blk ? 0.75 : 0.35;
+          ctx.fillStyle = '#f44';
+          // Down-triangle marker at predicted landing point on player Y line
+          ctx.fillRect(leadX - 3, game.playerY - 10, 6, 1);
+          ctx.fillRect(leadX - 2, game.playerY - 9,  4, 1);
+          ctx.fillRect(leadX - 1, game.playerY - 8,  2, 1);
+          ctx.restore();
+        }
+      }
       if (_lsActive) {
         const t = game.animFrame;
         const pulseR = 11 + Math.sin(t * 0.22) * 2;
