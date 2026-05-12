@@ -6857,6 +6857,8 @@ function commitGameToCumStats() {
   s.aceStreakBest = Math.max(s.aceStreakBest || 0, game.aceStreakBest || 0);
   // LASER PIERCE BEST — max enemies pierced by a single laser bullet
   s.laserPierceBest = Math.max(s.laserPierceBest || 0, game.laserPierceBest || 0);
+  // LIFETIME SCORE — sum of every committed run's final score (mode-scoped)
+  s.scoreTotal = (s.scoreTotal || 0) + (game.score || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -15516,6 +15518,15 @@ function drawStatsOverlay() {
       if (lpBest >= 3) {
         const lpCol = lpBest >= 10 ? '#fc4' : lpBest >= 6 ? '#0ff' : '#f6c';
         profileRow('LASER PIERCE BEST', 'x' + lpBest, lpCol);
+      }
+      // LIFETIME SCORE TOTAL — sum across both modes
+      const _scTot = (csN2.scoreTotal || 0) + (csC2.scoreTotal || 0);
+      if (_scTot >= 10000) {
+        const _scTotCol = _scTot >= 100000000 ? '#f6f'
+                        : _scTot >= 10000000 ? '#fc4'
+                        : _scTot >= 1000000 ? '#0ff'
+                        : _scTot >= 100000 ? '#0f8' : '#cce';
+        profileRow('LIFETIME SCORE', fmtScore(_scTot), _scTotCol);
       }
       // PICKUP TYPE TOTALS — show top-collected pickup type (e.g., "TOP: S x42")
       const ptRaw = localStorage.getItem('galagaPickupTotals');
