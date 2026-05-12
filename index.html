@@ -12400,6 +12400,11 @@ function drawStageIntro() {
           const _nr = computePilotNextRank();
           if (_nr && _nr.next) {
             drawRetroText('→ ' + _nr.next, 4, BASE_H/2 - 30, 4, '#444', 'left');
+            // Progress label (terse) — only first 20 chars to fit width
+            if (_nr.label) {
+              const _lbl = _nr.label.length > 20 ? _nr.label.slice(0, 20) : _nr.label;
+              drawRetroText(_lbl, 4, BASE_H/2 - 36, 3, '#333', 'left');
+            }
           }
         } catch (e) {}
       }
