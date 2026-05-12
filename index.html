@@ -16079,7 +16079,12 @@ function drawGameOverScreen() {
   }
   // PARRY CHAIN BEST — best parry streak this run
   if (tTime >= 1 && (game.parryStreakBest || 0) >= 3) {
-    drawRetroText('PARRY x' + game.parryStreakBest, BASE_W/2 - 30, cy + 94, 4, '#0cf');
+    const _psB = game.parryStreakBest;
+    const _psT = _psB >= 15 ? ' GUARDIAN'
+              : _psB >= 10 ? ' WARDEN'
+              : _psB >= 5  ? ' DEFLECTOR'
+              : '';
+    drawRetroText('PARRY x' + _psB + _psT, BASE_W/2 - 30, cy + 94, 4, '#0cf');
   }
   // RUN BIOMES SEEN — distinct biomes traversed this run
   if (tTime >= 1 && game.runBiomesSeen && game.runBiomesSeen.size >= 2) {
