@@ -12987,6 +12987,9 @@ function drawStageIntro() {
       if (typeof isPowerMaxed === 'function' && isPowerMaxed()) {
         const _mxBl = (game.animFrame >> 3) % 2 === 0;
         drawRetroText('MAX', 34, _plY, 4, _mxBl ? '#fc4' : '#fff', 'left');
+      } else if (game.maxPowerRevealed) {
+        // MAX SEEN — was once at max this run (now reset by death)
+        drawRetroText('MAX-X', 34, _plY, 3, '#888', 'left');
       }
     }
     // SHIELD CHARGES PEEK — small 'E xN' label at intro when any shield held.
