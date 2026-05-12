@@ -14625,6 +14625,10 @@ function drawHUD() {
     const totW = game.challengeWaves.length;
     const curW = Math.min(totW, (game.challengeWaveIdx || 0) + 1);
     drawRetroText('WAVE ' + curW + '/' + totW, BASE_W - 5, 30, 5, '#f6f', 'right');
+    // PERFECT WAVE PROGRESS — show running PW count when >= 1 this stage
+    if ((game.stagePerfectWaves || 0) >= 1) {
+      drawRetroText('PW ' + game.stagePerfectWaves + '/' + totW, BASE_W - 5, 36, 4, '#fc4', 'right');
+    }
     // 8-dot pip row showing which waves are complete (filled) vs upcoming (hollow)
     ctx.save();
     const pipY = 36, pipR = 1;
