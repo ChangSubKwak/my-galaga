@@ -4726,6 +4726,9 @@ function startStage() {
   game.diveTimer = 0;
   game.breathPhase = 0;
   game.shakeTimer = 0;
+  // STAGE START GRACE — 60-frame invincibility so the player can settle position
+  // without taking an immediate hit from a kamikaze / stray bullet at entry.
+  game.invincibleTimer = Math.max(game.invincibleTimer || 0, 60);
   // Per-stage stat reset
   game.stageFrames = 0;
   game.stageDied = false;
