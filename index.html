@@ -6114,6 +6114,8 @@ const ACHIEVEMENTS = {
   parryChain:    { name: 'PARRY CHAIN',     desc: 'Parry streak ×5 in a row' },
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
   marathonMaster:{ name: 'MARATHON MASTER',  desc: '20 no-death stages in a row' },
+  ghost5:        { name: 'GHOST HUNTER',    desc: 'Defeat 5 ghost variants' },
+  ghost25:       { name: 'GHOST SLAYER',    desc: 'Defeat 25 ghost variants' },
   parry200:      { name: 'PARRY 200',       desc: '200 parries lifetime' },
   parry500:      { name: 'PARRY 500',       desc: '500 parries lifetime' },
   dailyTen:      { name: 'DAILY DEVOTED',   desc: 'Complete 10 daily missions' },
@@ -8118,7 +8120,10 @@ function updateCollisions() {
             playSound('powerUp');
             try {
               const gk = parseInt(localStorage.getItem('galagaGhostKills') || '0', 10) || 0;
-              localStorage.setItem('galagaGhostKills', String(gk + 1));
+              const ngk = gk + 1;
+              localStorage.setItem('galagaGhostKills', String(ngk));
+              if (ngk >= 5 && typeof unlockAchievement === 'function')  unlockAchievement('ghost5');
+              if (ngk >= 25 && typeof unlockAchievement === 'function') unlockAchievement('ghost25');
             } catch (e) {}
           }
           if (e.elite) {
