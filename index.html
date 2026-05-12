@@ -17322,7 +17322,10 @@ function drawStatsOverlay() {
       const _esTot = (csN2.extraShipsTotal || 0) + (csC2.extraShipsTotal || 0);
       if (_esTot >= 3) {
         const _esCol = _esTot >= 50 ? '#fc4' : _esTot >= 15 ? '#0ff' : '#ff4';
-        profileRow('EXTRA SHIPS', String(_esTot), _esCol);
+        const _esN = _esTot >= 50 ? ' ARMADA'
+                   : _esTot >= 15 ? ' FLEET'
+                   : ' REINFORCED';
+        profileRow('EXTRA SHIPS', String(_esTot) + _esN, _esCol);
       }
       // OBJECTIVES MET LIFETIME
       const _ojTot = (csN2.objectivesMetTotal || 0) + (csC2.objectivesMetTotal || 0);
