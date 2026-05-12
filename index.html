@@ -9552,6 +9552,17 @@ function updateCollisions() {
         }
         // PERK 'parryDividend' — parry score → 3×
         addScore(game.activePerk === 'parryDividend' ? baseScore * 3 : baseScore);
+        // PERFECT PARRY — parry within the first 3 frames of dash (dashTimer
+        // 10-12 of starting 12). Bonus +50 + gold "PERFECT" callout above the
+        // bullet's deflect spot. Encourages tight timing reads.
+        if ((game.dashTimer || 0) >= 10) {
+          addScore(50);
+          game.floatTexts.push({
+            x: b.x, y: b.y - 14,
+            text: 'PERFECT', color: '#fc4', life: 35, maxLife: 35, size: 6
+          });
+          game.perfectParries = (game.perfectParries || 0) + 1;
+        }
         game.parryCount = (game.parryCount || 0) + 1;
         // PARRY LIFETIME TROPHIES — accumulate to localStorage for cross-run trophies
         try {
