@@ -17169,6 +17169,13 @@ function drawStatsOverlay() {
       if (_stcSample >= 10 && _runFr > 0) {
         const _avgSec = ((_runFr / _stcSample) / 60).toFixed(1);
         profileRow('AVG STAGE TIME', _avgSec + 's', '#0ff');
+        // AVG KILLS PER STAGE
+        const _kTot = (csN2.kills || 0) + (csC2.kills || 0);
+        if (_kTot >= 20) {
+          const _kps = Math.round(_kTot / _stcSample);
+          const _kpsCol = _kps >= 30 ? '#fc4' : _kps >= 15 ? '#0ff' : '#0f8';
+          profileRow('KILLS / STAGE', String(_kps), _kpsCol);
+        }
       }
       // LONGEST SINGLE RUN — max frames in any one run across both modes.
       const _longRun = Math.max(csN2.longestRun || 0, csC2.longestRun || 0);
