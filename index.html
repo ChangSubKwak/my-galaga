@@ -9659,6 +9659,8 @@ function killPlayer(srcX, srcY, cause) {
     game.lives--;
     // DEATH CAUSE TALLY — record cause to localStorage (death landed)
     if (game._deathCausePending) {
+      // FINAL CAUSE — keep on game for GAME_OVER recap line (cleared at resetGame)
+      game.lastDeathCause = game._deathCausePending;
       try {
         const raw = localStorage.getItem('galagaDeathCauses') || '{}';
         const tally = JSON.parse(raw);
@@ -16229,6 +16231,21 @@ function drawGameOverScreen() {
     drawRetroText('DAILY ' + dailyLabel(), BASE_W/2, cy + 44, 6, COL.green);
   }
 
+  // DEATH CAUSE RECAP — final hit attribution shown just before epitaph (~frame 95).
+  // Map raw cause to display string. Helps player diagnose what to evade next run.
+  if (game.lastDeathCause && elapsedGo > 95) {
+    const fade = Math.min(1, (elapsedGo - 95) / 20);
+    const dcMap = {
+      bullet:    'FELLED BY ENEMY FIRE',
+      collision:'FELLED BY DIVE IMPACT',
+      unknown:   'CAUSE UNKNOWN'
+    };
+    const dcLine = dcMap[game.lastDeathCause] || ('FELLED BY ' + String(game.lastDeathCause).toUpperCase());
+    ctx.save();
+    ctx.globalAlpha = 0.65 * fade;
+    drawRetroText(dcLine, BASE_W/2, cy + 62, 5, '#f88');
+    ctx.restore();
+  }
   // EPITAPH — narrative bookend, fades in at frame ~120 (after grade reveal at 145
   // happens later, but we want this BEFORE the action prompt so the closing line
   // reads as final transmission rather than UI noise). Soft gray italic-feel rendering
