@@ -12487,6 +12487,15 @@ function drawStageIntro() {
       drawRetroText('T ' + _rm + ':' + String(_rss).padStart(2, '0'),
                     BASE_W - 4, BASE_H/2 + 59, 4, '#888', 'right');
     }
+    // LIFETIME RUNS PEEK — total sessions across modes when meaningful (>= 10)
+    try {
+      const _csNr = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
+      const _csCr = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
+      const _sess = (_csNr.sessions || 0) + (_csCr.sessions || 0);
+      if (_sess >= 10) {
+        drawRetroText('R ' + _sess, BASE_W - 4, BASE_H/2 + 65, 4, '#666', 'right');
+      }
+    } catch (e) {}
     // BIOMES SEEN PEEK — lifetime biomes encountered fraction.
     try {
       const _bsRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
