@@ -10662,6 +10662,22 @@ function draw() {
     ctx.fillRect(BASE_W - 1 - i, 0, 1, BASE_H);
   }
   ctx.restore();
+  // DEEP STAGE FOG — additional subtle fog gradient at stage 60+. Pure visual
+  // atmosphere on top of standard vignette. Animated alpha for slight breathing.
+  if (game && game.stage >= 60
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    ctx.save();
+    const fogPulse = 0.6 + 0.4 * Math.sin(game.animFrame * 0.04);
+    ctx.fillStyle = '#445';
+    for (let i = 0; i < 6; i++) {
+      ctx.globalAlpha = 0.04 * fogPulse * (1 - i / 6);
+      ctx.fillRect(0, i, BASE_W, 1);
+      ctx.fillRect(0, BASE_H - 1 - i, BASE_W, 1);
+      ctx.fillRect(i, 0, 1, BASE_H);
+      ctx.fillRect(BASE_W - 1 - i, 0, 1, BASE_H);
+    }
+    ctx.restore();
+  }
 
   // Night mode auto-dimmer — eases eye strain between 22:00 and 06:00 local time.
   // Toggle off persistently with localStorage galagaNightOff = '1'.
