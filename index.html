@@ -15741,6 +15741,12 @@ function drawStatsOverlay() {
     }
     profileRow('RUNS',       fmtScore(totalRuns));
     profileRow('TOTAL KILLS', fmtScore(totalKills));
+    // LIFETIME SHOTS FIRED — sum across both modes, threshold 500
+    const _totalShots = (csN2.shotsFired || 0) + (csC2.shotsFired || 0);
+    if (_totalShots >= 500) {
+      const _sfCol = _totalShots >= 100000 ? '#fc4' : _totalShots >= 10000 ? '#0ff' : '#0f8';
+      profileRow('SHOTS FIRED', fmtScore(_totalShots), _sfCol);
+    }
     profileRow('PLAY TIME',   playTime, '#fff');
     profileRow('BEST STAGE',  String(Math.max(csN2.bestStage || 0, csC2.bestStage || 0)),
                (csN2.bestStage || 0) >= 30 ? COL.red : COL.cyan);
