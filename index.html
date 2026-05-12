@@ -15075,6 +15075,19 @@ function drawStatsOverlay() {
           profileRow('TOP PICKUP', topType + ' x' + topCount, ptCol);
         }
       }
+      // TOP PERK — most-picked perk across all runs (single-line preview).
+      // Full perk distribution surfaces visually below the row count list.
+      try {
+        const pkRaw = localStorage.getItem('galagaPerkPicks') || '{}';
+        const pkTot = JSON.parse(pkRaw);
+        let topPerk = null, topPerkCount = 0;
+        for (const k in pkTot) {
+          if ((pkTot[k] || 0) > topPerkCount) { topPerkCount = pkTot[k]; topPerk = k; }
+        }
+        if (topPerk && topPerkCount >= 2 && PERKS[topPerk]) {
+          profileRow('TOP PERK', PERKS[topPerk].name + ' x' + topPerkCount, PERKS[topPerk].col);
+        }
+      } catch (e) {}
       // DEATH CAUSE TALLY — bullet vs collision lifetime breakdown
       const causesRaw = localStorage.getItem('galagaDeathCauses') || '{}';
       const causes = JSON.parse(causesRaw);
