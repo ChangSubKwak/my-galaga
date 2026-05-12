@@ -5937,7 +5937,19 @@ function updateBullets() {
         if (b.trail.length > 5) b.trail.length = 5;
       }
     }
-    if (b.y < -5 || b.y > BASE_H + 5 || b.x < -5 || b.x > BASE_W + 5) game.bullets.splice(i, 1);
+    if (b.y < -5 || b.y > BASE_H + 5 || b.x < -5 || b.x > BASE_W + 5) {
+      // LASER PIERCE COUNT — when a laser bullet exits, if it pierced 3+
+      // enemies, emit a magenta "PIERCE xN" text at its final position.
+      if (b.kind === 'laser' && b.pierced && b.pierced.size >= 3) {
+        game.floatTexts.push({
+          x: b.x, y: Math.max(20, b.y),
+          text: 'PIERCE x' + b.pierced.size,
+          color: '#f6c', life: 50, maxLife: 50, size: 8
+        });
+        game.laserPierceBest = Math.max(game.laserPierceBest || 0, b.pierced.size);
+      }
+      game.bullets.splice(i, 1);
+    }
   }
   // Slow factor priority: witch (0.2) > T pickup (0.4) > LAST STAND (0.65) > SLOW BULLETS mutation (0.7) > none (1).
   const witchActive = (game.witchTimer || 0) > 0;
@@ -6740,6 +6752,8 @@ function commitGameToCumStats() {
   s.multiKillBest = Math.max(s.multiKillBest || 0, game.multiKillBest || 0);
   // ACE STREAK BEST — consecutive S/A grades across run
   s.aceStreakBest = Math.max(s.aceStreakBest || 0, game.aceStreakBest || 0);
+  // LASER PIERCE BEST — max enemies pierced by a single laser bullet
+  s.laserPierceBest = Math.max(s.laserPierceBest || 0, game.laserPierceBest || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -15224,6 +15238,12 @@ function drawStatsOverlay() {
       if (asBest >= 3) {
         const asCol = asBest >= 15 ? '#fc4' : asBest >= 10 ? '#0ff' : asBest >= 5 ? '#0f8' : '#cce';
         profileRow('ACE STREAK BEST', 'x' + asBest, asCol);
+      }
+      // LASER PIERCE BEST — max enemies pierced by a single laser bullet
+      const lpBest = Math.max(csN2.laserPierceBest || 0, csC2.laserPierceBest || 0);
+      if (lpBest >= 3) {
+        const lpCol = lpBest >= 10 ? '#fc4' : lpBest >= 6 ? '#0ff' : '#f6c';
+        profileRow('LASER PIERCE BEST', 'x' + lpBest, lpCol);
       }
       // PICKUP TYPE TOTALS — show top-collected pickup type (e.g., "TOP: S x42")
       const ptRaw = localStorage.getItem('galagaPickupTotals');
