@@ -12789,6 +12789,15 @@ function drawStageIntro() {
       if (_bsCount >= 1) {
         const _bsCol = _bsCount === 8 ? '#fc4' : '#0cf';
         drawRetroText('BIO ' + _bsCount + '/8', BASE_W - 4, BASE_H/2 + 47, 4, _bsCol, 'right');
+        // Mini 8-cell bar under text — filled cells = biomes seen
+        ctx.save();
+        const _bsBarX = BASE_W - 28, _bsBarY = BASE_H/2 + 52;
+        for (let _bi = 0; _bi < 8; _bi++) {
+          ctx.globalAlpha = _bi < _bsCount ? 0.8 : 0.18;
+          ctx.fillStyle = _bsCol;
+          ctx.fillRect(_bsBarX + _bi * 3, _bsBarY, 2, 1);
+        }
+        ctx.restore();
       }
     } catch (e) {}
     // DAILY STREAK PEEK — current daily-mission streak when >= 2 days.
