@@ -11660,10 +11660,17 @@ function drawStageIntro() {
                      : synergyLabel === 'HEAVY'    ? '#f8a' : '#888';
     const pcY = BASE_H - 44;
     drawRetroText('POWER', BASE_W/2 - 36, pcY, 5, '#888', 'left');
-    // S / N / P with type-specific colors
-    drawRetroText('S' + lvS, BASE_W/2 - 10, pcY, 6, '#f44', 'left');
-    drawRetroText('N' + lvN, BASE_W/2 + 4,  pcY, 6, '#0ff', 'left');
-    drawRetroText('P' + lvP, BASE_W/2 + 18, pcY, 6, '#f6f', 'left');
+    // S / N / P with type-specific colors. MAX cap: gold pulse on letter.
+    const _sMax = lvS >= MAX_POWER_LVL.S, _nMax = lvN >= MAX_POWER_LVL.N, _pMax = lvP >= MAX_POWER_LVL.P;
+    const _maxPulse = (game.animFrame >> 3) % 2 === 0 ? '#fc4' : '#fff';
+    drawRetroText('S' + lvS, BASE_W/2 - 10, pcY, 6, _sMax ? _maxPulse : '#f44', 'left');
+    drawRetroText('N' + lvN, BASE_W/2 + 4,  pcY, 6, _nMax ? _maxPulse : '#0ff', 'left');
+    drawRetroText('P' + lvP, BASE_W/2 + 18, pcY, 6, _pMax ? _maxPulse : '#f6f', 'left');
+    // POWER MAX INDICATOR — small "MAX" label when all three caps reached
+    if (_sMax && _nMax && _pMax) {
+      const _mxBlink = (game.animFrame >> 2) % 2 === 0 ? '#fc4' : '#fff';
+      drawRetroText('MAX', BASE_W/2 + 33, pcY, 5, _mxBlink, 'left');
+    }
     if (synergyLabel) {
       const synBlink = (game.animFrame >> 2) % 2 === 0 ? synergyCol : '#fff';
       drawRetroText(synergyLabel + ' BUILD', BASE_W/2, pcY + 7, 5, synBlink);
