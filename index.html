@@ -6923,6 +6923,8 @@ function commitGameToCumStats() {
   s.stagesClearedTotal = (s.stagesClearedTotal || 0) + Math.max(0, (gs.maxStage || game.stage || 1) - 1);
   // PERFECT WAVES LIFETIME — no-escape challenge waves across runs
   s.perfectWavesTotal = (s.perfectWavesTotal || 0) + (game.perfectWavesRun || 0);
+  // LONGEST SINGLE RUN — max frames in any one run (for marathon trophy)
+  s.longestRun = Math.max(s.longestRun || 0, game.runFrames || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -15924,6 +15926,15 @@ function drawStatsOverlay() {
       if (_stcSample >= 10 && _runFr > 0) {
         const _avgSec = ((_runFr / _stcSample) / 60).toFixed(1);
         profileRow('AVG STAGE TIME', _avgSec + 's', '#0ff');
+      }
+      // LONGEST SINGLE RUN — max frames in any one run across both modes.
+      const _longRun = Math.max(csN2.longestRun || 0, csC2.longestRun || 0);
+      if (_longRun >= 18000) { // 5 minutes
+        const _lrMin = Math.floor(_longRun / 60 / 60);
+        const _lrSec = Math.floor((_longRun / 60) % 60);
+        const _lrStr = _lrMin + ':' + String(_lrSec).padStart(2, '0');
+        const _lrCol = _longRun >= 108000 ? '#fc4' : _longRun >= 54000 ? '#0ff' : '#0f8';
+        profileRow('LONGEST RUN', _lrStr, _lrCol);
       }
       // DASH TOTAL — lifetime dashes across both modes
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
