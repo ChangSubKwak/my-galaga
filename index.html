@@ -12165,6 +12165,10 @@ function drawStageIntro() {
     if ((game.comboBest || 0) >= 3) {
       drawRetroText('CB x' + game.comboBest, BASE_W - 4, BASE_H/2 + 11, 4, '#0ff', 'right');
     }
+    // PARRY COUNT PEEK — session parry count
+    if ((game.parryCount || 0) >= 3) {
+      drawRetroText('PR x' + game.parryCount, BASE_W - 4, BASE_H/2 + 17, 4, '#0cf', 'right');
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
