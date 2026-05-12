@@ -11799,6 +11799,23 @@ function drawTitleScreen() {
       drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
     }
   } catch (e) {}
+  // BESTIARY DOTS — 8 small enemy-type dots beneath badge stack
+  if (typeof dexUnlocked !== 'undefined' && dexUnlocked.size > 0
+      && typeof ENEMY_INFO !== 'undefined') {
+    const _eOrder = ['bee', 'butterfly', 'boss', 'mirror', 'splitter',
+                     'shielded', 'ufo', 'kamikaze'];
+    const _eY = 84;
+    const _eStartX = BASE_W/2 - 14;
+    ctx.save();
+    for (let _ei = 0; _ei < 8; _ei++) {
+      const _et = _eOrder[_ei];
+      const _eCol = (ENEMY_INFO[_et] && ENEMY_INFO[_et].col) || '#fff';
+      ctx.globalAlpha = dexUnlocked.has(_et) ? 0.85 : 0.20;
+      ctx.fillStyle = _eCol;
+      ctx.fillRect(_eStartX + _ei * 4, _eY, 2, 2);
+    }
+    ctx.restore();
+  }
   // BIOMES DOTS — 8 small biome-colored dots beneath badge stack. Filled when
   // that biome has been visited, dim otherwise. At-a-glance exploration visual.
   try {
