@@ -13329,6 +13329,14 @@ function drawHUD() {
     const k = game.stats.kills;
     const kCol = k >= 1000 ? '#fc4' : k >= 500 ? '#0ff' : '#aaa';
     drawRetroText('K ' + k, 6, kY, 5, kCol, 'left');
+    // HUD KILLS PER MINUTE — after 60s of run, show K/M rate metric below kill
+    // counter. Useful speedrun / efficiency feedback.
+    if ((game.runFrames || 0) >= 3600) {
+      const minutes = (game.runFrames || 0) / 3600;
+      const kpm = Math.round(k / minutes);
+      const kpmCol = kpm >= 60 ? '#fc4' : kpm >= 30 ? '#0ff' : '#888';
+      drawRetroText(kpm + ' K/M', 6, kY + 6, 4, kpmCol, 'left');
+    }
   }
 
   // "ENEMIES LEFT" mini-counter when the stage is nearly done (≤ 6 alive in PLAYING)
