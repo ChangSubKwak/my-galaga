@@ -16104,40 +16104,46 @@ let accumulator = 0;
 const TICK = 1000 / FPS;
 
 function gameLoop(timestamp) {
-  if (lastTime === 0) lastTime = timestamp;
-  let dt = timestamp - lastTime;
-  lastTime = timestamp;
-  if (dt > 100) dt = 100; // cap
+  // FREEZE GUARD — wrap entire loop in try/finally so a thrown error in
+  // update() or draw() can't strand requestAnimationFrame and freeze the game.
+  // Errors logged to console; loop keeps running.
+  try {
+    if (lastTime === 0) lastTime = timestamp;
+    let dt = timestamp - lastTime;
+    lastTime = timestamp;
+    if (dt > 100) dt = 100; // cap
 
-  // FPS sampler — averages over the last ~30 frames
-  _fpsAcc += dt;
-  _fpsCount++;
-  if (timestamp - _fpsLastSample > 500) {
-    _fpsValue = Math.round((1000 * _fpsCount) / Math.max(1, _fpsAcc));
-    _fpsAcc = 0; _fpsCount = 0;
-    _fpsLastSample = timestamp;
-  }
-
-  accumulator += dt;
-  // Spiral-of-death guard: if accumulator is far behind (heavy frame stutter or
-  // browser stall), cap iterations and reset accumulator so we don't compound
-  // multiple expensive update() calls per draw and lock the main thread.
-  let maxIters = 6;
-  while (accumulator >= TICK && maxIters > 0) {
-    // Hit-stop: pause the simulation for a few frames after big impacts (game state only;
-    // animFrame still advances so explosions/sparks keep moving for visual flair)
-    if (game && game.hitStopFrames > 0) {
-      game.hitStopFrames--;
-      game.animFrame++;
-    } else {
-      update();
+    // FPS sampler — averages over the last ~30 frames
+    _fpsAcc += dt;
+    _fpsCount++;
+    if (timestamp - _fpsLastSample > 500) {
+      _fpsValue = Math.round((1000 * _fpsCount) / Math.max(1, _fpsAcc));
+      _fpsAcc = 0; _fpsCount = 0;
+      _fpsLastSample = timestamp;
     }
-    accumulator -= TICK;
-    maxIters--;
+
+    accumulator += dt;
+    // Spiral-of-death guard: if accumulator is far behind (heavy frame stutter or
+    // browser stall), cap iterations and reset accumulator so we don't compound
+    // multiple expensive update() calls per draw and lock the main thread.
+    let maxIters = 6;
+    while (accumulator >= TICK && maxIters > 0) {
+      // Hit-stop: pause the simulation for a few frames after big impacts (game state only;
+      // animFrame still advances so explosions/sparks keep moving for visual flair)
+      if (game && game.hitStopFrames > 0) {
+        game.hitStopFrames--;
+        game.animFrame++;
+      } else {
+        try { update(); } catch (uErr) { console.error('update() error:', uErr); }
+      }
+      accumulator -= TICK;
+      maxIters--;
+    }
+    if (maxIters === 0) accumulator = 0; // drain remainder if we hit the cap
+    try { draw(); } catch (dErr) { console.error('draw() error:', dErr); }
+  } finally {
+    requestAnimationFrame(gameLoop);
   }
-  if (maxIters === 0) accumulator = 0; // drain remainder if we hit the cap
-  draw();
-  requestAnimationFrame(gameLoop);
 }
 
 // --- Init ---
