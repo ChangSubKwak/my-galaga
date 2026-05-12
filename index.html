@@ -7423,7 +7423,16 @@ function drawPlayerTrail() {
   // Combo 50+ — rainbow trail cycling through 6 colors
   const rainbow = ['#f44', '#fa0', '#ff4', '#0f8', '#0cf', '#f6f'];
   const useRainbow = (game.combo || 0) >= 50;
-  const shipCol = (game.ship && game.ship.color) || '#0cf';
+  // BIOME-TINTED TRAIL — when a biome is active and player isn't in mega-combo,
+  // pick biome color over ship color for trail body ghost. Gives each biome a
+  // signature drift trail that fuses ship motion with environment.
+  let shipCol = (game.ship && game.ship.color) || '#0cf';
+  if (!useRainbow && typeof biomeForStage === 'function') {
+    const _bid = biomeForStage(game.stage || 1);
+    if (_bid && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_bid]) {
+      shipCol = BIOME_NAMES[_bid].col;
+    }
+  }
   for (let i = game.playerTrail.length - 1; i >= 0; i--) {
     const t = game.playerTrail[i];
     const fade = 1 - t.age / 14;
