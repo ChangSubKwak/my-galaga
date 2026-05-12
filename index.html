@@ -12644,6 +12644,17 @@ function drawStageIntro() {
         } catch (e) {}
       }
     }
+    // SHIP MASTERY PEEK — lifetime kills with current ship (above name)
+    try {
+      const _smRaw = localStorage.getItem('galagaShipMastery');
+      if (_smRaw) {
+        const _sm = JSON.parse(_smRaw);
+        const _sid = (typeof selectedShip !== 'undefined') ? selectedShip : 'default';
+        if (_sm && _sm[_sid] && _sm[_sid].kills >= 100) {
+          drawRetroText('K' + fmtScore(_sm[_sid].kills), BASE_W - 4, BASE_H/2 - 14, 3, '#666', 'right');
+        }
+      }
+    } catch (e) {}
     // SHIP NAME PEEK — current ship under pilot rank, in ship color.
     if (game.ship && game.ship.name) {
       drawRetroText(game.ship.name, BASE_W - 4, BASE_H/2 - 9, 4, game.ship.color || '#0cf', 'right');
