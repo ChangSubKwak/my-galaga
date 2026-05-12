@@ -9620,6 +9620,24 @@ function checkStageComplete() {
             } else {
               grade = 'D'; gradeCol = '#aaa';
             }
+            // ACE STREAK — track consecutive S/A grades. Banner at 3/5/10/15.
+            // Resets on B or below. Lifetime best persisted for run highlights.
+            const _isAce = (grade === 'S' || grade === 'A');
+            if (_isAce) {
+              game.aceStreak = (game.aceStreak || 0) + 1;
+              if (game.aceStreak > (game.aceStreakBest || 0)) game.aceStreakBest = game.aceStreak;
+              if (game.aceStreak === 3 || game.aceStreak === 5 || game.aceStreak === 10 || game.aceStreak === 15) {
+                game.floatTexts.push({
+                  x: BASE_W/2, y: BASE_H/2 + 40,
+                  text: 'ACE STREAK x' + game.aceStreak,
+                  color: '#fc4', life: 100, maxLife: 100, size: 10
+                });
+                if (typeof spawnConfetti === 'function') spawnConfetti(8);
+                if (typeof playSound === 'function') playSound('milestone');
+              }
+            } else {
+              game.aceStreak = 0;
+            }
             // Top-center large letter with bracket frame
             game.floatTexts.push({
               x: BASE_W/2, y: 56, text: '[ ' + grade + ' ]',
@@ -11395,6 +11413,8 @@ function pickRunHighlights() {
   if (parries >= 3)       out.push({ label: 'BULLETS PARRIED', value: String(parries),  prio: parries * 6, col: '#0ff' });
   const parryBest = game.parryStreakBest || 0;
   if (parryBest >= 3)     out.push({ label: 'PARRY CHAIN MAX', value: 'x' + parryBest,   prio: parryBest * 10, col: '#0cf' });
+  const aceBest = game.aceStreakBest || 0;
+  if (aceBest >= 3)       out.push({ label: 'ACE STREAK MAX', value: 'x' + aceBest,      prio: aceBest * 15, col: '#fc4' });
   if (elites >= 1)        out.push({ label: 'ELITES SLAIN',  value: String(elites),       prio: elites * 18, col: '#f44' });
   if (stages >= 3)        out.push({ label: 'STAGES CLEARED', value: String(stages),     prio: stages * 8, col: '#fc4' });
   if (bosses >= 1)        out.push({ label: 'BOSSES DOWN',    value: String(bosses),     prio: bosses * 60, col: '#f8a' });
