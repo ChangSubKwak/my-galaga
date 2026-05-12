@@ -6889,6 +6889,8 @@ function commitGameToCumStats() {
   s.pickupStreakBest = Math.max(s.pickupStreakBest || 0, game.pickupStreakBest || 0);
   // BOSS KILLS LIFETIME — sum of all bosses defeated across runs
   s.bossKillsTotal = (s.bossKillsTotal || 0) + (game.bossesKilledThisRun || 0);
+  // BOMBS USED LIFETIME — sum of B pickups detonated across runs
+  s.bombsTotal = (s.bombsTotal || 0) + ((game.stats && game.stats.bombsUsed) || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -15713,6 +15715,12 @@ function drawStatsOverlay() {
       if (_bkTot >= 1) {
         const _bkCol = _bkTot >= 100 ? '#fc4' : _bkTot >= 30 ? '#0ff' : _bkTot >= 10 ? '#0f8' : '#f8a';
         profileRow('BOSS KILLS', String(_bkTot), _bkCol);
+      }
+      // BOMBS USED LIFETIME — sum across both modes
+      const _bmTot = (csN2.bombsTotal || 0) + (csC2.bombsTotal || 0);
+      if (_bmTot >= 3) {
+        const _bmCol = _bmTot >= 100 ? '#fc4' : _bmTot >= 30 ? '#f44' : '#fa8';
+        profileRow('BOMBS USED', String(_bmTot), _bmCol);
       }
       // DASH TOTAL — lifetime dashes across both modes
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
