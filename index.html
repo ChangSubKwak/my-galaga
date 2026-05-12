@@ -5919,6 +5919,24 @@ function updatePlayer() {
         game.bullets.push(b);
         game.stats.shotsFired++;
         game.stageShotsFired++;
+        // MARKSMAN MILESTONE — once per run, when 50+ shots fired AND accuracy
+        // >= 90%, surface banner. Skill recognition without score inflation.
+        if (!game._marksmanFired && game.stats.shotsFired >= 50) {
+          const _accPct = (game.stats.shotsHit / game.stats.shotsFired) * 100;
+          if (_accPct >= 90) {
+            game._marksmanFired = true;
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 - 40, text: 'MARKSMAN',
+              color: '#0ff', life: 80, maxLife: 80, size: 10
+            });
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 - 28, text: '90%+ ACCURACY',
+              color: '#cce', life: 80, maxLife: 80, size: 5
+            });
+            if (typeof playSound === 'function') playSound('milestone');
+            if (typeof spawnConfetti === 'function') spawnConfetti(8);
+          }
+        }
         // Muzzle flash particle (6-frame fade) at gun barrel
         game.muzzleFlashes = game.muzzleFlashes || [];
         game.muzzleFlashes.push({ x: cx + ox, y: game.playerY - 6, life: 0, color: ship.color });
