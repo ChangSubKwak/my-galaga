@@ -9912,6 +9912,26 @@ function update() {
     // Ambient event tick (cargoShip drift / supernova fade). Frozen during PAUSED with
     // the rest of these atmospheric timers so the scene holds in place while paused.
     updateAmbientEvent();
+    // CORRUPTION VOICE — late stage (corruption > 0.4) randomly spawn distorted
+    // 1-word whispers at random screen position. Adds narrative voice layer to
+    // the existing purely-visual worldCorruption system. Score-neutral.
+    if (game.stage >= 50 && game.playerAlive
+        && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      // Spawn chance ramps from 0.0008 at stage 50 to 0.004 at stage 80 (~once per 4-15s)
+      const _voiceChance = Math.min(0.004, 0.0008 + (game.stage - 50) * 0.0001);
+      if (Math.random() < _voiceChance) {
+        const _voiceWords = ['STATIC', 'WHO?', 'WAKE.', 'WRONG', 'ECHO', 'HOLLOW',
+                             'TURN BACK', 'REMEMBER', '01010', 'INSIDE', 'NULL',
+                             'COLD', 'WATCHING', 'EMPTY'];
+        const _w = _voiceWords[Math.floor(Math.random() * _voiceWords.length)];
+        const _vx = 30 + Math.random() * (BASE_W - 60);
+        const _vy = 40 + Math.random() * (BASE_H - 80);
+        const _vc = Math.random() < 0.5 ? '#f48' : '#0cf';
+        game.floatTexts.push({
+          x: _vx, y: _vy, text: _w, color: _vc, life: 50, maxLife: 50, size: 5
+        });
+      }
+    }
     // Camera FX timers — moved out of draw() so they tick at simulation rate (60Hz)
     // instead of render rate (varies by monitor: 60/120/144Hz). On a 144Hz display the
     // 14-frame zoom pulse was burning out in ~95ms instead of 233ms.
