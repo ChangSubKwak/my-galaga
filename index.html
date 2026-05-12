@@ -11011,6 +11011,19 @@ function draw() {
         ctx.fillRect(0, 0, BASE_W, 6);
         ctx.fillRect(0, BASE_H - 6, BASE_W, 6);
       }
+      // CORRUPTION DEEP PULSE — at corr > 0.5, periodic violet vignette pulse
+      // (every ~5 sec, 18-frame fade). Adds 'something is here' atmospheric
+      // pressure beyond static edge effects.
+      if (corr > 0.5) {
+        const _dpCyc = 300; // ~5s at 60fps
+        const _dpPos = t % _dpCyc;
+        if (_dpPos < 18) {
+          const _dpA = (1 - _dpPos / 18) * (corr - 0.5) * 0.45;
+          ctx.globalAlpha = _dpA;
+          ctx.fillStyle = '#618';
+          ctx.fillRect(0, 0, BASE_W, BASE_H);
+        }
+      }
       // OVERSCAN GLITCH — 1-2 frame horizontal "vsync drop" white line at random
       // y, briefly. Fires ~once every 2-4 seconds at stage 70+, more often near 80.
       // Pure aesthetic noise — sells the "deep instability" tone of the late game.
