@@ -10029,6 +10029,14 @@ function checkStageComplete() {
               x: BASE_W/2, y: BASE_H/2 + 16, text: txt,
               color: '#0f8', life: 90, maxLife: 90, size: 7
             });
+            // BLAZE BANNER — 5+ second cut over prior PB
+            if (pbResult.prev != null && (pbResult.prev - game.stageFrames) >= 300) {
+              game.floatTexts.push({
+                x: BASE_W/2, y: BASE_H/2 + 8, text: 'BLAZE!',
+                color: '#fc4', life: 100, maxLife: 100, size: 10
+              });
+              if (typeof spawnConfetti === 'function') spawnConfetti(8);
+            }
             playSound('extraLife');
             // PB CELEBRATION ENHANCED (normal play variant)
             if (typeof spawnConfetti === 'function') spawnConfetti(12);
