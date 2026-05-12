@@ -15832,6 +15832,18 @@ function drawGameOverScreen() {
 
   drawRetroText('KILLS', BASE_W/2 - 40, cy, 6, COL.cyan);
   drawRetroText(Math.floor(s.kills * tKills).toString(), BASE_W/2 + 40, cy, 7, COL.yellow, 'right');
+  // KILLS TIER LABEL — after count completes
+  if (tKills >= 1) {
+    const _kT = s.kills >= 1000 ? 'EXTERMINATOR'
+              : s.kills >= 500  ? 'SLAYER'
+              : s.kills >= 200  ? 'HUNTER'
+              : s.kills >= 50   ? 'TRACKER'
+              : null;
+    if (_kT) {
+      const _kTcol = s.kills >= 1000 ? '#fc4' : s.kills >= 500 ? '#0ff' : s.kills >= 200 ? '#0f8' : '#888';
+      drawRetroText(_kT, BASE_W/2 + 40, cy + 6, 4, _kTcol, 'right');
+    }
+  }
 
   drawRetroText('ACCURACY', BASE_W/2 - 40, cy + 10, 6, COL.cyan);
   drawRetroText(Math.floor(acc * tAcc) + '%', BASE_W/2 + 40, cy + 10, 7, COL.yellow, 'right');
