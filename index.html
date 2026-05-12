@@ -10084,6 +10084,18 @@ function checkStageComplete() {
             x: BASE_W/2, y: cy + 39, text: '', countTo: total, prefix: 'TOTAL +', countDuration: 50,
             color: '#ff4', life: 80, maxLife: 80, size: 9
           });
+          // STAGE TOTAL TIER LABEL — big-windfall recognition tier
+          if (total >= 10000) {
+            const _tierTxt = total >= 50000 ? 'JACKPOT!'
+                           : total >= 25000 ? 'WINDFALL!'
+                           : 'BIG HAUL';
+            const _tierCol = total >= 50000 ? '#fc4' : total >= 25000 ? '#ff8' : '#0f8';
+            game.floatTexts.push({
+              x: BASE_W/2, y: cy + 50, text: _tierTxt,
+              color: _tierCol, life: 100, maxLife: 100, size: 8
+            });
+            if (typeof spawnConfetti === 'function') spawnConfetti(8);
+          }
           // STAGE GRADE — letter grade based on accuracy + no-death + time bonus tier.
           // Pure recognition layer; no extra score (the underlying bonuses already
           // reward the same axes). Counters per grade persisted to localStorage for
