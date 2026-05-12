@@ -11184,7 +11184,21 @@ function draw() {
     if (corr > 0) {
       ctx.save();
       const t = game.animFrame;
-      // STAGE TIER DARK VIGNETTE — soft black edge gradient. Strength scales
+      // BOSS LOW HP SCREEN PULSE — when any alive boss is under 25% HP, paint
+  // pulsing red edge bars to amplify decisive-blow tension.
+  if (game.state === STATE.BOSS_STAGE && game.megaBosses
+      && game.megaBosses.some(mb => mb.alive && mb.maxHp && mb.hp / mb.maxHp < 0.25)) {
+    const _bpA = 0.18 + 0.18 * Math.sin(game.animFrame * 0.22);
+    ctx.save();
+    ctx.globalAlpha = _bpA;
+    ctx.fillStyle = '#f44';
+    ctx.fillRect(0, 0, BASE_W, 3);
+    ctx.fillRect(0, BASE_H - 3, BASE_W, 3);
+    ctx.fillRect(0, 0, 3, BASE_H);
+    ctx.fillRect(BASE_W - 3, 0, 3, BASE_H);
+    ctx.restore();
+  }
+  // STAGE TIER DARK VIGNETTE — soft black edge gradient. Strength scales
       // with corruption. Adds oppression beyond colored noise.
       ctx.globalAlpha = corr * 0.30;
       ctx.fillStyle = '#000';
