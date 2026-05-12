@@ -5904,6 +5904,8 @@ function addScore(pts) {
   // Extra life every 30000 — disabled in challenge mode (hardcore = 1 life)
   if (!game.challengeMode && Math.floor(old / 30000) < Math.floor(game.score / 30000)) {
     game.lives++;
+    // Re-arm LAST LIFE ALERT — leaving 1-life state means next drop to 1 can re-fire
+    if (game.lives >= 2) game._lastLifeAlertFired = false;
     game.lifeGainPulseTimer = 30;
     game.extraShipsRun = (game.extraShipsRun || 0) + 1;
     playSound('extraLife');
@@ -7859,6 +7861,7 @@ function bumpCombo() {
       addScore(5000);
     } else {
       game.lives++;
+      if (game.lives >= 2) game._lastLifeAlertFired = false;
       game.extraShipsRun = (game.extraShipsRun || 0) + 1;
       // LIFE GAIN PULSE — flag for HUD lives row to pulse gold for 30 frames
       game.lifeGainPulseTimer = 30;
@@ -9740,6 +9743,26 @@ function killPlayer(srcX, srcY, cause) {
     game.respawnTimer = 90;
   } else {
     game.lives--;
+    // LAST LIFE ALERT — fires once when lives transitions to exactly 1.
+    // Dramatic red banner + flash + rumble. Re-arms when lives goes back up.
+    if (game.lives === 1 && !game._lastLifeAlertFired) {
+      game._lastLifeAlertFired = true;
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 30, text: 'LAST LIFE',
+        color: '#f44', life: 100, maxLife: 100, size: 14
+      });
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 16, text: 'MAKE IT COUNT',
+        color: '#fff', life: 90, maxLife: 90, size: 6
+      });
+      game.flashTimer = Math.max(game.flashTimer || 0, 12);
+      game.flashColor = '#f44';
+      if (typeof rumble === 'function') rumble(300, 0.95, 0.6);
+      if (typeof playSound === 'function') playSound('lowHealth');
+    }
+    // Re-arm when player gains a life (extra ship pickup brings >=2)
+    // Handled lazily in addScore/extra life paths (see below) but ensure flag
+    // is not stale here.
     // DEATH CAUSE TALLY — record cause to localStorage (death landed)
     if (game._deathCausePending) {
       // FINAL CAUSE — keep on game for GAME_OVER recap line (cleared at resetGame)
