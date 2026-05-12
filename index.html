@@ -2959,6 +2959,27 @@ const BIOME_NAMES = {
 // BIOME_WHISPERS — short atmospheric one-liners shown under the biome label
 // during STAGE_INTRO. Three variants per biome; rotates by (stage % 3) for
 // determinism. Pure flavor — no gameplay effect, no score.
+// STAGE_TIPS — adaptive gameplay hints surfaced during STAGE_INTRO based on
+// player stat weakness. First-match wins. Score-neutral. Different from
+// TRANSMISSION_LOGS (narrative) and BIOME_WHISPERS (atmospheric) — these are
+// pragmatic skill nudges that disappear once the relevant stat catches up.
+const STAGE_TIPS = [
+  { check: g => g.stage === 4 && (g.bossKills || 0) === 0,
+    tip: 'TIP: CHALLENGE STAGE - PERFECT FOR BONUS' },
+  { check: g => g.stage >= 5 && (g.parryCount || 0) < 3,
+    tip: 'TIP: DASH THROUGH ENEMY BULLETS = PARRY' },
+  { check: g => g.stage >= 4 && (g.comboBest || 0) < 5,
+    tip: 'TIP: CHAIN KILLS - 5 = X1.5 MULTIPLIER' },
+  { check: g => g.stage >= 9 && g.stage <= 10 && (g.bossKills || 0) === 0,
+    tip: 'TIP: BOSS STAGE NEXT - SAVE BOMBS' },
+  { check: g => g.stage >= 6 && (g.runPowerUps || 0) < 2,
+    tip: 'TIP: GRAB LETTERS - S/N/P STACK PERMANENT' },
+  { check: g => g.stage >= 8 && (g.witchSaves || 0) === 0,
+    tip: 'TIP: DASH ON FATAL HIT - WITCH TIME SAVE' },
+  { check: g => g.stage >= 12 && (g.eliteKills || 0) === 0,
+    tip: 'TIP: RED-OUTLINE ENEMIES = ELITES (X1.5 SCORE)' }
+];
+
 const BIOME_WHISPERS = {
   planet:    ['THE WORLD WATCHES', 'GRAVITY TUGS SOFTLY', 'BLUE CURVE BREATHES'],
   dawn:      ['LIGHT SPILLS OVER', 'WARMTH ON THE HULL', 'COLOR RETURNS SLOW'],
@@ -11550,6 +11571,19 @@ function drawStageIntro() {
   if (slide >= 1) {
     const tier = Math.min(4, Math.floor((game.stage - 1) / 4));
     drawRetroText('TIER ' + tier, BASE_W - 4, BASE_H/2 - 22, 5, COL.gray, 'right');
+  }
+  // ADAPTIVE TIP — surface skill hint based on first matching weakness check
+  if (slide >= 1 && !isBoss && typeof STAGE_TIPS !== 'undefined' && introElapsed > 60) {
+    let _tip = null;
+    for (const t of STAGE_TIPS) {
+      try { if (t.check(game)) { _tip = t.tip; break; } } catch (e) {}
+    }
+    if (_tip) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (introElapsed - 60) / 18) * 0.85;
+      drawRetroText(_tip, BASE_W/2 + offX, BASE_H/2 + 22, 4, '#0cf');
+      ctx.restore();
+    }
   }
 
   // BOSS INTRO CINEMATIC — WARNING flash band + boss name + silhouette preview.
