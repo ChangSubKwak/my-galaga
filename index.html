@@ -5748,6 +5748,22 @@ function addScore(pts) {
   if (game && game.dailyMode) pts = Math.round(pts * 1.25);
   const old = game.score;
   game.score = Math.min(SCORE_CAP, game.score + pts);
+  // SCORE MILESTONE BANNERS — when crossing 10k/50k/100k/500k/1M/10M for the
+  // first time this run, push gold banner. Compare old vs new to fire once.
+  {
+    const _scMs = [10000, 50000, 100000, 500000, 1000000, 10000000];
+    for (const _ms of _scMs) {
+      if (old < _ms && game.score >= _ms) {
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 40,
+          text: fmtScore(_ms) + ' POINTS!',
+          color: '#fc4', life: 90, maxLife: 90, size: 9
+        });
+        if (typeof spawnConfetti === 'function') spawnConfetti(8);
+        break;
+      }
+    }
+  }
   // DAILY MISSION check — fire once per day on completion. Only relevant in daily
   // mode runs where mission targeting is enabled.
   // Cache isDailyMissionDoneToday() result once per run to avoid hot-loop
