@@ -12345,6 +12345,15 @@ function drawStageIntro() {
     if (playerCallsign && playerCallsign !== '???' && typeof computePilotTitle === 'function') {
       drawRetroText('[' + playerCallsign + ']', 4, BASE_H/2 - 22, 5, '#888', 'left');
       drawRetroText(computePilotTitle(), 4, BASE_H/2 - 15, 4, '#555', 'left');
+      // NEXT RANK PEEK — show progress toward the next tier when available
+      if (typeof computePilotNextRank === 'function') {
+        try {
+          const _nr = computePilotNextRank();
+          if (_nr && _nr.next) {
+            drawRetroText('→ ' + _nr.next, 4, BASE_H/2 - 30, 4, '#444', 'left');
+          }
+        } catch (e) {}
+      }
     }
     // SHIP NAME PEEK — current ship under pilot rank, in ship color.
     if (game.ship && game.ship.name) {
