@@ -6925,6 +6925,14 @@ function saveCumStats(s, challenge) {
 }
 function commitGameToCumStats() {
   if (!game || game.isDemo) return;
+  // LAST RUN SUMMARY — save quick last-run snapshot for TITLE display.
+  try {
+    localStorage.setItem('galagaLastRun', JSON.stringify({
+      stage: (game.stats && game.stats.maxStage) || game.stage || 1,
+      score: game.score || 0,
+      combo: game.comboBest || 0
+    }));
+  } catch (e) {}
   // First commit ever — FRESH START achievement
   if ((loadCumStats(false).sessions || 0) + (loadCumStats(true).sessions || 0) === 0) {
     unlockAchievement('freshStart');
@@ -11760,6 +11768,18 @@ function drawTitleScreen() {
     const sCol = challengeModeRequested ? COL.red : dailyModeRequested ? COL.green : COL.cyan;
     drawRetroText('PRESS SPACE TO START', BASE_W/2, 190, 8, sCol);
   }
+  // LAST RUN SUMMARY — small one-line previous run summary at bottom-center
+  // so players can compare new attempts. Hidden when first ever run.
+  try {
+    const _lrRaw = localStorage.getItem('galagaLastRun');
+    if (_lrRaw && !callsignInput.active) {
+      const _lr = JSON.parse(_lrRaw);
+      if (_lr && _lr.stage > 0) {
+        const _lrStr = 'LAST  S' + _lr.stage + '  ' + fmtScore(_lr.score) + '  C×' + _lr.combo;
+        drawRetroText(_lrStr, BASE_W/2, BASE_H - 14, 4, '#555', 'center');
+      }
+    }
+  } catch (e) {}
   // INPUT DEVICE ICON — detect gamepad / touch / keyboard at draw time.
   // Small label corner-bottom-right. Defaults to KBD when no other signal.
   {
