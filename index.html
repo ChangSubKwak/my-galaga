@@ -8938,9 +8938,18 @@ function killPlayer(srcX, srcY, cause) {
   if ((game.shieldCharges || 0) > 0) {
     game.shieldCharges--;
     game.invincibleTimer = Math.max(game.invincibleTimer, 60);
-    game.flashTimer = 8;
+    game.flashTimer = 10;
     game.flashColor = '#4f8';
-    game.shakeTimer = Math.max(game.shakeTimer || 0, 8);
+    game.shakeTimer = Math.max(game.shakeTimer || 0, 10);
+    // SHIELD ABSORB CINEMATIC — 3 staggered expanding shockwave rings + 12
+    // itemBurst sparks + bigger banner + tiny hitStop. Makes the save feel
+    // earned without changing the gameplay outcome.
+    if (game.shockwaves) {
+      game.shockwaves.push({ x: game.playerX, y: game.playerY, life: 0,  maxLife: 22, maxR: 24, color: '#4f8' });
+      game.shockwaves.push({ x: game.playerX, y: game.playerY, life: -6, maxLife: 22, maxR: 32, color: '#0f8' });
+      game.shockwaves.push({ x: game.playerX, y: game.playerY, life: -12, maxLife: 22, maxR: 40, color: '#fff' });
+    }
+    game.hitStopFrames = Math.max(game.hitStopFrames || 0, 4);
     // Visual ring burst at player position so the save is unmissable
     for (let k = 0; k < 12; k++) {
       const a = (k / 12) * Math.PI * 2;
@@ -8951,11 +8960,12 @@ function killPlayer(srcX, srcY, cause) {
       });
     }
     game.floatTexts.push({
-      x: game.playerX, y: game.playerY - 14, text: 'SHIELD!',
-      color: '#4f8', life: 50, maxLife: 50, size: 8
+      x: game.playerX, y: game.playerY - 18, text: 'SHIELD!',
+      color: '#4f8', life: 60, maxLife: 60, size: 11
     });
+    if (typeof spawnConfetti === 'function') spawnConfetti(6);
     playSound('powerUp');
-    rumble(180, 0.6, 0.3);
+    rumble(220, 0.7, 0.4);
     return;
   }
   game.playerAlive = false;
