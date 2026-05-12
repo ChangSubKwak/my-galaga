@@ -12148,6 +12148,15 @@ function drawStageIntro() {
   ctx.shadowBlur = 10 * glowPulse;
   drawRetroText(stageLabel, BASE_W/2 + offX, BASE_H/2 - 10, 12, labelColor);
   ctx.restore();
+  // STAGE GOAL FRACTION — small 'N / 80' or 'N / ENDLESS' below the stage label
+  // showing progress to canonical end. Cyan default; gold when past 80.
+  if (slide >= 1 && !isBoss) {
+    let _frac;
+    if (game.stage > 80) _frac = game.stage + ' / ENDLESS';
+    else _frac = game.stage + ' / 80';
+    const _fCol = game.stage > 80 ? '#fc4' : '#666';
+    drawRetroText(_frac, BASE_W/2 + offX, BASE_H/2 + 40, 4, _fCol);
+  }
   // STAGE BIOME NAME — biome-themed sub-title under the stage label gives
   // each stage a thematic identity beyond the number. Renders only when a
   // biome is active (stage 8+) and not on boss stages (boss name takes priority).
