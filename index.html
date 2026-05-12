@@ -11502,6 +11502,12 @@ function drawTitleScreen() {
   if (typeof dexUnlocked !== 'undefined' && dexUnlocked.size >= 8) {
     drawRetroText('BESTIARY', BASE_W/2, 61, 4, '#f6f', 'center');
   }
+  // 100% ACHIEVEMENT BADGE — if all achievements unlocked, pulsing gold.
+  if (typeof unlockedAchievements !== 'undefined' && typeof ACHIEVEMENTS !== 'undefined'
+      && unlockedAchievements.size >= Object.keys(ACHIEVEMENTS).length) {
+    const _achBlink = (t >> 2) % 4 !== 0 ? '#fc4' : '#ff8';
+    drawRetroText('100% ★', BASE_W/2, 66, 5, _achBlink, 'center');
+  }
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
