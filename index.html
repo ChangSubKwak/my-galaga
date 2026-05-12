@@ -12848,6 +12848,15 @@ function drawStageIntro() {
   if (slide >= 1) {
     const tier = Math.min(4, Math.floor((game.stage - 1) / 4));
     drawRetroText('TIER ' + tier, BASE_W - 4, BASE_H/2 - 22, 5, COL.gray, 'right');
+    // TIER PIPS — 5-dot row (tier 0..4) below label
+    ctx.save();
+    const _tpCols = ['#0cf', '#0f8', '#fc4', '#f88', '#f6f'];
+    for (let _tp = 0; _tp < 5; _tp++) {
+      ctx.globalAlpha = _tp <= tier ? 0.85 : 0.20;
+      ctx.fillStyle = _tpCols[_tp];
+      ctx.fillRect(BASE_W - 27 + _tp * 5, BASE_H/2 - 18, 3, 1);
+    }
+    ctx.restore();
     // PILOT TITLE PEEK — small callsign + current rank near top-left corner so
     // each intro reminds the player who they are.
     if (playerCallsign && playerCallsign !== '???' && typeof computePilotTitle === 'function') {
