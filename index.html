@@ -16053,7 +16053,11 @@ function drawGameOverScreen() {
     if ((game.score || 0) >= 1000) {
       const _spm = Math.round((game.score || 0) / _mins);
       const _spmCol = _spm >= 50000 ? '#fc4' : _spm >= 20000 ? '#0ff' : _spm >= 5000 ? '#0f8' : '#888';
-      drawRetroText('S/MIN ' + fmtScore(_spm), BASE_W/2 + 30, cy + 52, 4, _spmCol);
+      const _spmN = _spm >= 50000 ? ' PRODIGY'
+                 : _spm >= 20000 ? ' STRONG'
+                 : _spm >= 5000  ? ' STEADY'
+                 : '';
+      drawRetroText('S/MIN ' + fmtScore(_spm) + _spmN, BASE_W/2 + 30, cy + 52, 4, _spmCol);
     }
   }
   // SHIP KILLS CONTRIBUTION — kills added to current ship mastery this run.
