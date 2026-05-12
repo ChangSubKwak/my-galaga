@@ -11435,6 +11435,11 @@ function drawTitleScreen() {
     } catch (e) {}
     drawRetroText(_dev, BASE_W - 4, BASE_H - 4, 4, '#666', 'right');
   }
+  // BGM TRACK PEEK — show current track id at bottom-left if active. Helps
+  // confirm audio is wired correctly and surfaces variety for music nerds.
+  if (typeof bgmTrack === 'string' && bgmTrack) {
+    drawRetroText('♪ ' + bgmTrack.toUpperCase(), 4, BASE_H - 4, 4, '#555', 'left');
+  }
   // TITLE TIPS ROTATION — bottom hint area cycles gameplay reminders every
   // 216 frames (3.6s). Hidden during callsign editor. Pure educational nudge.
   if (!callsignInput.active) {
