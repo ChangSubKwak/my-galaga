@@ -12530,6 +12530,14 @@ function drawStageIntro() {
         drawRetroText('BIO ' + _bsCount + '/8', BASE_W - 4, BASE_H/2 + 47, 4, _bsCol, 'right');
       }
     } catch (e) {}
+    // DAILY STREAK PEEK — current daily-mission streak when >= 2 days.
+    if (typeof computeDailyStreak === 'function') {
+      const _dStreak = computeDailyStreak();
+      if (_dStreak >= 2) {
+        const _dsCol = _dStreak >= 30 ? '#fc4' : _dStreak >= 7 ? '#0f8' : '#cce';
+        drawRetroText('D' + _dStreak, BASE_W - 4, BASE_H/2 + 71, 4, _dsCol, 'right');
+      }
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
