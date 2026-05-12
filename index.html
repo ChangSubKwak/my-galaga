@@ -4526,6 +4526,22 @@ function updateOneMegaBoss(mb) {
           x: b.x + (Math.random() * 4 - 2), y: b.y - 8,
           text: 'CRIT!', color: '#fc4', life: 30, maxLife: 30, size: 7
         });
+        // CRIT GOLD RING — small expanding shockwave + 6 gold sparks. Makes
+        // crit hits feel substantively heavier even on bosses where the
+        // damage gets absorbed without a kill.
+        if (game.shockwaves) {
+          game.shockwaves.push({
+            x: b.x, y: b.y, life: 0, maxLife: 16, maxR: 18, color: '#fc4'
+          });
+        }
+        for (let _k = 0; _k < 6; _k++) {
+          const _a = (_k / 6) * Math.PI * 2;
+          game.itemBursts.push({
+            x: b.x + Math.cos(_a) * 5,
+            y: b.y + Math.sin(_a) * 5,
+            life: -_k, color: '#fc4'
+          });
+        }
       }
       mb.hp -= dmgDealt;
       // BOSS HIT IMPACT SCALE — shake/flash scale with damage so heavy weapons
