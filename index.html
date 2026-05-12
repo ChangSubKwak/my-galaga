@@ -15406,6 +15406,32 @@ function drawHUD() {
     drawRetroText('WAVE ' + _cwCur + '/' + _cwTotal, BASE_W - 5, 44, 5, '#f6f', 'right');
     ctx.restore();
   }
+  // NEXT EXTRA LIFE INDICATOR — score progress to next 30k threshold. Disabled
+  // in challenge mode (no extra lives). Bar pulses brighter as it nears the
+  // threshold so the player can push for it on close calls.
+  if (!minimalHud
+      && !game.challengeMode
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (game.score || 0) > 0) {
+    const _sc = game.score || 0;
+    const _into = _sc % 30000;
+    const _ratio = _into / 30000;
+    const _remain = 30000 - _into;
+    const _nelBarX = BASE_W - 30, _nelBarY = 62, _nelBarW = 25;
+    const _nelClose = _ratio >= 0.85;
+    const _nelCol = _nelClose ? (game.animFrame % 8 < 4 ? '#0f8' : '#fff') : '#0f8';
+    ctx.save();
+    ctx.globalAlpha = 0.30;
+    ctx.fillStyle = _nelCol;
+    ctx.fillRect(_nelBarX, _nelBarY, _nelBarW, 1);
+    ctx.globalAlpha = _nelClose ? 0.95 : 0.65;
+    ctx.fillRect(_nelBarX, _nelBarY, Math.round(_nelBarW * _ratio), 1);
+    ctx.restore();
+    // Compact text label when close to threshold (≤ 5000 away)
+    if (_remain <= 5000) {
+      drawRetroText('+SHIP ' + Math.ceil(_remain / 100) * 100, BASE_W - 5, 70, 3, _nelCol, 'right');
+    }
+  }
   // ACTIVE BUFF TIMER BARS — vertical mini-bar stack for live timer countdowns.
   // Each bar: 26px wide × 2px tall, color-coded by buff. Hidden when timer == 0.
   // Placed right-side under PB pace indicator so the right column reads:
