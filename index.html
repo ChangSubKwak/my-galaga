@@ -12646,6 +12646,15 @@ function drawHUD() {
     }
   }
 
+  // HUD PICKUP STREAK — small "P×N" cyan counter when consecutive no-death
+  // pickups reach 2+. Hides on death (streak resets). Visible in normal HUD only.
+  if (!minimalHud && (game.pickupStreak || 0) >= 2
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    const psStr = 'P×' + game.pickupStreak;
+    const psCol = game.pickupStreak >= 10 ? '#fc4' : '#0ff';
+    drawRetroText(psStr, BASE_W - 5, 38, 4, psCol, 'right');
+  }
+
   // POWER UP PITY INDICATOR — small 15-dot row near top-left showing pity progress
   // (kills without a drop). Filled dots = kills accumulated; empty = headroom.
   // Drops invisibly when 0 — only surfaces when there's something to communicate.
