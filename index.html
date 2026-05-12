@@ -12153,6 +12153,11 @@ function drawStageIntro() {
     if ((game.highScore || 0) > 0) {
       drawRetroText('HI:' + fmtScore(game.highScore), BASE_W - 4, BASE_H/2 - 1, 4, '#fc4', 'right');
     }
+    // STREAK SUMMARY PEEK — zen (no-death) streak + parry streak best when active.
+    // Right side, below HI score. Encourages preservation play.
+    if ((game.zenStreak || 0) >= 2) {
+      drawRetroText('NODIE x' + game.zenStreak, BASE_W - 4, BASE_H/2 + 5, 4, '#0f8', 'right');
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
