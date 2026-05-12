@@ -11799,6 +11799,27 @@ function drawTitleScreen() {
       drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
     }
   } catch (e) {}
+  // BIOMES DOTS — 8 small biome-colored dots beneath badge stack. Filled when
+  // that biome has been visited, dim otherwise. At-a-glance exploration visual.
+  try {
+    const _bdRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
+    const _bdArr = JSON.parse(_bdRaw);
+    if (Array.isArray(_bdArr) && _bdArr.length > 0) {
+      const _order = ['planet', 'dawn', 'asteroid', 'ice', 'gasGiant', 'corona', 'blackhole', 'starfield'];
+      const _seen = new Set(_bdArr);
+      const _dY = 88;
+      const _dStartX = BASE_W/2 - 14;
+      ctx.save();
+      for (let _di = 0; _di < 8; _di++) {
+        const _bd = _order[_di];
+        const _bdCol = (typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_bd]) ? BIOME_NAMES[_bd].col : '#fff';
+        ctx.globalAlpha = _seen.has(_bd) ? 0.85 : 0.20;
+        ctx.fillStyle = _bdCol;
+        ctx.fillRect(_dStartX + _di * 4, _dY, 2, 2);
+      }
+      ctx.restore();
+    }
+  } catch (e) {}
   // MARATHONER BADGE — longest single run tier (15/30/60 min)
   try {
     const _csNm = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
