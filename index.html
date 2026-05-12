@@ -9931,6 +9931,14 @@ function checkStageComplete() {
               x: BASE_W/2, y: BASE_H/2 + 24, text: txt,
               color: '#ff4', life: 90, maxLife: 90, size: 7
             });
+            // SCORE PB CINEMATIC — small yellow shockwave for visual punctuation
+            if (game.shockwaves) {
+              game.shockwaves.push({
+                x: BASE_W/2, y: BASE_H/2 + 24,
+                life: 0, maxLife: 20, maxR: 40, color: '#ff4'
+              });
+            }
+            if (typeof spawnConfetti === 'function') spawnConfetti(6);
           }
           if (!game.stageDied) {
             unlockAchievement('perfectionist');
