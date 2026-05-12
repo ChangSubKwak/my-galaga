@@ -17263,7 +17263,11 @@ function drawStatsOverlay() {
       const _psBest = Math.max(csN2.pickupStreakBest || 0, csC2.pickupStreakBest || 0);
       if (_psBest >= 5) {
         const _psCol = _psBest >= 25 ? '#fc4' : _psBest >= 15 ? '#0ff' : _psBest >= 10 ? '#0f8' : '#cce';
-        profileRow('PICKUP STREAK BEST', 'x' + _psBest, _psCol);
+        const _psSN = _psBest >= 25 ? ' CURATOR'
+                    : _psBest >= 15 ? ' CONSERVATOR'
+                    : _psBest >= 10 ? ' COLLECTOR'
+                    : '';
+        profileRow('PICKUP STREAK BEST', 'x' + _psBest + _psSN, _psCol);
       }
       // BOSS KILLS LIFETIME — sum across both modes
       const _bkTot = (csN2.bossKillsTotal || 0) + (csC2.bossKillsTotal || 0);
