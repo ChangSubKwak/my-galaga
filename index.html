@@ -17126,7 +17126,11 @@ function drawStatsOverlay() {
       const parryTotal = parseInt(localStorage.getItem('galagaParryTotal') || '0', 10);
       if (parryTotal >= 5) {
         const pCol = parryTotal >= 500 ? '#fc4' : parryTotal >= 200 ? '#0ff' : parryTotal >= 50 ? '#0f8' : '#cce';
-        profileRow('PARRY TOTAL', String(parryTotal), pCol);
+        const _pTier = parryTotal >= 500 ? 'GUARDIAN'
+                     : parryTotal >= 200 ? 'WARDEN'
+                     : parryTotal >= 50  ? 'DEFLECTOR'
+                     : '';
+        profileRow('PARRY TOTAL', String(parryTotal) + (_pTier ? ' ' + _pTier : ''), pCol);
       }
       // PARRY STREAK BEST — lifetime max consecutive parries
       const psBest = Math.max(csN2.parryStreakBest || 0, csC2.parryStreakBest || 0);
