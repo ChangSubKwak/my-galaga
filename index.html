@@ -222,6 +222,30 @@ function shipAttrs() { return SHIPS[selectedShip] || SHIPS.default; }
 // PILOT TITLE — derives a personal callsign-side rank from cumulative stats.
 // Pulled from PROFILE PAGE logic so HUD can also display it. Returns one of:
 // ROOKIE / PILOT / VETERAN / APEX SURVIVOR / BESTIARY MASTER / ACE PILOT.
+// Composite completion percent — single number summarizing progression across
+// biomes/dex/ships/difficulties/perks/achievements categories.
+function computeCompositeCompletion() {
+  try {
+    const _bsC = JSON.parse(localStorage.getItem('galagaBiomesSeen') || '[]');
+    const _shC = JSON.parse(localStorage.getItem('galagaShipsUsed') || '[]');
+    const _dfC = JSON.parse(localStorage.getItem('galagaDifficultiesUsed') || '[]');
+    const _pkC = JSON.parse(localStorage.getItem('galagaPerkPicks') || '{}');
+    const _bs = Array.isArray(_bsC) ? Math.min(8, _bsC.length) : 0;
+    const _dx = (typeof dexUnlocked !== 'undefined') ? Math.min(8, dexUnlocked.size) : 0;
+    const _sh = Array.isArray(_shC) ? Math.min(4, _shC.length) : 0;
+    const _df = Array.isArray(_dfC) ? Math.min(3, _dfC.length) : 0;
+    let _pk = 0;
+    for (const _k in _pkC) if ((_pkC[_k] || 0) >= 1) _pk++;
+    const _pTot = (typeof PERK_IDS !== 'undefined' ? PERK_IDS.length : 10);
+    _pk = Math.min(_pTot, _pk);
+    const _ach = (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements.size : 0;
+    const _achTot = (typeof ACHIEVEMENTS !== 'undefined') ? Object.keys(ACHIEVEMENTS).length : 60;
+    return Math.round((
+      (_bs / 8) + (_dx / 8) + (_sh / 4) + (_df / 3) + (_pk / Math.max(1, _pTot)) + (_ach / Math.max(1, _achTot))
+    ) / 6 * 100);
+  } catch (e) { return 0; }
+}
+
 function computePilotTitle() {
   try {
     const csN = loadCumStats(false), csC = loadCumStats(true);
@@ -12793,6 +12817,14 @@ function drawStageIntro() {
             }
           }
         } catch (e) {}
+      }
+    }
+    // COMPOSITE % PEEK — overall progression at top-right corner of intro
+    if (typeof computeCompositeCompletion === 'function') {
+      const _ciC = computeCompositeCompletion();
+      if (_ciC >= 5) {
+        const _ciCol = _ciC >= 80 ? '#fc4' : _ciC >= 50 ? '#0ff' : _ciC >= 20 ? '#0f8' : '#888';
+        drawRetroText('CMPL ' + _ciC + '%', BASE_W - 4, BASE_H/2 - 30, 4, _ciCol, 'right');
       }
     }
     // SHIP MASTERY PEEK — lifetime kills with current ship (above name)
