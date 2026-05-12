@@ -12202,6 +12202,35 @@ function drawStageIntro() {
     const _activePerk = PERKS[game.activePerk];
     drawRetroText('PERK: ' + _activePerk.name, BASE_W/2, BASE_H - 18, 4, _activePerk.col);
   }
+  // CYCLE DOTS — 10-dot row showing position within current boss cycle.
+  // Pos 0 = just-after-boss (stage 1/11/21...), pos 9 = next boss.
+  // Dot colors: current = bright stage type col, past = dim, future = ghost.
+  if (slide >= 1) {
+    const _cycPos = (game.stage - 1) % BOSS_STAGE_INTERVAL;
+    const _dotY = BASE_H - 28;
+    const _dotW = 5, _gap = 1;
+    const _totalW = BOSS_STAGE_INTERVAL * (_dotW + _gap) - _gap;
+    const _startX = BASE_W/2 - _totalW/2;
+    ctx.save();
+    for (let i = 0; i < BOSS_STAGE_INTERVAL; i++) {
+      const _x = _startX + i * (_dotW + _gap);
+      const _stg = game.stage - _cycPos + i;
+      const _isBoss = (i === BOSS_STAGE_INTERVAL - 1);
+      const _isChall = (i + 1) % 4 === 0 && !_isBoss;
+      const _isPast = i < _cycPos;
+      const _isCur = i === _cycPos;
+      let _col = '#444';
+      if (_isCur) _col = _isBoss ? '#f44' : _isChall ? '#f6f' : '#0cf';
+      else if (_isPast) _col = '#666';
+      else if (_isBoss) _col = '#823';
+      else if (_isChall) _col = '#525';
+      ctx.globalAlpha = _isCur ? 0.95 : _isPast ? 0.55 : 0.40;
+      ctx.fillStyle = _col;
+      const _sz = _isCur ? 3 : 2;
+      ctx.fillRect(_x + (_dotW - _sz)/2, _dotY + (_dotW - _sz)/2, _sz, _sz);
+    }
+    ctx.restore();
+  }
 
   // STAGE INTRO MISSION REMINDER — daily mode shows today's mission status at the
   // very bottom so it reads as the last thing before the countdown. Only when a
