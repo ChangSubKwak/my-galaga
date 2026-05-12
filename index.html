@@ -17303,7 +17303,11 @@ function drawStatsOverlay() {
       const _pwTot = (csN2.perfectWavesTotal || 0) + (csC2.perfectWavesTotal || 0);
       if (_pwTot >= 3) {
         const _pwCol = _pwTot >= 100 ? '#fc4' : _pwTot >= 30 ? '#0ff' : _pwTot >= 10 ? '#0f8' : '#cce';
-        profileRow('PERFECT WAVES', String(_pwTot), _pwCol);
+        const _pwN = _pwTot >= 100 ? ' IMMACULATE'
+                   : _pwTot >= 30  ? ' TIDE-BREAKER'
+                   : _pwTot >= 10  ? ' WAVE-RIDER'
+                   : '';
+        profileRow('PERFECT WAVES', String(_pwTot) + _pwN, _pwCol);
       }
       // ALL-PERFECT STAGES LIFETIME — entire CHALLENGING stages with no escapes
       const _apTot = (csN2.allPerfectStagesTotal || 0) + (csC2.allPerfectStagesTotal || 0);
