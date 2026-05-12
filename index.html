@@ -7186,6 +7186,29 @@ function bumpCombo() {
   game.combo++;
   game.comboTimer = COMBO_DECAY;
   if (game.combo > game.comboBest) game.comboBest = game.combo;
+  // MULTIKILL DETECTOR — track kills in this frame via animFrame stamp.
+  // Same-frame kills increment counter; at 2+ trigger banner once per surge.
+  if (game._mkFrame === game.animFrame) {
+    game._mkCount = (game._mkCount || 1) + 1;
+    if (game._mkCount === 2 || game._mkCount === 3 || game._mkCount === 5 || game._mkCount === 8) {
+      const _mkLabel = game._mkCount >= 8 ? 'OCTOKILL'
+                     : game._mkCount >= 5 ? 'OVERKILL'
+                     : game._mkCount >= 3 ? 'TRIPLE'
+                     : 'DOUBLE';
+      const _mkCol = game._mkCount >= 5 ? '#fc4' : '#0ff';
+      game.floatTexts.push({
+        x: game.playerX, y: game.playerY - 26,
+        text: _mkLabel + (game._mkCount >= 5 ? ' x' + game._mkCount : ''),
+        color: _mkCol, life: 50, maxLife: 50, size: 8
+      });
+      if (game._mkCount >= 5 && typeof spawnConfetti === 'function') spawnConfetti(4);
+      game.multiKillsRun = (game.multiKillsRun || 0) + 1;
+      if (game._mkCount > (game.multiKillBest || 0)) game.multiKillBest = game._mkCount;
+    }
+  } else {
+    game._mkFrame = game.animFrame;
+    game._mkCount = 1;
+  }
   // COMBO LIFETIME PB — lazily compare against persisted record. Only fire
   // celebration when combo ≥ 10 (avoids triggering on every novice's first 1-9
   // combo). One-shot per run via _comboPbFired flag.
