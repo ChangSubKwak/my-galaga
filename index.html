@@ -17170,7 +17170,11 @@ function drawStatsOverlay() {
       const _bkTot = (csN2.bossKillsTotal || 0) + (csC2.bossKillsTotal || 0);
       if (_bkTot >= 1) {
         const _bkCol = _bkTot >= 100 ? '#fc4' : _bkTot >= 30 ? '#0ff' : _bkTot >= 10 ? '#0f8' : '#f8a';
-        profileRow('BOSS KILLS', String(_bkTot), _bkCol);
+        const _bkTier = _bkTot >= 100 ? 'NEMESIS'
+                      : _bkTot >= 30  ? 'CAPTAIN-SLAYER'
+                      : _bkTot >= 10  ? 'CHALLENGER'
+                      : '';
+        profileRow('BOSS KILLS', String(_bkTot) + (_bkTier ? ' ' + _bkTier : ''), _bkCol);
       }
       // BOMBS USED LIFETIME — sum across both modes
       const _bmTot = (csN2.bombsTotal || 0) + (csC2.bombsTotal || 0);
