@@ -423,7 +423,10 @@ const DAILY_MISSIONS = [
     progress: g => g.dualFighter ? '✓' : '—' },
   { id: 'elite5',    label: '5 ELITE KILLS',
     check: g => (g.eliteKills || 0) >= 5,
-    progress: g => Math.min(5, g.eliteKills || 0) + '/5' }
+    progress: g => Math.min(5, g.eliteKills || 0) + '/5' },
+  { id: 'dash10',    label: '10 DASHES',
+    check: g => (g.dashCount || 0) >= 10,
+    progress: g => Math.min(10, g.dashCount || 0) + '/10' }
 ];
 function dailyMission() {
   const s = dailySeed() | 0;
@@ -463,7 +466,7 @@ function markDailyMissionDone() {
         tArr.push(m.id);
         localStorage.setItem('galagaMissionTypesDone', JSON.stringify(tArr));
       }
-      if (Array.isArray(tArr) && tArr.length >= 11 && typeof unlockAchievement === 'function') {
+      if (Array.isArray(tArr) && tArr.length >= 12 && typeof unlockAchievement === 'function') {
         unlockAchievement('dailyMaster');
       }
     }
@@ -6081,7 +6084,7 @@ const ACHIEVEMENTS = {
   dailyMonth:    { name: 'DAILY MONTH',     desc: 'Complete 30 daily missions' },
   dailyCentury:  { name: 'DAILY CENTURY',   desc: 'Complete 100 daily missions' },
   dailyStreak30: { name: 'MOON CYCLE',      desc: '30-day daily mission streak' },
-  dailyMaster:   { name: 'DAILY MASTER',    desc: 'Complete all 11 mission types' },
+  dailyMaster:   { name: 'DAILY MASTER',    desc: 'Complete all 12 mission types' },
   wishHunter:    { name: 'WISH HUNTER',     desc: 'Shoot 10 golden shooting stars' },
   perfectChain:  { name: 'PERFECT CHAIN',   desc: 'Perfect stage streak ×5' },
   maxPowerThrice:{ name: 'POWER TRIAD',     desc: 'Reach MAX POWER 3 times total' },
@@ -14348,8 +14351,8 @@ function drawStatsOverlay() {
       const mtArr = JSON.parse(mtRaw);
       const mtCount = Array.isArray(mtArr) ? mtArr.length : 0;
       if (mtCount >= 1) {
-        profileRow('MISSION VARIETY', mtCount + ' / 11',
-                   mtCount === 11 ? '#fc4' : mtCount >= 7 ? '#0f8' : '#cce');
+        profileRow('MISSION VARIETY', mtCount + ' / 12',
+                   mtCount === 12 ? '#fc4' : mtCount >= 8 ? '#0f8' : '#cce');
       }
       // DAILY MISSION STREAK — current consecutive-day streak + best
       const dmStreak = parseInt(localStorage.getItem('galagaDailyMissionStreak') || '0', 10);
