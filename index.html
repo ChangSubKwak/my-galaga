@@ -15896,6 +15896,19 @@ function drawGameOverScreen() {
   const ssgo = String(tsShown % 60).padStart(2, '0');
   drawRetroText('TIME', BASE_W/2 - 40, cy + 34, 6, COL.cyan);
   drawRetroText(mmgo + ':' + ssgo, BASE_W/2 + 40, cy + 34, 7, COL.yellow, 'right');
+  // TIME TIER LABEL — after count completes
+  if (tTime >= 1) {
+    const _rt = game.runFrames || 0;
+    const _tT = _rt >= 108000 ? 'MARATHONER'   // 30 min
+              : _rt >= 54000  ? 'VETERAN'      // 15 min
+              : _rt >= 18000  ? 'SURVIVOR'     // 5 min
+              : _rt >= 7200   ? 'RECRUIT'      // 2 min
+              : null;
+    if (_tT) {
+      const _tTcol = _rt >= 108000 ? '#fc4' : _rt >= 54000 ? '#0ff' : _rt >= 18000 ? '#0f8' : '#888';
+      drawRetroText(_tT, BASE_W/2 - 40, cy + 40, 4, _tTcol, 'left');
+    }
+  }
   // COMPLETION DELTA — show gain over the run when finishing tally completes
   if (tTime >= 1 && typeof computeCompositeCompletion === 'function') {
     const _endCmp = computeCompositeCompletion();
