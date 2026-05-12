@@ -6993,7 +6993,22 @@ function updatePowerUps() {
         p.y += (dy / dist) * pull * 0.6;
       }
     }
-    if (p.y > BASE_H + 5) { game.powerUps.splice(i, 1); continue; }
+    if (p.y > BASE_H + 5) {
+      // POWERUP MISS FLOOR SPARK — 5 horizontal sparks at floor level in pickup
+      // color, signaling 'you missed that drop'. Tiny tick SFX. Encourages
+      // catching future drops without penalizing the player.
+      const _mCol = POWERUP_COL[p.type] || '#fff';
+      for (let _k = 0; _k < 5; _k++) {
+        game.itemBursts.push({
+          x: p.x + (_k - 2) * 2,
+          y: BASE_H - 2,
+          life: -_k, color: _mCol
+        });
+      }
+      game.missedPowerUps = (game.missedPowerUps || 0) + 1;
+      game.powerUps.splice(i, 1);
+      continue;
+    }
     if (!game.playerAlive) continue;
     const hitW = game.dualFighter ? 16 : 7;
     if (Math.abs(p.x - game.playerX) < hitW + 4 && Math.abs(p.y - game.playerY) < 8) {
