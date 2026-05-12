@@ -16871,6 +16871,22 @@ function drawBossStage() {
       ctx.fillRect(_dcX, _dcY, Math.round(_dcW * _dcRatio), 1);
       ctx.restore();
     }
+    // WITCH TIME COOLDOWN BAR — second progress strip directly below the dash
+    // bar (1px gap). Magenta to distinguish from dash cyan. Only while
+    // witchCooldown > 0 (i.e., a witch-time save was just used).
+    if ((game.witchCooldown || 0) > 0) {
+      const _wcW = 14;
+      const _wcRatio = 1 - (game.witchCooldown / 720);
+      const _wcY = game.playerY + 9;
+      const _wcX = game.playerX - _wcW / 2;
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = '#f6c';
+      ctx.fillRect(_wcX, _wcY, _wcW, 1);
+      ctx.globalAlpha = 0.95;
+      ctx.fillRect(_wcX, _wcY, Math.round(_wcW * _wcRatio), 1);
+      ctx.restore();
+    }
   }
 
   // Explosions
