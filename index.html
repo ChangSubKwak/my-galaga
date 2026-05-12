@@ -11799,6 +11799,26 @@ function drawTitleScreen() {
       drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
     }
   } catch (e) {}
+  // SHIPS DOTS — 4 dot row (color per ship) above bestiary
+  try {
+    const _spRaw = localStorage.getItem('galagaShipsUsed') || '[]';
+    const _spArr = JSON.parse(_spRaw);
+    if (Array.isArray(_spArr) && _spArr.length > 0) {
+      const _spOrd = (typeof SHIP_ORDER !== 'undefined') ? SHIP_ORDER : ['default','scout','bruiser','spark'];
+      const _spSet = new Set(_spArr);
+      const _sY = 80;
+      const _sStartX = BASE_W/2 - 6;
+      ctx.save();
+      for (let _si = 0; _si < _spOrd.length; _si++) {
+        const _sk = _spOrd[_si];
+        const _sCol = (typeof SHIPS !== 'undefined' && SHIPS[_sk]) ? SHIPS[_sk].color : '#fff';
+        ctx.globalAlpha = _spSet.has(_sk) ? 0.85 : 0.20;
+        ctx.fillStyle = _sCol;
+        ctx.fillRect(_sStartX + _si * 4, _sY, 2, 2);
+      }
+      ctx.restore();
+    }
+  } catch (e) {}
   // BESTIARY DOTS — 8 small enemy-type dots beneath badge stack
   if (typeof dexUnlocked !== 'undefined' && dexUnlocked.size > 0
       && typeof ENEMY_INFO !== 'undefined') {
