@@ -5662,6 +5662,8 @@ function updatePlayer() {
   let dmg = game.lvl.P + (ship.dmgBonus || 0) + (game.activePerk === 'heavyRound' ? 1 : 0);
   if (synergy === 'OVERLOAD') dmg += 1;
   else if (synergy === 'HEAVY') dmg += 2;
+  // PERK 'lastStand' — at 1 life, deal +2 damage. Rewards risky play.
+  if (game.activePerk === 'lastStand' && game.lives === 1) dmg += 2;
   const maxBullets = ship.bulletCap * n * (game.dualFighter ? 2 : 1);
   // Per-frame fire-rate cap (~10 shots/sec). Replaces the old `keys[' '] = false`
   // debounce, which broke touch-fire-hold (touch has no auto-repeat to re-set the key).
@@ -5875,7 +5877,8 @@ const PERKS = {
   vampire:       { name: 'VAMPIRE',         desc: '10-KILL → SHIELD +1',      col: '#f6f' },
   firebrand:     { name: 'FIREBRAND',       desc: 'BULLET SPEED +30%',         col: '#f44' },
   scavenger:     { name: 'SCAVENGER',       desc: 'TIMER PICKUPS LAST 1.5X',   col: '#fa6' },
-  bountyHunter:  { name: 'BOUNTY HUNTER',   desc: 'BOSS BOUNTY +50%',          col: '#fc4' }
+  bountyHunter:  { name: 'BOUNTY HUNTER',   desc: 'BOSS BOUNTY +50%',          col: '#fc4' },
+  lastStand:     { name: 'LAST STAND',      desc: 'AT 1 LIFE: DMG +2',         col: '#f44' }
 };
 const PERK_IDS = Object.keys(PERKS);
 const PERK_SELECT_FRAMES = 360;
