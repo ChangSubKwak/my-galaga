@@ -12300,6 +12300,12 @@ function drawStageIntro() {
       if (pbScore)  parts.push('SCORE ' + fmtScore(pbScore));
       drawRetroText('PB  ' + parts.join('   '),
                     BASE_W/2 + offX, BASE_H/2 - 18, 5, COL.gray);
+    } else {
+      // PB OPEN BADGE — no PB yet for this stage = automatic record on clear.
+      // Surface as gold call to action.
+      const _blink = (game.animFrame >> 3) % 2 === 0;
+      drawRetroText('PB OPEN', BASE_W/2 + offX, BASE_H/2 - 18, 5,
+                    _blink ? '#fc4' : '#ff4');
     }
     // STAGE MUTATION banner — only on normal stages where it's been rolled.
     if (game.stageMutation) {
