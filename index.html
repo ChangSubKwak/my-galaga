@@ -17182,7 +17182,12 @@ function drawStatsOverlay() {
       const _stcTot = (csN2.stagesClearedTotal || 0) + (csC2.stagesClearedTotal || 0);
       if (_stcTot >= 5) {
         const _stcCol = _stcTot >= 1000 ? '#f6f' : _stcTot >= 500 ? '#fc4' : _stcTot >= 200 ? '#0ff' : _stcTot >= 50 ? '#0f8' : '#cce';
-        profileRow('STAGES CLEARED', String(_stcTot), _stcCol);
+        const _stcTier = _stcTot >= 1000 ? 'CENTURION'
+                       : _stcTot >= 500  ? 'CONQUEROR'
+                       : _stcTot >= 200  ? 'CRUSADER'
+                       : _stcTot >= 50   ? 'CAMPAIGNER'
+                       : '';
+        profileRow('STAGES CLEARED', String(_stcTot) + (_stcTier ? ' ' + _stcTier : ''), _stcCol);
       }
       // PERFECT WAVES LIFETIME — no-escape challenge waves across both modes
       const _pwTot = (csN2.perfectWavesTotal || 0) + (csC2.perfectWavesTotal || 0);
