@@ -7053,6 +7053,14 @@ function updatePowerUps() {
         });
       }
       game.itemBursts.push({x: p.x, y: p.y, life: 0, color});
+      // POWERUP COLLECT RING — small shockwave at player position so the
+      // 'absorbed by ship' moment reads. Symmetric to the spawn burst.
+      if (game.shockwaves && game.playerAlive) {
+        game.shockwaves.push({
+          x: game.playerX, y: game.playerY,
+          life: 0, maxLife: 14, maxR: 14, color
+        });
+      }
       game.powerUps.splice(i, 1);
       game.stagePowerUpsPicked = (game.stagePowerUpsPicked || 0) + 1;
       game.runPowerUps = (game.runPowerUps || 0) + 1;
