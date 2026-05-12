@@ -10049,6 +10049,43 @@ function spawnStageClear(label, sub) {
     x: BASE_W/2, y: BASE_H/2 - 10, text: label,
     color: '#ff4', life: 90, maxLife: 90, size: 14
   });
+  // STAGE GRADE — compute letter grade from this stage's stats. Surfaced
+  // alongside the clear banner so the player gets immediate skill feedback.
+  // S: 95%+ acc + no-death + PB beat
+  // A: 85%+ acc + no-death
+  // B: 70%+ acc
+  // C: < 70% acc
+  // D: died this stage
+  try {
+    const _sf = game.stageShotsFired || 0;
+    const _sh = game.stageShotsHit || 0;
+    const _accPct = _sf > 0 ? (_sh / _sf) * 100 : 0;
+    const _died = !!game.stageDied;
+    let _pbBeat = false;
+    try {
+      const _pbF = (typeof stagePBs !== 'undefined' && stagePBs)
+        ? stagePBs[String(game.stage)] : null;
+      if (typeof _pbF === 'number' && _pbF > 0 && (game.stageFrames || 0) < _pbF) {
+        _pbBeat = true;
+      }
+    } catch (e) {}
+    let _grade, _gCol;
+    if (_died) { _grade = 'D'; _gCol = '#f88'; }
+    else if (_accPct >= 95 && _pbBeat)  { _grade = 'S'; _gCol = '#fc4'; }
+    else if (_accPct >= 85)             { _grade = 'A'; _gCol = '#0f8'; }
+    else if (_accPct >= 70)             { _grade = 'B'; _gCol = '#0cf'; }
+    else                                { _grade = 'C'; _gCol = '#fff'; }
+    if (_sf >= 5) {  // skip grade on near-zero-shot stages (boss insta-clears, etc.)
+      game.floatTexts.push({
+        x: BASE_W/2 + 56, y: BASE_H/2 - 10, text: _grade,
+        color: _gCol, life: 90, maxLife: 90, size: 16
+      });
+      game.floatTexts.push({
+        x: BASE_W/2 + 56, y: BASE_H/2 + 2, text: Math.round(_accPct) + '%',
+        color: '#888', life: 80, maxLife: 80, size: 5
+      });
+    }
+  } catch (e) {}
   // STAGE CLEAR BIOME FLASH — brief biome-colored screen flash for environmental
   // continuity. Falls back to green default when no biome (stage 1-7).
   if (typeof biomeForStage === 'function') {
