@@ -448,7 +448,11 @@ function markDailyMissionDone() {
     localStorage.setItem('galagaDailyMissionDone', String(todaySeed));
     const total = parseInt(localStorage.getItem('galagaDailyMissionTotal') || '0', 10) || 0;
     localStorage.setItem('galagaDailyMissionTotal', String(total + 1));
-    if (total + 1 >= 10 && typeof unlockAchievement === 'function') unlockAchievement('dailyTen');
+    if (typeof unlockAchievement === 'function') {
+      if (total + 1 >= 10)  unlockAchievement('dailyTen');
+      if (total + 1 >= 30)  unlockAchievement('dailyMonth');
+      if (total + 1 >= 100) unlockAchievement('dailyCentury');
+    }
     // DAILY MISSION STREAK — increment if last completion was yesterday, else
     // reset to 1. Stored separately from total to track *consecutive* days.
     const streakPrev = parseInt(localStorage.getItem('galagaDailyMissionStreak') || '0', 10) || 0;
@@ -460,6 +464,10 @@ function markDailyMissionDone() {
     const bestStreak = parseInt(localStorage.getItem('galagaDailyMissionStreakBest') || '0', 10) || 0;
     if (newStreak > bestStreak) {
       localStorage.setItem('galagaDailyMissionStreakBest', String(newStreak));
+    }
+    // 30-day streak achievement
+    if (newStreak >= 30 && typeof unlockAchievement === 'function') {
+      unlockAchievement('dailyStreak30');
     }
     // Streak milestone celebrations: 3/7/30 days (game.floatTexts trigger)
     if (game && (newStreak === 3 || newStreak === 7 || newStreak === 30)) {
@@ -5976,6 +5984,9 @@ const ACHIEVEMENTS = {
   // didn't have a discrete trophy yet.
   parryChain:    { name: 'PARRY CHAIN',     desc: 'Parry streak ×5 in a row' },
   dailyTen:      { name: 'DAILY DEVOTED',   desc: 'Complete 10 daily missions' },
+  dailyMonth:    { name: 'DAILY MONTH',     desc: 'Complete 30 daily missions' },
+  dailyCentury:  { name: 'DAILY CENTURY',   desc: 'Complete 100 daily missions' },
+  dailyStreak30: { name: 'MOON CYCLE',      desc: '30-day daily mission streak' },
   wishHunter:    { name: 'WISH HUNTER',     desc: 'Shoot 10 golden shooting stars' },
   perfectChain:  { name: 'PERFECT CHAIN',   desc: 'Perfect stage streak ×5' },
   maxPowerThrice:{ name: 'POWER TRIAD',     desc: 'Reach MAX POWER 3 times total' },
