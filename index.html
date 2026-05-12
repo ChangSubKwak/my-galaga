@@ -11830,6 +11830,22 @@ function drawStageIntro() {
   // from screen center outward. Reads as cinematic transition between stages.
   // Color picked from biome for cohesion (or default cyan).
   const introElapsed = 120 - game.stageTimer;
+  // STAGE TYPE BG TINT — faint 4-frame edge band by stage type so the player
+  // instantly reads what kind of stage is starting. Boss/challenge get the
+  // tint; normal stages stay clean (no distraction).
+  {
+    const _isBossT = game.stage % BOSS_STAGE_INTERVAL === 0;
+    const _isChallT = !_isBossT && game.stage % 4 === 0;
+    if ((_isBossT || _isChallT) && introElapsed < 36) {
+      const _tBand = 1 - introElapsed / 36;
+      ctx.save();
+      ctx.globalAlpha = 0.18 * _tBand;
+      ctx.fillStyle = _isBossT ? '#f44' : '#f6f';
+      ctx.fillRect(0, 0, BASE_W, 6);
+      ctx.fillRect(0, BASE_H - 6, BASE_W, 6);
+      ctx.restore();
+    }
+  }
   // STAGE INTRO PARTICLE STREAM — first 30 frames, small dots flow from screen
   // edges toward the center stage label. Subtle motion that draws attention to
   // the title sequence without competing with warp streaks.
