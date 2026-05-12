@@ -17688,6 +17688,32 @@ function drawStatsOverlay() {
         profileRow('PRACTICE', _suggestions[0], '#0ff');
       }
     } catch (e) {}
+    // TACTICAL WEAKNESS — derive from galagaDeathCauses tally. Shows which
+    // hit type kills the player most + a one-line counter-tip. Skipped if
+    // tally is empty (fresh save) or has fewer than 3 total deaths (low signal).
+    try {
+      const _dcRaw = localStorage.getItem('galagaDeathCauses') || '{}';
+      const _dcT = JSON.parse(_dcRaw);
+      const _dcTot = (_dcT.bullet || 0) + (_dcT.collision || 0) + (_dcT.unknown || 0);
+      if (_dcTot >= 3) {
+        const _b = _dcT.bullet || 0, _c = _dcT.collision || 0;
+        let _wLabel, _wTip, _wCol;
+        if (_b > _c) {
+          _wLabel = 'ENEMY FIRE';
+          _wTip = 'DASH-PARRY BULLETS';
+          _wCol = '#f88';
+        } else if (_c > _b) {
+          _wLabel = 'DIVE IMPACT';
+          _wTip = 'WATCH DIVE TRAILS';
+          _wCol = '#fc8';
+        } else {
+          _wLabel = 'BALANCED';
+          _wTip = 'KEEP REFINING';
+          _wCol = '#0f8';
+        }
+        profileRow('WEAKNESS', _wLabel + ' — ' + _wTip, _wCol);
+      }
+    } catch (e) {}
     // BOSSES DEFEATED — 8-boss checklist with ✓ / · for each
     try {
       const bossesRaw = localStorage.getItem('galagaBossesDefeated') || '{}';
