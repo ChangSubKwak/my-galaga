@@ -17027,7 +17027,15 @@ function drawStatsOverlay() {
                    : _pcmp >= 50  ? 'VETERAN'
                    : _pcmp >= 20  ? 'EXPLORER'
                    : 'BEGINNER';
-      profileRow('COMPLETION', _pcmp + '%  ' + _pcTier, _pcCol);
+      // TIER STAR VISUALIZATION — 5-step progress bar (☆ filled to ★)
+      const _pcStars = _pcmp >= 100 ? 5
+                    : _pcmp >= 80  ? 4
+                    : _pcmp >= 50  ? 3
+                    : _pcmp >= 20  ? 2
+                    : _pcmp >= 5   ? 1
+                    : 0;
+      const _pcBar = '★'.repeat(_pcStars) + '☆'.repeat(5 - _pcStars);
+      profileRow('COMPLETION', _pcBar + ' ' + _pcmp + '% ' + _pcTier, _pcCol);
     }
     profileRow('RUNS',       fmtScore(totalRuns));
     profileRow('TOTAL KILLS', fmtScore(totalKills));
