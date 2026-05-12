@@ -15848,6 +15848,11 @@ function drawGameOverScreen() {
   if (tTime >= 1 && game.dailyMode && game._dailyMissionFired) {
     drawRetroText('★ DAILY MISSION DONE', BASE_W/2, cy + 46, 4, '#fc4');
   }
+  // PERK PEEK — active perk used this run
+  if (tTime >= 1 && game.activePerk && typeof PERKS !== 'undefined' && PERKS[game.activePerk]) {
+    const _gpP = PERKS[game.activePerk];
+    drawRetroText('PERK ' + _gpP.name, BASE_W/2 - 40, cy + 46, 4, _gpP.col, 'left');
+  }
 
   // Tick sound for each row when it just begins counting
   // (uses gameOverTimer which decrements every tick)
