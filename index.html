@@ -17328,7 +17328,10 @@ function drawStatsOverlay() {
       const _ojTot = (csN2.objectivesMetTotal || 0) + (csC2.objectivesMetTotal || 0);
       if (_ojTot >= 3) {
         const _ojCol = _ojTot >= 100 ? '#fc4' : _ojTot >= 30 ? '#0ff' : '#0f8';
-        profileRow('OBJECTIVES MET', String(_ojTot), _ojCol);
+        const _ojN = _ojTot >= 100 ? ' MASTERMIND'
+                   : _ojTot >= 30  ? ' STRATEGIST'
+                   : ' TACTICIAN';
+        profileRow('OBJECTIVES MET', String(_ojTot) + _ojN, _ojCol);
       }
       // AVG STAGE TIME — total play frames divided by stages cleared (>= 10
       // sample). Lower = more efficient runs.
