@@ -12148,6 +12148,11 @@ function drawStageIntro() {
       const _lvCol = game.lives === 1 ? '#f44' : game.lives <= 2 ? '#fa8' : '#fff';
       drawRetroText('L:' + game.lives, 4, BASE_H/2 + 5, 4, _lvCol, 'left');
     }
+    // HIGH SCORE PEEK — small 'HI: N' label at right side mirroring left peeks.
+    // Lets player see the bar they're chasing without leaving the intro.
+    if ((game.highScore || 0) > 0) {
+      drawRetroText('HI:' + fmtScore(game.highScore), BASE_W - 4, BASE_H/2 - 1, 4, '#fc4', 'right');
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
