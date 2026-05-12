@@ -5757,6 +5757,19 @@ function addScore(pts) {
   if (game && game.dailyMode) pts = Math.round(pts * 1.25);
   const old = game.score;
   game.score = Math.min(SCORE_CAP, game.score + pts);
+  // LARGE SCORE GAIN BURST — when pts >= 1000, push small gold sparks at
+  // player position for impact feedback. Cap to 6 sparks regardless of size.
+  if (pts >= 1000 && game.playerAlive && game.itemBursts) {
+    const _spN = Math.min(6, Math.floor(pts / 1000) + 2);
+    for (let _k = 0; _k < _spN; _k++) {
+      const _a = (_k / _spN) * Math.PI * 2;
+      game.itemBursts.push({
+        x: game.playerX + Math.cos(_a) * 8,
+        y: game.playerY + Math.sin(_a) * 8,
+        life: -_k, color: '#fc4'
+      });
+    }
+  }
   // SCORE MILESTONE BANNERS — when crossing 10k/50k/100k/500k/1M/10M for the
   // first time this run, push gold banner. Compare old vs new to fire once.
   {
