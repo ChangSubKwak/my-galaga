@@ -3414,6 +3414,9 @@ function createEnemy(type, col, row, overrideX, overrideY) {
   const stage = (game && game.stage) || 0;
   const eliteRate = stage >= 10 ? 0.05 : stage >= 5 ? 0.03 : 0;
   const isElite = eliteCandidate && Math.random() < eliteRate;
+  // GHOST VARIANT — stage 60+ only, 3% chance. Invisible (alpha 0.15) until first
+  // hit reveals it. Awards 2× score on kill. Mutex with elite (one variant max).
+  const isGhost = !isElite && stage >= 60 && Math.random() < 0.03;
   const baseHp = (type === 'boss' || type === 'shielded') ? 2 : 1;
   return {
     type, col, row,
@@ -3422,6 +3425,7 @@ function createEnemy(type, col, row, overrideX, overrideY) {
     alive: true,
     hp: baseHp + (isElite ? 1 : 0),
     elite: isElite,
+    ghost: isGhost,
     state: 'formation', // formation, entering, diving, returning, capturing
     frame: 0, frameTimer: 0,
     pathProgress: 0, pathSpeed: 0.012,
@@ -7774,6 +7778,8 @@ function updateCollisions() {
         if (e.hp === 1 && _prevHp > 1) {
           e.criticalPulseTimer = 16;
         }
+        // GHOST REVEAL — first hit on a ghost variant reveals it (full alpha)
+        if (e.ghost && !e.ghostRevealed) e.ghostRevealed = true;
         // Shield-break feedback (only when not killed in same hit)
         if (e.hp > 0 && e.type === 'shielded' && !e.shieldBroken) {
           e.shieldBroken = true;
@@ -7804,7 +7810,8 @@ function updateCollisions() {
           const basePts = getEnemyPoints(e.type, inForm);
           const mult = comboMultiplier(game.combo);
           const eliteMul = e.elite ? 1.5 : 1;
-          const pts = Math.round(basePts * mult * eliteMul);
+          const ghostMul = e.ghost ? 2 : 1;
+          const pts = Math.round(basePts * mult * eliteMul * ghostMul);
           addScore(pts);
           game.comboBonusAccum = (game.comboBonusAccum || 0) + pts;
           // KILL SCORE FLOATER — per-kill "+N" at the kill site for kills that
@@ -11445,6 +11452,9 @@ function drawGameplay() {
         }
         ctx.restore();
       }
+      // GHOST stealth wrap — only sprite is dimmed; pips/flash stay readable
+      const _ghostStealth = e.ghost && !e.ghostRevealed;
+      if (_ghostStealth) { ctx.save(); ctx.globalAlpha = 0.15; }
       switch(e.type) {
         case 'bee': drawBee(e.x, e.y, e.frame); break;
         case 'butterfly': drawButterfly(e.x, e.y, e.frame); break;
@@ -11469,6 +11479,16 @@ function drawGameplay() {
             drawTractorBeam(e.x, e.y + 6, 80);
           }
           break;
+      }
+      // GHOST stealth restore + telltale dot (1px white at center) so the
+      // hidden enemy is still detectable by careful observation.
+      if (_ghostStealth) {
+        ctx.restore();
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(e.x, e.y, 1, 1);
+        ctx.restore();
       }
       // CRITICAL HP PULSE — red ring around enemy when 1 hit from death.
       // 16-frame life, ticked in update() (not draw — was draining 2.4× faster on
