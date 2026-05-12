@@ -14883,6 +14883,16 @@ function drawHUD() {
     }
     ctx.restore();
     drawRetroText('×' + mult + ' COMBO ' + game.combo, 6, 33, 6, col, 'left');
+    // COMBO TIER NAME — tier label by combo level
+    {
+      let _tierN = null;
+      if (game.combo >= 30) _tierN = 'MAX';
+      else if (game.combo >= 20) _tierN = 'PLATINUM';
+      else if (game.combo >= 15) _tierN = 'GOLD';
+      else if (game.combo >= 10) _tierN = 'SILVER';
+      else if (game.combo >= 5) _tierN = 'BRONZE';
+      if (_tierN) drawRetroText(_tierN, 70, 33, 4, col, 'left');
+    }
     // Running combo total (small, just below)
     const accum = game.comboBonusAccum || 0;
     if (accum > 0) {
