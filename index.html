@@ -8549,6 +8549,15 @@ function updateChallengeEnemies() {
       game.perfectWavesRun = (game.perfectWavesRun || 0) + 1;
       game.stagePerfectWaves = (game.stagePerfectWaves || 0) + 1;
       if (typeof playSound === 'function') playSound('milestone');
+      // RUN PERFECT WAVE MILESTONES — gold banner at 5/10/20 lifetime-of-run
+      if (game.perfectWavesRun === 5 || game.perfectWavesRun === 10 || game.perfectWavesRun === 20) {
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 18,
+          text: 'PERFECT WAVES x' + game.perfectWavesRun,
+          color: '#fc4', life: 90, maxLife: 90, size: 9
+        });
+        if (typeof spawnConfetti === 'function') spawnConfetti(10);
+      }
       // ALL-PERFECT STAGE BANNER — all waves in this stage perfect (final wave).
       if (game.challengeWaves
           && (game.challengeWaveIdx + 1) === game.challengeWaves.length
