@@ -2956,6 +2956,20 @@ const BIOME_NAMES = {
   starfield: { label: 'OPEN STARFIELD',  col: '#cef' }
 };
 
+// BIOME_WHISPERS — short atmospheric one-liners shown under the biome label
+// during STAGE_INTRO. Three variants per biome; rotates by (stage % 3) for
+// determinism. Pure flavor — no gameplay effect, no score.
+const BIOME_WHISPERS = {
+  planet:    ['THE WORLD WATCHES', 'GRAVITY TUGS SOFTLY', 'BLUE CURVE BREATHES'],
+  dawn:      ['LIGHT SPILLS OVER', 'WARMTH ON THE HULL', 'COLOR RETURNS SLOW'],
+  asteroid:  ['ROCKS REMEMBER', 'OLD DEBRIS DRIFTS', 'SILENCE BETWEEN STONES'],
+  ice:       ['CRYSTAL HUSH', 'EVERY SOUND FREEZES', 'COLD ECHOES LINGER'],
+  gasGiant:  ['CLOUDS PRESS DOWN', 'STORMS SPEAK NUMBERS', 'BANDS COIL ENDLESSLY'],
+  corona:    ['SUN BLEEDS HOT', 'THE EDGE BURNS', 'FLARE WINDS HOWL'],
+  blackhole: ['VOID HUMS', 'GEOMETRY UNRAVELS', 'EVENT HORIZON LEANS IN'],
+  starfield: ['LIGHTS WITHOUT END', 'EVERY DOT A FATE', 'WE ARE NOT ALONE HERE']
+};
+
 function biomeForStage(stage) {
   if (stage <= 7) return null;
   const idx = Math.floor((stage - 8) / 4);
@@ -11444,6 +11458,16 @@ function drawStageIntro() {
     if (_biomeId && BIOME_NAMES[_biomeId]) {
       const bInfo = BIOME_NAMES[_biomeId];
       drawRetroText('— ' + bInfo.label + ' —', BASE_W/2 + offX, BASE_H/2 + 2, 5, bInfo.col);
+      // BIOME WHISPER — atmospheric one-liner under biome label, last 75 frames of
+      // intro only (after the warp settles). Color softened from biome col.
+      if (typeof BIOME_WHISPERS !== 'undefined' && BIOME_WHISPERS[_biomeId] && introElapsed > 45) {
+        const variants = BIOME_WHISPERS[_biomeId];
+        const wText = variants[game.stage % variants.length];
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, (introElapsed - 45) / 18) * 0.65;
+        drawRetroText(wText, BASE_W/2 + offX, BASE_H/2 + 12, 4, bInfo.col);
+        ctx.restore();
+      }
     }
   }
   // Tier hint — current background tier number tiny in corner
