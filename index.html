@@ -9562,6 +9562,10 @@ function updateCollisions() {
             text: 'PERFECT', color: '#fc4', life: 35, maxLife: 35, size: 6
           });
           game.perfectParries = (game.perfectParries || 0) + 1;
+          try {
+            const _pp = parseInt(localStorage.getItem('galagaPerfectParries') || '0', 10) || 0;
+            localStorage.setItem('galagaPerfectParries', String(_pp + 1));
+          } catch (e) {}
         }
         game.parryCount = (game.parryCount || 0) + 1;
         // PARRY LIFETIME TROPHIES — accumulate to localStorage for cross-run trophies
@@ -12826,6 +12830,8 @@ function pickRunHighlights() {
   if (untRun >= 1)        out.push({ label: 'UNTOUCHED',     value: String(untRun),       prio: untRun * 28, col: '#0ff' });
   const lsRun = game.runLastStands || 0;
   if (lsRun >= 1)         out.push({ label: 'LAST STANDS',   value: String(lsRun),        prio: lsRun * 35, col: '#f44' });
+  const ppRun = game.perfectParries || 0;
+  if (ppRun >= 1)         out.push({ label: 'PERFECT PARRY', value: String(ppRun),        prio: ppRun * 22, col: '#fc4' });
   if (stages >= 3)        out.push({ label: 'STAGES CLEARED', value: String(stages),     prio: stages * 8, col: '#fc4' });
   if (bosses >= 1)        out.push({ label: 'BOSSES DOWN',    value: String(bosses),     prio: bosses * 60, col: '#f8a' });
   if (rescues >= 1)       out.push({ label: 'SELF RESCUE',    value: String(rescues),    prio: rescues * 30, col: '#fc4' });
@@ -17753,6 +17759,16 @@ function drawStatsOverlay() {
                      : parryTotal >= 50  ? 'DEFLECTOR'
                      : '';
         profileRow('PARRY TOTAL', String(parryTotal) + (_pTier ? ' ' + _pTier : ''), pCol);
+      }
+      // PERFECT PARRIES — lifetime count of frame-1-3 dash parries
+      const perfectParries = parseInt(localStorage.getItem('galagaPerfectParries') || '0', 10);
+      if (perfectParries >= 1) {
+        const _ppTier = perfectParries >= 100 ? ' VIRTUOSO'
+                      : perfectParries >= 25  ? ' PRECISE'
+                      : perfectParries >= 5   ? ' SHARP'
+                      : '';
+        profileRow('PERFECT PARRY', String(perfectParries) + _ppTier,
+                   perfectParries >= 100 ? '#fc4' : perfectParries >= 25 ? '#ff4' : '#fa8');
       }
       // PARRY STREAK BEST — lifetime max consecutive parries
       const psBest = Math.max(csN2.parryStreakBest || 0, csC2.parryStreakBest || 0);
