@@ -17344,8 +17344,13 @@ function drawStatsOverlay() {
       const _stcSample = (csN2.stagesClearedTotal || 0) + (csC2.stagesClearedTotal || 0);
       const _runFr = (csN2.runFrames || 0) + (csC2.runFrames || 0);
       if (_stcSample >= 10 && _runFr > 0) {
-        const _avgSec = ((_runFr / _stcSample) / 60).toFixed(1);
-        profileRow('AVG STAGE TIME', _avgSec + 's', '#0ff');
+        const _avgSecRaw = (_runFr / _stcSample) / 60;
+        const _avgSec = _avgSecRaw.toFixed(1);
+        const _aN = _avgSecRaw < 12 ? ' SPEEDRUN'
+                  : _avgSecRaw < 18 ? ' QUICK'
+                  : _avgSecRaw < 30 ? ' STEADY'
+                  : '';
+        profileRow('AVG STAGE TIME', _avgSec + 's' + _aN, '#0ff');
         // AVG KILLS PER STAGE
         const _kTot = (csN2.kills || 0) + (csC2.kills || 0);
         if (_kTot >= 20) {
