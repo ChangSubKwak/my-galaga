@@ -2003,7 +2003,16 @@ function drawExplosion(x, y, t, maxT) {
   const progress = t / maxT;
   const r = 4 + progress * 14;
   ctx.save(); ctx.translate(x, y);
-  const colors = ['#fff', '#ff0', '#f80', '#f00'];
+  // EXPLOSION BIOME TINT — splice biome color into the palette at stage 8+.
+  // Subtle: replaces ONE of the 4 base hues per biome so identity shifts but
+  // the white/yellow/orange core still reads as 'fire'.
+  let colors = ['#fff', '#ff0', '#f80', '#f00'];
+  if (game && typeof biomeForStage === 'function') {
+    const _bid = biomeForStage(game.stage);
+    if (_bid && BIOME_NAMES[_bid]) {
+      colors = ['#fff', '#ff0', BIOME_NAMES[_bid].col, '#f00'];
+    }
+  }
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + progress * 2;
     const d = r * (0.5 + Math.random() * 0.5);
