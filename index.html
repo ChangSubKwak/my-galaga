@@ -15157,6 +15157,15 @@ function drawGameOverScreen() {
   // Score color escalates as it counts up — yellow at high totals, magenta at 10M+
   const scCol = game.score >= 10000000 ? '#f6f' : game.score >= 1000000 ? COL.yellow : game.score >= 100000 ? '#ff8' : COL.white;
   drawRetroText(fmtScore(displayScore), BASE_W/2 + 40, cy - 12, 9, scCol, 'right');
+  // SCORE PB COMPARE — when count finishes (linearT >=1) show 'NEW HIGH!' or 'HI: N'.
+  if (linearT >= 1 && (game.highScore || 0) > 0) {
+    if (game.score >= game.highScore) {
+      const _hsB = (game.animFrame >> 2) % 2 === 0 ? '#fc4' : '#ff4';
+      drawRetroText('NEW HIGH!', BASE_W/2 + 40, cy - 4, 4, _hsB, 'right');
+    } else {
+      drawRetroText('HI: ' + fmtScore(game.highScore), BASE_W/2 + 40, cy - 4, 4, '#888', 'right');
+    }
+  }
 
   // Stats: kills, accuracy, max stage
   const s = game.stats || { kills: 0, shotsFired: 0, shotsHit: 0, maxStage: game.stage };
