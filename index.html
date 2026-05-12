@@ -16829,7 +16829,16 @@ function drawStatsOverlay() {
     const _accLab = _accTier ? (acc + '% ' + _accTier) : (acc + '%');
     row('OVERALL ACC', _accLab, acc >= 80 ? COL.green : COL.yellow);
   }
-  row('BEST STAGE',  String(cs.bestStage || 0), cs.bestStage >= 30 ? COL.red : cs.bestStage >= 10 ? COL.yellow : COL.cyan);
+  {
+    const _bsS = cs.bestStage || 0;
+    const _bsTier = _bsS >= 80 ? 'VOIDWALKER'
+                  : _bsS >= 50 ? 'APEX'
+                  : _bsS >= 30 ? 'VOYAGER'
+                  : _bsS >= 15 ? 'PATHFINDER'
+                  : _bsS >= 5  ? 'SCOUT' : '';
+    row('BEST STAGE', _bsS + (_bsTier ? ' ' + _bsTier : ''),
+        _bsS >= 30 ? COL.red : _bsS >= 10 ? COL.yellow : COL.cyan);
+  }
 
   // Mode-specific compact summary row
   y += 2;
