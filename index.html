@@ -11610,6 +11610,17 @@ function drawTitleScreen() {
       drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
     }
   } catch (e) {}
+  // MARATHONER BADGE — longest single run tier (15/30/60 min)
+  try {
+    const _csNm = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
+    const _csCm = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
+    const _lr = Math.max(_csNm.longestRun || 0, _csCm.longestRun || 0);
+    if (_lr >= 54000) { // 15 min+
+      const _mLabel = _lr >= 216000 ? 'IRON PILOT' : _lr >= 108000 ? 'MARATHONER' : 'LONG RUNNER';
+      const _mCol = _lr >= 216000 ? '#fc4' : _lr >= 108000 ? '#0ff' : '#0f8';
+      drawRetroText(_mLabel, BASE_W/2, 81, 4, _mCol, 'center');
+    }
+  } catch (e) {}
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
