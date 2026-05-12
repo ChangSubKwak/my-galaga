@@ -7600,7 +7600,26 @@ function bumpCombo() {
     }
   }
   if (game.combo === 15) unlockAchievement('combo15');
-  if (game.combo === 30) unlockAchievement('comboMaster');
+  if (game.combo === 30) {
+    unlockAchievement('comboMaster');
+    // MAX COMBO TIER FANFARE — first time hitting combo 30 (max multiplier tier
+    // x3.0) per run gets a banner + milestone SFX. Once per run via flag.
+    if (!game._maxComboTierFired) {
+      game._maxComboTierFired = true;
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 30, text: 'MAX MULTIPLIER',
+        color: '#fc4', life: 80, maxLife: 80, size: 10
+      });
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 18, text: 'x3.0 ACTIVE',
+        color: '#fff', life: 70, maxLife: 70, size: 6
+      });
+      if (typeof spawnConfetti === 'function') spawnConfetti(12);
+      if (typeof playSound === 'function') playSound('milestone');
+      game.flashTimer = Math.max(game.flashTimer || 0, 6);
+      game.flashColor = '#fc4';
+    }
+  }
   if (game.combo === 30 && !game.stageDied) unlockAchievement('killStreak3');
   if (game.combo === 45) unlockAchievement('combo45');
   if (game.combo === 60) unlockAchievement('streakMaster');
