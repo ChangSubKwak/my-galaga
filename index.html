@@ -4729,6 +4729,19 @@ function startStage() {
   // STAGE START GRACE — 60-frame invincibility so the player can settle position
   // without taking an immediate hit from a kamikaze / stray bullet at entry.
   game.invincibleTimer = Math.max(game.invincibleTimer || 0, 60);
+  // BIOME EXPLORATION — track biome IDs the player has visited across all runs
+  // for PROFILE + STAGE_INTRO "N/8" stat. Single-write per stage entry.
+  try {
+    const _bid = typeof biomeForStage === 'function' ? biomeForStage(game.stage) : null;
+    if (_bid) {
+      const sRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
+      const arr = JSON.parse(sRaw);
+      if (Array.isArray(arr) && arr.indexOf(_bid) < 0) {
+        arr.push(_bid);
+        localStorage.setItem('galagaBiomesSeen', JSON.stringify(arr));
+      }
+    }
+  } catch (e) {}
   // Per-stage stat reset
   game.stageFrames = 0;
   game.stageDied = false;
@@ -14034,6 +14047,15 @@ function drawStatsOverlay() {
     drawRetroText('PROGRESSION', px + 8, y, 7, COL.cyan, 'left');
     y += 9;
     profileRow('BESTIARY',     dexCount + ' / ' + dexTotal, dexCount === dexTotal ? '#0f8' : '#0ff');
+    // BIOMES SEEN — count of unique biomes visited across all runs
+    try {
+      const _bsRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
+      const _bsArr = JSON.parse(_bsRaw);
+      const bsCount = Array.isArray(_bsArr) ? _bsArr.length : 0;
+      if (bsCount >= 1) {
+        profileRow('BIOMES SEEN', bsCount + ' / 8', bsCount === 8 ? '#0f8' : '#0cf');
+      }
+    } catch (e) {}
     profileRow('STAGE TIME PBS', String(stagePBCount), '#0f8');
     profileRow('STAGE SCORE PBS', String(scorePBCount), '#ff4');
     profileRow('ACHIEVEMENTS', achCount + ' / ' + achTotal + '  ' + achPct + '%',
