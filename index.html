@@ -9895,9 +9895,26 @@ function checkStageComplete() {
             playSound(gradeSfx);
             // S grade gets a small rumble + screen flash to amplify the moment
             if (grade === 'S') {
-              game.flashTimer = Math.max(game.flashTimer || 0, 6);
+              game.flashTimer = Math.max(game.flashTimer || 0, 8);
               game.flashColor = '#fc4';
-              rumble(180, 0.7, 0.4);
+              rumble(220, 0.85, 0.5);
+              // S GRADE CINEMATIC — gold shockwave + 16 confetti + 'PERFECT!'
+              // bonus banner. Triggered only on S so it stays rare and earned.
+              if (game.shockwaves) {
+                game.shockwaves.push({
+                  x: BASE_W/2, y: 60,
+                  life: 0, maxLife: 28, maxR: 70, color: '#fc4'
+                });
+                game.shockwaves.push({
+                  x: BASE_W/2, y: 60,
+                  life: -8, maxLife: 22, maxR: 50, color: '#ff4'
+                });
+              }
+              if (typeof spawnConfetti === 'function') spawnConfetti(16);
+              game.floatTexts.push({
+                x: BASE_W/2, y: 84, text: 'PERFECT!',
+                color: '#fff', life: 100, maxLife: 100, size: 6
+              });
             }
             // Persist grade-tier counters for PROFILE page display
             try {
