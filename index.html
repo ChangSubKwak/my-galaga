@@ -14914,6 +14914,14 @@ function drawHUD() {
       && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
     drawRetroText('S:' + game.stagePowerUpsPicked, BASE_W - 5, 46, 4, '#fc8', 'right');
   }
+  // ENEMY BULLET COUNT — 'B N' when bullet density is meaningful (>=10).
+  if (!minimalHud
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (game.enemyBullets || []).length >= 10) {
+    const _bN = game.enemyBullets.length;
+    const _bCol = _bN >= 40 ? '#f44' : _bN >= 25 ? '#f88' : '#fa8';
+    drawRetroText('B ' + _bN, BASE_W - 5, 60, 4, _bCol, 'right');
+  }
 
   // PICKUP HISTORY TICKER — last 5 drop types as small colored letter chips at
   // top-right (under S:N stage counter). Newest at right, oldest at left. Fades
