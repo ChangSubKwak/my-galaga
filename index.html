@@ -6053,6 +6053,9 @@ const ACHIEVEMENTS = {
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
   parryChain:    { name: 'PARRY CHAIN',     desc: 'Parry streak ×5 in a row' },
+  parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
+  parry200:      { name: 'PARRY 200',       desc: '200 parries lifetime' },
+  parry500:      { name: 'PARRY 500',       desc: '500 parries lifetime' },
   dailyTen:      { name: 'DAILY DEVOTED',   desc: 'Complete 10 daily missions' },
   dailyMonth:    { name: 'DAILY MONTH',     desc: 'Complete 30 daily missions' },
   dailyCentury:  { name: 'DAILY CENTURY',   desc: 'Complete 100 daily missions' },
@@ -8561,6 +8564,15 @@ function updateCollisions() {
         // PERK 'parryDividend' — parry score → 3×
         addScore(game.activePerk === 'parryDividend' ? baseScore * 3 : baseScore);
         game.parryCount = (game.parryCount || 0) + 1;
+        // PARRY LIFETIME TROPHIES — accumulate to localStorage for cross-run trophies
+        try {
+          const pt = parseInt(localStorage.getItem('galagaParryTotal') || '0', 10) || 0;
+          const npt = pt + 1;
+          localStorage.setItem('galagaParryTotal', String(npt));
+          if (npt >= 50)  unlockAchievement('parry50');
+          if (npt >= 200) unlockAchievement('parry200');
+          if (npt >= 500) unlockAchievement('parry500');
+        } catch (e) {}
         // Visual + audio feedback at parry site
         game.hitSparks.push({ x: b.x, y: b.y, life: 0 });
         const sparkCount = 4 + tier * 2;
@@ -14164,6 +14176,12 @@ function drawStatsOverlay() {
       const critKills = parseInt(localStorage.getItem('galagaCritKills') || '0', 10);
       if (critKills >= 1) {
         profileRow('CRIT KILLS', String(critKills), critKills >= 100 ? '#fc4' : '#fc8');
+      }
+      // PARRY TOTAL — lifetime dash parry count
+      const parryTotal = parseInt(localStorage.getItem('galagaParryTotal') || '0', 10);
+      if (parryTotal >= 5) {
+        const pCol = parryTotal >= 500 ? '#fc4' : parryTotal >= 200 ? '#0ff' : parryTotal >= 50 ? '#0f8' : '#cce';
+        profileRow('PARRY TOTAL', String(parryTotal), pCol);
       }
       // PICKUP TYPE TOTALS — show top-collected pickup type (e.g., "TOP: S x42")
       const ptRaw = localStorage.getItem('galagaPickupTotals');
