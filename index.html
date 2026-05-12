@@ -11082,6 +11082,14 @@ function drawStageIntro() {
     }
   }
 
+  // STAGE INTRO ACTIVE PERK — if a perk is currently active (from prior boss),
+  // surface it in the intro so the player knows their build going into the
+  // next stage. Reminder fades in with the rest of the intro content.
+  if (game.activePerk && PERKS[game.activePerk] && slide >= 1) {
+    const _activePerk = PERKS[game.activePerk];
+    drawRetroText('PERK: ' + _activePerk.name, BASE_W/2, BASE_H - 18, 4, _activePerk.col);
+  }
+
   // STAGE INTRO MISSION REMINDER — daily mode shows today's mission status at the
   // very bottom so it reads as the last thing before the countdown. Only when a
   // mission is active and incomplete; auto-hides on completion.
