@@ -17015,8 +17015,15 @@ function drawStatsOverlay() {
         profileRow('STAGE PB SUM', fmtScore(_scPbSum), _scPbCol);
       }
     } catch (e) {}
-    profileRow('ACHIEVEMENTS', achCount + ' / ' + achTotal + '  ' + achPct + '%',
-               achPct >= 80 ? COL.green : COL.magenta);
+    {
+      const _achTier = achPct >= 100 ? 'COMPLETIONIST'
+                    : achPct >= 80  ? 'HUNTER'
+                    : achPct >= 50  ? 'PURSUER'
+                    : achPct >= 20  ? 'SEEKER'
+                    : '';
+      profileRow('ACHIEVEMENTS', achCount + ' / ' + achTotal + '  ' + achPct + '%' + (_achTier ? ' ' + _achTier : ''),
+                 achPct >= 80 ? COL.green : COL.magenta);
+    }
     // Daily streak (only if active)
     const streak = computeDailyStreak();
     if (streak >= 1) {
