@@ -10975,6 +10975,21 @@ function drawIntroCinematic() {
 function drawTitleScreen() {
   const t = game.animFrame;
 
+  // TIME-OF-DAY PILOT GREETING — top-left accent. Reads system clock at draw
+  // time and picks one of 5 phases: NIGHT/DAWN/MORNING/AFTERNOON/EVENING.
+  // Shown only when a callsign is set (not '???') and not in callsign editor.
+  if (!callsignInput.active && playerCallsign && playerCallsign !== '???') {
+    const _hr = new Date().getHours();
+    let _phase, _phCol;
+    if (_hr < 5)       { _phase = 'LATE NIGHT'; _phCol = '#a8f'; }
+    else if (_hr < 9)  { _phase = 'GOOD MORNING'; _phCol = '#fc8'; }
+    else if (_hr < 12) { _phase = 'GOOD MORNING'; _phCol = '#fc4'; }
+    else if (_hr < 17) { _phase = 'GOOD AFTERNOON'; _phCol = '#0cf'; }
+    else if (_hr < 21) { _phase = 'GOOD EVENING'; _phCol = '#f6c'; }
+    else               { _phase = 'GOOD NIGHT'; _phCol = '#48f'; }
+    drawRetroText(_phase + ', [' + playerCallsign + ']', BASE_W/2, 12, 5, _phCol);
+  }
+
   // Top decorative dashed border (animated marquee)
   ctx.fillStyle = '#0af';
   for (let i = 0; i < BASE_W; i += 8) {
