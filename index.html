@@ -11450,6 +11450,16 @@ function drawTitleScreen() {
       const mCol = done ? '#0f8' : '#fc4';
       drawRetroText(mLabel, BASE_W/2, 224, 4, mCol);
     }
+    // DAILY RESET COUNTDOWN — hours/minutes until local midnight rollover
+    {
+      const _now = new Date();
+      const _next = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() + 1, 0, 0, 0, 0);
+      const _ms = _next.getTime() - _now.getTime();
+      const _hr = Math.floor(_ms / 3600000);
+      const _mn = Math.floor((_ms % 3600000) / 60000);
+      const _cdStr = 'RESET IN ' + _hr + 'H ' + String(_mn).padStart(2, '0') + 'M';
+      drawRetroText(_cdStr, BASE_W/2, 230, 4, '#888');
+    }
   }
   const topList = loadTopScores(showMode);
   const startY = 226;
