@@ -8857,12 +8857,23 @@ function updateCollisions() {
           }
           bumpCombo();
           const inForm = e.state === 'formation';
+          // EARLY INTERCEPT — kill while enemy is still in entering path.
+          // Small flat bonus + callout. Rewards aggressive opening play.
+          const isIntercept = e.state === 'entering';
           const basePts = getEnemyPoints(e.type, inForm);
           const mult = comboMultiplier(game.combo);
           const eliteMul = e.elite ? 1.5 : 1;
           const ghostMul = e.ghost ? 2 : 1;
           const pts = Math.round(basePts * mult * eliteMul * ghostMul);
           addScore(pts);
+          if (isIntercept) {
+            addScore(50);
+            game.interceptCount = (game.interceptCount || 0) + 1;
+            game.floatTexts.push({
+              x: e.x, y: e.y - 14, text: 'INTERCEPT +50',
+              color: '#0ff', life: 30, maxLife: 30, size: 5
+            });
+          }
           game.comboBonusAccum = (game.comboBonusAccum || 0) + pts;
           // KILL SCORE FLOATER — per-kill "+N" at the kill site for kills that
           // earned a meaningful score (≥200). Color escalates with point value so
