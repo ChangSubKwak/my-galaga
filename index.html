@@ -5105,6 +5105,7 @@ function startStage() {
   game.stagePerfectWaves = 0;
   game.stageInterceptCount = 0;
   game._openingSalvoFired = false;
+  game._ultraParryFired = false;
   game.stageCloseCount = 0;
   game.lastStandAnnounced = false;
 
@@ -9482,10 +9483,31 @@ function updateCollisions() {
         game.parryStreakTimer = 90;
         if ((game.parryStreak || 0) > (game.parryStreakBest || 0)) game.parryStreakBest = game.parryStreak;
         if ((game.parryStreak || 0) >= 5) unlockAchievement('parryChain');
-        const tier = Math.min(3, Math.floor((game.parryStreak - 1) / 2));
-        const baseScore = [50, 75, 100, 150][tier];
-        const tierCol = ['#0ff', '#a8f', '#f6f', '#fc4'][tier];
+        // PARRY STREAK 10+ unlocks ULTRA tier (white-gold, 250 score). Below 10
+        // the original 4-tier ramp applies. One-time ULTRA fanfare at streak===10.
+        const tier = (game.parryStreak >= 10) ? 4
+                    : Math.min(3, Math.floor((game.parryStreak - 1) / 2));
+        const baseScore = [50, 75, 100, 150, 250][tier];
+        const tierCol = ['#0ff', '#a8f', '#f6f', '#fc4', '#fff'][tier];
         const tierLabel = game.parryStreak >= 2 ? ('PARRY x' + game.parryStreak) : 'PARRY';
+        // ULTRA PARRY fanfare — fires exactly once when streak crosses 10
+        if (game.parryStreak === 10 && !game._ultraParryFired) {
+          game._ultraParryFired = true;
+          addScore(500);
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 - 24, text: 'ULTRA PARRY',
+            color: '#fff', life: 80, maxLife: 80, size: 12
+          });
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 - 12, text: 'CHAIN x10  +500',
+            color: '#fc4', life: 70, maxLife: 70, size: 6
+          });
+          game.flashTimer = Math.max(game.flashTimer || 0, 8);
+          game.flashColor = '#fff';
+          if (typeof spawnConfetti === 'function') spawnConfetti(14);
+          if (typeof playSound === 'function') playSound('milestone');
+          rumble(280, 0.9, 0.5);
+        }
         // PERK 'parryDividend' — parry score → 3×
         addScore(game.activePerk === 'parryDividend' ? baseScore * 3 : baseScore);
         game.parryCount = (game.parryCount || 0) + 1;
