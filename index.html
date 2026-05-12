@@ -16079,7 +16079,11 @@ function drawGameOverScreen() {
   }
   // PARRY CHAIN BEST — best parry streak this run
   if (tTime >= 1 && (game.parryStreakBest || 0) >= 3) {
-    drawRetroText('PARRY x' + game.parryStreakBest, BASE_W/2, cy + 94, 4, '#0cf');
+    drawRetroText('PARRY x' + game.parryStreakBest, BASE_W/2 - 30, cy + 94, 4, '#0cf');
+  }
+  // RUN BIOMES SEEN — distinct biomes traversed this run
+  if (tTime >= 1 && game.runBiomesSeen && game.runBiomesSeen.size >= 2) {
+    drawRetroText('BIOMES ' + game.runBiomesSeen.size + '/8', BASE_W/2 + 30, cy + 94, 4, '#9ef');
   }
   // MAX CORRUPTION REACHED — translate maxStage to corruption tier
   if (tTime >= 1) {
