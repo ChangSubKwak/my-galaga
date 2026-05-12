@@ -9217,7 +9217,7 @@ function checkStageComplete() {
       if (game.stageEndGraceTimer < STAGE_END_GRACE) {
         if (game.stageEndGraceTimer === 0) {
           spawnStageClear('STAGE CLEAR!', null);
-          // SECONDARY OBJECTIVE check (silent unless met — visual reward only)
+          // SECONDARY OBJECTIVE check (visual reward when met, miss hint when not)
           if (game.stageObjective && game.stageObjective.met(game)) {
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 + 32,
@@ -9231,6 +9231,14 @@ function checkStageComplete() {
             });
             spawnConfetti(8);
             playSound('extraLife');
+          } else if (game.stageObjective) {
+            // OBJECTIVE FAIL HINT — show what was missed so the player learns
+            // which condition failed (e.g., COMBO 15+ unmet). Amber tone, brief.
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 + 32,
+              text: 'MISSED: ' + game.stageObjective.label,
+              color: '#fa8', life: 80, maxLife: 80, size: 6
+            });
           }
           // STAGE PB — clear time vs personal best for this stage
           const pbResult = recordStagePB(game.stage, game.stageFrames);
