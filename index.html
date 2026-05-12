@@ -2425,6 +2425,16 @@ function drawPlayerBullet(x, y, lvl, kind) {
 // Power-up capsule — gem orb with halo, type icon, and orbiting sparkle
 function drawPowerUp(p) {
   const x = p.x, y = p.y, t = game.animFrame;
+  // RARE LABEL — small blinking "RARE" tag above L/B/E pickups. Visual hint
+  // so high-value drops aren't missed in chaos. Skipped when pickup is near
+  // the top of the screen (would clip out of view).
+  if ((p.type === 'L' || p.type === 'B' || p.type === 'E') && y > 12) {
+    const _rBlink = (t >> 2) % 2 === 0;
+    if (_rBlink) {
+      const _rCol = p.type === 'L' ? '#f6c' : p.type === 'B' ? '#f44' : '#4f8';
+      drawRetroText('RARE', x, y - 8, 4, _rCol, 'center');
+    }
+  }
   // POWERUP PROXIMITY GLOW — small pulsing ring when player is within 30px.
   // Helps targeting under bullet pressure. Skipped if magnetic perk active
   // (its own dashed-line aura already telegraphs proximity).
