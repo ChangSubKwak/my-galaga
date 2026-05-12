@@ -5515,6 +5515,21 @@ function addScore(pts) {
   if (!game.challengeMode && Math.floor(old / 30000) < Math.floor(game.score / 30000)) {
     game.lives++;
     playSound('extraLife');
+    // EXTRA LIFE BANNER — celebrate threshold crossing with banner + confetti
+    if (game && game.floatTexts) {
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 30, text: 'EXTRA LIFE!',
+        color: '#0f8', life: 100, maxLife: 100, size: 13
+      });
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 16, text: '+1 SHIP',
+        color: '#cfc', life: 100, maxLife: 100, size: 7
+      });
+      if (typeof spawnConfetti === 'function') spawnConfetti(14);
+      game.flashTimer = Math.max(game.flashTimer || 0, 8);
+      game.flashColor = '#0f8';
+      if (typeof rumble === 'function') rumble(220, 0.7, 0.4);
+    }
   }
 }
 
