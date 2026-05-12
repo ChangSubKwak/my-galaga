@@ -7681,7 +7681,14 @@ function bumpCombo() {
   // Combo step sound at multiplier-tier transitions, escalating haptic + tiny shake.
   // Tiers: c≥3 (1.25×), c≥5 (1.5×), c≥10 (2×), c≥15 (2.5×), c≥20 (3×, max).
   if (game.combo === 3 || game.combo === 5 || game.combo === 10 || game.combo === 15 || game.combo === 20) {
-    playSound('comboStep');
+    // Tier-specific SFX: higher tiers get more triumphant cues (tick→step→
+    // powerUp→milestone→extraLife). Pure audio escalation, no gameplay impact.
+    const _tSfx = game.combo === 3 ? 'tick'
+                : game.combo === 5 ? 'comboStep'
+                : game.combo === 10 ? 'powerUp'
+                : game.combo === 15 ? 'milestone'
+                : 'extraLife';
+    playSound(_tSfx);
     const strong = Math.min(0.9, 0.3 + game.combo * 0.04);
     rumble(120, strong, strong * 0.5);
     const shakeAdd = game.combo >= 20 ? 8 : game.combo >= 15 ? 6 : game.combo >= 10 ? 4 : 2;
