@@ -6571,6 +6571,8 @@ function commitGameToCumStats() {
   s.shotsHit   = (s.shotsHit   || 0) + (gs.shotsHit   || 0);
   s.runFrames  = (s.runFrames  || 0) + (game.runFrames || 0);
   s.bestStage  = Math.max(s.bestStage || 0, gs.maxStage || game.stage || 0);
+  // PARRY STREAK BEST — track lifetime max consecutive parries across all runs
+  s.parryStreakBest = Math.max(s.parryStreakBest || 0, game.parryStreakBest || 0);
   saveCumStats(s, challenge);
   // SHIP MASTERY — per-ship cumulative stats (kills / runs / bestStage). Separate from
   // cumStats which is mode-scoped. Lets the player see "I've killed 3,200 with Scout"
@@ -11260,6 +11262,8 @@ function pickRunHighlights() {
 
   if (cBest >= 5)         out.push({ label: 'MAX COMBO',     value: String(cBest),       prio: cBest * 4, col: '#0ff' });
   if (parries >= 3)       out.push({ label: 'BULLETS PARRIED', value: String(parries),  prio: parries * 6, col: '#0ff' });
+  const parryBest = game.parryStreakBest || 0;
+  if (parryBest >= 3)     out.push({ label: 'PARRY CHAIN MAX', value: 'x' + parryBest,   prio: parryBest * 10, col: '#0cf' });
   if (elites >= 1)        out.push({ label: 'ELITES SLAIN',  value: String(elites),       prio: elites * 18, col: '#f44' });
   if (stages >= 3)        out.push({ label: 'STAGES CLEARED', value: String(stages),     prio: stages * 8, col: '#fc4' });
   if (bosses >= 1)        out.push({ label: 'BOSSES DOWN',    value: String(bosses),     prio: bosses * 60, col: '#f8a' });
@@ -14629,6 +14633,12 @@ function drawStatsOverlay() {
       if (parryTotal >= 5) {
         const pCol = parryTotal >= 500 ? '#fc4' : parryTotal >= 200 ? '#0ff' : parryTotal >= 50 ? '#0f8' : '#cce';
         profileRow('PARRY TOTAL', String(parryTotal), pCol);
+      }
+      // PARRY STREAK BEST — lifetime max consecutive parries
+      const psBest = Math.max(csN2.parryStreakBest || 0, csC2.parryStreakBest || 0);
+      if (psBest >= 3) {
+        const psCol = psBest >= 15 ? '#fc4' : psBest >= 8 ? '#0ff' : psBest >= 5 ? '#0f8' : '#cce';
+        profileRow('PARRY CHAIN BEST', 'x' + psBest, psCol);
       }
       // PICKUP TYPE TOTALS — show top-collected pickup type (e.g., "TOP: S x42")
       const ptRaw = localStorage.getItem('galagaPickupTotals');
