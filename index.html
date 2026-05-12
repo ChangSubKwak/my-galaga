@@ -12851,6 +12851,16 @@ function drawHUD() {
       }
     }
     drawRetroText(timeStr, BASE_W - 5, 22, 5, clockCol, 'right');
+    // PB DELTA NUMBER — small "(-0.8s)" / "(+1.2s)" relative to PB so the
+    // speedrunner sees exact pace, not just ahead/behind color.
+    if (typeof pb === 'number' && pb > 0) {
+      const deltaFrames = game.stageFrames - pb;
+      const deltaSec = (deltaFrames / 60).toFixed(1);
+      const sign = deltaFrames >= 0 ? '+' : '';
+      const deltaCol = deltaFrames < 0 ? '#0f8' : '#f88';
+      // Position to the left of the clock so it reads naturally
+      drawRetroText('(' + sign + deltaSec + 's)', BASE_W - 5 - (timeStr.length * 5) - 2, 22, 4, deltaCol, 'right');
+    }
     // HUD RUN TIMER — cumulative run time under the stage clock. Speedrun aid.
     // Hidden in minimal HUD mode to keep clean view.
     if (!minimalHud && (game.runFrames || 0) > 0) {
