@@ -12138,6 +12138,17 @@ function drawStageIntro() {
     if ((game.shieldCharges || 0) > 0) {
       drawRetroText('E x' + game.shieldCharges, 4, BASE_H/2 - 1, 4, '#0f8', 'left');
     }
+    // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
+    // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
+    {
+      let _bp = null, _bpCol = '#fff';
+      if ((game.laserTimer  || 0) > 0)      { _bp = 'LASER'; _bpCol = '#f6c'; }
+      else if ((game.homingTimer || 0) > 0) { _bp = 'HOMING'; _bpCol = '#0f8'; }
+      else if ((game.waveTimer   || 0) > 0) { _bp = 'WAVE'; _bpCol = '#6cf'; }
+      else if ((game.rapidTimer  || 0) > 0) { _bp = 'RAPID'; _bpCol = '#fc4'; }
+      else if ((game.slowTimer   || 0) > 0) { _bp = 'SLOW'; _bpCol = '#8ff'; }
+      if (_bp) drawRetroText(_bp, BASE_W - 4, BASE_H/2 - 15, 4, _bpCol, 'right');
+    }
   }
   // RUN QUICK STATS — single-line summary of in-progress run shown at stage 2+.
   // Combo / Score / Accuracy. Score-neutral context for player decisions.
