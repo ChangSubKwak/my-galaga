@@ -11021,6 +11021,16 @@ function drawStageIntro() {
   ctx.shadowBlur = 10 * glowPulse;
   drawRetroText(stageLabel, BASE_W/2 + offX, BASE_H/2 - 10, 12, labelColor);
   ctx.restore();
+  // STAGE BIOME NAME — biome-themed sub-title under the stage label gives
+  // each stage a thematic identity beyond the number. Renders only when a
+  // biome is active (stage 8+) and not on boss stages (boss name takes priority).
+  if (slide >= 1 && !isBoss) {
+    const _biomeId = typeof biomeForStage === 'function' ? biomeForStage(game.stage) : null;
+    if (_biomeId && BIOME_NAMES[_biomeId]) {
+      const bInfo = BIOME_NAMES[_biomeId];
+      drawRetroText('— ' + bInfo.label + ' —', BASE_W/2 + offX, BASE_H/2 + 2, 5, bInfo.col);
+    }
+  }
   // Tier hint — current background tier number tiny in corner
   if (slide >= 1) {
     const tier = Math.min(4, Math.floor((game.stage - 1) / 4));
