@@ -11604,6 +11604,17 @@ function drawStageIntro() {
     drawRetroText(label, BASE_W/2, BASE_H - 28, 4, '#fc4');
   }
 
+  // PERK COUNTDOWN — show how many stages until the next boss (= next perk
+  // pick opportunity). Useful for planning around expiring perks/build state.
+  if (slide >= 1 && !isBoss && game.stage > 0 && game.stage < 80) {
+    const nextBoss = Math.ceil(game.stage / 10) * 10;
+    const distance = nextBoss - game.stage;
+    if (distance > 0 && distance <= 5) {
+      drawRetroText('PERK IN ' + distance + ' STAGE' + (distance === 1 ? '' : 'S'),
+        BASE_W/2, BASE_H - 60, 4, '#888');
+    }
+  }
+
   // STAGE INTRO ACTIVE PERK — if a perk is currently active (from prior boss),
   // surface it in the intro so the player knows their build going into the
   // next stage. Reminder fades in with the rest of the intro content.
