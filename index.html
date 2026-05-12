@@ -12317,6 +12317,14 @@ function drawStageIntro() {
     if (game.ship && game.ship.name) {
       drawRetroText(game.ship.name, BASE_W - 4, BASE_H/2 - 9, 4, game.ship.color || '#0cf', 'right');
     }
+    // SHIP SPRITE PREVIEW — small ship icon next to TIER label so the player
+    // sees the active ship at every intro entry. Reuses drawPlayer with lvl
+    // to show current build state.
+    if (typeof drawPlayer === 'function') {
+      const _sCol = (game.ship && game.ship.color) || '#0cf';
+      const _sx = BASE_W - 28, _sy = BASE_H/2 - 22;
+      drawPlayer(_sx, _sy, _sCol, game.lvl);
+    }
     // POWER LEVEL PEEK — S/N/P current levels at intro so the player sees the
     // build they're carrying in. Hidden when all 1/1/1 (no progress yet).
     if (game.lvl && (game.lvl.S > 1 || game.lvl.N > 1 || game.lvl.P > 1)) {
