@@ -15999,6 +15999,19 @@ function drawGameOverScreen() {
     drawRetroText('— FINAL TRANSMISSION —', BASE_W/2, ey, 5, '#888');
     ctx.globalAlpha = 0.85 * fade;
     drawRetroText(game.runEpitaph, BASE_W/2, ey + 8, 6, '#cfc');
+    // LAST TRANSMISSION ECHO — show the most recent narrative log seen (last
+    // TRANSMISSION_LOGS stage <= maxStage) for arc continuity.
+    if (typeof TRANSMISSION_LOGS !== 'undefined') {
+      const _mxS = (game.stats && game.stats.maxStage) || game.stage || 1;
+      const _keys = Object.keys(TRANSMISSION_LOGS).map(Number).filter(k => k <= _mxS).sort((a, b) => b - a);
+      if (_keys.length > 0) {
+        const _lastLog = TRANSMISSION_LOGS[_keys[0]];
+        if (Array.isArray(_lastLog) && _lastLog[0]) {
+          ctx.globalAlpha = 0.35 * fade;
+          drawRetroText(_lastLog[0], BASE_W/2, ey - 6, 4, '#666');
+        }
+      }
+    }
     // TIME-OF-DAY MOOD — atmospheric line below epitaph based on real-world hour.
     const _h = new Date().getHours();
     const _mood = _h < 5  ? 'THE LATE NIGHT KEEPS WATCH.'
