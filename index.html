@@ -12260,6 +12260,25 @@ function drawStageIntro() {
   // from screen center outward. Reads as cinematic transition between stages.
   // Color picked from biome for cohesion (or default cyan).
   const introElapsed = 120 - game.stageTimer;
+  // TIME-OF-DAY ACCENT — top thin band tinted by real-world hour phase, so
+  // each intro carries the day's mood. Subtle so it stays under stage-type
+  // tint and warp.
+  {
+    const _hr = new Date().getHours();
+    let _todCol = null;
+    if (_hr < 5)       _todCol = '#48f';       // late night
+    else if (_hr < 9)  _todCol = '#fc8';       // morning
+    else if (_hr < 17) _todCol = '#0cf';       // afternoon
+    else if (_hr < 21) _todCol = '#f6c';       // evening
+    else               _todCol = '#48f';       // night
+    if (_todCol) {
+      ctx.save();
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = _todCol;
+      ctx.fillRect(0, 0, BASE_W, 2);
+      ctx.restore();
+    }
+  }
   // HARD MODE BANDS — when difficultyMode === 'hard', paint left/right 1px
   // red bands across the entire intro to reinforce the chosen challenge.
   if (typeof difficultyMode !== 'undefined' && difficultyMode === 'hard') {
