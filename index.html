@@ -12816,6 +12816,19 @@ function drawStageIntro() {
     if (game.killedTypes && game.killedTypes.size >= 3) {
       drawRetroText('TYP ' + game.killedTypes.size, BASE_W - 4, BASE_H/2 + 83, 4, '#0cf', 'right');
     }
+    // BESTIARY MINI BAR — lifetime dex unlocked fraction
+    if (typeof dexUnlocked !== 'undefined' && dexUnlocked.size >= 1) {
+      const _dxCol = dexUnlocked.size >= 8 ? '#fc4' : '#f6f';
+      drawRetroText('DEX ' + dexUnlocked.size + '/8', BASE_W - 4, BASE_H/2 + 89, 4, _dxCol, 'right');
+      ctx.save();
+      const _dxBarX = BASE_W - 28, _dxBarY = BASE_H/2 + 94;
+      for (let _di = 0; _di < 8; _di++) {
+        ctx.globalAlpha = _di < dexUnlocked.size ? 0.8 : 0.18;
+        ctx.fillStyle = _dxCol;
+        ctx.fillRect(_dxBarX + _di * 3, _dxBarY, 2, 1);
+      }
+      ctx.restore();
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
