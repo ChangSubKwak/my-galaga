@@ -14384,6 +14384,15 @@ function drawHUD() {
       const deltaCol = deltaFrames < 0 ? '#0f8' : '#f88';
       // Position to the left of the clock so it reads naturally
       drawRetroText('(' + sign + deltaSec + 's)', BASE_W - 5 - (timeStr.length * 5) - 2, 22, 4, deltaCol, 'right');
+      // STAGE TIMER PB BAR — 30px bar under clock showing frames / PB ratio
+      const _pbR = Math.min(1.2, game.stageFrames / pb);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(BASE_W - 33, 28, 28, 1);
+      ctx.fillStyle = _pbR < 0.7 ? '#0f8' : _pbR < 1 ? '#fc4' : '#f88';
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(BASE_W - 33, 28, Math.round(Math.min(28, 28 * _pbR)), 1);
+      ctx.restore();
     }
     // HUD RUN TIMER — cumulative run time under the stage clock. Speedrun aid.
     // Hidden in minimal HUD mode to keep clean view.
