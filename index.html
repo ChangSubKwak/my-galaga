@@ -7392,6 +7392,22 @@ function updatePowerUps() {
         rumble(360, 0.9, 0.6);
       } else if (game.lvl[p.type] < MAX_POWER_LVL[p.type]) {
         game.lvl[p.type]++;
+        // PER-TYPE CAP FANFARE — first time this run that S/N/P hits its cap
+        // (but the full build isn't complete yet). Surfaces individual mastery.
+        if (game.lvl[p.type] === MAX_POWER_LVL[p.type] && !isPowerMaxed()) {
+          game._typeMaxedFlags = game._typeMaxedFlags || {};
+          if (!game._typeMaxedFlags[p.type]) {
+            game._typeMaxedFlags[p.type] = true;
+            const _typeLbl = { S: 'SHOT', N: 'NUKE', P: 'PIERCE' }[p.type] || p.type;
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 - 14, text: _typeLbl + ' MAXED',
+              color, life: 70, maxLife: 70, size: 10
+            });
+            game.flashTimer = Math.max(game.flashTimer || 0, 5);
+            game.flashColor = color;
+            if (typeof spawnConfetti === 'function') spawnConfetti(8);
+          }
+        }
         if (isPowerMaxed()) {
           unlockAchievement('bigShot');
           playSound('powerMax');
@@ -9663,6 +9679,7 @@ function killPlayer(srcX, srcY, cause) {
   game.playerAlive = false;
   game.stageDied = true;
   game.lvl = {S: 1, N: 1, P: 1};
+  game._typeMaxedFlags = {};
   game.powerUps = [];
   // Lose timed power-ups too, for consistency with lvl reset
   game.slowTimer = 0;
