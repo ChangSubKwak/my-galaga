@@ -12754,6 +12754,15 @@ function drawHUD() {
     const m = game.stageMutation;
     const blink = (game.animFrame >> 3) % 2 === 0 ? m.color : '#fff';
     drawRetroText(m.label, BASE_W - 5, 16, 5, blink, 'right');
+    // MUTATION DESCRIPTOR — show desc for the first ~5 seconds of the stage so
+    // the player learns the rule change before settling into play.
+    if (m.desc && (game.stageFrames || 0) < 300) {
+      const fade = 1 - (game.stageFrames || 0) / 300;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, fade) * 0.85;
+      drawRetroText(m.desc, BASE_W - 5, 22, 4, '#888', 'right');
+      ctx.restore();
+    }
   }
   // SECONDARY OBJECTIVE mini-badge — small two-line under stage label (or below
   // mutation if both active). Soft green so it doesn't shout for attention.
