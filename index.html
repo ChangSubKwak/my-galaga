@@ -17631,7 +17631,11 @@ function drawStatsOverlay() {
         if (gTotal >= 10) {
           const _sPct = Math.round((gS / gTotal) * 100);
           const _sRatioCol = _sPct >= 30 ? '#fc4' : _sPct >= 15 ? '#0ff' : _sPct >= 5 ? '#0f8' : '#cce';
-          profileRow('S RATIO', _sPct + '%', _sRatioCol);
+          const _srN = _sPct >= 30 ? ' REMARKABLE'
+                     : _sPct >= 15 ? ' CONSISTENT'
+                     : _sPct >= 5  ? ' PROMISING'
+                     : '';
+          profileRow('S RATIO', _sPct + '%' + _srN, _sRatioCol);
         }
       }
     } catch (e) {}
