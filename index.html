@@ -14449,6 +14449,22 @@ function drawHUD() {
       drawRetroText('+' + fmtScore(_stgScore), 50, 25, 4, '#888', 'right');
     }
   }
+  // HIGH SCORE PROGRESS BAR — 1px bar at upper-center showing fraction of
+  // current score toward the live high threshold. Hidden under minimal HUD
+  // or when no high score is set yet.
+  if (!minimalHud
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (game.liveHighThreshold || 0) > 0) {
+    const _hsRatio = Math.min(1, (game.score || 0) / game.liveHighThreshold);
+    const _hsBarX = 12, _hsBarY = 21, _hsBarW = 36;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(_hsBarX, _hsBarY, _hsBarW, 1);
+    ctx.fillStyle = _hsRatio >= 1 ? '#fc4' : _hsRatio >= 0.9 ? '#ff4' : _hsRatio >= 0.5 ? '#0ff' : '#0f8';
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(_hsBarX, _hsBarY, Math.round(_hsBarW * _hsRatio), 1);
+    ctx.restore();
+  }
   // HUD PICKUP STREAK — small "P×N" cyan counter when consecutive no-death
   // pickups reach 2+. Hides on death (streak resets). Visible in normal HUD only.
   if (!minimalHud && (game.pickupStreak || 0) >= 2
