@@ -12133,6 +12133,10 @@ function drawStageIntro() {
       drawRetroText('[' + playerCallsign + ']', 4, BASE_H/2 - 22, 5, '#888', 'left');
       drawRetroText(computePilotTitle(), 4, BASE_H/2 - 15, 4, '#555', 'left');
     }
+    // SHIP NAME PEEK — current ship under pilot rank, in ship color.
+    if (game.ship && game.ship.name) {
+      drawRetroText(game.ship.name, BASE_W - 4, BASE_H/2 - 9, 4, game.ship.color || '#0cf', 'right');
+    }
     // POWER LEVEL PEEK — S/N/P current levels at intro so the player sees the
     // build they're carrying in. Hidden when all 1/1/1 (no progress yet).
     if (game.lvl && (game.lvl.S > 1 || game.lvl.N > 1 || game.lvl.P > 1)) {
