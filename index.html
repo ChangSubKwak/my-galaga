@@ -11072,6 +11072,15 @@ function draw() {
     if (corr > 0) {
       ctx.save();
       const t = game.animFrame;
+      // STAGE TIER DARK VIGNETTE — soft black edge gradient. Strength scales
+      // with corruption. Adds oppression beyond colored noise.
+      ctx.globalAlpha = corr * 0.30;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, 6, BASE_H);
+      ctx.fillRect(BASE_W - 6, 0, 6, BASE_H);
+      ctx.globalAlpha = corr * 0.18;
+      ctx.fillRect(0, 0, BASE_W, 6);
+      ctx.fillRect(0, BASE_H - 6, BASE_W, 6);
       // Edge noise — random corrupted pixels at screen edges. Density scales with corr.
       const noiseCount = Math.floor(corr * 30);
       ctx.globalAlpha = 0.45;
