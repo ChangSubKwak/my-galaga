@@ -17127,6 +17127,52 @@ function drawStatsOverlay() {
                     : '';
       profileRow('ACHIEVEMENTS', achCount + ' / ' + achTotal + '  ' + achPct + '%' + (_achTier ? ' ' + _achTier : ''),
                  achPct >= 80 ? COL.green : COL.magenta);
+      // NEXT ACHIEVEMENT PROXIMITY TEASER — find the closest unlocked-able
+      // achievement (smallest absolute gap, progress >= 30%). Pulls live values
+      // from cumStats + localStorage. Skipped if everything quantifiable is unlocked.
+      try {
+        const _ua = (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements : new Set();
+        const _hi = parseInt(localStorage.getItem('galagaHigh') || '0', 10) || 0;
+        const _pT = parseInt(localStorage.getItem('galagaParryTotal') || '0', 10) || 0;
+        const _ckT = parseInt(localStorage.getItem('galagaCritKills') || '0', 10) || 0;
+        const _ghT = parseInt(localStorage.getItem('galagaGhostKills') || '0', 10) || 0;
+        const _bwT = parseInt(localStorage.getItem('galagaBonusWins') || '0', 10) || 0;
+        let _ddT = 0;
+        try { _ddT = (JSON.parse(localStorage.getItem('galagaDailyDays') || '[]') || []).length; } catch (e) {}
+        const _bsT2 = Math.max(csN2.bestStage || 0, csC2.bestStage || 0);
+        const _candidates = [
+          { k: 'parry50',      cur: _pT,    thr: 50,      label: 'PARRY 50' },
+          { k: 'parry200',     cur: _pT,    thr: 200,     label: 'PARRY 200' },
+          { k: 'parry500',     cur: _pT,    thr: 500,     label: 'PARRY 500' },
+          { k: 'ghost5',       cur: _ghT,   thr: 5,       label: 'GHOST HUNTER' },
+          { k: 'ghost25',      cur: _ghT,   thr: 25,      label: 'GHOST SLAYER' },
+          { k: 'dailyTen',     cur: _ddT,   thr: 10,      label: 'DAILY DEVOTED' },
+          { k: 'dailyMonth',   cur: _ddT,   thr: 30,      label: 'DAILY MONTH' },
+          { k: 'dailyCentury', cur: _ddT,   thr: 100,     label: 'DAILY CENTURY' },
+          { k: 'veteran',      cur: _bsT2,  thr: 10,      label: 'VETERAN' },
+          { k: 'marathon',     cur: _bsT2,  thr: 25,      label: 'MARATHON' },
+          { k: 'flagWaver',    cur: _bsT2,  thr: 30,      label: 'FLAG WAVER' },
+          { k: 'finalBoss',    cur: _bsT2,  thr: 40,      label: 'FINAL BOSS' },
+          { k: 'legend',       cur: _bsT2,  thr: 50,      label: 'LEGEND' },
+          { k: 'millionaire',  cur: _hi,    thr: 1000000, label: 'MILLIONAIRE' },
+          { k: 'rich',         cur: _hi,    thr: 5000000, label: 'RICH' },
+          { k: 'bonusKing',    cur: _bwT,   thr: 5,       label: 'BONUS KING' }
+        ];
+        let _best = null;
+        for (let i = 0; i < _candidates.length; i++) {
+          const c = _candidates[i];
+          if (_ua.has(c.k)) continue;
+          const ratio = c.cur / c.thr;
+          if (ratio < 0.3) continue;
+          const gap = c.thr - c.cur;
+          if (gap <= 0) continue;
+          if (!_best || gap < _best.gap) _best = { label: c.label, gap, ratio };
+        }
+        if (_best) {
+          const pct = Math.min(99, Math.floor(_best.ratio * 100));
+          profileRow('NEXT', _best.label + '  ' + pct + '%', '#fc8');
+        }
+      } catch (e) {}
     }
     // Daily streak (only if active)
     const streak = computeDailyStreak();
