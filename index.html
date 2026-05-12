@@ -12161,6 +12161,10 @@ function drawStageIntro() {
     if ((game.zenStreak || 0) >= 2) {
       drawRetroText('NODIE x' + game.zenStreak, BASE_W - 4, BASE_H/2 + 5, 4, '#0f8', 'right');
     }
+    // COMBO BEST PEEK — session combo best at right side stack.
+    if ((game.comboBest || 0) >= 3) {
+      drawRetroText('CB x' + game.comboBest, BASE_W - 4, BASE_H/2 + 11, 4, '#0ff', 'right');
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
