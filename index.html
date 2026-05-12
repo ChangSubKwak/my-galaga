@@ -17254,7 +17254,10 @@ function drawStatsOverlay() {
       const lpBest = Math.max(csN2.laserPierceBest || 0, csC2.laserPierceBest || 0);
       if (lpBest >= 3) {
         const lpCol = lpBest >= 10 ? '#fc4' : lpBest >= 6 ? '#0ff' : '#f6c';
-        profileRow('LASER PIERCE BEST', 'x' + lpBest, lpCol);
+        const _lpN = lpBest >= 10 ? ' LANCE'
+                   : lpBest >= 6  ? ' SPEAR'
+                   : ' PIERCER';
+        profileRow('LASER PIERCE BEST', 'x' + lpBest + _lpN, lpCol);
       }
       // PICKUP STREAK BEST — max consecutive no-death pickups in a single run
       const _psBest = Math.max(csN2.pickupStreakBest || 0, csC2.pickupStreakBest || 0);
