@@ -9056,6 +9056,16 @@ function updateCollisions() {
     for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
       const b = game.enemyBullets[i];
       if (Math.abs(b.x - game.playerX) < hitW + 2 && Math.abs(b.y - game.playerY) < 9) {
+        // PARRY DEFLECT GHOST — push 3 fading cyan ghosts upward from bullet pos
+        // before removing the bullet. Reads as 'deflected back at sender'.
+        if (game.itemBursts) {
+          for (let _g = 0; _g < 3; _g++) {
+            game.itemBursts.push({
+              x: b.x, y: b.y - _g * 3,
+              life: -_g * 2, color: '#0ff'
+            });
+          }
+        }
         game.enemyBullets.splice(i, 1);
         // PARRY STREAK — chain parries within 90 frames stack. Tier-up base score
         // 50 → 75 → 100 → 150 (cap). Tier color cyan → purple → gold so chains
