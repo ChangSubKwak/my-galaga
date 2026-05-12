@@ -4950,6 +4950,15 @@ function startStage() {
       color: '#0ff', life: 80, maxLife: 80, size: 7
     });
   }
+  // MARATHON BANNER — when zenStreak >= 10, push big gold banner so the elite
+  // no-death streak feels weighty alongside the existing MARATHON x5/10/20 award.
+  if ((game.zenStreak || 0) >= 10) {
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 - 56,
+      text: 'MARATHON x' + game.zenStreak,
+      color: '#fc4', life: 90, maxLife: 90, size: 9
+    });
+  }
   // NEW PB STAGE BANNER — when entering a stage exceeding lifetime best across
   // both normal and challenge modes (one-shot per run via _stagePbFired flag).
   if (!game._stagePbFired) {
