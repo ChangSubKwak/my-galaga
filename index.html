@@ -16821,7 +16821,14 @@ function drawStatsOverlay() {
   row('SESSIONS',    String(cs.sessions || 0), COL.cyan);
   row('PLAY TIME',   playTime, '#fff');
   row('TOTAL KILLS', fmtScore(cs.kills || 0), COL.yellow);
-  row('OVERALL ACC', acc + '%', acc >= 80 ? COL.green : COL.yellow);
+  {
+    const _accTier = acc >= 95 ? 'SHARPSHOOTER'
+                   : acc >= 85 ? 'CRACK SHOT'
+                   : acc >= 70 ? 'MARKSMAN'
+                   : acc >= 50 ? 'STEADY' : '';
+    const _accLab = _accTier ? (acc + '% ' + _accTier) : (acc + '%');
+    row('OVERALL ACC', _accLab, acc >= 80 ? COL.green : COL.yellow);
+  }
   row('BEST STAGE',  String(cs.bestStage || 0), cs.bestStage >= 30 ? COL.red : cs.bestStage >= 10 ? COL.yellow : COL.cyan);
 
   // Mode-specific compact summary row
