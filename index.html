@@ -7075,6 +7075,8 @@ function commitGameToCumStats() {
   s.allPerfectStagesTotal = (s.allPerfectStagesTotal || 0) + (game.allPerfectStagesRun || 0);
   // EXTRA SHIPS LIFETIME — sum of extra ship grants across runs
   s.extraShipsTotal = (s.extraShipsTotal || 0) + (game.extraShipsRun || 0);
+  // OBJECTIVES MET LIFETIME — secondary objective completions across runs
+  s.objectivesMetTotal = (s.objectivesMetTotal || 0) + (game.objectivesMetRun || 0);
   saveCumStats(s, challenge);
   // KILLS-BY-TYPE LIFETIME — batched write of session counts.
   try {
@@ -17134,6 +17136,12 @@ function drawStatsOverlay() {
       if (_esTot >= 3) {
         const _esCol = _esTot >= 50 ? '#fc4' : _esTot >= 15 ? '#0ff' : '#ff4';
         profileRow('EXTRA SHIPS', String(_esTot), _esCol);
+      }
+      // OBJECTIVES MET LIFETIME
+      const _ojTot = (csN2.objectivesMetTotal || 0) + (csC2.objectivesMetTotal || 0);
+      if (_ojTot >= 3) {
+        const _ojCol = _ojTot >= 100 ? '#fc4' : _ojTot >= 30 ? '#0ff' : '#0f8';
+        profileRow('OBJECTIVES MET', String(_ojTot), _ojCol);
       }
       // AVG STAGE TIME — total play frames divided by stages cleared (>= 10
       // sample). Lower = more efficient runs.
