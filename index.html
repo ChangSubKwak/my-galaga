@@ -12313,6 +12313,12 @@ function drawHUD() {
       }
     }
     drawRetroText(timeStr, BASE_W - 5, 22, 5, clockCol, 'right');
+    // HUD RUN TIMER — cumulative run time under the stage clock. Speedrun aid.
+    // Hidden in minimal HUD mode to keep clean view.
+    if (!minimalHud && (game.runFrames || 0) > 0) {
+      const runStr = fmtFrameTime(game.runFrames || 0);
+      drawRetroText('R ' + runStr, BASE_W - 5, 28, 4, '#888', 'right');
+    }
     // PB ALARM tick — once per second SFX while in alarm zone
     if (pbAlarm && game.animFrame % 60 === 0 && typeof playSound === 'function') {
       playSound('tick');
