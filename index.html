@@ -13412,6 +13412,29 @@ function drawCrown(x, y, color) {
 }
 
 function drawHUD() {
+  // PLAYER EDGE VIGNETTE — faint cyan band on left/right when player is within
+  // 20px of that edge. Alpha grows as player approaches the wall, peaking at
+  // touching. Helps spatial awareness without compromising the playfield read.
+  if (game.playerAlive
+      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    const _edgeMax = 20;
+    const _distL = Math.max(0, game.playerX);
+    const _distR = Math.max(0, BASE_W - game.playerX);
+    if (_distL < _edgeMax) {
+      ctx.save();
+      ctx.globalAlpha = (1 - _distL / _edgeMax) * 0.25;
+      ctx.fillStyle = '#0cf';
+      ctx.fillRect(0, 0, 3, BASE_H);
+      ctx.restore();
+    }
+    if (_distR < _edgeMax) {
+      ctx.save();
+      ctx.globalAlpha = (1 - _distR / _edgeMax) * 0.25;
+      ctx.fillStyle = '#0cf';
+      ctx.fillRect(BASE_W - 3, 0, 3, BASE_H);
+      ctx.restore();
+    }
+  }
   // STAGE PROGRESS BAR — 1px high bar at top of screen showing how far into the
   // current stage the player is. Stage-type specific:
   //   PLAYING:     killed/total formation enemies
