@@ -12328,6 +12328,16 @@ function drawStageIntro() {
     drawRetroText('WARNING', BASE_W/2 + offX, BASE_H/2 + 38, 9, warnPulse ? '#f44' : '#fff');
     // 2) Boss name (between WARNING band and the bottom)
     drawRetroText(bossNameFor(game.stage), BASE_W/2 + offX, BASE_H/2 + 50, 8, '#fc4');
+    // BOSS HP PREVIEW — predict total HP from stage formula (matches makeMegaBoss)
+    {
+      const _s = game.stage;
+      const _baseHp = 20 + _s * 3;
+      let _totalHp;
+      if (_s >= 30) _totalHp = Math.round(_baseHp * 2.5);
+      else if (_s >= 20) _totalHp = Math.round(_baseHp * 0.65) * 2;
+      else _totalHp = _baseHp;
+      drawRetroText('HP ' + _totalHp, BASE_W/2 + offX, BASE_H/2 + 60, 5, '#f88');
+    }
     // BOSS ARCHETYPE PREVIEW — small subtitle with the archetype type + color so
     // player can prep for signature pattern (split / laser / fragment / pulse).
     if (typeof archetypeFor === 'function') {
