@@ -5628,6 +5628,18 @@ function updatePlayer() {
     });
     playSound('powerUp');
     spawnConfetti(6);
+    // PEAK BUILD ANNOUNCEMENT — when synergy + activePerk both active, surface
+    // 'PEAK BUILD!' bonus banner at the synergy entry moment.
+    if (game.activePerk && PERKS[game.activePerk]) {
+      game.floatTexts.push({
+        x: BASE_W/2, y: BASE_H/2 - 6,
+        text: '★ PEAK BUILD ★',
+        color: '#fc4', life: 100, maxLife: 100, size: 9
+      });
+      game.flashTimer = Math.max(game.flashTimer || 0, 6);
+      game.flashColor = '#fc4';
+      playSound('milestone');
+    }
   } else if (!synergy && game.lastSynergy) {
     // Lost the combo (player picked up an off-combo level) — silent reset
     game.lastSynergy = null;
