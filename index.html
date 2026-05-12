@@ -4266,6 +4266,13 @@ function updateOneMegaBoss(mb) {
       game.stats.shotsHit++;
       game.stageShotsHit++;
       const dmgDealt = b.dmg || 1;
+      // CRIT hit feedback at boss hit site
+      if (b.crit) {
+        game.floatTexts.push({
+          x: b.x + (Math.random() * 4 - 2), y: b.y - 8,
+          text: 'CRIT!', color: '#fc4', life: 30, maxLife: 30, size: 7
+        });
+      }
       mb.hp -= dmgDealt;
       // BOSS HIT IMPACT SCALE — shake/flash scale with damage so heavy weapons
       // (laser, synergy, perks) feel substantively heavier on impact.
@@ -5551,6 +5558,12 @@ function updatePlayer() {
         if (laser) { b.kind = 'laser'; b.pierced = new Set(); }
         else if (homing) { b.kind = 'homing'; b.vx = 0; }
         else if (wave) { b.kind = 'wave'; b.spawnX = bx; b.spawnFrame = game.animFrame; }
+        // CRITICAL HIT — 4% chance bullet is a crit (+50% damage, gold visual).
+        // Skipped for laser (already strong) to keep balance proportional.
+        if (!laser && Math.random() < 0.04) {
+          b.crit = true;
+          b.dmg = Math.max(b.dmg + 1, Math.round(b.dmg * 1.5));
+        }
         game.bullets.push(b);
         game.stats.shotsFired++;
         game.stageShotsFired++;
@@ -11679,8 +11692,22 @@ function drawGameplay() {
   for (const p of game.powerUps) drawPowerUp(p);
 
   // Draw player bullets — GAM-42 tier visuals (Sleek / Nova / Shard)
-  for (const b of game.bullets)
+  for (const b of game.bullets) {
+    // CRITICAL HIT outline — pre-render gold halo for crit bullets so the
+    // player anticipates the +50% damage hit before it lands.
+    if (b.crit) {
+      ctx.save();
+      const cPulse = 0.55 + 0.45 * Math.sin(game.animFrame * 0.4);
+      ctx.globalAlpha = cPulse;
+      ctx.fillStyle = '#fc4';
+      ctx.fillRect(Math.round(b.x - 2), Math.round(b.y - 3), 5, 1);
+      ctx.fillRect(Math.round(b.x - 2), Math.round(b.y + 2), 5, 1);
+      ctx.fillRect(Math.round(b.x - 3), Math.round(b.y - 2), 1, 5);
+      ctx.fillRect(Math.round(b.x + 2), Math.round(b.y - 2), 1, 5);
+      ctx.restore();
+    }
     drawPlayerBullet(b.x, b.y, b.lvl ?? 1, b.kind);
+  }
 
   // Draw enemy bullets
   for (const b of game.enemyBullets) drawEnemyBullet(b);
