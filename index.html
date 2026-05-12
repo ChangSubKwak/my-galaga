@@ -10084,6 +10084,14 @@ function spawnStageClear(label, sub) {
         x: BASE_W/2 + 56, y: BASE_H/2 + 2, text: Math.round(_accPct) + '%',
         color: '#888', life: 80, maxLife: 80, size: 5
       });
+      // STAGE GRADE LIFETIME TALLY — accumulate per-grade counts to localStorage
+      // so PROFILE can surface medal totals (esp. S count = mastery signal).
+      try {
+        const _gRaw = localStorage.getItem('galagaStageGrades') || '{}';
+        const _gT = JSON.parse(_gRaw);
+        _gT[_grade] = (_gT[_grade] || 0) + 1;
+        localStorage.setItem('galagaStageGrades', JSON.stringify(_gT));
+      } catch (e) {}
     }
   } catch (e) {}
   // STAGE CLEAR BIOME FLASH — brief biome-colored screen flash for environmental
@@ -17410,6 +17418,21 @@ function drawStatsOverlay() {
       if (perfectClears >= 1) {
         profileRow('PERFECT CLEARS', String(perfectClears), perfectClears >= 25 ? '#ff4' : '#fc8');
       }
+      // STAGE GRADES — lifetime tally of S/A/B/C/D letter grades. Surfaces S
+      // (top-tier mastery: 95%+ acc + no-death + PB beat). Shown only when S ≥ 1.
+      try {
+        const _sgRaw = localStorage.getItem('galagaStageGrades') || '{}';
+        const _sgT = JSON.parse(_sgRaw);
+        const _sCnt = _sgT.S || 0;
+        if (_sCnt >= 1) {
+          const _sgTier = _sCnt >= 50 ? ' GRANDMASTER'
+                        : _sCnt >= 20 ? ' MASTER'
+                        : _sCnt >= 5  ? ' ADEPT'
+                        : '';
+          profileRow('S GRADES', '★ ' + _sCnt + _sgTier,
+                     _sCnt >= 50 ? '#fc4' : _sCnt >= 20 ? '#ff4' : '#fc8');
+        }
+      } catch (e) {}
       // GOLDEN CLEARS — perfect + new PB simultaneous mastery count
       const goldenClears = parseInt(localStorage.getItem('galagaGoldenClears') || '0', 10);
       if (goldenClears >= 1) {
