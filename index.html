@@ -13828,6 +13828,18 @@ function drawGameOverScreen() {
       const sec = Math.ceil(game.autoRestartTimer / 60);
       const cdCol = sec <= 2 ? '#fa8' : COL.gray;
       drawRetroText('AUTO RETRY ' + sec, BASE_W/2, cy + 62, 5, cdCol);
+      // AUTO RETRY PROGRESS BAR — visual countdown under the text. Fill drains
+      // left-to-right as timer counts down.
+      const arProg = game.autoRestartTimer / 480;
+      const arBarW = 60;
+      const arBarX = BASE_W/2 - arBarW/2;
+      const arBarY = cy + 69;
+      ctx.save();
+      ctx.fillStyle = '#222';
+      ctx.fillRect(arBarX, arBarY, arBarW, 2);
+      ctx.fillStyle = cdCol;
+      ctx.fillRect(arBarX, arBarY, Math.round(arBarW * arProg), 2);
+      ctx.restore();
     }
   }
 }
