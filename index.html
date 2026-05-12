@@ -2260,11 +2260,19 @@ function drawHitSpark(s) {
   const r = p * 8;
   ctx.save();
   ctx.globalAlpha = 1 - p;
+  // BIOME SPARK GLOW — when a biome is active, replace one of the 6 ray colors
+  // (every 3rd) with biome col so each spark carries environment hint without
+  // losing the yellow/white core identity.
+  let _bsCol = null;
+  if (game && typeof biomeForStage === 'function') {
+    const _bid = biomeForStage(game.stage || 1);
+    if (_bid && BIOME_NAMES && BIOME_NAMES[_bid]) _bsCol = BIOME_NAMES[_bid].col;
+  }
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + s.life * 0.05;
     const px = Math.cos(a) * r;
     const py = Math.sin(a) * r;
-    ctx.fillStyle = i % 2 === 0 ? '#ff4' : '#fff';
+    ctx.fillStyle = (_bsCol && i % 3 === 0) ? _bsCol : (i % 2 === 0 ? '#ff4' : '#fff');
     const sz = 2 - p * 1.5;
     ctx.fillRect(s.x + px - sz / 2, s.y + py - sz / 2, sz, sz);
   }
