@@ -13475,6 +13475,34 @@ function drawHUD() {
       ctx.restore();
       drawRetroText('→' + nextTier, 66, 45, 5, nextCol, 'left');
     }
+    // COMBO ARSENAL PROGRESS DOTS — 4-tier overview row (just below bar)
+    // Claimed: filled gold/pink/cyan/white. Next-target: pulsing. Future: dim outline.
+    {
+      const dotY = 50;
+      for (let i = 0; i < arsenalTiers.length; i++) {
+        const dx = 4 + i * 5;
+        const claimed = !!game.comboArsenalClaimed[arsenalTiers[i]];
+        const isNext = !claimed && nextTier === arsenalTiers[i];
+        ctx.save();
+        if (claimed) {
+          ctx.fillStyle = arsenalColors[i];
+          ctx.globalAlpha = 0.95;
+          ctx.fillRect(dx, dotY, 3, 3);
+        } else if (isNext) {
+          ctx.fillStyle = arsenalColors[i];
+          ctx.globalAlpha = 0.5 + 0.5 * Math.sin(game.animFrame * 0.3);
+          ctx.fillRect(dx, dotY, 3, 3);
+        } else {
+          ctx.fillStyle = arsenalColors[i];
+          ctx.globalAlpha = 0.25;
+          ctx.fillRect(dx, dotY, 3, 1);
+          ctx.fillRect(dx, dotY + 2, 3, 1);
+          ctx.fillRect(dx, dotY, 1, 3);
+          ctx.fillRect(dx + 2, dotY, 1, 3);
+        }
+        ctx.restore();
+      }
+    }
     // Tier transition flash — within 12 frames of hitting tier-up combo (5/10/15/30)
     if ([5, 10, 15, 30, 60, 100].some(t => game.combo === t)) {
       ctx.save();
