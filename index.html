@@ -5106,6 +5106,7 @@ function startStage() {
   game.stageInterceptCount = 0;
   game._openingSalvoFired = false;
   game._ultraParryFired = false;
+  game.stageHitTaken = 0;
   game.stageCloseCount = 0;
   game.lastStandAnnounced = false;
 
@@ -9625,6 +9626,11 @@ function tryTriggerWitchTime(srcX, srcY) {
 }
 
 function killPlayer(srcX, srcY, cause) {
+  // STAGE HIT REGISTRY — any hit attempt counted (even cheat/shield-absorbed) so
+  // UNTOUCHED STAGE detection at clear sees zero only on truly clean runs.
+  // Witch time pre-check (which can save) does NOT increment — that's a player
+  // skill window, not a touch.
+  game.stageHitTaken = (game.stageHitTaken || 0) + 1;
   // DEATH POSTMORTEM — capture the offending hit source so the renderer can draw
   // a red expanding ring at the culprit for the next ~30 frames. Only set when a
   // source is supplied (witch/shield/cheat paths bail out before the visual).
@@ -10164,6 +10170,31 @@ function spawnStageClear(label, sub) {
       x: BASE_W/2, y: BASE_H/2 + 6, text: sub,
       color: '#fff', life: 90, maxLife: 90, size: 9
     });
+  }
+  // UNTOUCHED STAGE — zero hit-attempts taken (no death, no shield absorb,
+  // no cheat eat). Pure evasion mastery. Skipped on stages with <5 shots fired
+  // (e.g., instant boss-down doesn't deserve trophy).
+  if ((game.stageHitTaken || 0) === 0 && (game.stageShotsFired || 0) >= 5) {
+    addScore(300);
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 + 50, text: 'UNTOUCHED',
+      color: '#0ff', life: 100, maxLife: 100, size: 11
+    });
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 + 62, text: '+300',
+      color: '#fff', life: 90, maxLife: 90, size: 6
+    });
+    if (game.shockwaves) {
+      game.shockwaves.push({
+        x: game.playerX, y: game.playerY,
+        life: 0, maxLife: 26, maxR: 34, color: '#0ff'
+      });
+    }
+    try {
+      const _ut = parseInt(localStorage.getItem('galagaUntouchedStages') || '0', 10) || 0;
+      localStorage.setItem('galagaUntouchedStages', String(_ut + 1));
+    } catch (e) {}
+    game.runUntouched = (game.runUntouched || 0) + 1;
   }
   // LAST STAND — stage cleared with exactly 1 life remaining and didn't die.
   // Adds drama to the win + small score bonus + lifetime counter.
