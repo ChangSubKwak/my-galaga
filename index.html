@@ -15786,6 +15786,10 @@ function drawGameOverScreen() {
       drawRetroText('+' + _delta + '% PROGRESS', BASE_W/2 + 40, cy + 40, 4, '#fc4', 'right');
     }
   }
+  // DAILY MISSION DONE BADGE — if mission completed during this run
+  if (tTime >= 1 && game.dailyMode && game._dailyMissionFired) {
+    drawRetroText('★ DAILY MISSION DONE', BASE_W/2, cy + 46, 4, '#fc4');
+  }
 
   // Tick sound for each row when it just begins counting
   // (uses gameOverTimer which decrements every tick)
