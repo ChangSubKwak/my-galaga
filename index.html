@@ -11719,6 +11719,24 @@ function drawGameplay() {
     // SHIP MOMENTUM TILT — rotate ship sprite ± up to ~10° based on game.playerTilt.
     // Aura is drawn unrotated so it sits flat to the world, then ship is drawn rotated.
     const tiltRad = (game.playerTilt || 0) * 0.18; // ~10.3° max
+    // PERK ACTIVE SHIP DOTS — 4 corner dots in perk color so the player sees
+    // their current perk reflected on the ship sprite. Suppressed during dash.
+    function _drawPerkDots(cx, cy) {
+      if (!game.activePerk || !PERKS[game.activePerk]) return;
+      if (game.dashTimer > 0) return;
+      const pCol = PERKS[game.activePerk].col;
+      const t = game.animFrame;
+      const pulse = 0.55 + 0.35 * Math.sin(t * 0.18);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = pCol;
+      // 4 corner pixels at ±8 from center
+      ctx.fillRect(cx - 8, cy - 8, 1, 1);
+      ctx.fillRect(cx + 7, cy - 8, 1, 1);
+      ctx.fillRect(cx - 8, cy + 7, 1, 1);
+      ctx.fillRect(cx + 7, cy + 7, 1, 1);
+      ctx.restore();
+    }
     // SYNERGY AURA — rotating ring of 8 dots matching active WEAPON SYNERGY.
     // Drawn before the ship so it reads as a halo. Suppressed during dash so the
     // dash trail/iframes stay visually clean.
@@ -11744,6 +11762,8 @@ function drawGameplay() {
       drawShipTraitAura(game.playerX + 8, game.playerY, selectedShip);
       _drawSynergyAura(game.playerX - 8, game.playerY);
       _drawSynergyAura(game.playerX + 8, game.playerY);
+      _drawPerkDots(game.playerX - 8, game.playerY);
+      _drawPerkDots(game.playerX + 8, game.playerY);
       ctx.save();
       ctx.translate(game.playerX - 8, game.playerY);
       ctx.rotate(tiltRad);
@@ -11776,6 +11796,7 @@ function drawGameplay() {
     } else {
       drawShipTraitAura(game.playerX, game.playerY, selectedShip);
       _drawSynergyAura(game.playerX, game.playerY);
+      _drawPerkDots(game.playerX, game.playerY);
       ctx.save();
       ctx.translate(game.playerX, game.playerY);
       ctx.rotate(tiltRad);
