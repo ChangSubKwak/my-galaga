@@ -9343,6 +9343,15 @@ function checkStageComplete() {
             if (game.zenStreak === 3) unlockAchievement('noDie3');
             if (game.zenStreak === 10) unlockAchievement('perfectRun');
             if (game.lives === 1) unlockAchievement('comeback');
+            // MARATHON BANNER — gold banner at no-death streak milestones
+            if (game.zenStreak === 5 || game.zenStreak === 10 || game.zenStreak === 20) {
+              game.floatTexts.push({
+                x: BASE_W/2, y: BASE_H/2 - 6, text: 'MARATHON x' + game.zenStreak,
+                color: '#fc4', life: 110, maxLife: 110, size: 12
+              });
+              spawnConfetti(10);
+              playSound('milestone');
+            }
           } else {
             game.zenStreak = 0;
           }
