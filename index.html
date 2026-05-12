@@ -6664,12 +6664,15 @@ function updatePowerUps() {
       // PERK 'scavenger' — timer pickups (T/R/W/H/L) last 1.5×. Applied at pickup
       // time so a non-scavenger run's timer can't be retro-extended by perk swap.
       const _scavMul = game.activePerk === 'scavenger' ? 1.5 : 1;
+      // PICKUP DURATION HINT — append "+Ns" so the player sees the actual seconds
+      // granted (especially valuable when scavenger perk is active for 9s timers).
+      const _durSec = (dur) => '+' + (Math.round(dur * _scavMul / 60)) + 's';
       if (p.type === 'T') {
         // Timed slow-bullet effect (refresh duration on re-pickup)
         const wasActive = (game.slowTimer || 0) > 0;
         game.slowTimer = Math.round(SLOW_DURATION * _scavMul);
         game.floatTexts.push({
-          x: p.x, y: p.y, text: wasActive ? 'SLOW REFRESHED' : 'SLOW TIME!',
+          x: p.x, y: p.y, text: (wasActive ? 'SLOW REFRESHED' : 'SLOW TIME!') + ' ' + _durSec(SLOW_DURATION),
           color, life: 60, maxLife: 60, size: 9
         });
         triggerWeaponCallout(color);
@@ -6678,7 +6681,7 @@ function updatePowerUps() {
         const wasActive = (game.rapidTimer || 0) > 0;
         game.rapidTimer = Math.round(RAPID_DURATION * _scavMul);
         game.floatTexts.push({
-          x: p.x, y: p.y, text: wasActive ? 'RAPID REFRESHED' : 'RAPID FIRE!',
+          x: p.x, y: p.y, text: (wasActive ? 'RAPID REFRESHED' : 'RAPID FIRE!') + ' ' + _durSec(RAPID_DURATION),
           color, life: 60, maxLife: 60, size: 9
         });
         triggerWeaponCallout(color);
@@ -6687,7 +6690,7 @@ function updatePowerUps() {
         const wasActive = (game.waveTimer || 0) > 0;
         game.waveTimer = Math.round(WAVE_DURATION * _scavMul);
         game.floatTexts.push({
-          x: p.x, y: p.y, text: wasActive ? 'WAVE REFRESHED' : 'WAVE SHOT!',
+          x: p.x, y: p.y, text: (wasActive ? 'WAVE REFRESHED' : 'WAVE SHOT!') + ' ' + _durSec(WAVE_DURATION),
           color, life: 60, maxLife: 60, size: 9
         });
         triggerWeaponCallout(color);
@@ -6696,7 +6699,7 @@ function updatePowerUps() {
         const wasActive = (game.homingTimer || 0) > 0;
         game.homingTimer = Math.round(HOMING_DURATION * _scavMul);
         game.floatTexts.push({
-          x: p.x, y: p.y, text: wasActive ? 'HOMING REFRESHED' : 'HOMING SHOT!',
+          x: p.x, y: p.y, text: (wasActive ? 'HOMING REFRESHED' : 'HOMING SHOT!') + ' ' + _durSec(HOMING_DURATION),
           color, life: 60, maxLife: 60, size: 9
         });
         triggerWeaponCallout(color);
@@ -6706,7 +6709,7 @@ function updatePowerUps() {
         const wasActive = (game.laserTimer || 0) > 0;
         game.laserTimer = Math.round(LASER_DURATION * _scavMul);
         game.floatTexts.push({
-          x: p.x, y: p.y, text: wasActive ? 'LASER REFRESHED' : 'LASER!',
+          x: p.x, y: p.y, text: (wasActive ? 'LASER REFRESHED' : 'LASER!') + ' ' + _durSec(LASER_DURATION),
           color, life: 60, maxLife: 60, size: 10
         });
         triggerWeaponCallout(color);
