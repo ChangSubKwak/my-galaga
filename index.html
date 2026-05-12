@@ -5053,6 +5053,13 @@ function startStage() {
   try {
     const _bid = typeof biomeForStage === 'function' ? biomeForStage(game.stage) : null;
     if (_bid) {
+      // BIOME VISIT COUNT — per-biome counter (write once per stage entry)
+      try {
+        const _bvRaw = localStorage.getItem('galagaBiomeVisits') || '{}';
+        const _bv = JSON.parse(_bvRaw);
+        _bv[_bid] = (_bv[_bid] || 0) + 1;
+        localStorage.setItem('galagaBiomeVisits', JSON.stringify(_bv));
+      } catch (e2) {}
       const sRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
       const arr = JSON.parse(sRaw);
       if (Array.isArray(arr) && arr.indexOf(_bid) < 0) {
@@ -17087,6 +17094,18 @@ function drawStatsOverlay() {
           const _tCol = (typeof ENEMY_INFO !== 'undefined' && ENEMY_INFO[_topT])
             ? ENEMY_INFO[_topT].col : '#fff';
           profileRow('TOP ENEMY', _topT.toUpperCase() + ' x' + fmtScore(_topC), _tCol);
+        }
+      } catch (e) {}
+      // TOP BIOME — most-visited biome across all runs
+      try {
+        const _bvRaw = localStorage.getItem('galagaBiomeVisits') || '{}';
+        const _bv = JSON.parse(_bvRaw);
+        let _tB = null, _tBC = 0;
+        for (const _k in _bv) {
+          if ((_bv[_k] || 0) > _tBC) { _tBC = _bv[_k]; _tB = _k; }
+        }
+        if (_tB && _tBC >= 3 && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_tB]) {
+          profileRow('TOP BIOME', BIOME_NAMES[_tB].label + ' x' + _tBC, BIOME_NAMES[_tB].col);
         }
       } catch (e) {}
       // TOP PERK — most-picked perk across all runs (single-line preview).
