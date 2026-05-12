@@ -4872,6 +4872,24 @@ function startStage() {
     if (typeof playSound === 'function') playSound('milestone');
     if (typeof spawnConfetti === 'function') spawnConfetti(12);
   }
+  // NEW PB STAGE BANNER — when entering a stage exceeding lifetime best across
+  // both normal and challenge modes (one-shot per run via _stagePbFired flag).
+  if (!game._stagePbFired) {
+    try {
+      const _csN = loadCumStats(false);
+      const _csC = loadCumStats(true);
+      const _bestEver = Math.max(_csN.bestStage || 0, _csC.bestStage || 0);
+      if (_bestEver > 0 && game.stage > _bestEver) {
+        game._stagePbFired = true;
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 64, text: 'NEW DEEPEST STAGE',
+          color: '#fc4', life: 120, maxLife: 120, size: 8
+        });
+        if (typeof playSound === 'function') playSound('milestone');
+        if (typeof spawnConfetti === 'function') spawnConfetti(8);
+      }
+    } catch (e) {}
+  }
   // BIOME EXPLORATION — track biome IDs the player has visited across all runs
   // for PROFILE + STAGE_INTRO "N/8" stat. Single-write per stage entry.
   try {
