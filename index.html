@@ -10028,6 +10028,14 @@ function checkStageComplete() {
           if (game.stageShotsFired >= 10 && game.stageShotsHit === game.stageShotsFired && !game.stageDied) {
             unlockAchievement('perfectStage');
             if (game.stage + 1 >= 10) unlockAchievement('pacifist10');
+            // PERFECT ACCURACY BANNER — 100% hit rate (10+ shots) recognition
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 + 80,
+              text: 'PERFECT AIM', color: '#0ff',
+              life: 90, maxLife: 90, size: 9
+            });
+            if (typeof spawnConfetti === 'function') spawnConfetti(10);
+            if (typeof playSound === 'function') playSound('milestone');
           }
           if (game.stage + 1 >= 10) unlockAchievement('veteran');
           if (game.stage + 1 >= 10 && difficultyMode === 'hard') unlockAchievement('hardcoreFan');
