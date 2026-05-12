@@ -3805,7 +3805,9 @@ function setupChallengingStage() {
   }
 
   const baseSpeed = 1.5 + game.stage * 0.05;
-  const GROUP_SIZE = 8;
+  // CHALLENGE DEPTH SCALING — base group size 8 enemies, +1 at stage 20+,
+  // +2 at stage 40+. Adds 16 → 18-20 enemies per wave at deeper stages.
+  const GROUP_SIZE = 8 + (game.stage >= 40 ? 2 : game.stage >= 20 ? 1 : 0);
 
   for (let w = 0; w < numWaves; w++) {
     const pattern = patternOrder[w];
