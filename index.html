@@ -12612,6 +12612,19 @@ function drawStageIntro() {
     ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
     ctx.restore();
   }
+  // BIOME EDGE PULSE — first 30 frames of intro paint biome-colored 1px
+  // left/right edges to extend the warp identity into the intro proper.
+  if (introElapsed < 30 && typeof biomeForStage === 'function') {
+    const _bidE = biomeForStage(game.stage || 1);
+    if (_bidE && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_bidE]) {
+      ctx.save();
+      ctx.globalAlpha = (1 - introElapsed / 30) * 0.4;
+      ctx.fillStyle = BIOME_NAMES[_bidE].col;
+      ctx.fillRect(0, 0, 1, BASE_H);
+      ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
+      ctx.restore();
+    }
+  }
   // STAGE TYPE BG TINT — faint 4-frame edge band by stage type so the player
   // instantly reads what kind of stage is starting. Boss/challenge get the
   // tint; normal stages stay clean (no distraction).
