@@ -12195,6 +12195,10 @@ function drawStageIntro() {
     if (game.stats && (game.stats.kills || 0) >= 10) {
       drawRetroText('K x' + game.stats.kills, BASE_W - 4, BASE_H/2 + 23, 4, '#f88', 'right');
     }
+    // PERFECT WAVES PEEK — count of no-escape challenge waves this run.
+    if ((game.perfectWavesRun || 0) >= 1) {
+      drawRetroText('PW x' + game.perfectWavesRun, BASE_W - 4, BASE_H/2 + 29, 4, '#fc4', 'right');
+    }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
     {
