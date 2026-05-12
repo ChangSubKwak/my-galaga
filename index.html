@@ -11484,6 +11484,13 @@ function drawTitleScreen() {
       drawRetroText('ALL SHIPS', BASE_W/2, 46, 4, '#0cf', 'center');
     }
   } catch (e) {}
+  // ALL DIFFICULTIES USED BADGE — if user has tried easy/normal/hard, show.
+  try {
+    const _difsUsed = JSON.parse(localStorage.getItem('galagaDifficultiesUsed') || '[]');
+    if (Array.isArray(_difsUsed) && _difsUsed.length >= 3) {
+      drawRetroText('ALL DIFFICULTIES', BASE_W/2, 51, 4, '#f88', 'center');
+    }
+  } catch (e) {}
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
