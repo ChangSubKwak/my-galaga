@@ -5187,12 +5187,38 @@ function initInput() {
             tally[perkId] = (tally[perkId] || 0) + 1;
             localStorage.setItem('galagaPerkPicks', JSON.stringify(tally));
           } catch (e) {}
+          // PERK ACTIVATION CINEMATIC — name + desc + shockwave + confetti
+          // burst centered on screen. Marks the moment of strategy commitment.
+          const _perk = PERKS[perkId];
           game.floatTexts.push({
-            x: BASE_W/2, y: BASE_H/2 - 20,
-            text: 'PERK: ' + PERKS[perkId].name,
-            color: PERKS[perkId].col, life: 60, maxLife: 60, size: 10
+            x: BASE_W/2, y: BASE_H/2 - 26,
+            text: 'PERK ACQUIRED',
+            color: '#fff', life: 70, maxLife: 70, size: 6
           });
-          playSound('powerUp');
+          game.floatTexts.push({
+            x: BASE_W/2, y: BASE_H/2 - 14,
+            text: _perk.name,
+            color: _perk.col, life: 80, maxLife: 80, size: 12
+          });
+          if (_perk.desc) {
+            game.floatTexts.push({
+              x: BASE_W/2, y: BASE_H/2 - 2,
+              text: _perk.desc,
+              color: '#aaa', life: 80, maxLife: 80, size: 5
+            });
+          }
+          if (game.shockwaves) {
+            game.shockwaves.push({
+              x: BASE_W/2, y: BASE_H/2 - 14,
+              life: 0, maxLife: 30, maxR: 50,
+              color: _perk.col
+            });
+          }
+          if (typeof spawnConfetti === 'function') spawnConfetti(10);
+          game.flashTimer = Math.max(game.flashTimer || 0, 6);
+          game.flashColor = _perk.col;
+          playSound('milestone');
+          rumble(220, 0.6, 0.4);
           return;
         }
       }
