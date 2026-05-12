@@ -16063,7 +16063,12 @@ function drawGameOverScreen() {
   }
   // MULTIKILL BEST — biggest same-frame kill count this run
   if (tTime >= 1 && (game.multiKillBest || 0) >= 3) {
-    drawRetroText('MULTIKILL x' + game.multiKillBest, BASE_W/2 - 30, cy + 82, 4, '#fc4');
+    const _mkb = game.multiKillBest;
+    const _mkN = _mkb >= 8 ? ' OCTOKILL'
+              : _mkb >= 5 ? ' OVERKILL'
+              : _mkb >= 3 ? ' TRIPLE'
+              : '';
+    drawRetroText('MULTIKILL x' + _mkb + _mkN, BASE_W/2 - 30, cy + 82, 4, '#fc4');
   }
   // LASER PIERCE BEST — biggest single-bullet pierce count this run
   if (tTime >= 1 && (game.laserPierceBest || 0) >= 3) {
