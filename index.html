@@ -16017,6 +16017,24 @@ function drawGameOverScreen() {
   if (tTime >= 1 && (game.extraShipsRun || 0) >= 1) {
     drawRetroText('+' + game.extraShipsRun + ' SHIPS EARNED', BASE_W/2, cy + 70, 4, '#ff4');
   }
+  // MAX CORRUPTION REACHED — translate maxStage to corruption tier
+  if (tTime >= 1) {
+    const _msC = (s.maxStage || 0);
+    const _maxCorr = _msC >= 80 ? 100
+                  : _msC >= 70 ? 80
+                  : _msC >= 60 ? 65
+                  : _msC >= 50 ? 45
+                  : _msC >= 40 ? 25
+                  : _msC >= 30 ? 10 : 0;
+    if (_maxCorr >= 10) {
+      const _mcTier = _maxCorr >= 95 ? 'OBLIVION'
+                   : _maxCorr >= 75 ? 'NULL'
+                   : _maxCorr >= 60 ? 'VOID'
+                   : _maxCorr >= 45 ? 'DEEP'
+                   : 'EDGE';
+      drawRetroText('CORR REACHED: ' + _mcTier, BASE_W/2, cy + 76, 4, '#f48');
+    }
+  }
   // TOP RUN ENEMY — most-killed type this run when meaningful
   if (tTime >= 1 && game.killsByTypeRun) {
     let _tT = null, _tC = 0;
