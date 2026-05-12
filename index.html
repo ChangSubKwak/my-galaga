@@ -2583,8 +2583,11 @@ function drawEnemyBullet(b) {
   const ux = -b.vx / sp, uy = -b.vy / sp;
   const C = BULLET_COLORS[b.kind] || BULLET_COLORS.dive;
   // When bullet density is high, render fewer trail echoes (perf)
-  // High stages get longer trails for visibility — but density cap still applies
+  // High stages get longer trails for visibility — but density cap still applies.
+  // Tiers: <25: 3 / 25-49: 4 / 50-74: 5 / 75+: 6 — readability at speed.
   const trailLen = (game.enemyBullets && game.enemyBullets.length >= 30) ? 1
+                  : (game.stage >= 75) ? 6
+                  : (game.stage >= 50) ? 5
                   : (game.stage >= 25) ? 4 : 3;
 
   ctx.save();
