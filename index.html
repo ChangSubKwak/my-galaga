@@ -11601,6 +11601,15 @@ function drawTitleScreen() {
       drawRetroText('PARRY MASTER', BASE_W/2, 71, 4, '#0cf', 'center');
     }
   } catch (e) {}
+  // COMBO LEGEND BADGE — galagaMaxComboEver >= 50
+  try {
+    const _cbEver = parseInt(localStorage.getItem('galagaMaxComboEver') || '0', 10) || 0;
+    if (_cbEver >= 50) {
+      const _clCol = _cbEver >= 100 ? '#fc4' : '#0ff';
+      const _clLabel = _cbEver >= 100 ? 'COMBO GOD' : 'COMBO LEGEND';
+      drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
+    }
+  } catch (e) {}
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
