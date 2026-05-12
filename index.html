@@ -453,6 +453,20 @@ function markDailyMissionDone() {
       if (total + 1 >= 30)  unlockAchievement('dailyMonth');
       if (total + 1 >= 100) unlockAchievement('dailyCentury');
     }
+    // DAILY MISSION MASTERY — record this mission type to a Set; unlock master
+    // achievement when all 11 mission types have been completed at least once.
+    const m = (typeof dailyMission === 'function') ? dailyMission() : null;
+    if (m && m.id) {
+      const tRaw = localStorage.getItem('galagaMissionTypesDone') || '[]';
+      const tArr = JSON.parse(tRaw);
+      if (Array.isArray(tArr) && tArr.indexOf(m.id) < 0) {
+        tArr.push(m.id);
+        localStorage.setItem('galagaMissionTypesDone', JSON.stringify(tArr));
+      }
+      if (Array.isArray(tArr) && tArr.length >= 11 && typeof unlockAchievement === 'function') {
+        unlockAchievement('dailyMaster');
+      }
+    }
     // DAILY MISSION STREAK — increment if last completion was yesterday, else
     // reset to 1. Stored separately from total to track *consecutive* days.
     const streakPrev = parseInt(localStorage.getItem('galagaDailyMissionStreak') || '0', 10) || 0;
@@ -6064,6 +6078,7 @@ const ACHIEVEMENTS = {
   dailyMonth:    { name: 'DAILY MONTH',     desc: 'Complete 30 daily missions' },
   dailyCentury:  { name: 'DAILY CENTURY',   desc: 'Complete 100 daily missions' },
   dailyStreak30: { name: 'MOON CYCLE',      desc: '30-day daily mission streak' },
+  dailyMaster:   { name: 'DAILY MASTER',    desc: 'Complete all 11 mission types' },
   wishHunter:    { name: 'WISH HUNTER',     desc: 'Shoot 10 golden shooting stars' },
   perfectChain:  { name: 'PERFECT CHAIN',   desc: 'Perfect stage streak ×5' },
   maxPowerThrice:{ name: 'POWER TRIAD',     desc: 'Reach MAX POWER 3 times total' },
@@ -14232,6 +14247,14 @@ function drawStatsOverlay() {
                     : dmTotal >= 30  ? '#0f8'
                     : dmTotal >= 10  ? '#f6f' : '#cfc';
         profileRow('DAILY MISSIONS', String(dmTotal), dmCol);
+      }
+      // MISSION VARIETY — count of unique mission types completed
+      const mtRaw = localStorage.getItem('galagaMissionTypesDone') || '[]';
+      const mtArr = JSON.parse(mtRaw);
+      const mtCount = Array.isArray(mtArr) ? mtArr.length : 0;
+      if (mtCount >= 1) {
+        profileRow('MISSION VARIETY', mtCount + ' / 11',
+                   mtCount === 11 ? '#fc4' : mtCount >= 7 ? '#0f8' : '#cce');
       }
       // DAILY MISSION STREAK — current consecutive-day streak + best
       const dmStreak = parseInt(localStorage.getItem('galagaDailyMissionStreak') || '0', 10);
