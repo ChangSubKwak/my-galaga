@@ -15779,6 +15779,22 @@ function drawGameOverScreen() {
   // Score color escalates as it counts up — yellow at high totals, magenta at 10M+
   const scCol = game.score >= 10000000 ? '#f6f' : game.score >= 1000000 ? COL.yellow : game.score >= 100000 ? '#ff8' : COL.white;
   drawRetroText(fmtScore(displayScore), BASE_W/2 + 40, cy - 12, 9, scCol, 'right');
+  // SCORE TIER LABEL — name tier based on final score
+  if (linearT >= 1) {
+    const _sT = game.score >= 10000000 ? 'LEGEND'
+              : game.score >= 1000000  ? 'PLATINUM'
+              : game.score >= 100000   ? 'GOLD'
+              : game.score >= 10000    ? 'SILVER'
+              : game.score >= 1000     ? 'BRONZE'
+              : null;
+    if (_sT) {
+      const _sTcol = game.score >= 10000000 ? '#f6f'
+                   : game.score >= 1000000  ? '#fc4'
+                   : game.score >= 100000   ? '#ff8'
+                   : game.score >= 10000    ? '#0ff' : '#0f8';
+      drawRetroText(_sT + ' TIER', BASE_W/2 - 40, cy - 4, 4, _sTcol, 'left');
+    }
+  }
   // SCORE PB COMPARE — when count finishes (linearT >=1) show 'NEW HIGH!' or 'HI: N'.
   if (linearT >= 1 && (game.highScore || 0) > 0) {
     if (game.score >= game.highScore) {
