@@ -17358,7 +17358,11 @@ function drawStatsOverlay() {
       const _dTot = (csN2.dashTotal || 0) + (csC2.dashTotal || 0);
       if (_dTot >= 10) {
         const _dCol = _dTot >= 1000 ? '#fc4' : _dTot >= 300 ? '#0ff' : _dTot >= 100 ? '#0f8' : '#cce';
-        profileRow('DASH TOTAL', String(_dTot), _dCol);
+        const _dN = _dTot >= 1000 ? ' NIMBLE'
+                  : _dTot >= 300  ? ' SWIFT'
+                  : _dTot >= 100  ? ' AGILE'
+                  : '';
+        profileRow('DASH TOTAL', String(_dTot) + _dN, _dCol);
       }
       // LIFETIME SCORE TOTAL — sum across both modes
       const _scTot = (csN2.scoreTotal || 0) + (csC2.scoreTotal || 0);
