@@ -12059,6 +12059,10 @@ function pickRunHighlights() {
   if (aceBest >= 3)       out.push({ label: 'ACE STREAK MAX', value: 'x' + aceBest,      prio: aceBest * 15, col: '#fc4' });
   const mkBest = game.multiKillBest || 0;
   if (mkBest >= 3)        out.push({ label: 'MULTIKILL MAX', value: 'x' + mkBest,        prio: mkBest * 20, col: '#fc4' });
+  const pwRun = game.perfectWavesRun || 0;
+  if (pwRun >= 1)         out.push({ label: 'PERFECT WAVES', value: String(pwRun),       prio: pwRun * 12, col: '#fc4' });
+  const ckRun = game.critKillsRun || 0;
+  if (ckRun >= 5)         out.push({ label: 'CRIT KILLS',    value: String(ckRun),       prio: ckRun * 5, col: '#fc4' });
   if (elites >= 1)        out.push({ label: 'ELITES SLAIN',  value: String(elites),       prio: elites * 18, col: '#f44' });
   if (stages >= 3)        out.push({ label: 'STAGES CLEARED', value: String(stages),     prio: stages * 8, col: '#fc4' });
   if (bosses >= 1)        out.push({ label: 'BOSSES DOWN',    value: String(bosses),     prio: bosses * 60, col: '#f8a' });
