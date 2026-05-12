@@ -17313,7 +17313,10 @@ function drawStatsOverlay() {
       const _apTot = (csN2.allPerfectStagesTotal || 0) + (csC2.allPerfectStagesTotal || 0);
       if (_apTot >= 1) {
         const _apCol = _apTot >= 10 ? '#fc4' : _apTot >= 3 ? '#0ff' : '#0f8';
-        profileRow('ALL-PERFECT STAGES', String(_apTot), _apCol);
+        const _apN = _apTot >= 10 ? ' ASCENDANT'
+                   : _apTot >= 3  ? ' FLAWLESS'
+                   : ' METICULOUS';
+        profileRow('ALL-PERFECT STAGES', String(_apTot) + _apN, _apCol);
       }
       // EXTRA SHIPS LIFETIME — extra lives earned across runs
       const _esTot = (csN2.extraShipsTotal || 0) + (csC2.extraShipsTotal || 0);
