@@ -11876,9 +11876,18 @@ function drawStageIntro() {
     const warpFade = 1 - introElapsed / 30;
     const cx = BASE_W / 2, cy = BASE_H / 2;
     ctx.save();
+    // WARP BIOME COLOR — at biome-active stages, streaks pick up biome col
+    // half the time (alternate i parity) so the warp reads as 'entering
+    // <biome>'. Fully white otherwise so stage 1-7 stays clean.
+    let _warpAlt = null;
+    if (typeof biomeForStage === 'function') {
+      const _bid = biomeForStage(game.stage || 1);
+      if (_bid && BIOME_NAMES && BIOME_NAMES[_bid]) _warpAlt = BIOME_NAMES[_bid].col;
+    }
     ctx.fillStyle = '#fff';
     // 24 radial streaks emanating from center
     for (let i = 0; i < 24; i++) {
+      if (_warpAlt) ctx.fillStyle = (i & 1) ? _warpAlt : '#fff';
       const ang = (i / 24) * Math.PI * 2;
       const rStart = 20 + introElapsed * 6;
       const rEnd   = rStart + 18;
