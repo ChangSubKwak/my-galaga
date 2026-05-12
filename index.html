@@ -5107,6 +5107,7 @@ function startStage() {
   game._openingSalvoFired = false;
   game._ultraParryFired = false;
   game.stageHitTaken = 0;
+  game.stageGhostKills = 0;
   game.stageCloseCount = 0;
   game.lastStandAnnounced = false;
 
@@ -8938,6 +8939,17 @@ function updateCollisions() {
               x: e.x, y: e.y - 12, text: 'GHOST KILL!',
               color: '#a8f', life: 50, maxLife: 50, size: 8
             });
+            // GHOST CHAIN — per-stage tally. 2nd+ ghost in same stage adds
+            // a +100 bonus and a "GHOST CHAIN x N" callout.
+            game.stageGhostKills = (game.stageGhostKills || 0) + 1;
+            if (game.stageGhostKills >= 2) {
+              addScore(100);
+              game.floatTexts.push({
+                x: BASE_W/2, y: BASE_H/2 - 14,
+                text: 'GHOST CHAIN x' + game.stageGhostKills,
+                color: '#a8f', life: 70, maxLife: 70, size: 9
+              });
+            }
             if (game.shockwaves) {
               game.shockwaves.push({ x: e.x, y: e.y, life: 0, maxLife: 18, maxR: 16, color: '#a8f' });
             }
