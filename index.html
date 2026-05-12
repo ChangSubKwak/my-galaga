@@ -11834,6 +11834,20 @@ function drawStageIntro() {
     const tier = Math.min(4, Math.floor((game.stage - 1) / 4));
     drawRetroText('TIER ' + tier, BASE_W - 4, BASE_H/2 - 22, 5, COL.gray, 'right');
   }
+  // RUN QUICK STATS — single-line summary of in-progress run shown at stage 2+.
+  // Combo / Score / Accuracy. Score-neutral context for player decisions.
+  if (slide >= 1 && game.stage >= 2) {
+    const _sc = game.score || 0;
+    const _cb = game.comboBest || 0;
+    const _accNum = (game.stats && game.stats.shotsFired)
+      ? Math.round((game.stats.shotsHit / game.stats.shotsFired) * 100) : 0;
+    const _scStr = _sc >= 1000 ? Math.round(_sc / 1000) + 'K' : String(_sc);
+    const _runLine = 'RUN  C×' + _cb + '  ' + _scStr + 'PT  ' + _accNum + '%';
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    drawRetroText(_runLine, BASE_W/2, BASE_H/2 + 32, 4, '#aaa');
+    ctx.restore();
+  }
   // ADAPTIVE TIP — surface skill hint based on first matching weakness check
   if (slide >= 1 && !isBoss && typeof STAGE_TIPS !== 'undefined' && introElapsed > 60) {
     let _tip = null;
