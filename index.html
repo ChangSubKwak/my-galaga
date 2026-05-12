@@ -11235,6 +11235,19 @@ function drawTitleScreen() {
     const sCol = challengeModeRequested ? COL.red : dailyModeRequested ? COL.green : COL.cyan;
     drawRetroText('PRESS SPACE TO START', BASE_W/2, 190, 8, sCol);
   }
+  // INPUT DEVICE ICON — detect gamepad / touch / keyboard at draw time.
+  // Small label corner-bottom-right. Defaults to KBD when no other signal.
+  {
+    let _dev = 'KBD';
+    if ('ontouchstart' in window) _dev = 'TCH';
+    try {
+      if (navigator.getGamepads) {
+        const _gps = navigator.getGamepads();
+        for (const _gp of _gps) { if (_gp) { _dev = 'GPD'; break; } }
+      }
+    } catch (e) {}
+    drawRetroText(_dev, BASE_W - 4, BASE_H - 4, 4, '#666', 'right');
+  }
   // TITLE TIPS ROTATION — bottom hint area cycles gameplay reminders every
   // 216 frames (3.6s). Hidden during callsign editor. Pure educational nudge.
   if (!callsignInput.active) {
