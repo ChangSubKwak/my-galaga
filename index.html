@@ -12266,6 +12266,12 @@ function drawStageIntro() {
   if (isBossNext && slide >= 1) {
     const blink = (game.animFrame >> 2) % 2 === 0;
     drawRetroText('BOSS NEXT', BASE_W/2, BASE_H - 38, 6, blink ? '#f44' : '#fff');
+    // BOSS NAME PREVIEW — surface upcoming boss name just below the BOSS NEXT
+    // tag so the player can mentally prep for the archetype/personality.
+    if (typeof bossNameFor === 'function') {
+      const _bn = bossNameFor(game.stage + 1);
+      if (_bn) drawRetroText(_bn, BASE_W/2, BASE_H - 30, 5, '#fc8');
+    }
   }
 
   // STAGE INTRO MARATHON PROGRESS — when no-death stage streak ≥ 2, show
