@@ -4931,6 +4931,21 @@ function startStage() {
     });
     if (typeof playSound === 'function') playSound('tick');
   }
+  // STAGE 80 FINAL APPROACH BANNER — last canonical boss stage. Special
+  // 'FINAL APPROACH' + 'STAGE 80' banner stack + extra confetti. Only fires
+  // when entering 80 fresh (not after dying mid-stage).
+  if (game.stage === 80 && !game._stage80Fired) {
+    game._stage80Fired = true;
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 - 70,
+      text: 'FINAL APPROACH',
+      color: '#fc4', life: 140, maxLife: 140, size: 8
+    });
+    if (typeof playSound === 'function') playSound('milestone');
+    if (typeof spawnConfetti === 'function') spawnConfetti(18);
+    game.flashTimer = Math.max(game.flashTimer || 0, 10);
+    game.flashColor = '#f44';
+  }
   // QUARTER MILESTONE BANNER — at stage 25/50/75 entry, brief gold banner +
   // milestone SFX. Marks the long-arc progression beyond the 10-stage boss cadence.
   if (game.stage === 25 || game.stage === 50 || game.stage === 75) {
