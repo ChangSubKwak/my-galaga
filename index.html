@@ -4975,6 +4975,15 @@ function startStage() {
       color: '#fc4', life: 90, maxLife: 90, size: 9
     });
   }
+  // NEXT MILESTONE NUDGE — when zenStreak is exactly 4/9/19 (one stage shy
+  // of 5/10/20 marathon awards), push a 'KEEP IT UP!' nudge.
+  if ([4, 9, 19].indexOf(game.zenStreak || 0) >= 0) {
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 + 60,
+      text: 'KEEP IT UP — NEXT IS MILESTONE',
+      color: '#fc4', life: 80, maxLife: 80, size: 5
+    });
+  }
   // NEW PB STAGE BANNER — when entering a stage exceeding lifetime best across
   // both normal and challenge modes (one-shot per run via _stagePbFired flag).
   if (!game._stagePbFired) {
