@@ -3597,12 +3597,14 @@ function createEnemy(type, col, row, overrideX, overrideY) {
   // hit reveals it. Awards 2× score on kill. Mutex with elite (one variant max).
   const isGhost = !isElite && stage >= 60 && Math.random() < 0.03;
   const baseHp = (type === 'boss' || type === 'shielded') ? 2 : 1;
+  const _maxHp = baseHp + (isElite ? 1 : 0);
   return {
     type, col, row,
     homeX: pos.x, homeY: pos.y,
     x: pos.x, y: pos.y,
     alive: true,
-    hp: baseHp + (isElite ? 1 : 0),
+    hp: _maxHp,
+    maxHp: _maxHp,
     elite: isElite,
     ghost: isGhost,
     state: 'formation', // formation, entering, diving, returning, capturing
@@ -12574,6 +12576,21 @@ function drawGameplay() {
         ctx.globalAlpha = 0.55;
         ctx.fillStyle = '#fff';
         ctx.fillRect(e.x, e.y, 1, 1);
+        ctx.restore();
+      }
+      // ENEMY MINI HP BAR — 1px bar above damaged multi-HP enemies. Shows
+      // remaining HP fraction. Only when maxHp > 1 AND hp < maxHp. Hidden for
+      // single-HP enemies and unhit multi-HP enemies (clean view).
+      if (e.maxHp && e.maxHp > 1 && e.hp > 0 && e.hp < e.maxHp) {
+        const _ratio = e.hp / e.maxHp;
+        const _bw = 12;
+        const _bx = e.x - _bw/2, _by = e.y - 12;
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = '#222';
+        ctx.fillRect(_bx, _by, _bw, 1);
+        ctx.fillStyle = _ratio > 0.5 ? '#0f8' : _ratio > 0.25 ? '#fc4' : '#f44';
+        ctx.fillRect(_bx, _by, Math.round(_bw * _ratio), 1);
         ctx.restore();
       }
       // ENEMY HIT FLASH — 4-frame white tint after non-fatal damage. Sits on top
