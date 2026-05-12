@@ -15234,6 +15234,11 @@ function drawHUD() {
       }
       ctx.restore();
       drawRetroText('→' + nextTier, 66, 45, 5, nextCol, 'left');
+      // ARSENAL TIER IMMINENT — within 3 combo of next tier, blink gold tag
+      if ((nextTier - game.combo) <= 3 && (nextTier - game.combo) > 0) {
+        const _aiB = (game.animFrame >> 2) % 2 === 0;
+        if (_aiB) drawRetroText('IMMINENT', 4, 53, 4, '#fc4', 'left');
+      }
     }
     // COMBO ARSENAL PROGRESS DOTS — 4-tier overview row (just below bar)
     // Claimed: filled gold/pink/cyan/white. Next-target: pulsing. Future: dim outline.
