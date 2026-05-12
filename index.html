@@ -8671,6 +8671,9 @@ function updateCollisions() {
             game._sameTypeStreak = 1;
             game._lastKillType = e.type;
           }
+          // KILLED TYPES SET — track unique types killed this run (for variety peek)
+          if (!game.killedTypes) game.killedTypes = new Set();
+          game.killedTypes.add(e.type);
           if (game._sameTypeStreak === 5 || game._sameTypeStreak === 10) {
             const _typeColors = {
               bee: '#fc4', butterfly: '#f48', boss: '#f8a', mirror: '#8ff',
@@ -12719,6 +12722,10 @@ function drawStageIntro() {
     // BOSS COUNT PEEK — bosses defeated this run.
     if ((game.bossesKilledThisRun || 0) >= 1) {
       drawRetroText('BS x' + game.bossesKilledThisRun, BASE_W - 4, BASE_H/2 + 77, 4, '#f8a', 'right');
+    }
+    // KILLED TYPES PEEK — unique enemy types killed this run (variety hunter)
+    if (game.killedTypes && game.killedTypes.size >= 3) {
+      drawRetroText('TYP ' + game.killedTypes.size, BASE_W - 4, BASE_H/2 + 83, 4, '#0cf', 'right');
     }
     // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
     // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
