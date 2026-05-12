@@ -16090,7 +16090,12 @@ function drawGameOverScreen() {
   }
   // OBJECTIVES MET — secondary objectives completed this run
   if (tTime >= 1 && (game.objectivesMetRun || 0) >= 1) {
-    drawRetroText('OBJ x' + game.objectivesMetRun, BASE_W/2 + 30, cy + 88, 4, '#0f8');
+    const _obj = game.objectivesMetRun;
+    const _objN = _obj >= 10 ? ' MASTERMIND'
+               : _obj >= 5  ? ' STRATEGIST'
+               : _obj >= 1  ? ' TACTICIAN'
+               : '';
+    drawRetroText('OBJ x' + _obj + _objN, BASE_W/2 + 30, cy + 88, 4, '#0f8');
   }
   // PARRY CHAIN BEST — best parry streak this run
   if (tTime >= 1 && (game.parryStreakBest || 0) >= 3) {
