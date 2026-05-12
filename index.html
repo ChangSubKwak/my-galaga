@@ -16818,7 +16818,15 @@ function drawStatsOverlay() {
     y += 8;
   }
 
-  row('SESSIONS',    String(cs.sessions || 0), COL.cyan);
+  {
+    const _ss = cs.sessions || 0;
+    const _ssTier = _ss >= 500 ? 'COMMITTED'
+                  : _ss >= 100 ? 'DEDICATED'
+                  : _ss >= 30  ? 'REGULAR'
+                  : _ss >= 5   ? 'PILOT'
+                  : '';
+    row('SESSIONS', _ss + (_ssTier ? ' ' + _ssTier : ''), COL.cyan);
+  }
   row('PLAY TIME',   playTime, '#fff');
   {
     const _tk = cs.kills || 0;
