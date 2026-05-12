@@ -7896,6 +7896,14 @@ function updateChallengeEnemies() {
         x: BASE_W - 18, y: 36, text: '+1',
         color: '#f6f', life: 30, maxLife: 30, size: 5
       });
+      // WAVE TRANSITION SHOCKWAVE — magenta expanding ring from center for a
+      // cinematic between-wave beat. Skipped on final wave (stage clear fanfare).
+      if (game.shockwaves) {
+        game.shockwaves.push({
+          x: BASE_W/2, y: BASE_H/2,
+          life: 0, maxLife: 18, maxR: 100, color: '#f6f'
+        });
+      }
     }
     game.challengeWaveIdx++;
     game.challengeWaveStartFrame = game.stageFrames; // mark start of next wave
