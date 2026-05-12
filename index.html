@@ -17406,7 +17406,11 @@ function drawStatsOverlay() {
         if (_runs >= 3) {
           const _avg = Math.round(_scTot / _runs);
           const _avgCol = _avg >= 100000 ? '#fc4' : _avg >= 50000 ? '#0ff' : _avg >= 20000 ? '#0f8' : '#cce';
-          profileRow('AVG / RUN', fmtScore(_avg), _avgCol);
+          const _avgN = _avg >= 100000 ? ' PRODIGY'
+                      : _avg >= 50000  ? ' STRONG'
+                      : _avg >= 20000  ? ' STEADY'
+                      : '';
+          profileRow('AVG / RUN', fmtScore(_avg) + _avgN, _avgCol);
         }
       }
       // PICKUP TYPE TOTALS — show top-collected pickup type (e.g., "TOP: S x42")
