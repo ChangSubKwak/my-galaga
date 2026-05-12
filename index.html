@@ -5412,6 +5412,7 @@ function initInput() {
     if (e.key === '`' || e.code === 'Backquote') {
       if (game) {
         game.cheatInvincible = !game.cheatInvincible;
+        if (game.cheatInvincible) game._cheatUsedAtAnyTime = true;
         game.floatTexts.push({
           x: BASE_W/2, y: 50, text: 'GOD MODE: ' + (game.cheatInvincible ? 'ON' : 'OFF'),
           color: game.cheatInvincible ? '#fc4' : COL.gray, life: 60, maxLife: 60, size: 9
@@ -16181,6 +16182,11 @@ function drawGameOverScreen() {
     }
     // PROFILE TAB HINT — gray reminder you can dive into stats from TITLE
     drawRetroText('TITLE → TAB PROFILE', BASE_W/2, cy + 60, 4, '#666');
+    // CHEAT-USED INDICATOR — surface honor flag when god mode was toggled on
+    // at any point during this run.
+    if (game._cheatUsedAtAnyTime) {
+      drawRetroText('(GOD MODE USED)', BASE_W/2, cy + 66, 4, '#a88');
+    }
     // Auto-retry countdown — always visible (no blink) so the second-counter doesn't jitter
     if (game.autoRestartTimer > 0) {
       const sec = Math.ceil(game.autoRestartTimer / 60);
