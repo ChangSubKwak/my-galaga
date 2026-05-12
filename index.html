@@ -17244,7 +17244,11 @@ function drawStatsOverlay() {
       const asBest = Math.max(csN2.aceStreakBest || 0, csC2.aceStreakBest || 0);
       if (asBest >= 3) {
         const asCol = asBest >= 15 ? '#fc4' : asBest >= 10 ? '#0ff' : asBest >= 5 ? '#0f8' : '#cce';
-        profileRow('ACE STREAK BEST', 'x' + asBest, asCol);
+        const _asN = asBest >= 15 ? ' ACE-LEGEND'
+                   : asBest >= 10 ? ' ACE-PRO'
+                   : asBest >= 5  ? ' VIRTUOSO'
+                   : '';
+        profileRow('ACE STREAK BEST', 'x' + asBest + _asN, asCol);
       }
       // LASER PIERCE BEST — max enemies pierced by a single laser bullet
       const lpBest = Math.max(csN2.laserPierceBest || 0, csC2.laserPierceBest || 0);
