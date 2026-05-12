@@ -11829,33 +11829,14 @@ function drawTitleScreen() {
       drawRetroText(_clLabel, BASE_W/2, 76, 4, _clCol, 'center');
     }
   } catch (e) {}
-  // COMPOSITE COMPLETION % — weighted aggregate of progression categories
-  // (biomes 8 / dex 8 / ships 4 / diffs 3 / perks 10 / achievements). Shown
-  // as 'CMPL N%' below the dots so the player sees one summary metric.
-  try {
-    const _bsC = JSON.parse(localStorage.getItem('galagaBiomesSeen') || '[]');
-    const _shC = JSON.parse(localStorage.getItem('galagaShipsUsed') || '[]');
-    const _dfC = JSON.parse(localStorage.getItem('galagaDifficultiesUsed') || '[]');
-    const _pkC = JSON.parse(localStorage.getItem('galagaPerkPicks') || '{}');
-    const _bs = Array.isArray(_bsC) ? Math.min(8, _bsC.length) : 0;
-    const _dx = (typeof dexUnlocked !== 'undefined') ? Math.min(8, dexUnlocked.size) : 0;
-    const _sh = Array.isArray(_shC) ? Math.min(4, _shC.length) : 0;
-    const _df = Array.isArray(_dfC) ? Math.min(3, _dfC.length) : 0;
-    let _pk = 0;
-    for (const _k in _pkC) if ((_pkC[_k] || 0) >= 1) _pk++;
-    _pk = Math.min((typeof PERK_IDS !== 'undefined' ? PERK_IDS.length : 10), _pk);
-    const _ach = (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements.size : 0;
-    const _achTot = (typeof ACHIEVEMENTS !== 'undefined') ? Object.keys(ACHIEVEMENTS).length : 60;
-    const _comp = Math.round((
-      (_bs / 8) + (_dx / 8) + (_sh / 4) + (_df / 3) +
-      (_pk / Math.max(1, (typeof PERK_IDS !== 'undefined' ? PERK_IDS.length : 10))) +
-      (_ach / Math.max(1, _achTot))
-    ) / 6 * 100);
+  // COMPOSITE COMPLETION % — weighted aggregate via shared helper.
+  if (typeof computeCompositeCompletion === 'function') {
+    const _comp = computeCompositeCompletion();
     if (_comp >= 5) {
       const _cmpCol = _comp >= 80 ? '#fc4' : _comp >= 50 ? '#0ff' : _comp >= 20 ? '#0f8' : '#888';
       drawRetroText('CMPL ' + _comp + '%', BASE_W/2, 94, 4, _cmpCol, 'center');
     }
-  } catch (e) {}
+  }
   // PERKS DOTS — 10 dots showing perks tried at least once (lifetime).
   try {
     const _pkRaw = localStorage.getItem('galagaPerkPicks') || '{}';
