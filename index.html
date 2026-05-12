@@ -11498,6 +11498,10 @@ function drawTitleScreen() {
       drawRetroText('ALL BIOMES', BASE_W/2, 56, 4, '#9ef', 'center');
     }
   } catch (e) {}
+  // BESTIARY COMPLETE BADGE — if dexUnlocked has all enemy types
+  if (typeof dexUnlocked !== 'undefined' && dexUnlocked.size >= 8) {
+    drawRetroText('BESTIARY', BASE_W/2, 61, 4, '#f6f', 'center');
+  }
   // Animated rainbow GALAGA logo with per-letter bobbing
   const letters = 'GALAGA'.split('');
   const palette = ['#f44', '#fa0', '#ff4', '#4f4', '#4af', '#f4f'];
