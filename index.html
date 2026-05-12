@@ -13066,6 +13066,17 @@ function drawStageIntro() {
     // CHALLENGE NEXT — next stage is a challenging stage (every 4 except boss)
     const _cnBlink = (game.animFrame >> 2) % 2 === 0;
     drawRetroText('CHALLENGE NEXT', BASE_W/2, BASE_H - 38, 5, _cnBlink ? '#f6f' : '#fff');
+  } else if (slide >= 1 && !isBoss && !isChallenge) {
+    // CHALLENGE-IN-N PEEK — when next challenge is 2-4 stages away, show small
+    // dim 'CHALL IN N' label. Helps planning + sustaining no-death runs.
+    let _cInN = 0;
+    for (let _s = game.stage + 1; _s < game.stage + 5; _s++) {
+      if (_s % BOSS_STAGE_INTERVAL === 0) break;
+      if (_s % 4 === 0) { _cInN = _s - game.stage; break; }
+    }
+    if (_cInN >= 2 && _cInN <= 4) {
+      drawRetroText('CHALL IN ' + _cInN, BASE_W/2, BASE_H - 38, 4, '#888');
+    }
   }
 
   // STAGE INTRO MARATHON PROGRESS — when no-death stage streak ≥ 2, show
