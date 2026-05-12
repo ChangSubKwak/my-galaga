@@ -16081,7 +16081,12 @@ function drawGameOverScreen() {
   }
   // ACE STREAK BEST — best S/A grade streak this run
   if (tTime >= 1 && (game.aceStreakBest || 0) >= 3) {
-    drawRetroText('ACE x' + game.aceStreakBest, BASE_W/2 - 30, cy + 88, 4, '#fc4');
+    const _asb = game.aceStreakBest;
+    const _asN = _asb >= 15 ? ' ACE-LEGEND'
+              : _asb >= 10 ? ' ACE-PRO'
+              : _asb >= 5  ? ' VIRTUOSO'
+              : '';
+    drawRetroText('ACE x' + _asb + _asN, BASE_W/2 - 30, cy + 88, 4, '#fc4');
   }
   // OBJECTIVES MET — secondary objectives completed this run
   if (tTime >= 1 && (game.objectivesMetRun || 0) >= 1) {
