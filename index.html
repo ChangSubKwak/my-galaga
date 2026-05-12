@@ -1991,6 +1991,18 @@ function drawStar(s) {
   // Far stars get a cooler tint to convey depth
   ctx.fillStyle = s.layer === 'far' ? '#9ac' : s.color;
   ctx.fillRect(s.x, s.y, 1, 1);
+  // BIOME STARFIELD TINT — near-layer stars overlay a faint biome color so the
+  // sky cohesion shifts with biome (ice = cool blue stars, corona = warm, etc.).
+  // Subtle: ~22% alpha additional fill on top of the base star pixel.
+  if (s.layer === 'near' && game && typeof biomeForStage === 'function') {
+    const _bid = biomeForStage(game.stage);
+    if (_bid && BIOME_NAMES[_bid]) {
+      ctx.globalAlpha = a * 0.22;
+      ctx.fillStyle = BIOME_NAMES[_bid].col;
+      ctx.fillRect(s.x, s.y, 1, 1);
+      ctx.globalAlpha = a;
+    }
+  }
   // HYPERSPACE STARS — near-layer stars get vertical trail at deep stages (30+).
   // Tier 1 (30-49): 1px tail / Tier 2 (50-69): 2px / Tier 3 (70+): 3px hyperspace.
   // Active only during gameplay states (TITLE / STAGE_INTRO stay clean).
