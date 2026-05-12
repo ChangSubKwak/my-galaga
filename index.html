@@ -2708,6 +2708,57 @@ let game, keys, stars;
 const STAR_COLORS = ['#fff', '#fff', '#fff', '#cef', '#fce', '#ffe', '#cff'];
 
 // Star layers — far is dim/slow, near is bright/fast; gives the field a sense of depth.
+// CONSTELLATION LINES — at stage 50+, occasional faint dashed line between
+// two nearby near-layer stars fades in/out for atmospheric mythology. Spawn
+// rolled every ~10s (600 frames); single active line at a time.
+let constellationLine = null;
+function maybeSpawnConstellation() {
+  if (!game || game.stage < 50) return;
+  if (constellationLine) return;
+  if (game.animFrame % 600 !== 0) return;
+  // Pick two near-layer stars
+  const nears = stars.filter(s => s.layer === 'near');
+  if (nears.length < 2) return;
+  const a = nears[Math.floor(Math.random() * nears.length)];
+  let b = a;
+  for (let tries = 0; tries < 8 && b === a; tries++) {
+    b = nears[Math.floor(Math.random() * nears.length)];
+  }
+  if (b === a) return;
+  // Skip if too far apart (avoid edge-to-edge)
+  const dx = a.x - b.x, dy = a.y - b.y;
+  if (Math.sqrt(dx*dx + dy*dy) > 80) return;
+  constellationLine = { ax: a.x, ay: a.y, bx: b.x, by: b.y, life: 0, maxLife: 90 };
+}
+function updateConstellation() {
+  if (!constellationLine) return;
+  constellationLine.life++;
+  if (constellationLine.life >= constellationLine.maxLife) constellationLine = null;
+}
+function drawConstellation() {
+  if (!constellationLine) return;
+  const cl = constellationLine;
+  const ratio = cl.life / cl.maxLife;
+  // Triangle alpha: ramp up first 30%, hold, ramp out last 30%
+  let alpha;
+  if (ratio < 0.3)      alpha = ratio / 0.3;
+  else if (ratio > 0.7) alpha = (1 - ratio) / 0.3;
+  else                  alpha = 1;
+  alpha *= 0.18;
+  ctx.save();
+  ctx.fillStyle = '#9ac';
+  const segs = 16;
+  for (let s = 0; s <= segs; s++) {
+    if ((s + (game.animFrame >> 2)) % 3 === 0) continue; // dashed flow
+    const t = s / segs;
+    const x = Math.round(cl.ax + (cl.bx - cl.ax) * t);
+    const y = Math.round(cl.ay + (cl.by - cl.ay) * t);
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  ctx.restore();
+}
+
 // DEEP SPACE DUST — drifting motes that subtly populate the background at high
 // stages, suggesting cosmic detritus. Lazy-init on first late-stage entry.
 let dustMotes = null;
@@ -9532,6 +9583,8 @@ function update() {
   pollGamepad();
   updateStars();
   updateDustMotes();
+  maybeSpawnConstellation();
+  updateConstellation();
   updateShake();
   if (volIndicatorTimer > 0) volIndicatorTimer--;
   // Gameplay-logic timers — frozen during PAUSED so post-respawn / dash iframes aren't
@@ -9993,6 +10046,8 @@ function draw() {
   for (const s of stars) drawStar(s);
   // DEEP SPACE DUST — drifting motes overlay (stage 50+)
   drawDustMotes();
+  // CONSTELLATION LINES — faint star connections (stage 50+, occasional)
+  drawConstellation();
   for (const ss of game.shootingStars) drawShootingStar(ss);
 
   // Apply screen shake
