@@ -13936,6 +13936,15 @@ function drawHUD() {
     const _shift = _corr >= 0.8 ? 1 : _corr >= 0.5 ? 2 : 3;
     const _blink = (game.animFrame >> _shift) % 2 === 0 ? '#f48' : '#fff';
     drawRetroText('CORR ' + _pct + '%', BASE_W - 5, 16, 4, _blink, 'right');
+    // CORRUPTION TIER NAME — narrative tier label below percent. Sells the
+    // 'how deep are you' progression beyond the number.
+    if (_corr >= 0.45) {
+      const _tier = _corr >= 0.95 ? 'OBLIVION'
+                  : _corr >= 0.75 ? 'NULL'
+                  : _corr >= 0.60 ? 'VOID'
+                  : 'DEEP';
+      drawRetroText(_tier, BASE_W - 5, 22, 4, '#f48', 'right');
+    }
   }
   // STAGE TIME CLOCK — real-time mm:ss.t timer + PB delta indicator. Only renders
   // during active gameplay states (no TITLE/INTRO/GAME_OVER pollution). Color shifts
