@@ -10142,6 +10142,27 @@ function spawnStageClear(label, sub) {
       color: '#fff', life: 90, maxLife: 90, size: 9
     });
   }
+  // LAST STAND — stage cleared with exactly 1 life remaining and didn't die.
+  // Adds drama to the win + small score bonus + lifetime counter.
+  if ((game.lives || 0) === 1 && !game.stageDied) {
+    addScore(200);
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 + 24, text: 'LAST STAND',
+      color: '#f44', life: 100, maxLife: 100, size: 11
+    });
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 + 36, text: '+200',
+      color: '#fff', life: 90, maxLife: 90, size: 6
+    });
+    game.flashTimer = Math.max(game.flashTimer || 0, 6);
+    game.flashColor = '#f44';
+    if (typeof rumble === 'function') rumble(320, 0.85, 0.5);
+    try {
+      const _ls = parseInt(localStorage.getItem('galagaLastStands') || '0', 10) || 0;
+      localStorage.setItem('galagaLastStands', String(_ls + 1));
+    } catch (e) {}
+    game.runLastStands = (game.runLastStands || 0) + 1;
+  }
   spawnConfetti(8);
   // STAGE CLEAR PLAYER CELEBRATION — visual reward AT the player ship: shockwave
   // ring + 8 radial spark particles + slight screen flash. Localizes the win.
@@ -17453,6 +17474,15 @@ function drawStatsOverlay() {
       const perfectClears = parseInt(localStorage.getItem('galagaPerfectClears') || '0', 10);
       if (perfectClears >= 1) {
         profileRow('PERFECT CLEARS', String(perfectClears), perfectClears >= 25 ? '#ff4' : '#fc8');
+      }
+      // LAST STANDS — lifetime count of 1-life-remaining stage clears
+      const lastStands = parseInt(localStorage.getItem('galagaLastStands') || '0', 10);
+      if (lastStands >= 1) {
+        const _lsTier = lastStands >= 25 ? ' UNDYING'
+                      : lastStands >= 10 ? ' DEFIANT'
+                      : '';
+        profileRow('LAST STANDS', String(lastStands) + _lsTier,
+                   lastStands >= 25 ? '#f44' : lastStands >= 10 ? '#fa8' : '#fc8');
       }
       // STAGE GRADES — lifetime tally of S/A/B/C/D letter grades. Surfaces S
       // (top-tier mastery: 95%+ acc + no-death + PB beat). Shown only when S ≥ 1.
