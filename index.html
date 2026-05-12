@@ -10489,10 +10489,23 @@ function draw() {
     ctx.globalAlpha = 0.55 * fadeIn;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, BASE_W, BASE_H);
+    // PERK SELECT URGENCY — pulse red border + edge bars when <1.5s remaining
+    if (remaining < 90) {
+      const urgPulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.4);
+      ctx.globalAlpha = 0.45 * urgPulse;
+      ctx.fillStyle = '#f44';
+      ctx.fillRect(0, 0, BASE_W, 3);
+      ctx.fillRect(0, BASE_H - 3, BASE_W, 3);
+      ctx.fillRect(0, 0, 3, BASE_H);
+      ctx.fillRect(BASE_W - 3, 0, 3, BASE_H);
+      // Tick sfx every 30 frame
+      if (game.animFrame % 30 === 0 && typeof playSound === 'function') playSound('tick');
+    }
     ctx.globalAlpha = fadeIn;
-    drawRetroText('CHOOSE A PERK', BASE_W/2, 70, 11, '#fc4');
+    const titleCol = remaining < 90 ? '#f44' : '#fc4';
+    drawRetroText('CHOOSE A PERK', BASE_W/2, 70, 11, titleCol);
     const sec = Math.ceil(remaining / 60);
-    drawRetroText(sec + 'S', BASE_W/2, 84, 6, COL.gray);
+    drawRetroText(sec + 'S', BASE_W/2, 84, 6, remaining < 90 ? '#f44' : COL.gray);
     // 3 cards
     const cardW = 64, cardH = 60, gap = 6;
     const totalW = cardW * 3 + gap * 2;
