@@ -10974,6 +10974,22 @@ function draw() {
   // black hole). Layered ABOVE nebula so it reads as foreground geography, BELOW stars
   // so the starfield still twinkles through. Stage-tier driven, see biomeForStage.
   drawBiome();
+  // DRIFT EMBERS — at stage 50+, slow upward red/orange particles drift across
+  // screen to amplify the deep-territory pressure. Deterministic positions
+  // derived from animFrame so they self-reset cleanly on state change.
+  if ((game.stage || 0) >= 50
+      && game.state !== STATE.PAUSED && game.state !== STATE.TITLE && game.state !== STATE.GAME_OVER) {
+    const _emT = game.animFrame;
+    ctx.save();
+    for (let _ei = 0; _ei < 5; _ei++) {
+      const _ex = ((_ei * 53 + _emT * 0.05) % BASE_W);
+      const _ey = (BASE_H - ((_ei * 71 + _emT * 0.25) % (BASE_H + 20)));
+      ctx.globalAlpha = 0.30 + 0.15 * Math.sin((_emT + _ei * 17) * 0.04);
+      ctx.fillStyle = _ei % 2 === 0 ? '#f80' : '#f44';
+      ctx.fillRect(Math.round(_ex), Math.round(_ey), 1, 1);
+    }
+    ctx.restore();
+  }
   // AMBIENT EVENTS — narrative one-shots (cargo ship traversal, supernova flash).
   // Drawn after biome but before aurora/stars so engine glow / silhouette read clearly.
   drawAmbientEvent();
