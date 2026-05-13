@@ -1691,6 +1691,41 @@ function drawGoldenBee(x, y, frame) {
 }
 
 // Mirror clone — ghostly cyan copy of the player ship that tracks mirrored x.
+// WARPER — purple teleporter variant. Has a swirl body that fades during warp.
+// warpFade param 0 = solid, 1 = fully faded out (during teleport). Drawn as a
+// triangular hull with orbiting dots — distinct from other enemy silhouettes.
+function drawWarper(x, y, frame, warpFade) {
+  const t = (frame || 0);
+  ctx.save();
+  ctx.translate(x, y);
+  // Fade ALL strokes uniformly while warping. Solid most of the time.
+  const _alpha = warpFade > 0 ? Math.max(0.10, 1 - warpFade) : 1;
+  ctx.globalAlpha = _alpha;
+  // Purple aura ring (subtle, pulses)
+  ctx.fillStyle = '#a0f';
+  const pulse = (Math.sin(performance.now() * 0.006) + 1) * 0.5;
+  ctx.globalAlpha = _alpha * (0.18 + 0.20 * pulse);
+  ctx.fillRect(-9, -8, 18, 16);
+  ctx.globalAlpha = _alpha;
+  // Body — triangular hull
+  ctx.fillStyle = '#c4f';
+  ctx.fillRect(-1, -7, 2, 2);   // top tip
+  ctx.fillRect(-3, -5, 6, 2);
+  ctx.fillRect(-5, -3, 10, 4);
+  ctx.fillRect(-7, 1, 14, 2);   // wide bottom
+  // Inner core (lighter)
+  ctx.fillStyle = '#fcf';
+  ctx.fillRect(-1, -3, 2, 4);
+  // Orbiting pair of dots (warp indicator)
+  ctx.fillStyle = '#ff8';
+  const orbA = t * 0.25;
+  const ox = Math.cos(orbA) * 7;
+  const oy = Math.sin(orbA) * 4;
+  ctx.fillRect(Math.round(ox) - 1, Math.round(oy) - 1, 2, 2);
+  ctx.fillRect(Math.round(-ox) - 1, Math.round(-oy) - 1, 2, 2);
+  ctx.restore();
+}
+
 function drawMirror(x, y, frame) {
   const t = performance.now() * 0.008;
   ctx.save();
@@ -3894,8 +3929,15 @@ function createFormation() {
   game.formationVariant = pickFormationVariant();
   const shieldChance = game.stage >= 7 ? Math.min(0.30, (game.stage - 6) * 0.06) : 0;
   const splitterChance = game.stage >= 5 ? Math.min(0.25, (game.stage - 4) * 0.05) : 0;
-  const pickButterfly = () => Math.random() < shieldChance ? 'shielded' : 'butterfly';
-  const pickBee = () => Math.random() < splitterChance ? 'splitter' : 'bee';
+  // WARPER chance — starts stage 8, scales up to ~20% by stage 15. Replaces a
+  // small fraction of butterfly/bee picks so total enemy count stays stable.
+  const warperChance = game.stage >= 8 ? Math.min(0.20, (game.stage - 7) * 0.03) : 0;
+  const pickButterfly = () => Math.random() < warperChance ? 'warper'
+                            : Math.random() < shieldChance ? 'shielded'
+                            : 'butterfly';
+  const pickBee = () => Math.random() < (warperChance * 0.6) ? 'warper'
+                      : Math.random() < splitterChance ? 'splitter'
+                      : 'bee';
 
   if (game.formationVariant === 'grid') {
     // Row 0: 4 bosses
@@ -5786,6 +5828,7 @@ function getEnemyPoints(type, inFormation) {
     case 'butterfly': return inFormation ? 80 : 160;
     case 'boss': return inFormation ? 150 : 400;
     case 'kamikaze': return 200;
+    case 'warper': return inFormation ? 200 : 350;
     case 'splitter': return inFormation ? 100 : 200;
     case 'minibee': return 30;
     case 'shielded': return inFormation ? 120 : 240;
@@ -6602,6 +6645,7 @@ const ENEMY_INFO = {
   ufo:        { name: 'UFO',         trait: 'RARE, SLOW HORIZONTAL — BIG PTS',col: '#0ef' },
   hoverer:    { name: 'HOVERER',     trait: 'SUSPENDED MID-AIR, AIMED FIRE',  col: '#aaa' },
   kamikaze:   { name: 'KAMIKAZE',    trait: 'NO PATTERN — RAMS PLAYER',       col: '#f44' },
+  warper:     { name: 'WARPER',      trait: 'TELEPORTS WHILE DIVING — 350 PTS', col: '#a0f' },
   goldenBee:  { name: 'GOLDEN BEE',  trait: 'RARE — METEOR SHOWER ON KILL',   col: '#fc4' },
   minibee:    { name: 'MINIBEE',     trait: 'SPLITTER FRAGMENT — WEAK',       col: '#fa0' }
 };
@@ -8322,6 +8366,48 @@ function updateEnemies() {
         e.x += e.evadeOffsetX;
         e.evadeOffsetX *= 0.92;
         if (Math.abs(e.evadeOffsetX) < 0.1) e.evadeOffsetX = 0;
+      }
+      // WARPER teleport — purple variant warps to a random nearby x position
+      // (±20-50px) every ~120 frames during dive. warpFade ramps 0→1→0 over
+      // 24 frames: fade out for 12, swap position at midpoint, fade in 12.
+      if (e.type === 'warper') {
+        if (!e.warpTimer) e.warpTimer = 60 + Math.floor(Math.random() * 60);
+        e.warpTimer--;
+        if (e.warpTimer === 12) {
+          // Mid-warp: spawn purple flash + 6 spark, swap x position
+          for (let _k = 0; _k < 6; _k++) {
+            const _a = (_k / 6) * Math.PI * 2;
+            game.itemBursts.push({
+              x: e.x + Math.cos(_a) * 8,
+              y: e.y + Math.sin(_a) * 8,
+              life: -_k, color: '#a0f'
+            });
+          }
+          const _dir = Math.random() < 0.5 ? -1 : 1;
+          const _dx = (20 + Math.random() * 30) * _dir;
+          e.x = Math.max(16, Math.min(BASE_W - 16, e.x + _dx));
+          // Path-segment progress invalidated by teleport — snap segment x to new pos
+          if (e.pathSegments && e.pathSegments[e.pathSegIndex]) {
+            const _seg = e.pathSegments[e.pathSegIndex];
+            const _shift = e.x - _seg.p3.x;
+            _seg.p2.x += _shift;
+            _seg.p3.x += _shift;
+          }
+        }
+        // Fade calculation: 0 at start, 1 at swap, 0 after
+        if (e.warpTimer > 12) {
+          e.warpFade = 0;
+        } else if (e.warpTimer > 0) {
+          // 12..0 → 1..0 (fading in after swap)
+          e.warpFade = e.warpTimer / 12;
+        } else {
+          e.warpFade = 0;
+          e.warpTimer = 90 + Math.floor(Math.random() * 60);
+        }
+        // Pre-warp fade (last 12 of timer before swap)
+        if (e.warpTimer <= 24 && e.warpTimer > 12) {
+          e.warpFade = (24 - e.warpTimer) / 12;
+        }
       }
       // Faint dive trail — sparse trailing particles every few frames
       if (e.diveTimer % 4 === 0 && Math.random() < 0.4) {
@@ -14249,6 +14335,7 @@ function drawGameplay() {
         case 'ufo': drawUFO(e.x, e.y, e.frame); break;
         case 'goldenBee': drawGoldenBee(e.x, e.y, e.frame); break;
         case 'mirror': drawMirror(e.x, e.y, e.frame); break;
+        case 'warper': drawWarper(e.x, e.y, e.frame, e.warpFade || 0); break;
         case 'hoverer': drawHoverer(e.x, e.y, e.frame); break;
         case 'boss':
           drawBoss(e.x, e.y, e.frame, e.hp < 2);
