@@ -12381,10 +12381,11 @@ function drawTitleScreen() {
     drawRetroText('PRESS SPACE TO START', BASE_W/2, 190, 8, sCol);
   }
   // LAST RUN SUMMARY — small one-line previous run summary at bottom-center
-  // so players can compare new attempts. Hidden when first ever run.
+  // so players can compare new attempts. Hidden when first ever run, or when
+  // daily mode is showing its extras at the bottom (which reuse this slot).
   try {
     const _lrRaw = localStorage.getItem('galagaLastRun');
-    if (_lrRaw && !callsignInput.active) {
+    if (_lrRaw && !callsignInput.active && !dailyModeRequested) {
       const _lr = JSON.parse(_lrRaw);
       if (_lr && _lr.stage > 0) {
         const _lrStr = 'LAST  S' + _lr.stage + '  ' + fmtScore(_lr.score) + '  C×' + _lr.combo;
@@ -12415,8 +12416,9 @@ function drawTitleScreen() {
     drawRetroText('♪ ' + bgmTrack.toUpperCase(), 4, BASE_H - 4, 4, '#555', 'left');
   }
   // TITLE TIPS ROTATION — bottom hint area cycles gameplay reminders every
-  // 216 frames (3.6s). Hidden during callsign editor. Pure educational nudge.
-  if (!callsignInput.active) {
+  // 216 frames (3.6s). Hidden during callsign editor and in daily mode (daily
+  // extras at y=266/272 reuse that slot).
+  if (!callsignInput.active && !dailyModeRequested) {
     const _titleTips = [
       'SHIFT TO DASH',
       'DASH THRU BULLETS = PARRY',
@@ -12435,7 +12437,7 @@ function drawTitleScreen() {
                   : 1;
     ctx.save();
     ctx.globalAlpha = _ttAlpha * 0.65;
-    drawRetroText(_titleTips[_ttIdx], BASE_W/2, 260, 5, '#888');
+    drawRetroText(_titleTips[_ttIdx], BASE_W/2, 266, 4, '#888');
     ctx.restore();
   }
   // PILOT CALLSIGN — shown below the title, swaps to live editor when active.
@@ -12459,25 +12461,17 @@ function drawTitleScreen() {
     }
     drawRetroText('UP DN  L R   ENTER OK   ESC', BASE_W/2, 244, 5, COL.gray);
   } else {
-    // PILOT block relocated ABOVE the TOP SCORES header (y=218). Previously
-    // PILOT at y=222 and U CHANGE at y=230 sat ON the leaderboard rows (which
-    // begin at y=226) and overlapped row #1 / row #2 text.
-    drawRetroText('PILOT [' + playerCallsign + ']', BASE_W/2, 204, 6, callsignColor());
-    if ((game.animFrame >> 5) % 2 === 0) {
-      drawRetroText('U CHANGE   O COLOR', BASE_W/2, 211, 4, COL.gray);
-    }
+    // PILOT line sits at y=208 between the mode-toggle row (y=200) and the
+    // R:START STAGE conditional row (y=216). U CHANGE/O COLOR hint removed —
+    // already cycles through the tips rotation at y=265.
+    drawRetroText('PILOT [' + playerCallsign + ']', BASE_W/2, 208, 6, callsignColor());
     // TIME-OF-DAY GREETING — small in-world salutation tied to the player's local
     // clock. Cycles between four watch windows so the title feels live across
     // a day cycle. Drawn faded grey so it sits as marginal flavor.
     {
-      const hour = new Date().getHours();
-      let greet;
-      if (hour < 5)        greet = 'NIGHT WATCH';
-      else if (hour < 12)  greet = 'MORNING WATCH';
-      else if (hour < 18)  greet = 'AFTERNOON SHIFT';
-      else if (hour < 23)  greet = 'EVENING WATCH';
-      else                 greet = 'DEEP NIGHT';
-      drawRetroText('— ' + greet + ' —', BASE_W/2, 238, 4, '#888');
+      // (Time-of-day greeting at y=238 removed — it landed inside the
+      // 5 leaderboard rows at y=230-258 and overlapped row #3 text.
+      // Greeting is already shown at top of screen at y=12.)
     }
   }
   // (First-time help nudge moved into the bottom controls hint to avoid overlapping top-score row 5)
@@ -12504,7 +12498,7 @@ function drawTitleScreen() {
   // Start-from-stage selector — only shown when at least one milestone has been cleared (compact, same row group)
   if (highestCheckpoint > 0) {
     const startCol = startStageRequested > 1 ? COL.yellow : COL.gray;
-    drawRetroText('R:START STAGE ' + startStageRequested, BASE_W/2, 208, 5, startCol);
+    drawRetroText('R:START STAGE ' + startStageRequested, BASE_W/2, 216, 4, startCol);
   }
   // Ship loadout indicator
   {
@@ -12564,48 +12558,37 @@ function drawTitleScreen() {
                   : showMode === 'challenge' ? 'TOP SCORES (CHALLENGE)'
                   : 'TOP SCORES';
   const topHeaderCol = showMode === 'daily' ? COL.green : COL.red;
-  drawRetroText(topHeader, BASE_W/2, 218, 6, topHeaderCol);
+  drawRetroText(topHeader, BASE_W/2, 222, 6, topHeaderCol);
   // DAILY MODIFIER preview — shows today's deterministic modifier so players know
   // what they're signing up for before pressing Start.
   if (dailyModeRequested) {
-    // Daily extras relocated to BELOW the TOP SCORES rows (which fill y=226-254)
-    // to avoid the previous overlap with the header (y=218) and row #1/#2.
-    // Re-derive without game context (TITLE)
+    // Daily extras live BELOW the score rows (which now end at y=258) and
+    // replace the tips rotation slot. Two compact rows so no overlap with
+    // mode toggles (y=200), PILOT (y=208), or TOP SCORES header (y=222).
     const seed = (typeof dailySeed === 'function' ? dailySeed() : 0) | 0;
     const dailyMod = STAGE_MUTATIONS[seed % STAGE_MUTATIONS.length];
-    // STREAK / TODAY block sits at y=197 (above PRESS SPACE-adjacent area)
     const streak = computeDailyStreak();
     if (streak >= 1) {
       const streakCol = streak >= 30 ? '#fc4' : streak >= 7 ? '#0f8' : '#cfc';
-      drawRetroText('STREAK ' + streak + 'D', BASE_W/2 - 40, 197, 4, streakCol, 'center');
+      drawRetroText('STREAK ' + streak + 'D', BASE_W/2 - 50, 266, 4, streakCol, 'center');
     }
     if (dailyMod) {
       const blink = (game.animFrame >> 3) % 2 === 0 ? dailyMod.color : '#fff';
-      drawRetroText('TODAY ' + dailyMod.label, BASE_W/2 + 16, 197, 4, blink, 'center');
+      drawRetroText('TODAY ' + dailyMod.label, BASE_W/2 + 20, 266, 4, blink, 'center');
     }
-    // SEED / MISSION / RESET below the score rows (y=226-254 end)
     if (typeof dailySeedCode === 'function') {
-      drawRetroText('SEED ' + dailySeedCode(), BASE_W/2 - 40, 261, 4, '#f6f', 'center');
+      drawRetroText('SEED ' + dailySeedCode(), BASE_W/2 - 50, 272, 4, '#f6f', 'center');
     }
     if (typeof dailyMission === 'function') {
       const m = dailyMission();
       const done = (typeof isDailyMissionDoneToday === 'function') && isDailyMissionDoneToday();
       const mLabel = (done ? 'DONE ' : 'GOAL ') + m.label;
       const mCol = done ? '#0f8' : '#fc4';
-      drawRetroText(mLabel, BASE_W/2 + 20, 261, 4, mCol, 'center');
-    }
-    {
-      const _now = new Date();
-      const _next = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() + 1, 0, 0, 0, 0);
-      const _ms = _next.getTime() - _now.getTime();
-      const _hr = Math.floor(_ms / 3600000);
-      const _mn = Math.floor((_ms % 3600000) / 60000);
-      const _cdStr = 'RESET ' + _hr + 'H' + String(_mn).padStart(2, '0');
-      drawRetroText(_cdStr, BASE_W/2, 267, 3, '#888');
+      drawRetroText(mLabel, BASE_W/2 + 20, 272, 4, mCol, 'center');
     }
   }
   const topList = loadTopScores(showMode);
-  const startY = 226;
+  const startY = 230;
   for (let i = 0; i < 5; i++) {
     const e = topList[i];
     const rowY = startY + i * 7;
