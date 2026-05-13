@@ -2425,31 +2425,9 @@ function drawPlayerBullet(x, y, lvl, kind) {
 // Power-up capsule — gem orb with halo, type icon, and orbiting sparkle
 function drawPowerUp(p) {
   const x = p.x, y = p.y, t = game.animFrame;
-  // DESPAWN WARNING — when pickup is in last 30px of falling, blink a red
-  // 5px ring outline so the player feels the urgency to intercept.
-  if (y > BASE_H - 30 && y < BASE_H) {
-    const _dwBlink = (t >> 1) % 2 === 0;
-    if (_dwBlink) {
-      ctx.save();
-      ctx.globalAlpha = 0.7;
-      ctx.strokeStyle = '#f88';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(x, y, 6, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-  // RARE LABEL — small blinking "RARE" tag above L/B/E pickups. Visual hint
-  // so high-value drops aren't missed in chaos. Skipped when pickup is near
-  // the top of the screen (would clip out of view).
-  if ((p.type === 'L' || p.type === 'B' || p.type === 'E') && y > 12) {
-    const _rBlink = (t >> 2) % 2 === 0;
-    if (_rBlink) {
-      const _rCol = p.type === 'L' ? '#f6c' : p.type === 'B' ? '#f44' : '#4f8';
-      drawRetroText('RARE', x, y - 8, 4, _rCol, 'center');
-    }
-  }
+  // (Blinking RARE label and despawn-warning ring removed in cleanup pass —
+  // both contributed to the heavy blink that disturbed gameplay reads.
+  // Existing trail + miss-floor sparks still telegraph the pickup falling.)
   // POWERUP PROXIMITY GLOW — small pulsing ring when player is within 30px.
   // Helps targeting under bullet pressure. Skipped if magnetic perk active
   // (its own dashed-line aura already telegraphs proximity).
@@ -12193,12 +12171,10 @@ function drawTitleScreen() {
     const _lr = Math.max(_csNp.longestRun || 0, _csCp.longestRun || 0);
     const _trophies = [];
     if (_gcCnt > 0) {
-      const _gcBlink = (t >> 3) % 4 !== 0 ? '#fc4' : '#ff8';
-      _trophies.push({ text: _gcCnt >= 5 ? '★3' : _gcCnt >= 2 ? '★2' : '★', col: _gcBlink });
+      _trophies.push({ text: _gcCnt >= 5 ? '★3' : _gcCnt >= 2 ? '★2' : '★', col: '#fc4' });
     }
     if (_achAll) {
-      const _achBlink = (t >> 2) % 4 !== 0 ? '#fc4' : '#ff8';
-      _trophies.push({ text: '100%', col: _achBlink });
+      _trophies.push({ text: '100%', col: '#fc4' });
     }
     if (_psPm >= 10) _trophies.push({ text: 'PM', col: '#0cf' });
     if (_cbEver >= 50) _trophies.push({ text: _cbEver >= 100 ? 'CG' : 'CL', col: _cbEver >= 100 ? '#fc4' : '#0ff' });
@@ -14852,14 +14828,9 @@ function drawLastEnemyAlert() {
   // Only when formation is fully entered to avoid alerting during entrance
   if (!game.allEntered) return;
   const alive = (game.enemies || []).filter(e => e.alive);
-  // STAGE END COUNTDOWN — when 2-5 enemies remain, show small "N LEFT" tag
-  // top-center so the player can plan their last sweeps. Skipped at 1 (LAST!
-  // takes over) and >5 (too early to nudge).
-  if (alive.length >= 2 && alive.length <= 5) {
-    const _cBlink = (game.animFrame >> 3) % 2 === 0;
-    drawRetroText(alive.length + ' LEFT', BASE_W/2, BASE_H - 24, 5,
-                  _cBlink ? '#fc8' : '#fff', 'center');
-  }
+  // (STAGE END COUNTDOWN "N LEFT" removed in HUD cleanup. Top progress bar
+  // already encodes how many enemies remain. The 1-enemy LAST! ring + label
+  // below still fires as the final-kill signal.)
   if (alive.length !== 1) return;
   const e = alive[0];
   const t = game.animFrame;
@@ -14971,25 +14942,9 @@ function drawCrown(x, y, color) {
 }
 
 function drawHUD() {
-  // BULLET HELL EDGE WARNING — pulsing red top/bottom bands when enemy bullet
-  // count is high. Reads as "screen pressure" — pushes player to evade/clear.
-  // Threshold raised for boss stages (naturally bullet-dense).
-  if (game && game.enemyBullets
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
-    const _bhThresh = game.state === STATE.BOSS_STAGE ? 22 : 15;
-    const _bhN = game.enemyBullets.length;
-    if (_bhN >= _bhThresh) {
-      const _bhOver = Math.min(1, (_bhN - _bhThresh) / 12);  // 0 at threshold, 1 at +12
-      const _bhPulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.25);
-      const _bhAlpha = 0.15 + 0.35 * _bhOver * _bhPulse;
-      ctx.save();
-      ctx.globalAlpha = _bhAlpha;
-      ctx.fillStyle = '#f44';
-      ctx.fillRect(0, 0, BASE_W, 2);
-      ctx.fillRect(0, BASE_H - 2, BASE_W, 2);
-      ctx.restore();
-    }
-  }
+  // (BULLET HELL EDGE WARNING removed — the pulsing red bands were a major
+  // contributor to perceived blinking. Bullet pressure now reads naturally
+  // through the sheer bullet count on screen.)
   // PLAYER EDGE VIGNETTE — faint cyan band on left/right when player is within
   // 20px of that edge. Alpha grows as player approaches the wall, peaking at
   // touching. Helps spatial awareness without compromising the playfield read.
@@ -15380,89 +15335,11 @@ function drawHUD() {
       ctx.restore();
     }
   }
-  // LIVE STAGE CLOCK — current stageFrames as mm:ss.d. Shown for all stages
-  // including first-ever attempts where PB pace is hidden. Sits just above
-  // the PB pace line at right side, dim so it doesn't compete with score.
-  if (!minimalHud
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
-      && (game.stageFrames || 0) > 0
-      && typeof fmtFrameTime === 'function') {
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    drawRetroText('T ' + fmtFrameTime(game.stageFrames), BASE_W - 5, 50, 4, '#888', 'right');
-    ctx.restore();
-  }
-  // CHALLENGE WAVE INDICATOR — "WAVE N/8" label so the player tracks progress
-  // through the 8-wave bonus structure. Only during CHALLENGING state.
-  if (!minimalHud
-      && game.state === STATE.CHALLENGING
-      && game.challengeWaves) {
-    const _cwTotal = game.challengeWaves.length;
-    const _cwCur = Math.min(_cwTotal, (game.challengeWaveIdx || 0) + 1);
-    ctx.save();
-    ctx.globalAlpha = 0.85;
-    drawRetroText('WAVE ' + _cwCur + '/' + _cwTotal, BASE_W - 5, 44, 5, '#f6f', 'right');
-    ctx.restore();
-  }
-  // NEXT EXTRA LIFE INDICATOR — score progress to next 30k threshold. Disabled
-  // in challenge mode (no extra lives). Bar pulses brighter as it nears the
-  // threshold so the player can push for it on close calls.
-  if (!minimalHud
-      && !game.challengeMode
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
-      && (game.score || 0) > 0) {
-    const _sc = game.score || 0;
-    const _into = _sc % 30000;
-    const _ratio = _into / 30000;
-    const _remain = 30000 - _into;
-    const _nelBarX = BASE_W - 30, _nelBarY = 62, _nelBarW = 25;
-    const _nelClose = _ratio >= 0.85;
-    const _nelCol = _nelClose ? (game.animFrame % 8 < 4 ? '#0f8' : '#fff') : '#0f8';
-    ctx.save();
-    ctx.globalAlpha = 0.30;
-    ctx.fillStyle = _nelCol;
-    ctx.fillRect(_nelBarX, _nelBarY, _nelBarW, 1);
-    ctx.globalAlpha = _nelClose ? 0.95 : 0.65;
-    ctx.fillRect(_nelBarX, _nelBarY, Math.round(_nelBarW * _ratio), 1);
-    ctx.restore();
-    // Compact text label when close to threshold (≤ 5000 away)
-    if (_remain <= 5000) {
-      drawRetroText('+SHIP ' + Math.ceil(_remain / 100) * 100, BASE_W - 5, 70, 3, _nelCol, 'right');
-    }
-  }
-  // ACTIVE BUFF TIMER BARS — vertical mini-bar stack for live timer countdowns.
-  // Each bar: 26px wide × 2px tall, color-coded by buff. Hidden when timer == 0.
-  // Placed right-side under PB pace indicator so the right column reads:
-  //   stage / icon / PB-bar / PB-pace / [buff bars stack]
-  if (!minimalHud
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
-    const _buffs = [
-      { t: game.laserTimer || 0,  d: LASER_DURATION,  c: '#f6c', lbl: 'L' },
-      { t: game.homingTimer || 0, d: HOMING_DURATION, c: '#0f8', lbl: 'H' },
-      { t: game.waveTimer || 0,   d: WAVE_DURATION,   c: '#6cf', lbl: 'W' },
-      { t: game.rapidTimer || 0,  d: RAPID_DURATION,  c: '#fc4', lbl: 'R' },
-      { t: game.slowTimer || 0,   d: SLOW_DURATION,   c: '#8ff', lbl: 'T' }
-    ];
-    let _by = 64;
-    for (const _b of _buffs) {
-      if (_b.t <= 0) continue;
-      const _bw = 26;
-      const _bx = BASE_W - 5 - _bw;
-      // Track (dim)
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.fillStyle = _b.c;
-      ctx.fillRect(_bx, _by, _bw, 2);
-      // Filled remaining
-      const _ratio = Math.max(0, Math.min(1, _b.t / _b.d));
-      ctx.globalAlpha = 0.85;
-      ctx.fillRect(_bx, _by, Math.round(_bw * _ratio), 2);
-      ctx.restore();
-      // Tiny label letter to the left
-      drawRetroText(_b.lbl, _bx - 2, _by + 1, 3, _b.c, 'right');
-      _by += 4;
-    }
-  }
+  // (LIVE STAGE CLOCK / NEXT EXTRA LIFE bar / BUFF TIMER BARS removed in HUD
+  // cleanup pass — too many simultaneous numeric/visual indicators. Active
+  // buffs are still represented by the single-letter peek in the right-side
+  // intro stack and the existing weapon callouts. CHALLENGE WAVE indicator
+  // also removed; the top progress bar already encodes wave fraction.)
   // WORLD CORRUPTION HUD INDICATOR — small "CORR XX%" label when stage 30+ enters
   // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
   // pure context cue for late-game depth.
@@ -17108,23 +16985,8 @@ function drawBossStage() {
       }
       ctx.restore();
     }
-    // MAGNET FIELD RING — combo ≥ 30 draws a faint pulsing cyan ring at the
-    // magnet range to visualize the pickup attraction zone. combo ≥ 60 doubles
-    // brightness. Draw BEFORE the ship so the ring sits underneath.
-    if (game.combo >= 30 && game.playerAlive) {
-      const _mr = 36 + ((game.combo >= 60) ? 40 : 20)
-                + ((game.activePerk === 'magnetic') ? 36 : 0);
-      const _pulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.18);
-      const _alpha = (game.combo >= 60 ? 0.18 : 0.10) * (0.6 + 0.4 * _pulse);
-      ctx.save();
-      ctx.globalAlpha = _alpha;
-      ctx.strokeStyle = '#0cf';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(game.playerX, game.playerY, _mr, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
+    // (MAGNET FIELD RING removed — the magnet range still grows with combo
+    // tier as a hidden mechanic but no visual ring competes for attention.)
     if (game.dualFighter) {
       drawShipTraitAura(game.playerX - 8, game.playerY, selectedShip);
       drawShipTraitAura(game.playerX + 8, game.playerY, selectedShip);
@@ -17134,38 +16996,9 @@ function drawBossStage() {
       drawShipTraitAura(game.playerX, game.playerY, selectedShip);
       drawPlayer(game.playerX, game.playerY, pcol, game.lvl);
     }
-    // DASH COOLDOWN BAR — small cyan progress strip under the ship while
-    // dash cooldown is active. Fills empty→full as cooldown counts down so
-    // ready state corresponds to "bar full." 60-frame cooldown total.
-    if ((game.dashCooldown || 0) > 0) {
-      const _dcW = 14;
-      const _dcRatio = 1 - (game.dashCooldown / 60);
-      const _dcY = game.playerY + 7;
-      const _dcX = game.playerX - _dcW / 2;
-      ctx.save();
-      ctx.globalAlpha = 0.45;
-      ctx.fillStyle = '#0cf';
-      ctx.fillRect(_dcX, _dcY, _dcW, 1);
-      ctx.globalAlpha = 0.95;
-      ctx.fillRect(_dcX, _dcY, Math.round(_dcW * _dcRatio), 1);
-      ctx.restore();
-    }
-    // WITCH TIME COOLDOWN BAR — second progress strip directly below the dash
-    // bar (1px gap). Magenta to distinguish from dash cyan. Only while
-    // witchCooldown > 0 (i.e., a witch-time save was just used).
-    if ((game.witchCooldown || 0) > 0) {
-      const _wcW = 14;
-      const _wcRatio = 1 - (game.witchCooldown / 720);
-      const _wcY = game.playerY + 9;
-      const _wcX = game.playerX - _wcW / 2;
-      ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle = '#f6c';
-      ctx.fillRect(_wcX, _wcY, _wcW, 1);
-      ctx.globalAlpha = 0.95;
-      ctx.fillRect(_wcX, _wcY, Math.round(_wcW * _wcRatio), 1);
-      ctx.restore();
-    }
+    // (DASH and WITCH cooldown bars under the ship removed — they sat in the
+    // player's line of sight and contributed to visual noise. The dash icon
+    // glow on the ship body still signals dash-ready state.)
   }
 
   // Explosions
