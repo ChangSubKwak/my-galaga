@@ -2494,7 +2494,7 @@ function drawPowerUp(p) {
       const sAlpha = Math.max(0, Math.min(1, 1 - dist / 200));
       const cMap = {
         S: '#0df', N: '#1e6', P: '#e3e', T: '#5af', R: '#fc4',
-        W: '#f6a', H: '#0cf', B: '#f44', L: '#fff', E: '#4f8'
+        W: '#f6a', H: '#0cf', B: '#f44', L: '#fff', E: '#4f8', F: '#fa0'
       };
       ctx.save();
       ctx.globalAlpha = sAlpha * 0.35;
@@ -2531,7 +2531,8 @@ function drawPowerUp(p) {
     H: { core: '#0cf', edge: '#069', shine: '#cef', glow: '#0ef' },
     B: { core: '#f44', edge: '#811', shine: '#fcc', glow: '#f44' },
     L: { core: '#fff', edge: '#779', shine: '#fff', glow: '#cff' },
-    E: { core: '#4f8', edge: '#062', shine: '#cfe', glow: '#4f8' }
+    E: { core: '#4f8', edge: '#062', shine: '#cfe', glow: '#4f8' },
+    F: { core: '#fa0', edge: '#a50', shine: '#fec', glow: '#fc4' }
   };
   const c = palette[p.type] || palette.S;
 
@@ -2687,6 +2688,24 @@ function drawPowerUp(p) {
     ctx.fillRect(x - 2, y + 2, 5, 1);
     ctx.fillStyle = '#ff4';
     ctx.fillRect(x - 1, y - 1, 3, 3);
+  } else if (p.type === 'F') {
+    // FORK — 3-arrow fan icon (one straight up, two angled out). Visualizes
+    // the spread shot pattern the player gets.
+    ctx.fillStyle = '#ff4';
+    // Center arrow
+    ctx.fillRect(x,     y - 3, 1, 6);
+    ctx.fillRect(x - 1, y - 2, 3, 1);
+    // Left arrow (angled up-left)
+    ctx.fillRect(x - 3, y - 1, 1, 1);
+    ctx.fillRect(x - 4, y,     1, 1);
+    ctx.fillRect(x - 2, y - 2, 1, 1);
+    // Right arrow (angled up-right)
+    ctx.fillRect(x + 2, y - 1, 1, 1);
+    ctx.fillRect(x + 3, y,     1, 1);
+    ctx.fillRect(x + 1, y - 2, 1, 1);
+    // White tip on center arrow
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x, y - 3, 1, 1);
   }
 
   // Orbiting sparkle
@@ -6210,6 +6229,25 @@ function updatePlayer() {
         game.bullets.push(b);
         game.stats.shotsFired++;
         game.stageShotsFired++;
+        // FORK — also spawn two angled side bullets (±15° from vertical). Each
+        // inherits the primary bullet's kind/dmg/crit so wave/homing/laser
+        // still apply. Tagged with vx so updateBullets carries them sideways.
+        if ((game.forkTimer || 0) > 0 && game.bullets.length < maxBullets + 8) {
+          const _angRad = 0.262;  // ~15° in radians
+          const _sin = Math.sin(_angRad);
+          const _cos = Math.cos(_angRad);
+          for (const _sign of [-1, 1]) {
+            const _fb = { x: bx, y: game.playerY - 8, vy: b.vy * _cos, vx: _sign * speed * _sin, dmg: b.dmg, lvl: b.lvl };
+            if (b.kind) _fb.kind = b.kind;
+            if (b.kind === 'laser') _fb.pierced = new Set();
+            if (b.kind === 'wave') { _fb.spawnX = bx; _fb.spawnFrame = game.animFrame; }
+            if (b.crit) _fb.crit = true;
+            _fb.fork = true;  // mark so updateBullets uses the vx component
+            game.bullets.push(_fb);
+            game.stats.shotsFired++;
+            game.stageShotsFired++;
+          }
+        }
         // SHOTS FIRED MILESTONES — small gray banner at 100/500/1000/2000 to
         // surface long-run sustainment. One-shot via === check.
         const _sf = game.stats.shotsFired;
@@ -6306,9 +6344,15 @@ function updateBullets() {
       if (b.trail.length > 5) b.trail.length = 5;
     } else {
       b.y += b.vy;
+      // FORK bullets carry vx for angled trajectory. Wave override below
+      // re-positions x using sine, so wave forks ride the spawn x offset.
+      if (b.fork && b.vx && b.kind !== 'wave') {
+        b.x += b.vx;
+      }
       if (b.kind === 'wave') {
         const elapsed = game.animFrame - (b.spawnFrame || 0);
-        b.x = (b.spawnX || b.x) + Math.sin(elapsed * 0.28) * 7;
+        b.x = (b.spawnX || b.x) + Math.sin(elapsed * 0.28) * 7
+            + (b.fork && b.vx ? b.vx * elapsed : 0);
         // WAVE BULLET TRAIL — record last 5 positions for zigzag visualization
         if (!b.trail) b.trail = [];
         b.trail.unshift({ x: b.x, y: b.y });
@@ -6434,6 +6478,7 @@ function updateBullets() {
   if ((game.waveTimer   || 0) > 0) game.waveTimer--;
   if ((game.homingTimer || 0) > 0) game.homingTimer--;
   if ((game.laserTimer  || 0) > 0) game.laserTimer--;
+  if ((game.forkTimer   || 0) > 0) game.forkTimer--;
 }
 
 const MAX_POWER_LVL = {S: 5, N: 3, P: 3};
@@ -6444,7 +6489,7 @@ function isPowerMaxed() {
       && game.lvl.P === MAX_POWER_LVL.P;
 }
 
-const POWERUP_COL = {S: '#0ff', N: '#0f8', P: '#f6f', T: '#8df', R: '#fc4', W: '#f8a', B: '#f44', H: '#0ef', L: '#fff', E: '#4f8'};
+const POWERUP_COL = {S: '#0ff', N: '#0f8', P: '#f6f', T: '#8df', R: '#fc4', W: '#f8a', B: '#f44', H: '#0ef', L: '#fff', E: '#4f8', F: '#fa0'};
 const SHIELD_MAX = 3;
 const SLOW_DURATION   = 360; // T — slow enemy bullets, 6 seconds at 60fps
 const RAPID_DURATION  = 360; // R — halved fire cooldown, 6 seconds
@@ -7381,6 +7426,18 @@ function updatePowerUps() {
         game.floatTexts.push({
           x: p.x, y: p.y, text: (wasActive ? 'LASER REFRESHED' : 'LASER!') + ' ' + _durSec(LASER_DURATION),
           color, life: 60, maxLife: 60, size: 10
+        });
+        triggerWeaponCallout(color);
+      } else if (p.type === 'F') {
+        // FORK — every fire press spawns 2 additional angled bullets (±15°) on
+        // top of the normal shot. Compatible with laser/wave/homing — the
+        // angled bullets inherit the same kind. 6-second duration like other
+        // timer pickups; stacks with rapid for dense triangular cones.
+        const wasActive = (game.forkTimer || 0) > 0;
+        game.forkTimer = Math.round(360 * _scavMul);
+        game.floatTexts.push({
+          x: p.x, y: p.y, text: (wasActive ? 'FORK REFRESHED' : 'FORK SHOT!') + ' ' + _durSec(360),
+          color, life: 60, maxLife: 60, size: 9
         });
         triggerWeaponCallout(color);
       } else if (p.type === 'E') {
@@ -9484,7 +9541,7 @@ function updateCollisions() {
             // SMART POWER DROPS — zero-weight any S/N/P type that's already maxed,
             // then redistribute among remaining types. Avoids wasted pickups when
             // the player has S5 / N3 / P3. Other types (T/R/W/H/L/B/E) unaffected.
-            const W = { S: 15, N: 16, P: 16, T: 10, R: 9, W: 8, H: 8, L: 6, B: 6, E: 6 };
+            const W = { S: 14, N: 15, P: 15, T: 10, R: 9, W: 8, H: 8, L: 5, B: 5, E: 5, F: 7 };
             if ((game.lvl.S || 1) >= MAX_POWER_LVL.S) W.S = 0;
             if ((game.lvl.N || 1) >= MAX_POWER_LVL.N) W.N = 0;
             if ((game.lvl.P || 1) >= MAX_POWER_LVL.P) W.P = 0;
@@ -9867,6 +9924,7 @@ function killPlayer(srcX, srcY, cause) {
   game.waveTimer = 0;
   game.homingTimer = 0;
   game.laserTimer = 0;
+  game.forkTimer = 0;
   game.shieldCharges = 0;
   // Witch window may have been the trigger for this kill — clear so the death cutscene
   // isn't visually framed by lingering edge glow.
