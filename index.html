@@ -15220,32 +15220,11 @@ function drawHUD() {
       }
     } catch (e) {}
   }
-  // LIVE PB PACE INDICATOR — during gameplay, compare current stageFrames to
-  // this stage's recorded PB. Shows time delta as you race the clock.
-  // Skipped if no PB for this stage (first run) or first 60 frames (slide-in).
-  if (!minimalHud
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
-      && (game.stageFrames || 0) > 60
-      && typeof stagePBs !== 'undefined' && stagePBs) {
-    const _pbF = stagePBs[String(game.stage)];
-    if (typeof _pbF === 'number' && _pbF > 0) {
-      const _delta = game.stageFrames - _pbF;
-      const _absSec = Math.abs(_delta / 60);
-      const _txt = _delta < 0
-        ? 'PB -' + _absSec.toFixed(1) + 's'   // ahead of PB (good)
-        : 'PB +' + _absSec.toFixed(1) + 's';  // behind PB (over)
-      const _pbCol = _delta < 0 ? '#0cf' : '#f88';
-      ctx.save();
-      ctx.globalAlpha = 0.75;
-      drawRetroText(_txt, BASE_W - 5, 58, 4, _pbCol, 'right');
-      ctx.restore();
-    }
-  }
-  // (LIVE STAGE CLOCK / NEXT EXTRA LIFE bar / BUFF TIMER BARS removed in HUD
-  // cleanup pass — too many simultaneous numeric/visual indicators. Active
-  // buffs are still represented by the single-letter peek in the right-side
-  // intro stack and the existing weapon callouts. CHALLENGE WAVE indicator
-  // also removed; the top progress bar already encodes wave fraction.)
+  // (LIVE PB PACE INDICATOR at y=58 removed — it duplicated the PB delta the
+  // STAGE TIME CLOCK below already shows at y=22. One PB read, not two.
+  // LIVE STAGE CLOCK / NEXT EXTRA LIFE bar / BUFF TIMER BARS also removed in
+  // earlier HUD cleanup — active buffs still surface via weapon callouts and
+  // the STAGE_INTRO status panel.)
   // WORLD CORRUPTION HUD INDICATOR — small "CORR XX%" label when stage 30+ enters
   // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
   // pure context cue for late-game depth.
@@ -15263,14 +15242,15 @@ function drawHUD() {
     const _shift = _corr >= 0.8 ? 1 : _corr >= 0.5 ? 2 : 3;
     const _blink = (game.animFrame >> _shift) % 2 === 0 ? '#f48' : '#fff';
     drawRetroText('CORR ' + _pct + '%', BASE_W - 5, 16, 4, _blink, 'right');
-    // CORRUPTION TIER NAME — narrative tier label below percent. Sells the
-    // 'how deep are you' progression beyond the number.
+    // CORRUPTION TIER NAME — narrative tier label. Drawn at y=34 (below the
+    // STAGE TIME CLOCK at y=22 and its PB bar at y=28) so it no longer
+    // collides with the clock on stage 50+.
     if (_corr >= 0.45) {
       const _tier = _corr >= 0.95 ? 'OBLIVION'
                   : _corr >= 0.75 ? 'NULL'
                   : _corr >= 0.60 ? 'VOID'
                   : 'DEEP';
-      drawRetroText(_tier, BASE_W - 5, 22, 4, '#f48', 'right');
+      drawRetroText(_tier, BASE_W - 5, 34, 4, '#f48', 'right');
     }
   }
   // STAGE TIME CLOCK — real-time mm:ss.t timer + PB delta indicator. Only renders
