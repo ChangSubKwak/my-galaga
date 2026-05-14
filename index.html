@@ -16186,295 +16186,57 @@ function drawGameOverScreen() {
     }
   }
 
-  // Stats: kills, accuracy, max stage
+  // STATS — 5 core metrics in a clean 2-column grid. Every tier sub-label
+  // (EXTERMINATOR / SHARPSHOOTER / VOIDWALKER / etc.) and the dozen+ bonus
+  // stat lines (K/MIN, S/MIN, SHIP KILLS, MULTIKILL, PIERCE, ACE, OBJ, PARRY,
+  // BIOMES, CORR, TOP, CMPL, PERK, EXTRA SHIPS...) were removed — that detail
+  // lives in the PROFILE tab. Game over now shows just: identity, score,
+  // 5 stats, grade, death cause, epitaph, 3 highlights, restart prompt.
   const s = game.stats || { kills: 0, shotsFired: 0, shotsHit: 0, maxStage: game.stage };
   const acc = s.shotsFired === 0 ? 0 : Math.round((s.shotsHit / s.shotsFired) * 100);
 
-  // Each row uses its own count-up window so they roll up sequentially after SCORE finishes
+  // Sequential count-up windows so the stats roll in after SCORE finishes.
   function rollT(start, end) {
     return Math.max(0, Math.min(1, (elapsedGo - start) / (end - start)));
   }
-  const tKills    = rollT(95, 115);
-  const tAcc      = rollT(105, 125);
-  const tStage    = rollT(115, 130);
-  const tCombo    = rollT(125, 140);
-  const tTime     = rollT(135, 150);
+  const tKills = rollT(95, 112);
+  const tAcc   = rollT(103, 120);
+  const tStage = rollT(111, 126);
+  const tCombo = rollT(119, 134);
+  const tTime  = rollT(127, 142);
 
-  drawRetroText('KILLS', BASE_W/2 - 40, cy, 6, COL.cyan);
-  drawRetroText(Math.floor(s.kills * tKills).toString(), BASE_W/2 + 40, cy, 7, COL.yellow, 'right');
-  // KILLS TIER LABEL — after count completes
-  if (tKills >= 1) {
-    const _kT = s.kills >= 1000 ? 'EXTERMINATOR'
-              : s.kills >= 500  ? 'SLAYER'
-              : s.kills >= 200  ? 'HUNTER'
-              : s.kills >= 50   ? 'TRACKER'
-              : null;
-    if (_kT) {
-      const _kTcol = s.kills >= 1000 ? '#fc4' : s.kills >= 500 ? '#0ff' : s.kills >= 200 ? '#0f8' : '#888';
-      drawRetroText(_kT, BASE_W/2 + 40, cy + 6, 4, _kTcol, 'right');
-    }
-  }
-
-  drawRetroText('ACCURACY', BASE_W/2 - 40, cy + 10, 6, COL.cyan);
-  drawRetroText(Math.floor(acc * tAcc) + '%', BASE_W/2 + 40, cy + 10, 7, COL.yellow, 'right');
-  // ACC TIER LABEL — after count completes
-  if (tAcc >= 1) {
-    const _aT = acc >= 95 ? 'SHARPSHOOTER'
-              : acc >= 85 ? 'CRACK SHOT'
-              : acc >= 70 ? 'MARKSMAN'
-              : acc >= 50 ? 'STEADY HAND'
-              : null;
-    if (_aT) {
-      const _aTcol = acc >= 95 ? '#fc4' : acc >= 85 ? '#0ff' : acc >= 70 ? '#0f8' : '#888';
-      drawRetroText(_aT, BASE_W/2 - 40, cy + 16, 4, _aTcol, 'left');
-    }
-  }
-
-  drawRetroText('MAX STAGE', BASE_W/2 - 40, cy + 18, 6, COL.cyan);
-  drawRetroText(Math.floor(s.maxStage * tStage).toString(), BASE_W/2 + 40, cy + 18, 7, COL.yellow, 'right');
-  // STAGE TIER LABEL — after stage count completes
-  if (tStage >= 1) {
-    const _ms = s.maxStage || 0;
-    const _sgT = _ms >= 80 ? 'VOIDWALKER'
-              : _ms >= 50 ? 'APEX'
-              : _ms >= 30 ? 'VOYAGER'
-              : _ms >= 15 ? 'PATHFINDER'
-              : _ms >= 5  ? 'SCOUT'
-              : null;
-    if (_sgT) {
-      const _sgTcol = _ms >= 80 ? '#f6f' : _ms >= 50 ? '#fc4' : _ms >= 30 ? '#0ff' : _ms >= 15 ? '#0f8' : '#888';
-      drawRetroText(_sgT, BASE_W/2 - 40, cy + 24, 4, _sgTcol, 'left');
-    }
-  }
-  // PB COMPARISON — tiny 'BEST: N' below max stage when we have lifetime PB to compare
-  try {
-    const _csNg = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
-    const _csCg = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
-    const _pbStage = Math.max(_csNg.bestStage || 0, _csCg.bestStage || 0);
-    if (_pbStage > 0 && tStage >= 1) {
-      const _pbCol = (s.maxStage || 0) >= _pbStage ? '#fc4' : '#888';
-      const _pbLab = (s.maxStage || 0) >= _pbStage ? 'PB!' : 'BEST: ' + _pbStage;
-      drawRetroText(_pbLab, BASE_W/2 + 40, cy + 24, 4, _pbCol, 'right');
-    }
-  } catch (e) {}
-
-  drawRetroText('BEST COMBO', BASE_W/2 - 40, cy + 26, 6, COL.cyan);
-  drawRetroText(Math.floor((game.comboBest || 0) * tCombo).toString(), BASE_W/2 + 40, cy + 26, 7, COL.yellow, 'right');
-  // COMBO TIER LABEL — after count completes
-  if (tCombo >= 1) {
-    const _cb = game.comboBest || 0;
-    const _cT = _cb >= 30 ? 'MAX'
-             : _cb >= 20 ? 'PLATINUM'
-             : _cb >= 15 ? 'GOLD'
-             : _cb >= 10 ? 'SILVER'
-             : _cb >= 5  ? 'BRONZE'
-             : null;
-    if (_cT) {
-      const _cTcol = _cb >= 30 ? '#fc4' : _cb >= 20 ? '#f6f' : _cb >= 15 ? '#ff8' : _cb >= 10 ? '#0ff' : '#0f8';
-      drawRetroText(_cT, BASE_W/2 - 40, cy + 32, 4, _cTcol, 'left');
-    }
-  }
-  // COMBO PB COMPARE — when count finishes show NEW BEST! or PB: N
-  if (tCombo >= 1) {
-    try {
-      const _cbE = parseInt(localStorage.getItem('galagaMaxComboEver') || '0', 10) || 0;
-      if (_cbE > 0) {
-        if ((game.comboBest || 0) >= _cbE) {
-          drawRetroText('NEW BEST!', BASE_W/2 + 40, cy + 32, 4, '#fc4', 'right');
-        } else {
-          drawRetroText('PB: x' + _cbE, BASE_W/2 + 40, cy + 32, 4, '#888', 'right');
-        }
-      }
-    } catch (e) {}
-  }
-
+  // 2-column grid. Left col: label left-aligned at cxL, value right-aligned at cvL.
+  // Right col: label left-aligned at cxR, value right-aligned at cvR.
+  const _cxL = BASE_W/2 - 48, _cvL = BASE_W/2 - 8;
+  const _cxR = BASE_W/2 + 8,  _cvR = BASE_W/2 + 40;
+  // Row 1 — KILLS | ACCURACY
+  drawRetroText('KILLS', _cxL, cy + 8, 5, COL.cyan, 'left');
+  drawRetroText(Math.floor(s.kills * tKills).toString(), _cvL, cy + 8, 6, COL.yellow, 'right');
+  drawRetroText('ACC', _cxR, cy + 8, 5, COL.cyan, 'left');
+  drawRetroText(Math.floor(acc * tAcc) + '%', _cvR, cy + 8, 6, COL.yellow, 'right');
+  // Row 2 — MAX STAGE | BEST COMBO
+  drawRetroText('STAGE', _cxL, cy + 18, 5, COL.cyan, 'left');
+  drawRetroText(Math.floor(s.maxStage * tStage).toString(), _cvL, cy + 18, 6, COL.yellow, 'right');
+  drawRetroText('COMBO', _cxR, cy + 18, 5, COL.cyan, 'left');
+  drawRetroText('x' + Math.floor((game.comboBest || 0) * tCombo), _cvR, cy + 18, 6, COL.yellow, 'right');
+  // Row 3 — TIME (left). Right column reserved for the GRADE letter.
   const ts = Math.floor((game.runFrames || 0) / 60);
   const tsShown = Math.floor(ts * tTime);
   const mmgo = String(Math.floor(tsShown / 60)).padStart(2, '0');
   const ssgo = String(tsShown % 60).padStart(2, '0');
-  drawRetroText('TIME', BASE_W/2 - 40, cy + 34, 6, COL.cyan);
-  drawRetroText(mmgo + ':' + ssgo, BASE_W/2 + 40, cy + 34, 7, COL.yellow, 'right');
-  // TIME TIER LABEL — after count completes
-  if (tTime >= 1) {
-    const _rt = game.runFrames || 0;
-    const _tT = _rt >= 108000 ? 'MARATHONER'   // 30 min
-              : _rt >= 54000  ? 'VETERAN'      // 15 min
-              : _rt >= 18000  ? 'SURVIVOR'     // 5 min
-              : _rt >= 7200   ? 'RECRUIT'      // 2 min
-              : null;
-    if (_tT) {
-      const _tTcol = _rt >= 108000 ? '#fc4' : _rt >= 54000 ? '#0ff' : _rt >= 18000 ? '#0f8' : '#888';
-      drawRetroText(_tT, BASE_W/2 - 40, cy + 40, 4, _tTcol, 'left');
-    }
-  }
-  // COMPLETION DELTA — show gain over the run when finishing tally completes
-  if (tTime >= 1 && typeof computeCompositeCompletion === 'function') {
-    const _endCmp = computeCompositeCompletion();
-    const _delta = _endCmp - (game.runStartCmp || 0);
-    if (_delta >= 1) {
-      drawRetroText('+' + _delta + '% PROGRESS', BASE_W/2 + 40, cy + 40, 4, '#fc4', 'right');
-    }
-    // TIER CROSSING — when CMPL crossed 25/50/75/100 this run
-    const _tiers = [25, 50, 75, 100];
-    let _xed = 0;
-    for (const _tt of _tiers) {
-      if ((game.runStartCmp || 0) < _tt && _endCmp >= _tt) _xed = _tt;
-    }
-    if (_xed > 0) {
-      drawRetroText(_xed + '% TIER CROSSED', BASE_W/2 + 40, cy + 46, 4,
-                    _xed >= 100 ? '#fc4' : _xed >= 75 ? '#f6f' : _xed >= 50 ? '#0ff' : '#0f8',
-                    'right');
-    }
-    // CMPL TIER NAME — small tier name with %
-    const _gcTier = _endCmp >= 100 ? 'COMPLETED'
-                 : _endCmp >= 80 ? 'ELITE'
-                 : _endCmp >= 50 ? 'VETERAN'
-                 : _endCmp >= 20 ? 'EXPLORER'
-                 : 'BEGINNER';
-    drawRetroText('CMPL ' + _endCmp + '% ' + _gcTier, BASE_W/2 - 40, cy + 40, 4, '#888', 'left');
-  }
-  // DAILY MISSION DONE BADGE — if mission completed during this run
-  if (tTime >= 1 && game.dailyMode && game._dailyMissionFired) {
-    drawRetroText('★ DAILY MISSION DONE', BASE_W/2, cy + 46, 4, '#fc4');
-  }
-  // PERK PEEK — active perk used this run
-  if (tTime >= 1 && game.activePerk && typeof PERKS !== 'undefined' && PERKS[game.activePerk]) {
-    const _gpP = PERKS[game.activePerk];
-    drawRetroText('PERK ' + _gpP.name, BASE_W/2 - 40, cy + 46, 4, _gpP.col, 'left');
-  }
-  // KILLS PER MINUTE — efficiency metric below stats
-  if (tTime >= 1 && (game.runFrames || 0) >= 1800 && (s.kills || 0) >= 5) {
-    const _mins = (game.runFrames || 1) / 3600;
-    const _kpm = Math.round((s.kills || 0) / _mins);
-    const _kpmCol = _kpm >= 100 ? '#fc4' : _kpm >= 50 ? '#0ff' : _kpm >= 25 ? '#0f8' : '#888';
-    const _kpmN = _kpm >= 100 ? ' RAPID'
-              : _kpm >= 50  ? ' QUICK'
-              : _kpm >= 25  ? ' STEADY'
-              : '';
-    drawRetroText('K/MIN ' + _kpm + _kpmN, BASE_W/2 - 30, cy + 52, 4, _kpmCol);
-    // SCORE/MIN — symmetric efficiency metric
-    if ((game.score || 0) >= 1000) {
-      const _spm = Math.round((game.score || 0) / _mins);
-      const _spmCol = _spm >= 50000 ? '#fc4' : _spm >= 20000 ? '#0ff' : _spm >= 5000 ? '#0f8' : '#888';
-      const _spmN = _spm >= 50000 ? ' PRODIGY'
-                 : _spm >= 20000 ? ' STRONG'
-                 : _spm >= 5000  ? ' STEADY'
-                 : '';
-      drawRetroText('S/MIN ' + fmtScore(_spm) + _spmN, BASE_W/2 + 30, cy + 52, 4, _spmCol);
-    }
-  }
-  // SHIP KILLS CONTRIBUTION — kills added to current ship mastery this run.
-  if (tTime >= 1 && (s.kills || 0) >= 10 && typeof selectedShip !== 'undefined') {
-    const _sCol2 = (game.ship && game.ship.color) || '#0cf';
-    const _skN = (s.kills) >= 500 ? ' CHAMPION'
-              : (s.kills) >= 200 ? ' ACE'
-              : (s.kills) >= 50  ? ' PILOT'
-              : '';
-    drawRetroText('+' + fmtScore(s.kills) + ' SHIP KILLS' + _skN, BASE_W/2, cy + 58, 4, _sCol2);
-  }
-  // EXTRA SHIPS EARNED — count of extra lives gained this run
-  if (tTime >= 1 && (game.extraShipsRun || 0) >= 1) {
-    const _es = game.extraShipsRun;
-    const _esN = _es >= 5 ? ' ARMADA'
-              : _es >= 3 ? ' FLEET'
-              : ' REINFORCED';
-    drawRetroText('+' + _es + ' SHIPS EARNED' + _esN, BASE_W/2, cy + 70, 4, '#ff4');
-  }
-  // MULTIKILL BEST — biggest same-frame kill count this run
-  if (tTime >= 1 && (game.multiKillBest || 0) >= 3) {
-    const _mkb = game.multiKillBest;
-    const _mkN = _mkb >= 8 ? ' OCTOKILL'
-              : _mkb >= 5 ? ' OVERKILL'
-              : _mkb >= 3 ? ' TRIPLE'
-              : '';
-    drawRetroText('MULTIKILL x' + _mkb + _mkN, BASE_W/2 - 30, cy + 82, 4, '#fc4');
-  }
-  // LASER PIERCE BEST — biggest single-bullet pierce count this run
-  if (tTime >= 1 && (game.laserPierceBest || 0) >= 3) {
-    const _lpb = game.laserPierceBest;
-    const _lpN = _lpb >= 10 ? ' LANCE'
-              : _lpb >= 6  ? ' SPEAR'
-              : _lpb >= 3  ? ' PIERCER'
-              : '';
-    drawRetroText('PIERCE x' + _lpb + _lpN, BASE_W/2 + 30, cy + 82, 4, '#f6c');
-  }
-  // ACE STREAK BEST — best S/A grade streak this run
-  if (tTime >= 1 && (game.aceStreakBest || 0) >= 3) {
-    const _asb = game.aceStreakBest;
-    const _asN = _asb >= 15 ? ' ACE-LEGEND'
-              : _asb >= 10 ? ' ACE-PRO'
-              : _asb >= 5  ? ' VIRTUOSO'
-              : '';
-    drawRetroText('ACE x' + _asb + _asN, BASE_W/2 - 30, cy + 88, 4, '#fc4');
-  }
-  // OBJECTIVES MET — secondary objectives completed this run
-  if (tTime >= 1 && (game.objectivesMetRun || 0) >= 1) {
-    const _obj = game.objectivesMetRun;
-    const _objN = _obj >= 10 ? ' MASTERMIND'
-               : _obj >= 5  ? ' STRATEGIST'
-               : _obj >= 1  ? ' TACTICIAN'
-               : '';
-    drawRetroText('OBJ x' + _obj + _objN, BASE_W/2 + 30, cy + 88, 4, '#0f8');
-  }
-  // PARRY CHAIN BEST — best parry streak this run
-  if (tTime >= 1 && (game.parryStreakBest || 0) >= 3) {
-    const _psB = game.parryStreakBest;
-    const _psT = _psB >= 15 ? ' GUARDIAN'
-              : _psB >= 10 ? ' WARDEN'
-              : _psB >= 5  ? ' DEFLECTOR'
-              : '';
-    drawRetroText('PARRY x' + _psB + _psT, BASE_W/2 - 30, cy + 94, 4, '#0cf');
-  }
-  // RUN BIOMES SEEN — distinct biomes traversed this run
-  if (tTime >= 1 && game.runBiomesSeen && game.runBiomesSeen.size >= 2) {
-    const _rbs = game.runBiomesSeen.size;
-    const _rbsN = _rbs === 8 ? ' COMPLETE'
-               : _rbs >= 6  ? ' EXPLORER'
-               : _rbs >= 4  ? ' WANDERER'
-               : '';
-    drawRetroText('BIOMES ' + _rbs + '/8' + _rbsN, BASE_W/2 + 30, cy + 94, 4, '#9ef');
-  }
-  // MAX CORRUPTION REACHED — translate maxStage to corruption tier
-  if (tTime >= 1) {
-    const _msC = (s.maxStage || 0);
-    const _maxCorr = _msC >= 80 ? 100
-                  : _msC >= 70 ? 80
-                  : _msC >= 60 ? 65
-                  : _msC >= 50 ? 45
-                  : _msC >= 40 ? 25
-                  : _msC >= 30 ? 10 : 0;
-    if (_maxCorr >= 10) {
-      const _mcTier = _maxCorr >= 95 ? 'OBLIVION'
-                   : _maxCorr >= 75 ? 'NULL'
-                   : _maxCorr >= 60 ? 'VOID'
-                   : _maxCorr >= 45 ? 'DEEP'
-                   : 'EDGE';
-      drawRetroText('CORR REACHED: ' + _mcTier, BASE_W/2, cy + 76, 4, '#f48');
-    }
-  }
-  // TOP RUN ENEMY — most-killed type this run when meaningful
-  if (tTime >= 1 && game.killsByTypeRun) {
-    let _tT = null, _tC = 0;
-    for (const _k in game.killsByTypeRun) {
-      if ((game.killsByTypeRun[_k] || 0) > _tC) { _tC = game.killsByTypeRun[_k]; _tT = _k; }
-    }
-    if (_tT && _tC >= 10) {
-      const _tCol2 = (typeof ENEMY_INFO !== 'undefined' && ENEMY_INFO[_tT])
-        ? ENEMY_INFO[_tT].col : '#fff';
-      drawRetroText('TOP: ' + _tT.toUpperCase() + ' x' + _tC, BASE_W/2, cy + 64, 4, _tCol2);
-    }
-  }
+  drawRetroText('TIME', _cxL, cy + 28, 5, COL.cyan, 'left');
+  drawRetroText(mmgo + ':' + ssgo, _cvL, cy + 28, 6, COL.yellow, 'right');
 
-  // Tick sound for each row when it just begins counting
-  // (uses gameOverTimer which decrements every tick)
-  if (game.gameOverTimer === 180 - 95 || game.gameOverTimer === 180 - 105
-      || game.gameOverTimer === 180 - 115 || game.gameOverTimer === 180 - 125
-      || game.gameOverTimer === 180 - 135) {
+  // Tick sounds as each stat row begins counting
+  if (game.gameOverTimer === 180 - 95 || game.gameOverTimer === 180 - 103
+      || game.gameOverTimer === 180 - 111 || game.gameOverTimer === 180 - 119
+      || game.gameOverTimer === 180 - 127) {
     playSound('tick');
   }
 
-  // Composite grade — combines score, accuracy, and max stage into a single S/A/B/C/D rank
-  if (elapsedGo > 145) {
+  // GRADE — composite S/A/B/C/D from score + accuracy + stage. Big letter in
+  // the right column next to the stat rows, vertically centered.
+  if (elapsedGo > 138) {
     const sF = Math.min(1, (game.score || 0) / 100000) * 0.5;
     const aF = (acc / 100) * 0.3;
     const stF = Math.min(1, (s.maxStage || 1) / 30) * 0.2;
@@ -16485,203 +16247,93 @@ function drawGameOverScreen() {
     else if (total >= 0.55) { grade = 'B'; gcol = COL.green; }
     else if (total >= 0.40) { grade = 'C'; gcol = COL.cyan; }
     else                    { grade = 'D'; gcol = COL.gray; }
-    // Big GRADE letter on the far right of the stats column (next to TIME row)
-    drawRetroText('GRADE', BASE_W/2 + 56, cy + 4, 5, COL.cyan);
+    drawRetroText('GRADE', BASE_W/2 + 64, cy + 22, 5, COL.cyan);
     ctx.save();
     ctx.shadowColor = gcol;
-    ctx.shadowBlur = 6 + 4 * Math.sin(game.animFrame * 0.2);
-    drawRetroText(grade, BASE_W/2 + 56, cy + 18, 22, gcol);
+    ctx.shadowBlur = 5 + 3 * Math.sin(game.animFrame * 0.2);
+    drawRetroText(grade, BASE_W/2 + 64, cy + 34, 16, gcol);
     ctx.restore();
   }
 
-  // VS BEST comparison — only shown when this run did NOT set a new top-5 (those already get NEW HIGH).
-  // Uses pre-run threshold so we compare against the personal best BEFORE this run was submitted.
-  if (elapsedGo > 150 && game.topRank < 0) {
-    const prevBest = game.liveHighThreshold || 0;
-    let label, lcol;
-    if (prevBest === 0) {
-      label = 'FIRST RUN!';
-      lcol = COL.cyan;
-    } else if (game.score === prevBest) {
-      label = 'TIED PERSONAL BEST';
-      lcol = COL.cyan;
-    } else {
-      const delta = prevBest - game.score;
-      const pct = Math.round((game.score / prevBest) * 100);
-      label = 'VS BEST  -' + fmtScore(delta) + ' (' + pct + '%)';
-      lcol = '#fa8';
-    }
-    drawRetroText(label, BASE_W/2, cy + 44, 6, lcol);
-  }
-
-  // New top-rank celebration — daily mode prefixes "DAILY" so it's clear which leaderboard ranked
-  if (game.topRank >= 0) {
+  // NEW HIGH / RANK celebration — one dramatic line just inside the panel
+  // bottom. Only when this run made the top-5; otherwise nothing (the score
+  // row already shows NEW HIGH! / HI: N).
+  if (game.topRank >= 0 && elapsedGo > 140) {
     const nhsCol = (game.animFrame >> 3) % 2 === 0 ? COL.yellow : COL.magenta;
     const prefix = game.dailyMode ? 'DAILY ' : game.challengeMode ? 'CHAL ' : '';
     const text = game.topRank === 0
       ? (prefix ? prefix + 'BEST!' : 'NEW HIGH SCORE!')
       : (prefix + 'RANK #' + (game.topRank + 1) + '!');
-    drawRetroText(text, BASE_W/2, cy + 44, 8, nhsCol);
-  } else if (game.dailyMode && elapsedGo > 150) {
-    // Daily mode but didn't make top 5 — still show today's seed as a small footer
-    drawRetroText('DAILY ' + dailyLabel(), BASE_W/2, cy + 44, 6, COL.green);
+    drawRetroText(text, BASE_W/2, cy + 44, 6, nhsCol);
   }
 
-  // DEATH CAUSE RECAP — final hit attribution shown just before epitaph (~frame 95).
-  // Map raw cause to display string. Helps player diagnose what to evade next run.
-  if (game.lastDeathCause && elapsedGo > 95) {
-    const fade = Math.min(1, (elapsedGo - 95) / 20);
+  // DEATH CAUSE — single line just below the panel
+  if (game.lastDeathCause && elapsedGo > 110) {
+    const fade = Math.min(1, (elapsedGo - 110) / 20);
     const dcMap = {
       bullet:    'FELLED BY ENEMY FIRE',
-      collision:'FELLED BY DIVE IMPACT',
+      collision: 'FELLED BY DIVE IMPACT',
       unknown:   'CAUSE UNKNOWN'
     };
     const dcLine = dcMap[game.lastDeathCause] || ('FELLED BY ' + String(game.lastDeathCause).toUpperCase());
     ctx.save();
-    ctx.globalAlpha = 0.65 * fade;
-    drawRetroText(dcLine, BASE_W/2, cy + 62, 5, '#f88');
-    ctx.restore();
-  }
-  // EPITAPH — narrative bookend, fades in at frame ~120 (after grade reveal at 145
-  // happens later, but we want this BEFORE the action prompt so the closing line
-  // reads as final transmission rather than UI noise). Soft gray italic-feel rendering
-  // so it sits below the score row without competing with it.
-  if (game.runEpitaph && elapsedGo > 110) {
-    const fade = Math.min(1, (elapsedGo - 110) / 30);
-    const ey = cy + 72;
-    ctx.save();
-    ctx.globalAlpha = 0.55 * fade;
-    drawRetroText('— FINAL TRANSMISSION —', BASE_W/2, ey, 5, '#888');
-    ctx.globalAlpha = 0.85 * fade;
-    drawRetroText(game.runEpitaph, BASE_W/2, ey + 8, 6, '#cfc');
-    // LAST TRANSMISSION ECHO — show the most recent narrative log seen (last
-    // TRANSMISSION_LOGS stage <= maxStage) for arc continuity.
-    if (typeof TRANSMISSION_LOGS !== 'undefined') {
-      const _mxS = (game.stats && game.stats.maxStage) || game.stage || 1;
-      const _keys = Object.keys(TRANSMISSION_LOGS).map(Number).filter(k => k <= _mxS).sort((a, b) => b - a);
-      if (_keys.length > 0) {
-        const _lastLog = TRANSMISSION_LOGS[_keys[0]];
-        if (Array.isArray(_lastLog) && _lastLog[0]) {
-          ctx.globalAlpha = 0.35 * fade;
-          drawRetroText(_lastLog[0], BASE_W/2, ey - 6, 4, '#666');
-        }
-      }
-    }
-    // TIME-OF-DAY MOOD — atmospheric line below epitaph based on real-world hour.
-    const _h = new Date().getHours();
-    const _mood = _h < 5  ? 'THE LATE NIGHT KEEPS WATCH.'
-                : _h < 9  ? 'THE DAY BEGINS WITHOUT YOU.'
-                : _h < 12 ? 'MORNING LIGHT REACHES THE WRECK.'
-                : _h < 17 ? 'THE AFTERNOON HOLDS QUIET.'
-                : _h < 21 ? 'EVENING SETTLES OVER THE FIELD.'
-                : 'THE NIGHT REMEMBERS.';
-    ctx.globalAlpha = 0.45 * fade;
-    drawRetroText(_mood, BASE_W/2, ey + 16, 4, '#888');
+    ctx.globalAlpha = 0.7 * fade;
+    drawRetroText(dcLine, BASE_W/2, cy + 60, 4, '#f88');
     ctx.restore();
   }
 
-  // RUN HIGHLIGHTS — fades in shortly after epitaph (frame 140+). Up to 3 lines,
-  // compact stat-card style. Sits between epitaph and the SPACE/RETRY prompt.
-  // Stagger per-line fade so they appear sequentially (~6 frame gap) for ceremony feel.
-  if (game.runHighlights && game.runHighlights.length > 0 && elapsedGo > 140) {
+  // EPITAPH — narrative bookend: header + one closing line
+  if (game.runEpitaph && elapsedGo > 122) {
+    const fade = Math.min(1, (elapsedGo - 122) / 30);
+    ctx.save();
+    ctx.globalAlpha = 0.5 * fade;
+    drawRetroText('— FINAL TRANSMISSION —', BASE_W/2, cy + 70, 4, '#888');
+    ctx.globalAlpha = 0.85 * fade;
+    drawRetroText(game.runEpitaph, BASE_W/2, cy + 78, 5, '#cfc');
+    ctx.restore();
+  }
+
+  // RUN HIGHLIGHTS — header + up to 3 lines, staggered fade-in
+  if (game.runHighlights && game.runHighlights.length > 0 && elapsedGo > 145) {
     const hy = cy + 92;
     ctx.save();
-    ctx.globalAlpha = 0.55 * Math.min(1, (elapsedGo - 140) / 20);
-    drawRetroText('— PILOT [' + playerCallsign + '] HIGHLIGHTS —', BASE_W/2, hy, 5, '#888');
+    ctx.globalAlpha = 0.5 * Math.min(1, (elapsedGo - 145) / 20);
+    drawRetroText('— HIGHLIGHTS —', BASE_W/2, hy, 4, '#888');
     ctx.restore();
     for (let i = 0; i < game.runHighlights.length; i++) {
       const h = game.runHighlights[i];
-      const lineFrame = 150 + i * 6;
+      const lineFrame = 153 + i * 6;
       if (elapsedGo < lineFrame) continue;
       const lineFade = Math.min(1, (elapsedGo - lineFrame) / 14);
       ctx.save();
       ctx.globalAlpha = lineFade;
-      drawRetroText(h.label, BASE_W/2 - 30, hy + 8 + i * 8, 5, '#888', 'right');
-      drawRetroText(h.value, BASE_W/2 - 24, hy + 8 + i * 8, 6, h.col, 'left');
-      ctx.restore();
-    }
-    // PILOT TIP — single mechanic hint, surfaced near the bottom after highlights
-    // finish settling in. Reveals after the run-highlights cascade so it lands as
-    // a separate beat ("you fell — here's something you may not know yet").
-    if (game.runTip && elapsedGo > 200) {
-      const tipFade = Math.min(1, (elapsedGo - 200) / 30);
-      ctx.save();
-      ctx.globalAlpha = tipFade * 0.9;
-      const tipY = hy + 8 + game.runHighlights.length * 8 + 8;
-      drawRetroText(game.runTip, BASE_W/2, tipY, 5, '#cfc');
-      ctx.restore();
-    }
-    // NEXT GOAL — single forward-looking target. Reveals one beat after the tip
-    // so the player ends the death screen looking ahead instead of at the past.
-    if (game.runGoal && elapsedGo > 240) {
-      const goalFade = Math.min(1, (elapsedGo - 240) / 30);
-      ctx.save();
-      ctx.globalAlpha = goalFade;
-      const goalY = hy + 8 + game.runHighlights.length * 8 + 16;
-      const blink = (game.animFrame >> 4) % 2 === 0 ? game.runGoalCol : '#fff';
-      drawRetroText(game.runGoal, BASE_W/2, goalY, 6, blink);
-      ctx.restore();
-    }
-    // NEXT ACHIEVEMENT — first un-unlocked achievement as a forward target. Helps
-    // the player end the death screen with one specific trophy in mind.
-    if (elapsedGo > 260 && typeof ACHIEVEMENTS !== 'undefined' && typeof unlockedAchievements !== 'undefined') {
-      const allIds = Object.keys(ACHIEVEMENTS);
-      let nextAch = null;
-      for (const id of allIds) {
-        if (!unlockedAchievements.has(id)) { nextAch = ACHIEVEMENTS[id]; break; }
-      }
-      if (nextAch) {
-        const aFade = Math.min(1, (elapsedGo - 260) / 30);
-        ctx.save();
-        ctx.globalAlpha = aFade * 0.85;
-        const aY = hy + 8 + game.runHighlights.length * 8 + 22;
-        drawRetroText('TRY: ' + nextAch.name, BASE_W/2, aY, 4, '#0ff');
-        ctx.restore();
-      }
-    }
-    // GAME OVER SHARE LINE — compact stat string for manual share/transcription.
-    // "[CSK] S25 145K 76% DAILY" format. Reveals last so it lands as a coda.
-    if (elapsedGo > 280) {
-      const shrFade = Math.min(1, (elapsedGo - 280) / 30);
-      const accStr = (() => {
-        const sf = game.stats.shotsFired || 0;
-        return sf > 0 ? Math.round((game.stats.shotsHit / sf) * 100) + '%' : '-';
-      })();
-      const modeTag = game.dailyMode ? 'DAILY' : game.challengeMode ? 'CHAL' : 'NORM';
-      const scoreShort = (game.score >= 1000) ? Math.round(game.score / 1000) + 'K' : String(game.score || 0);
-      const shareLine = '[' + playerCallsign + '] S' + (game.stats.maxStage || 0)
-                      + '  ' + scoreShort + '  ' + accStr + '  ' + modeTag;
-      ctx.save();
-      ctx.globalAlpha = shrFade * 0.75;
-      drawRetroText(shareLine, BASE_W/2, hy + 8 + game.runHighlights.length * 8 + 26, 4, '#0cf');
+      drawRetroText(h.label, BASE_W/2 - 4, hy + 9 + i * 8, 4, '#888', 'right');
+      drawRetroText(h.value, BASE_W/2 + 2, hy + 9 + i * 8, 5, h.col, 'left');
       ctx.restore();
     }
   }
 
   if (game.gameOverTimer <= 0) {
+    // Restart prompt sits below the highlights block (which ends ~cy+116).
     if (game.animFrame % 60 < 40) {
-      drawRetroText('SPACE TITLE   R RETRY', BASE_W/2, cy + 54, 6, COL.cyan);
+      drawRetroText('SPACE TITLE   R RETRY', BASE_W/2, cy + 126, 6, COL.cyan);
     }
-    // PROFILE TAB HINT — gray reminder you can dive into stats from TITLE
-    drawRetroText('TITLE → TAB PROFILE', BASE_W/2, cy + 60, 4, '#666');
-    // CHEAT-USED INDICATOR — surface honor flag when god mode was toggled on
-    // at any point during this run.
+    drawRetroText('TITLE → TAB PROFILE', BASE_W/2, cy + 134, 4, '#666');
+    // CHEAT-USED honor flag
     if (game._cheatUsedAtAnyTime) {
-      drawRetroText('(GOD MODE USED)', BASE_W/2, cy + 66, 4, '#a88');
+      drawRetroText('(GOD MODE USED)', BASE_W/2, cy + 141, 4, '#a88');
     } else if (game._stageJumpUsed) {
-      drawRetroText('(STAGE JUMP USED)', BASE_W/2, cy + 66, 4, '#a88');
+      drawRetroText('(STAGE JUMP USED)', BASE_W/2, cy + 141, 4, '#a88');
     }
-    // Auto-retry countdown — always visible (no blink) so the second-counter doesn't jitter
+    // Auto-retry countdown — replaces the manual prompt position when active
     if (game.autoRestartTimer > 0) {
       const sec = Math.ceil(game.autoRestartTimer / 60);
       const cdCol = sec <= 2 ? '#fa8' : COL.gray;
-      drawRetroText('AUTO RETRY ' + sec, BASE_W/2, cy + 62, 5, cdCol);
-      // AUTO RETRY PROGRESS BAR — visual countdown under the text. Fill drains
-      // left-to-right as timer counts down.
+      drawRetroText('AUTO RETRY ' + sec, BASE_W/2, cy + 134, 5, cdCol);
       const arProg = game.autoRestartTimer / 480;
       const arBarW = 60;
       const arBarX = BASE_W/2 - arBarW/2;
-      const arBarY = cy + 69;
+      const arBarY = cy + 141;
       ctx.save();
       ctx.fillStyle = '#222';
       ctx.fillRect(arBarX, arBarY, arBarW, 2);
