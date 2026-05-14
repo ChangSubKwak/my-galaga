@@ -16614,22 +16614,22 @@ function drawPauseScreen() {
   infoRow('ACC',   acc);
 
   // PAUSE BIOME WHEEL — visualize the 8-biome cycle and player's current
-  // position in it. Active only at stage >= 8 (when biomes turn on).
+  // position in it. Active only at stage >= 8 (when biomes turn on). Sits
+  // top-right of the panel, ABOVE the info rows (which start at py+46) so
+  // it no longer overlaps the SHIP row. Radius shrunk 14→10 to clear it.
   if (typeof biomeForStage === 'function' && game.stage >= 8) {
-    const wheelCx = px + panelW - 22;
-    const wheelCy = py + 32;
-    const wheelR = 14;
+    const wheelCx = px + panelW - 18;
+    const wheelCy = py + 22;
+    const wheelR = 10;
     const _curBiome = biomeForStage(game.stage);
     const _order = ['planet', 'dawn', 'asteroid', 'ice', 'gasGiant', 'corona', 'blackhole', 'starfield'];
     ctx.save();
-    // outer ring
     ctx.globalAlpha = 0.4;
     ctx.strokeStyle = '#555';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(wheelCx, wheelCy, wheelR, 0, Math.PI * 2);
     ctx.stroke();
-    // 8 biome pips
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
       const pxw = wheelCx + Math.cos(a) * wheelR;
@@ -16640,11 +16640,6 @@ function drawPauseScreen() {
       ctx.fillStyle = BIOME_NAMES[_bid] ? BIOME_NAMES[_bid].col : '#fff';
       const sz = _isCur ? 4 : 2;
       ctx.fillRect(pxw - sz/2, pyw - sz/2, sz, sz);
-    }
-    // center label
-    if (_curBiome && BIOME_NAMES[_curBiome]) {
-      ctx.globalAlpha = 0.85;
-      drawRetroText('CYCLE', wheelCx, wheelCy - 22, 4, '#888');
     }
     ctx.restore();
   }
