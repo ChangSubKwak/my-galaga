@@ -13309,326 +13309,87 @@ function drawStageIntro() {
       }
     }
   }
-  // Tier hint — current background tier number tiny in corner
+  // STAGE_INTRO STATUS PANEL — pared back from ~30 stacked peeks to a tight,
+  // readable set. LEFT column = who/what you are (callsign, build, lives).
+  // RIGHT column = what you're carrying & chasing (ship, buff, HI, accuracy,
+  // recent grade, stage PB goal). Run-total trivia (kills/parries/biomes/dex/
+  // sessions etc.) was removed — that belongs in the PROFILE tab and the
+  // GAME_OVER recap, not on the pre-stage screen.
   if (slide >= 1) {
-    const tier = Math.min(4, Math.floor((game.stage - 1) / 4));
-    drawRetroText('TIER ' + tier, BASE_W - 4, BASE_H/2 - 22, 5, COL.gray, 'right');
-    // TIER PIPS — 5-dot row (tier 0..4) below label
-    ctx.save();
-    const _tpCols = ['#0cf', '#0f8', '#fc4', '#f88', '#f6f'];
-    for (let _tp = 0; _tp < 5; _tp++) {
-      ctx.globalAlpha = _tp <= tier ? 0.85 : 0.20;
-      ctx.fillStyle = _tpCols[_tp];
-      ctx.fillRect(BASE_W - 27 + _tp * 5, BASE_H/2 - 18, 3, 1);
-    }
-    ctx.restore();
-    // PILOT TITLE PEEK — small callsign + current rank near top-left corner so
-    // each intro reminds the player who they are.
-    if (playerCallsign && playerCallsign !== '???' && typeof computePilotTitle === 'function') {
-      drawRetroText('[' + playerCallsign + ']', 4, BASE_H/2 - 22, 5, '#888', 'left');
-      drawRetroText(computePilotTitle(), 4, BASE_H/2 - 15, 4, '#555', 'left');
-      // NEXT RANK PEEK — show progress toward the next tier when available
-      if (typeof computePilotNextRank === 'function') {
-        try {
-          const _nr = computePilotNextRank();
-          if (_nr && _nr.next) {
-            drawRetroText('→ ' + _nr.next, 4, BASE_H/2 - 30, 4, '#444', 'left');
-            // Progress label (terse) — only first 20 chars to fit width
-            if (_nr.label) {
-              const _lbl = _nr.label.length > 20 ? _nr.label.slice(0, 20) : _nr.label;
-              drawRetroText(_lbl, 4, BASE_H/2 - 36, 3, '#333', 'left');
-            }
-          }
-        } catch (e) {}
+    // ---- LEFT COLUMN ----
+    // Callsign + rank
+    if (playerCallsign && playerCallsign !== '???') {
+      drawRetroText('[' + playerCallsign + ']', 4, BASE_H/2 - 18, 5, '#999', 'left');
+      if (typeof computePilotTitle === 'function') {
+        drawRetroText(computePilotTitle(), 4, BASE_H/2 - 11, 4, '#666', 'left');
       }
     }
-    // COMPOSITE % PEEK — overall progression at top-right corner of intro
-    if (typeof computeCompositeCompletion === 'function') {
-      const _ciC = computeCompositeCompletion();
-      if (_ciC >= 5) {
-        const _ciCol = _ciC >= 80 ? '#fc4' : _ciC >= 50 ? '#0ff' : _ciC >= 20 ? '#0f8' : '#888';
-        const _ciTier = _ciC >= 100 ? ' COMP'
-                     : _ciC >= 80  ? ' ELITE'
-                     : _ciC >= 50  ? ' VET'
-                     : _ciC >= 20  ? ' EXPL'
-                     : '';
-        drawRetroText('CMPL ' + _ciC + '%' + _ciTier, BASE_W - 4, BASE_H/2 - 30, 4, _ciCol, 'right');
-        // Mini progress bar (30px wide) right under the text
-        ctx.save();
-        const _ciBarX = BASE_W - 33, _ciBarY = BASE_H/2 - 25;
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.fillRect(_ciBarX, _ciBarY, 30, 1);
-        ctx.fillStyle = _ciCol;
-        ctx.globalAlpha = 0.8;
-        ctx.fillRect(_ciBarX, _ciBarY, Math.round(30 * _ciC / 100), 1);
-        ctx.restore();
-      }
-    }
-    // SHIP MASTERY PEEK — lifetime kills with current ship (above name)
-    try {
-      const _smRaw = localStorage.getItem('galagaShipMastery');
-      if (_smRaw) {
-        const _sm = JSON.parse(_smRaw);
-        const _sid = (typeof selectedShip !== 'undefined') ? selectedShip : 'default';
-        if (_sm && _sm[_sid] && _sm[_sid].kills >= 100) {
-          drawRetroText('K' + fmtScore(_sm[_sid].kills), BASE_W - 4, BASE_H/2 - 14, 3, '#666', 'right');
-        }
-      }
-    } catch (e) {}
-    // SHIP NAME PEEK — current ship under pilot rank, in ship color.
-    if (game.ship && game.ship.name) {
-      drawRetroText(game.ship.name, BASE_W - 4, BASE_H/2 - 9, 4, game.ship.color || '#0cf', 'right');
-      // SHIP BONUS PEEK — speed/dmg modifiers in compact label
-      const _bonusParts = [];
-      if (game.ship.speedMul && game.ship.speedMul !== 1) {
-        _bonusParts.push('SPD' + (game.ship.speedMul > 1 ? '+' : '') + Math.round((game.ship.speedMul - 1) * 100) + '%');
-      }
-      if (game.ship.dmgBonus) {
-        _bonusParts.push('DMG+' + game.ship.dmgBonus);
-      }
-      if (game.ship.bulletCap && game.ship.bulletCap !== 3) {
-        _bonusParts.push('CAP' + game.ship.bulletCap);
-      }
-      if (_bonusParts.length) {
-        drawRetroText(_bonusParts.join(' '), BASE_W - 4, BASE_H/2 - 4, 3, '#888', 'right');
-      }
-    }
-    // LIFETIME SCORE PEEK — total score across all runs as K format
-    try {
-      const _csNs = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
-      const _csCs = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
-      const _scT = (_csNs.scoreTotal || 0) + (_csCs.scoreTotal || 0);
-      if (_scT >= 10000) {
-        const _scK = _scT >= 1000000 ? (Math.floor(_scT / 100000) / 10) + 'M'
-                   : Math.floor(_scT / 1000) + 'K';
-        drawRetroText('Σ ' + _scK, 4, BASE_H/2 + 12, 4, '#888', 'left');
-      }
-    } catch (e) {}
-    // SHIP SPRITE PREVIEW — small ship icon next to TIER label so the player
-    // sees the active ship at every intro entry. Reuses drawPlayer with lvl
-    // to show current build state.
-    if (typeof drawPlayer === 'function') {
-      const _sCol = (game.ship && game.ship.color) || '#0cf';
-      const _sx = BASE_W - 28, _sy = BASE_H/2 - 22;
-      drawPlayer(_sx, _sy, _sCol, game.lvl);
-    }
-    // POWER LEVEL PEEK — S/N/P current levels at intro so the player sees the
-    // build they're carrying in. Hidden when all 1/1/1 (no progress yet).
+    // Power build S/N/P (hidden at 1/1/1)
     if (game.lvl && (game.lvl.S > 1 || game.lvl.N > 1 || game.lvl.P > 1)) {
-      const _plY = BASE_H/2 - 8;
+      const _plY = BASE_H/2 - 2;
       drawRetroText('S' + game.lvl.S, 4, _plY, 4, '#f44', 'left');
-      drawRetroText('N' + game.lvl.N, 14, _plY, 4, '#0ff', 'left');
-      drawRetroText('P' + game.lvl.P, 24, _plY, 4, '#f6f', 'left');
-      // MAX BUILD BADGE — all three caps reached
+      drawRetroText('N' + game.lvl.N, 15, _plY, 4, '#0ff', 'left');
+      drawRetroText('P' + game.lvl.P, 26, _plY, 4, '#f6f', 'left');
       if (typeof isPowerMaxed === 'function' && isPowerMaxed()) {
-        const _mxBl = (game.animFrame >> 3) % 2 === 0;
-        drawRetroText('MAX', 34, _plY, 4, _mxBl ? '#fc4' : '#fff', 'left');
-      } else if (game.maxPowerRevealed) {
-        // MAX SEEN — was once at max this run (now reset by death)
-        drawRetroText('MAX-X', 34, _plY, 3, '#888', 'left');
+        drawRetroText('MAX', 37, _plY, 4, '#fc4', 'left');
       }
     }
-    // SHIELD CHARGES PEEK — small 'E xN' label at intro when any shield held.
+    // Shield charges
     if ((game.shieldCharges || 0) > 0) {
-      drawRetroText('E x' + game.shieldCharges, 4, BASE_H/2 - 1, 4, '#0f8', 'left');
+      drawRetroText('E x' + game.shieldCharges, 4, BASE_H/2 + 6, 4, '#0f8', 'left');
     }
-    // ARSENAL TIER PIPS — 4-dot row showing claimed combo arsenal tiers
-    if (game.comboArsenalClaimed) {
-      const _arT = [25, 50, 75, 100];
-      const _arC = ['#fc4', '#f8a', '#0ef', '#fff'];
-      let _anyClaimed = false;
-      for (const _t of _arT) if (game.comboArsenalClaimed[_t]) { _anyClaimed = true; break; }
-      if (_anyClaimed) {
-        ctx.save();
-        for (let _ai = 0; _ai < 4; _ai++) {
-          ctx.globalAlpha = game.comboArsenalClaimed[_arT[_ai]] ? 0.85 : 0.20;
-          ctx.fillStyle = _arC[_ai];
-          ctx.fillRect(4 + _ai * 4, BASE_H/2 + 18, 2, 2);
-        }
-        ctx.restore();
-      }
-    }
-    // LIVES PEEK — small lives count near power peek so the player sees how
-    // many ships remain entering this stage. Red when last life.
+    // Lives
     {
       const _lvCol = game.lives === 1 ? '#f44' : game.lives <= 2 ? '#fa8' : '#fff';
-      drawRetroText('L:' + game.lives, 4, BASE_H/2 + 5, 4, _lvCol, 'left');
+      drawRetroText('LIVES ' + game.lives, 4, BASE_H/2 + 13, 4, _lvCol, 'left');
     }
-    // HIGH SCORE PEEK — small 'HI: N' label at right side mirroring left peeks.
-    // Lets player see the bar they're chasing without leaving the intro.
+
+    // ---- RIGHT COLUMN ----
+    // Ship sprite + name
+    if (typeof drawPlayer === 'function') {
+      const _sCol = (game.ship && game.ship.color) || '#0cf';
+      drawPlayer(BASE_W - 28, BASE_H/2 - 18, _sCol, game.lvl);
+    }
+    if (game.ship && game.ship.name) {
+      drawRetroText(game.ship.name, BASE_W - 4, BASE_H/2 - 11, 4, game.ship.color || '#0cf', 'right');
+    }
+    // Active buff (single highest-priority)
+    {
+      let _bp = null, _bpCol = '#fff';
+      if ((game.laserTimer  || 0) > 0)      { _bp = 'LASER'; _bpCol = '#f6c'; }
+      else if ((game.forkTimer  || 0) > 0)  { _bp = 'FORK'; _bpCol = '#fa0'; }
+      else if ((game.homingTimer || 0) > 0) { _bp = 'HOMING'; _bpCol = '#0f8'; }
+      else if ((game.waveTimer   || 0) > 0) { _bp = 'WAVE'; _bpCol = '#6cf'; }
+      else if ((game.rapidTimer  || 0) > 0) { _bp = 'RAPID'; _bpCol = '#fc4'; }
+      else if ((game.slowTimer   || 0) > 0) { _bp = 'SLOW'; _bpCol = '#8ff'; }
+      if (_bp) drawRetroText(_bp, BASE_W - 4, BASE_H/2 - 4, 4, _bpCol, 'right');
+    }
+    // High score
     if ((game.highScore || 0) > 0) {
-      drawRetroText('HI:' + fmtScore(game.highScore), BASE_W - 4, BASE_H/2 - 1, 4, '#fc4', 'right');
+      drawRetroText('HI ' + fmtScore(game.highScore), BASE_W - 4, BASE_H/2 + 4, 4, '#fc4', 'right');
     }
-    // STREAK SUMMARY PEEK — zen (no-death) streak + parry streak best when active.
-    // Right side, below HI score. Encourages preservation play.
-    if ((game.zenStreak || 0) >= 2) {
-      drawRetroText('NODIE x' + game.zenStreak, BASE_W - 4, BASE_H/2 + 5, 4, '#0f8', 'right');
-    }
-    // COMBO BEST PEEK — session combo best at right side stack.
-    if ((game.comboBest || 0) >= 3) {
-      drawRetroText('CB x' + game.comboBest, BASE_W - 4, BASE_H/2 + 11, 4, '#0ff', 'right');
-    }
-    // PARRY COUNT PEEK — session parry count
-    if ((game.parryCount || 0) >= 3) {
-      drawRetroText('PR x' + game.parryCount, BASE_W - 4, BASE_H/2 + 17, 4, '#0cf', 'right');
-    }
-    // RUN KILLS PEEK — session kill count when meaningful (>= 10).
-    if (game.stats && (game.stats.kills || 0) >= 10) {
-      drawRetroText('K x' + game.stats.kills, BASE_W - 4, BASE_H/2 + 23, 4, '#f88', 'right');
-    }
-    // PERFECT WAVES PEEK — count of no-escape challenge waves this run.
-    if ((game.perfectWavesRun || 0) >= 1) {
-      drawRetroText('PW x' + game.perfectWavesRun, BASE_W - 4, BASE_H/2 + 29, 4, '#fc4', 'right');
-    }
-    // ACCURACY PEEK — current run accuracy when sample is meaningful.
+    // Run accuracy (when sample is meaningful)
     if (game.stats && (game.stats.shotsFired || 0) >= 10) {
       const _accInt = Math.round((game.stats.shotsHit / game.stats.shotsFired) * 100);
       const _accCol = _accInt >= 90 ? '#0f8' : _accInt >= 70 ? '#0ff' : _accInt >= 50 ? '#fc4' : '#f88';
-      drawRetroText('ACC ' + _accInt + '%', BASE_W - 4, BASE_H/2 + 35, 4, _accCol, 'right');
+      drawRetroText('ACC ' + _accInt + '%', BASE_W - 4, BASE_H/2 + 11, 4, _accCol, 'right');
     }
-    // ELITE COUNT PEEK — run elite kills counter when active.
-    if ((game.eliteKills || 0) >= 1) {
-      drawRetroText('EL x' + game.eliteKills, BASE_W - 4, BASE_H/2 + 41, 4, '#f44', 'right');
-    }
-    // CRIT KILLS PEEK — run crit kill counter when active.
-    if ((game.critKillsRun || 0) >= 3) {
-      drawRetroText('CR x' + game.critKillsRun, BASE_W - 4, BASE_H/2 + 53, 4, '#fc4', 'right');
-    }
-    // MULTIKILL BEST RUN PEEK — biggest same-frame kill count this run.
-    if ((game.multiKillBest || 0) >= 3) {
-      drawRetroText('MK x' + game.multiKillBest, BASE_W - 4, BASE_H/2 + 95, 4, '#fc4', 'right');
-    }
-    // DASH COUNT PEEK — total dashes this run
-    if ((game.dashCount || 0) >= 5) {
-      drawRetroText('DS x' + game.dashCount, BASE_W - 4, BASE_H/2 + 101, 4, '#0ff', 'right');
-    }
-    // PICKUP STREAK BEST RUN PEEK — best no-death pickup streak this run
-    if ((game.pickupStreakBest || 0) >= 3) {
-      drawRetroText('PS x' + game.pickupStreakBest, BASE_W - 4, BASE_H/2 + 107, 4, '#0cf', 'right');
-    }
-    // EXTRA SHIPS PEEK — count of extra lives earned this run
-    if ((game.extraShipsRun || 0) >= 1) {
-      drawRetroText('+SHIP x' + game.extraShipsRun, BASE_W - 4, BASE_H/2 + 113, 4, '#ff4', 'right');
-    }
-    // RUN BIOMES PEEK — distinct biomes visited this run
-    if (game.runBiomesSeen && game.runBiomesSeen.size >= 2) {
-      drawRetroText('B ' + game.runBiomesSeen.size + '/8', BASE_W - 4, BASE_H/2 + 119, 4, '#9ef', 'right');
-    }
-    // LAST STAGE GRADE PEEK — directly compare last grade to current run target
+    // Previous stage grade
     if (game.lastStageGrade) {
-      drawRetroText('PREV ' + game.lastStageGrade, BASE_W - 4, BASE_H/2 + 125, 4,
+      drawRetroText('PREV ' + game.lastStageGrade, BASE_W - 4, BASE_H/2 + 18, 4,
                     game.lastStageGradeCol || '#fff', 'right');
     }
-    // RECENT GRADE QUEUE — last 3 grades, oldest → newest, colored per letter.
-    // Helps player feel streaks (e.g. "SSS" momentum, "DDC" recovery needed).
-    if (Array.isArray(game.recentGrades) && game.recentGrades.length >= 2) {
-      const _gqMap = { S: '#fc4', A: '#0f8', B: '#0cf', C: '#fff', D: '#f88' };
-      let _qx = BASE_W - 4;
-      for (let _qi = game.recentGrades.length - 1; _qi >= 0; _qi--) {
-        const _gL = game.recentGrades[_qi];
-        drawRetroText(_gL, _qx, BASE_H/2 + 119, 4, _gqMap[_gL] || '#fff', 'right');
-        _qx -= 5;
-      }
-    }
-    // S GRADE TARGET HINT — show condition trio for top-tier rating, dim.
-    // Only on normal stages (boss/chall use different scoring). Skip stage 1.
-    if ((game.stage || 0) >= 2
-        && (game.stage % BOSS_STAGE_INTERVAL !== 0)
-        && (game.stage % 4 !== 0)) {
-      drawRetroText('S: 95% NO-DIE PB', BASE_W - 4, BASE_H/2 + 131, 3, '#666', 'right');
-    }
-    // PB STATUS HINT — show whether this stage has a stored PB. "FIRST PB" tag
-    // when missing (motivates discovery), "PB " + time when set. Only on
-    // normal stages (boss/challenge run different timing schemes).
+    // Stage PB status — only on normal stages (boss/challenge use other timing)
     if ((game.stage || 0) >= 1
         && (game.stage % BOSS_STAGE_INTERVAL !== 0)
         && (game.stage % 4 !== 0)
         && typeof stagePBs !== 'undefined' && stagePBs) {
       const _pbF2 = stagePBs[String(game.stage)];
-      if (typeof _pbF2 === 'number' && _pbF2 > 0
-          && typeof fmtFrameTime === 'function') {
-        drawRetroText('PB ' + fmtFrameTime(_pbF2), BASE_W - 4, BASE_H/2 + 137, 3, '#0cf', 'right');
+      if (typeof _pbF2 === 'number' && _pbF2 > 0 && typeof fmtFrameTime === 'function') {
+        drawRetroText('PB ' + fmtFrameTime(_pbF2), BASE_W - 4, BASE_H/2 + 25, 4, '#0cf', 'right');
       } else {
-        const _blink = (game.animFrame >> 4) % 2 === 0;
-        drawRetroText('FIRST PB', BASE_W - 4, BASE_H/2 + 137, 3,
-                      _blink ? '#fc4' : '#fa8', 'right');
+        drawRetroText('NO PB YET', BASE_W - 4, BASE_H/2 + 25, 4, '#888', 'right');
       }
-    }
-    // RUN ELAPSED PEEK — current run time in MM:SS when meaningful (>= 30s)
-    if ((game.runFrames || 0) >= 1800) {
-      const _rs = Math.floor(game.runFrames / 60);
-      const _rm = Math.floor(_rs / 60);
-      const _rss = _rs % 60;
-      drawRetroText('T ' + _rm + ':' + String(_rss).padStart(2, '0'),
-                    BASE_W - 4, BASE_H/2 + 59, 4, '#888', 'right');
-    }
-    // LIFETIME RUNS PEEK — total sessions across modes when meaningful (>= 10)
-    try {
-      const _csNr = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
-      const _csCr = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
-      const _sess = (_csNr.sessions || 0) + (_csCr.sessions || 0);
-      if (_sess >= 10) {
-        drawRetroText('R ' + _sess, BASE_W - 4, BASE_H/2 + 65, 4, '#666', 'right');
-      }
-    } catch (e) {}
-    // BIOMES SEEN PEEK — lifetime biomes encountered fraction.
-    try {
-      const _bsRaw = localStorage.getItem('galagaBiomesSeen') || '[]';
-      const _bsArr = JSON.parse(_bsRaw);
-      const _bsCount = Array.isArray(_bsArr) ? _bsArr.length : 0;
-      if (_bsCount >= 1) {
-        const _bsCol = _bsCount === 8 ? '#fc4' : '#0cf';
-        drawRetroText('BIO ' + _bsCount + '/8', BASE_W - 4, BASE_H/2 + 47, 4, _bsCol, 'right');
-        // Mini 8-cell bar under text — filled cells = biomes seen
-        ctx.save();
-        const _bsBarX = BASE_W - 28, _bsBarY = BASE_H/2 + 52;
-        for (let _bi = 0; _bi < 8; _bi++) {
-          ctx.globalAlpha = _bi < _bsCount ? 0.8 : 0.18;
-          ctx.fillStyle = _bsCol;
-          ctx.fillRect(_bsBarX + _bi * 3, _bsBarY, 2, 1);
-        }
-        ctx.restore();
-      }
-    } catch (e) {}
-    // DAILY STREAK PEEK — current daily-mission streak when >= 2 days.
-    if (typeof computeDailyStreak === 'function') {
-      const _dStreak = computeDailyStreak();
-      if (_dStreak >= 2) {
-        const _dsCol = _dStreak >= 30 ? '#fc4' : _dStreak >= 7 ? '#0f8' : '#cce';
-        drawRetroText('D' + _dStreak, BASE_W - 4, BASE_H/2 + 71, 4, _dsCol, 'right');
-      }
-    }
-    // BOSS COUNT PEEK — bosses defeated this run.
-    if ((game.bossesKilledThisRun || 0) >= 1) {
-      drawRetroText('BS x' + game.bossesKilledThisRun, BASE_W - 4, BASE_H/2 + 77, 4, '#f8a', 'right');
-    }
-    // KILLED TYPES PEEK — unique enemy types killed this run (variety hunter)
-    if (game.killedTypes && game.killedTypes.size >= 3) {
-      drawRetroText('TYP ' + game.killedTypes.size, BASE_W - 4, BASE_H/2 + 83, 4, '#0cf', 'right');
-    }
-    // BESTIARY MINI BAR — lifetime dex unlocked fraction
-    if (typeof dexUnlocked !== 'undefined' && dexUnlocked.size >= 1) {
-      const _dxCol = dexUnlocked.size >= 8 ? '#fc4' : '#f6f';
-      drawRetroText('DEX ' + dexUnlocked.size + '/8', BASE_W - 4, BASE_H/2 + 89, 4, _dxCol, 'right');
-      ctx.save();
-      const _dxBarX = BASE_W - 28, _dxBarY = BASE_H/2 + 94;
-      for (let _di = 0; _di < 8; _di++) {
-        ctx.globalAlpha = _di < dexUnlocked.size ? 0.8 : 0.18;
-        ctx.fillStyle = _dxCol;
-        ctx.fillRect(_dxBarX + _di * 3, _dxBarY, 2, 1);
-      }
-      ctx.restore();
-    }
-    // BUFF TIMER PEEK — single highest-priority active temp buff as small letter
-    // (L/H/W/R/T) at the right side mirror of left peeks. Hidden when none.
-    {
-      let _bp = null, _bpCol = '#fff';
-      if ((game.laserTimer  || 0) > 0)      { _bp = 'LASER'; _bpCol = '#f6c'; }
-      else if ((game.homingTimer || 0) > 0) { _bp = 'HOMING'; _bpCol = '#0f8'; }
-      else if ((game.waveTimer   || 0) > 0) { _bp = 'WAVE'; _bpCol = '#6cf'; }
-      else if ((game.rapidTimer  || 0) > 0) { _bp = 'RAPID'; _bpCol = '#fc4'; }
-      else if ((game.slowTimer   || 0) > 0) { _bp = 'SLOW'; _bpCol = '#8ff'; }
-      if (_bp) drawRetroText(_bp, BASE_W - 4, BASE_H/2 - 15, 4, _bpCol, 'right');
     }
   }
   // RUN QUICK STATS — single-line summary of in-progress run shown at stage 2+.
