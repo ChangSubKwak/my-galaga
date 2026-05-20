@@ -4231,6 +4231,7 @@ function updateInterceptQueue() {
 
 function drawInterceptTerminal() {
   if (!game || !game.interceptQueue || game.interceptQueue.length === 0) return;
+  if (minimalHud) return; // enemy-comms flavor — hidden in the clean/minimal view
   if (game.state === STATE.TITLE || game.state === STATE.STAGE_INTRO
       || game.state === STATE.GAME_OVER || game.state === STATE.BONUS_GAME) return;
   ctx.save();
