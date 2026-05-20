@@ -651,6 +651,39 @@ if (typeof G.powerUpDropRate === 'function') {
 } else { console.log('  (skipped — powerUpDropRate not exposed)'); }
 
 // ============================================================
+section('stats overlay page model — Tab navigation invariants');
+if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'function') {
+  const gp = G.statsAchGridPages();
+  const tp = G.statsTotalPages();
+  ok(gp >= 1, 'at least one achievement grid page');
+  // summary(1) + grids(gp) + bestiary(1) + profile(1)
+  eq(tp, gp + 3, 'total pages = grid pages + 3 (summary/bestiary/profile)');
+  // The four draw branches key off these indices; assert they stay distinct and
+  // ordered so a future ACHIEVEMENTS change can't collapse two pages onto one
+  // index or push a page out of the Tab cycle.
+  const summaryPage  = 0;
+  const firstGridPg  = 1;
+  const lastGridPg   = gp;
+  const bestiaryPage = gp + 1;
+  const profilePage  = gp + 2;
+  ok(firstGridPg <= lastGridPg, 'grid page range is non-empty');
+  ok(summaryPage < firstGridPg, 'summary precedes grids');
+  ok(lastGridPg < bestiaryPage, 'grids precede bestiary');
+  ok(bestiaryPage < profilePage, 'bestiary precedes profile');
+  eq(profilePage, tp - 1, 'profile is the last page (Tab wraps after it)');
+  // every page index in [0, tp) maps to exactly one of the four kinds
+  let covered = 0;
+  for (let p = 0; p < tp; p++) {
+    const kinds = (p === summaryPage ? 1 : 0)
+                + (p >= firstGridPg && p <= lastGridPg ? 1 : 0)
+                + (p === bestiaryPage ? 1 : 0)
+                + (p === profilePage ? 1 : 0);
+    if (kinds === 1) covered++;
+  }
+  eq(covered, tp, 'every Tab page maps to exactly one kind (no gaps/overlaps)');
+} else { console.log('  (skipped — stats page helpers not exposed)'); }
+
+// ============================================================
 section('SHIPS ↔ SHIP_ORDER bijection + stat sanity (no unselectable ships)');
 if (G.__getShips() && G.__getShipOrder()) {
   const SHIPS = G.__getShips();

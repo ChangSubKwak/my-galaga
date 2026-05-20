@@ -7707,12 +7707,10 @@ function initInput() {
       }
     }
     // Cycle stats pages within stats overlay — Tab (wraps back to page 0 past the end).
-    // Pages: 0..(achPages-1) achievement grids, then bestiary, then pilot profile.
+    // Pages: 0 summary, 1..G achievement grids, then bestiary, then pilot profile.
     if (e.key === 'Tab' && game.statsOverlay) {
       e.preventDefault();
-      const achPages = Math.max(1, Math.ceil(Object.keys(ACHIEVEMENTS).length / 30));
-      const numPages = achPages + 2; // +1 bestiary, +1 profile
-      game.statsAchPage = ((game.statsAchPage || 0) + 1) % numPages;
+      game.statsAchPage = ((game.statsAchPage || 0) + 1) % statsTotalPages();
       playSound('tick');
     }
     // Quit to title from pause — commit the run as if it ended naturally so
@@ -8939,6 +8937,17 @@ const ACHIEVEMENTS = {
   combo75:       { name: 'COMBO 75',      desc: 'First combo 75' },
   pillarsOf:     { name: 'PILLARS OF',    desc: 'Stage 100 reached' },
 };
+// Stats overlay page model — single source of truth for Tab navigation so the
+// keydown handler and the four draw branches can't desync. Pages, in order:
+//   0                  STATS SUMMARY (OVERALL / TOP SCORES / BEST TIMES)
+//   1 .. G             ACHIEVEMENT grids   (G = statsAchGridPages())
+//   G + 1              BESTIARY
+//   G + 2              PROFILE
+const STATS_ACH_PER_PAGE = 30; // 10 rows × 3 cols
+function statsAchGridPages() {
+  return Math.max(1, Math.ceil(Object.keys(ACHIEVEMENTS).length / STATS_ACH_PER_PAGE));
+}
+function statsTotalPages() { return statsAchGridPages() + 3; }
 const ACH_KEY = 'galagaAchievements';
 let unlockedAchievements = (() => {
   try {
@@ -22208,14 +22217,14 @@ function drawStatsOverlay() {
 
   let y = py + 28;
 
+  if (typeof game.statsAchPage !== 'number') game.statsAchPage = 0;
+  game.statsAchPage = Math.max(0, Math.min(statsTotalPages() - 1, game.statsAchPage));
+
   // Profile page: detect early so it gets full panel space (no OVERALL/BEST TIMES overhead)
   {
-    const _ppIds = Object.keys(ACHIEVEMENTS || {});
-    const _ppPgs = Math.max(1, Math.ceil(_ppIds.length / 30));
-    const _ppNp  = _ppPgs + 2;
-    if (typeof game.statsAchPage !== 'number') game.statsAchPage = 0;
-    game.statsAchPage = Math.max(0, Math.min(_ppNp - 1, game.statsAchPage));
-    if (game.statsAchPage === _ppPgs + 1) {
+    const _ppPgs = statsAchGridPages();
+    const _ppNp  = statsTotalPages();
+    if (game.statsAchPage === _ppPgs + 2) {
       const _rk  = computePilotTitle();
       const _ni  = computePilotNextRank();
       const _cN2 = loadCumStats(false), _cC2 = loadCumStats(true);
@@ -22537,11 +22546,9 @@ function drawStatsOverlay() {
   // on its own page rather than appended below the OVERALL/TOP SCORES/BEST TIMES
   // block, which used to push the 12-row enemy codex ~46px past the panel footer.
   {
-    const _bIds = Object.keys(ACHIEVEMENTS || {});
-    const _bPgs = Math.max(1, Math.ceil(_bIds.length / 30));
-    if (game.statsAchPage === _bPgs) {
+    if (game.statsAchPage === statsAchGridPages() + 1) {
       drawRetroText('BESTIARY', px + 8, y, 7, COL.cyan, 'left');
-      drawRetroText((game.statsAchPage + 1) + '/' + (_bPgs + 2) + '  TAB',
+      drawRetroText((game.statsAchPage + 1) + '/' + statsTotalPages() + '  TAB',
                     px + panelW - 8, y, 5, COL.gray, 'right');
       y += 9;
       const dexIds = Object.keys(ENEMY_INFO);
@@ -22557,6 +22564,48 @@ function drawStatsOverlay() {
         drawRetroText(got ? info.trait : 'DEFEAT TO REVEAL',
                       px + panelW - 8, y + 1, 5, got ? '#fff' : '#333', 'right');
         y += 9;
+      }
+      drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
+      return;
+    }
+  }
+
+  // ACHIEVEMENT grid — dedicated page(s) 1..G, each the full panel for 30 cells
+  // (was appended below the lifetime-stats block, where a full 10-row page ran
+  // its last cells past the I CLOSE footer; the stats block also repeated on
+  // every grid page). Page 0 is the stats summary, handled by the fall-through.
+  {
+    const _gPgs = statsAchGridPages();
+    if (game.statsAchPage >= 1 && game.statsAchPage <= _gPgs) {
+      const ids = Object.keys(ACHIEVEMENTS);
+      const cellW = (panelW - 16) / 3;
+      const cellH = 8;
+      drawRetroText('ACHIEVEMENTS', px + 8, y, 7, COL.cyan, 'left');
+      drawRetroText((game.statsAchPage + 1) + '/' + statsTotalPages() + '  TAB',
+                    px + panelW - 8, y, 5, COL.gray, 'right');
+      y += 9;
+      drawRetroText(ach + '/' + totalAch + ' UNLOCKED', px + 8, y, 5, COL.magenta, 'left');
+      y += 8;
+      const start = (game.statsAchPage - 1) * STATS_ACH_PER_PAGE;
+      const end = Math.min(ids.length, start + STATS_ACH_PER_PAGE);
+      for (let i = start; i < end; i++) {
+        const id = ids[i];
+        const offset = i - start;
+        const r = Math.floor(offset / 3), c = offset % 3;
+        const cx = px + 8 + c * cellW;
+        const cy = y + r * cellH;
+        const got = unlockedAchievements.has(id);
+        ctx.fillStyle = got ? 'rgba(255,170,68,0.20)' : 'rgba(40,40,40,0.45)';
+        ctx.fillRect(cx, cy, cellW - 2, cellH - 2);
+        ctx.fillStyle = got ? '#fc4' : '#333';
+        ctx.fillRect(cx, cy, cellW - 2, 1);
+        ctx.fillRect(cx, cy + cellH - 3, cellW - 2, 1);
+        const gemX = cx + 4, gemY = cy + (cellH - 2) / 2;
+        if (got) drawMiniGem(gemX, gemY, '#fc4');
+        else { ctx.fillStyle = '#555'; ctx.fillRect(gemX - 1, gemY - 1, 3, 3); }
+        const name = ACHIEVEMENTS[id].name;
+        drawRetroText(name.length > 12 ? name.slice(0, 12) : name,
+                      cx + 9, cy + (cellH - 1) / 2, 5, got ? '#fff' : '#666', 'left');
       }
       drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
       return;
@@ -22657,42 +22706,10 @@ function drawStatsOverlay() {
     y += 7;
   }
 
-  // Achievement grid (3-col, one cell per achievement). BESTIARY (enemy codex)
-  // and PROFILE are dedicated pages handled by their own early-returns above.
-  y += 4;
-  const ids = Object.keys(ACHIEVEMENTS);
-  const cellW = (panelW - 16) / 3;
-  const cellH = 7;
-  const PER_PAGE = 30; // 10 rows × 3 cols
-  const achPages = Math.max(1, Math.ceil(ids.length / PER_PAGE));
-  const numPages = achPages + 2; // +1 bestiary, +1 profile (last)
-  if (typeof game.statsAchPage !== 'number') game.statsAchPage = 0;
-  game.statsAchPage = Math.max(0, Math.min(numPages - 1, game.statsAchPage));
-  drawRetroText('ACHIEVEMENTS', px + 8, y, 7, COL.cyan, 'left');
-  drawRetroText((game.statsAchPage + 1) + '/' + numPages + '  TAB', px + panelW - 8, y, 5, COL.gray, 'right');
-  y += 9;
-  const start = game.statsAchPage * PER_PAGE;
-  const end = Math.min(ids.length, start + PER_PAGE);
-  for (let i = start; i < end; i++) {
-    const id = ids[i];
-    const offset = i - start;
-    const r = Math.floor(offset / 3), c = offset % 3;
-    const cx = px + 8 + c * cellW;
-    const cy = y + r * cellH;
-    const got = unlockedAchievements.has(id);
-    ctx.fillStyle = got ? 'rgba(255,170,68,0.20)' : 'rgba(40,40,40,0.45)';
-    ctx.fillRect(cx, cy, cellW - 2, cellH - 2);
-    ctx.fillStyle = got ? '#fc4' : '#333';
-    ctx.fillRect(cx, cy, cellW - 2, 1);
-    ctx.fillRect(cx, cy + cellH - 3, cellW - 2, 1);
-    const gemX = cx + 4, gemY = cy + (cellH - 2) / 2;
-    if (got) drawMiniGem(gemX, gemY, '#fc4');
-    else { ctx.fillStyle = '#555'; ctx.fillRect(gemX - 1, gemY - 1, 3, 3); }
-    const name = ACHIEVEMENTS[id].name;
-    drawRetroText(name.length > 12 ? name.slice(0, 12) : name, cx + 9, cy + (cellH - 1) / 2, 5, got ? '#fff' : '#666', 'left');
-  }
-
-  drawRetroText('I  CLOSE', BASE_W/2, py + panelH - 8, 6, COL.gray);
+  // Page-0 footer. This is the STATS SUMMARY page; the ACHIEVEMENT grids,
+  // BESTIARY, and PROFILE are their own Tab pages with early-returns above.
+  drawRetroText('1/' + statsTotalPages() + '  TAB', px + panelW - 8, py + panelH - 8, 5, COL.gray, 'right');
+  drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
 }
 
 // --- Game loop ---
