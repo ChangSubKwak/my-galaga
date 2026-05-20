@@ -22522,6 +22522,36 @@ function drawStatsOverlay() {
     }
   }
 
+  // BESTIARY page — dedicated full panel (mirrors the profile early-return). Drawn
+  // on its own page rather than appended below the OVERALL/TOP SCORES/BEST TIMES
+  // block, which used to push the 12-row enemy codex ~46px past the panel footer.
+  {
+    const _bIds = Object.keys(ACHIEVEMENTS || {});
+    const _bPgs = Math.max(1, Math.ceil(_bIds.length / 30));
+    if (game.statsAchPage === _bPgs) {
+      drawRetroText('BESTIARY', px + 8, y, 7, COL.cyan, 'left');
+      drawRetroText((game.statsAchPage + 1) + '/' + (_bPgs + 2) + '  TAB',
+                    px + panelW - 8, y, 5, COL.gray, 'right');
+      y += 9;
+      const dexIds = Object.keys(ENEMY_INFO);
+      const unlockedCount = dexIds.filter(t => dexUnlocked.has(t)).length;
+      drawRetroText(unlockedCount + '/' + dexIds.length + ' ENCOUNTERED', px + 8, y, 5, COL.gray, 'left');
+      y += 8;
+      for (const t of dexIds) {
+        const info = ENEMY_INFO[t];
+        const got = dexUnlocked.has(t);
+        ctx.fillStyle = got ? 'rgba(0,255,136,0.10)' : 'rgba(40,40,40,0.40)';
+        ctx.fillRect(px + 6, y - 1, panelW - 12, 8);
+        drawRetroText(got ? info.name : '???', px + 8, y + 1, 6, got ? info.col : '#444', 'left');
+        drawRetroText(got ? info.trait : 'DEFEAT TO REVEAL',
+                      px + panelW - 8, y + 1, 5, got ? '#fff' : '#333', 'right');
+        y += 9;
+      }
+      drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
+      return;
+    }
+  }
+
   drawRetroText('OVERALL', px + 8, y, 7, COL.cyan, 'left');
   y += 9;
 
@@ -22616,8 +22646,8 @@ function drawStatsOverlay() {
     y += 7;
   }
 
-  // Achievement grid (2-row × 3-col, one cell per achievement)
-  // Last page is the BESTIARY (enemy codex) — same Tab cycle.
+  // Achievement grid (3-col, one cell per achievement). BESTIARY (enemy codex)
+  // and PROFILE are dedicated pages handled by their own early-returns above.
   y += 4;
   const ids = Object.keys(ACHIEVEMENTS);
   const cellW = (panelW - 16) / 3;
@@ -22627,30 +22657,9 @@ function drawStatsOverlay() {
   const numPages = achPages + 2; // +1 bestiary, +1 profile (last)
   if (typeof game.statsAchPage !== 'number') game.statsAchPage = 0;
   game.statsAchPage = Math.max(0, Math.min(numPages - 1, game.statsAchPage));
-  const onBestiary = game.statsAchPage === achPages;
-  const headerText = onBestiary ? 'BESTIARY' : 'ACHIEVEMENTS';
-  drawRetroText(headerText, px + 8, y, 7, COL.cyan, 'left');
+  drawRetroText('ACHIEVEMENTS', px + 8, y, 7, COL.cyan, 'left');
   drawRetroText((game.statsAchPage + 1) + '/' + numPages + '  TAB', px + panelW - 8, y, 5, COL.gray, 'right');
   y += 9;
-  if (onBestiary) {
-    // BESTIARY page — list of all enemy types with unlock state.
-    // Locked entries show '???' and gray silhouette feel; unlocked show name + trait.
-    const dexIds = Object.keys(ENEMY_INFO);
-    const unlockedCount = dexIds.filter(t => dexUnlocked.has(t)).length;
-    drawRetroText(unlockedCount + '/' + dexIds.length + ' ENCOUNTERED', px + 8, y, 5, COL.gray, 'left');
-    y += 8;
-    for (const t of dexIds) {
-      const info = ENEMY_INFO[t];
-      const got = dexUnlocked.has(t);
-      ctx.fillStyle = got ? 'rgba(0,255,136,0.10)' : 'rgba(40,40,40,0.40)';
-      ctx.fillRect(px + 6, y - 1, panelW - 12, 8);
-      drawRetroText(got ? info.name : '???', px + 8, y + 1, 6, got ? info.col : '#444', 'left');
-      drawRetroText(got ? info.trait : 'DEFEAT TO REVEAL',
-                    px + panelW - 8, y + 1, 5, got ? '#fff' : '#333', 'right');
-      y += 9;
-    }
-    return; // skip the achievement grid below — no ctx.save was active in this branch
-  }
   const start = game.statsAchPage * PER_PAGE;
   const end = Math.min(ids.length, start + PER_PAGE);
   for (let i = start; i < end; i++) {
