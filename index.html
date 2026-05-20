@@ -20038,17 +20038,18 @@ function drawHUD() {
     const _pct = Math.round(_corr * 100);
     const _shift = _corr >= 0.8 ? 1 : _corr >= 0.5 ? 2 : 3;
     const _blink = (game.animFrame >> _shift) % 2 === 0 ? '#f48' : '#fff';
-    drawRetroText('CORR ' + _pct + '%', BASE_W - 5, 16, 4, _blink, 'right');
-    // CORRUPTION TIER NAME — narrative tier label. Drawn at y=34 (below the
-    // STAGE TIME CLOCK at y=22 and its PB bar at y=28) so it no longer
-    // collides with the clock on stage 50+.
+    // CORRUPTION READOUT — percent + (stage 50+) tier name on ONE right-aligned
+    // line at y=34 (below the clock at y=22 and its PB bar at y=28). Previously
+    // the % sat at y=14/16 where it overlapped the ACT chip, and was split far
+    // from its tier name at y=34. Unified here: no ACT collision, % beside tier.
+    let _corrTxt = 'CORR ' + _pct + '%';
     if (_corr >= 0.45) {
-      const _tier = _corr >= 0.95 ? 'OBLIVION'
-                  : _corr >= 0.75 ? 'NULL'
-                  : _corr >= 0.60 ? 'VOID'
-                  : 'DEEP';
-      drawRetroText(_tier, BASE_W - 5, 34, 4, '#f48', 'right');
+      _corrTxt += '  ' + (_corr >= 0.95 ? 'OBLIVION'
+                        : _corr >= 0.75 ? 'NULL'
+                        : _corr >= 0.60 ? 'VOID'
+                        : 'DEEP');
     }
+    drawRetroText(_corrTxt, BASE_W - 5, 34, 4, _blink, 'right');
   }
   // STAGE TIME CLOCK — real-time mm:ss.t timer + PB delta indicator. Only renders
   // during active gameplay states (no TITLE/INTRO/GAME_OVER pollution). Color shifts
