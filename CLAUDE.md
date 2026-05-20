@@ -47,7 +47,7 @@ need a browser.
 
 ### Single-file structure
 
-`index.html` (~10,000 lines) contains the entire game: HTML shell, CSS, and an inline `<script>` block that holds all game logic. The two `*.svg` files (`bullet_concepts.svg`, `bullet_readability.svg`) are design references for player-bullet visuals and are not loaded by the game.
+`index.html` (~22,700 lines) contains the entire game: HTML shell, CSS, and an inline `<script>` block that holds all game logic. The two `*.svg` files (`bullet_concepts.svg`, `bullet_readability.svg`) are design references for player-bullet visuals and are not loaded by the game.
 
 ### Fixed-timestep loop with internal resolution
 
@@ -157,10 +157,11 @@ BGM tracks have 5 voices: `lead` (square/saw, detuned chorus) + `bass` (triangle
 
 ### Persistence
 
-`localStorage` holds 25 keys, all prefixed `galaga*`:
+`localStorage` holds 60+ keys, all prefixed `galaga*`:
 - Scoring: `galagaHigh`, `galagaTopScoresNormal/Challenge/Daily`, `galagaCumStats[Challenge]`, `galagaBestTimes`, `galagaBonusWins`
 - Mode/settings: `galagaDaily`, `galagaChallenge`, `galagaShip`, `galagaDifficulty`, `galagaMute`, `galagaBGMOff`, `galagaSFXOff`, `galagaVol`, `galagaShake`, `galagaRumble`, `galagaColorBlind`, `galagaNightOff`, `galagaCheckpoint`, `galagaIntroSeen`
 - Progression: `galagaAchievements`, `galagaDexUnlocked`, `galagaCallsign`, `galagaDailyDays`, `galagaShipsUsed`, `galagaDifficultiesUsed`
+- Lifetime skill stats (each a running total/peak): `galagaParryTotal`, `galagaNearMissTotal`, `galagaGrazeChainBest`, `galagaCleanStreakBest`, `galagaRevengeTotal`, `galagaFlawlessBosses`, `galagaWitchSaves`, `galagaPBBeats`, `galagaEliteKills`, `galagaStageGrades`, `galagaKillsByType`, `galagaPickupTotals`, `galagaBiomeVisits`, `galagaDeathCauses`, … (grep `galaga` for the full set)
 
 Each read site uses `try/catch` and falls back to a default — corrupt storage is non-fatal.
 
