@@ -963,6 +963,42 @@ if (typeof G.killPlayer === 'function') {
 } else { console.log('  (skipped — killPlayer not exposed)'); }
 
 // ============================================================
+section('ACHIEVEMENTS: every defined achievement is unlockable & no unlock is undefined');
+{
+  // Source-level guard. An ACHIEVEMENTS entry with no unlockAchievement('id')
+  // reference is unreachable (dead); an unlockAchievement('id') whose id isn't
+  // defined silently no-ops. With 100+ achievements this drift is easy to miss.
+  // Line-scan from `const ACHIEVEMENTS = {` to the first line that is exactly `};`
+  // (mirrors the robust sed-range approach; a single non-greedy regex truncates
+  // early on the first nested-looking close).
+  const _lines = scriptSrc.split('\n');
+  const _start = _lines.findIndex(l => /const ACHIEVEMENTS = \{/.test(l));
+  const defined = new Set();
+  let foundBlock = false;
+  if (_start >= 0) {
+    for (let i = _start + 1; i < _lines.length; i++) {
+      if (/^\};/.test(_lines[i])) { foundBlock = true; break; }   // closing `};` at col 0
+      const km = _lines[i].match(/^\s+([a-zA-Z0-9]+)\s*:\s*\{/);   // `  key: { ... }`
+      if (km) defined.add(km[1]);
+    }
+  }
+  ok(foundBlock, 'ACHIEVEMENTS object found + closed in source');
+  {
+    ok(defined.size >= 50, 'ACHIEVEMENTS defines >= 50 (got ' + defined.size + ')');
+    const refs = new Set((scriptSrc.match(/unlockAchievement\('([a-zA-Z0-9]+)'\)/g) || [])
+      .map(s => s.match(/'([a-zA-Z0-9]+)'/)[1]));
+    // every referenced id must be defined (no silent no-op unlocks)
+    let allDefined = true, undef = [];
+    for (const r of refs) { if (!defined.has(r)) { allDefined = false; undef.push(r); } }
+    ok(allDefined, 'every unlockAchievement id is defined' + (undef.length ? ' (undefined: ' + undef.slice(0, 5).join(', ') + ')' : ''));
+    // every defined achievement must have at least one literal unlock reference
+    let allReachable = true, dead = [];
+    for (const d of defined) { if (!refs.has(d)) { allReachable = false; dead.push(d); } }
+    ok(allReachable, 'every defined achievement has an unlock reference' + (dead.length ? ' (unreachable: ' + dead.slice(0, 5).join(', ') + ')' : ''));
+  }
+}
+
+// ============================================================
 section('pickRunHighlights returns a sorted, capped list');
 if (typeof G.pickRunHighlights === 'function') {
   const g = fresh();
