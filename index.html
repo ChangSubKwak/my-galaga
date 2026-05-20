@@ -4174,6 +4174,9 @@ const INTERCEPT_MSG = {
   nearMissAce:   ['EVASION SPECIALIST!', 'NO HIT REGISTERED!', 'TARGET DEFIES FIRE!'],
   perfectParry:  ['IT TIMED THE DEFLECT!', 'IMPOSSIBLE READ!', 'PILOT MASTERS THE DASH!'],
   firstParry:    ['PILOT GRAZES OUR FIRE!', 'DEFLECTION DETECTED!', 'NEW THREAT VECTOR!'],
+  clusterParry:  ['THEY DANCED THROUGH THE VOLLEY!', 'OUR BARRAGE — TURNED ASIDE!', 'IMPOSSIBLE DEFLECTION!'],
+  flawlessKill:  ['THE CHAMPION FELL UNTOUCHED!', 'NOT A SCRATCH ON THEM!', 'FLAWLESS — HOW?!'],
+  revengeKill:   ['THEY HUNT US BACK!', 'THE PILOT REMEMBERS!', 'VENGEANCE INBOUND!'],
   firstExtra:    ['ENEMY GAINS STRENGTH!', 'IT GROWS RESILIENT!', 'WE LOST GROUND!'],
   firstElite:    ['PILOT KILLED AN ACE!', 'WING COMMANDER DOWN!', 'OUR BEST IS DEAD!'],
   guardianMaster:['TARGET COMMANDS DRONES!', 'FOUR ALLIES!', 'UNSTOPPABLE FORMATION!'],
@@ -6499,6 +6502,8 @@ function updateOneMegaBoss(mb) {
             localStorage.setItem('galagaFlawlessBosses', String(_fb + 1));
           } catch (_eFB) {}
           if (typeof playSound === 'function') playSound('extraLife');
+          // NARRATIVE FUSION — enemy comms react to the untouched takedown.
+          if (typeof pushIntercept === 'function') pushIntercept('flawlessKill');
         }
         // Cinematic camera cut: black bars + slow zoom for ~60 frames
         game.cinematicBars = Math.max(game.cinematicBars || 0, 60);
@@ -11702,6 +11707,10 @@ function updateCollisions() {
               const _rT = parseInt(localStorage.getItem('galagaRevengeTotal') || '0', 10) || 0;
               localStorage.setItem('galagaRevengeTotal', String(_rT + 1));
             } catch (_eR) {}
+            // NARRATIVE FUSION — enemy comms note the pilot hunting back (first/run).
+            if (game.revengeCount === 1 && typeof pushIntercept === 'function') {
+              pushIntercept('revengeKill');
+            }
           }
           const inForm = e.state === 'formation';
           // EARLY INTERCEPT — kill while enemy is still in entering path.
@@ -12594,6 +12603,11 @@ function updateCollisions() {
       if (typeof spawnConfetti === 'function') spawnConfetti(8);
       if (typeof playSound === 'function') playSound('milestone');
       rumble(180, 0.6, 0.35);
+      // NARRATIVE FUSION — enemy comms register the impossible deflection (once/run).
+      if (!game._clusterInterceptFired && typeof pushIntercept === 'function') {
+        game._clusterInterceptFired = true;
+        pushIntercept('clusterParry');
+      }
     }
   }
   // Enemy bullets vs player (skip while invincible)
