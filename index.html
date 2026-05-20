@@ -3454,6 +3454,14 @@ function drawNebulae() {
     } else if ((game.comboLostVignette || 0) > 0) {
       reactTint = '#722';
       reactAlpha = (game.comboLostVignette / 60) * 0.20;
+    } else if (game.stageDied && (game.combo || 0) < 5
+        && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      // STRAINED — PILOT MOMENTUM regrouping state (post-death, combo not yet rebuilt).
+      // A faint desaturated blue-grey haze reads as "shaken focus" — the quiet third
+      // pole between ASCENDING (bright aura) and CORNERED (red unease). Dissolves
+      // naturally once the player rebuilds combo to 5 (the STRAINED exit condition).
+      reactTint = '#446';
+      reactAlpha = 0.08 + 0.04 * Math.sin(game.animFrame * 0.06);
     } else if ((game.combo || 0) >= 30) {
       reactTint = '#a82';
       reactAlpha = 0.10 + 0.06 * Math.sin(game.animFrame * 0.05);
