@@ -22072,12 +22072,12 @@ function drawHelpOverlay() {
   let y = py + 22;
   function section(title) {
     drawRetroText(title, px + 8, y, 7, COL.cyan, 'left');
-    y += 9;
+    y += 8;
   }
   function kvRow(k, v) {
-    drawRetroText(k, px + 8, y, 6, COL.white, 'left');
-    drawRetroText(v, px + panelW - 8, y, 6, COL.gray, 'right');
-    y += 7;
+    drawRetroText(k, px + 8, y, 5, COL.white, 'left');
+    drawRetroText(v, px + panelW - 8, y, 5, COL.gray, 'right');
+    y += 6;
   }
   section('PLAY');
   kvRow('ARROWS / A,D', 'MOVE');
@@ -22107,7 +22107,7 @@ function drawHelpOverlay() {
 
   y += 2;
   drawRetroText('POWER UPS', px + 8, y, 7, COL.cyan, 'left');
-  y += 9;
+  y += 8;
   const items = [
     ['S', 'SPEED  +SHOT VELOCITY (MAX 5)',  '#0ff'],
     ['N', 'NUMBER +SHOTS PER SALVO (MAX 3)','#0f8'],
@@ -22121,9 +22121,9 @@ function drawHelpOverlay() {
     ['E', 'SHIELD ABSORB 1 HIT (STACK 3)',  '#4f8']
   ];
   for (const [tag, desc, col] of items) {
-    drawRetroText(tag, px + 8, y, 7, col, 'left');
+    drawRetroText(tag, px + 8, y, 6, col, 'left');
     drawRetroText(desc, px + 22, y, 5, COL.white, 'left');
-    y += 7;
+    y += 6;
   }
 
   y += 2;
@@ -22135,9 +22135,9 @@ function drawHelpOverlay() {
     ['START / OPTIONS','PAUSE']
   ];
   for (const [k, v] of gpRows) {
-    drawRetroText(k, px + 8, y, 6, COL.white, 'left');
-    drawRetroText(v, px + panelW - 8, y, 6, COL.cyan, 'right');
-    y += 6;
+    drawRetroText(k, px + 8, y, 5, COL.white, 'left');
+    drawRetroText(v, px + panelW - 8, y, 5, COL.cyan, 'right');
+    y += 5;
   }
 
   // Footer (tip + close hint)
