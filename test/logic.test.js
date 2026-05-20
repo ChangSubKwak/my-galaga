@@ -159,6 +159,7 @@ const shim = `
 ;try { globalThis.__getShipOrder = function () { return (typeof SHIP_ORDER !== 'undefined') ? SHIP_ORDER : null; }; } catch (e) {}
 ;try { globalThis.__getKeys = function () { return (typeof keys !== 'undefined') ? keys : null; }; } catch (e) {}
 ;try { globalThis.__getDailyMissions = function () { return (typeof DAILY_MISSIONS !== 'undefined') ? DAILY_MISSIONS : null; }; } catch (e) {}
+;try { globalThis.__setDifficulty = function (m) { if (typeof difficultyMode !== 'undefined') difficultyMode = m; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -1068,6 +1069,29 @@ section('INTERCEPT_MSG: every literal pushIntercept(id) is a defined message');
   for (const r of refs) { if (!defined.has(r)) { allDefined = false; undef.push(r); } }
   ok(allDefined, 'every literal pushIntercept id is defined in INTERCEPT_MSG' + (undef.length ? ' (undefined: ' + undef.join(', ') + ')' : ''));
 }
+
+// ============================================================
+section('diffSpeedMul / diffFireMul — bounded, sane, correctly ordered per mode');
+if (typeof G.diffSpeedMul === 'function' && typeof G.diffFireMul === 'function' && typeof G.__setDifficulty === 'function') {
+  // diffSpeedMul: easy slower (<1), hard faster (>1), normal = 1
+  G.__setDifficulty('easy');   const se = G.diffSpeedMul();
+  G.__setDifficulty('normal'); const sn = G.diffSpeedMul();
+  G.__setDifficulty('hard');   const sh = G.diffSpeedMul();
+  eq(sn, 1, 'normal speedMul = 1');
+  ok(se > 0 && se < 1, 'easy speedMul in (0,1)');
+  ok(sh > 1 && sh < 2, 'hard speedMul in (1,2) — bounded, not absurd');
+  ok(se < sn && sn < sh, 'speedMul ordered easy < normal < hard');
+  // diffFireMul: LOWER = enemies fire MORE (shootEvery uses it). easy higher, hard lower.
+  // Tested with no stageMutation so the denseFire divisor doesn't apply.
+  G.__setDifficulty('easy');   const fe = G.diffFireMul();
+  G.__setDifficulty('normal'); const fn = G.diffFireMul();
+  G.__setDifficulty('hard');   const fh = G.diffFireMul();
+  eq(fn, 1, 'normal fireMul = 1');
+  ok(fe > 1, 'easy fireMul > 1 (enemies fire less often)');
+  ok(fh > 0 && fh < 1, 'hard fireMul in (0,1) (enemies fire more often), still positive');
+  ok(fh < fn && fn < fe, 'fireMul ordered hard < normal < easy');
+  G.__setDifficulty('normal'); // restore
+} else { console.log('  (skipped — diff muls / __setDifficulty not exposed)'); }
 
 // ============================================================
 section('pickRunHighlights returns a sorted, capped list');
