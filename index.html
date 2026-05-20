@@ -19663,7 +19663,9 @@ function drawHUD() {
     if (hint) {
       const blink = (game.animFrame >> 3) % 2 === 0 ? '#fc4' : '#fff';
       drawRetroText(hint, BASE_W/2, 30, 6, blink);
-      drawRetroText('FIRST FLIGHT', BASE_W/2, 38, 5, COL.gray);
+      // (Removed the decorative "FIRST FLIGHT" label at y=38 — it overlapped the
+      // "SWARM DIVE!" combat alert at y=39 on stage 1, and the control hint above
+      // already conveys the tutorial context. Declutters the center column.)
     }
   }
   // Score: glow yellow + flicker between yellow/white when a NEW HIGH was just set
