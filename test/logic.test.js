@@ -1042,6 +1042,32 @@ if (typeof G.pickRunTitle === 'function') {
 } else { console.log('  (skipped — pickRunTitle not exposed)'); }
 
 // ============================================================
+section('INTERCEPT_MSG: every literal pushIntercept(id) is a defined message');
+{
+  // One-directional guard (referenced ⊆ defined): a pushIntercept('typo') silently
+  // no-ops (pushIntercept returns early on an unknown key), so a misspelled trigger
+  // is an invisible dead beat. We don't assert the reverse — some keys are pushed
+  // via dynamic refs (morale state map, endurance tiers) the literal scan can't see.
+  const lines = scriptSrc.split('\n');
+  const start = lines.findIndex(l => /const INTERCEPT_MSG = \{/.test(l));
+  const defined = new Set();
+  let closed = false;
+  if (start >= 0) {
+    for (let i = start + 1; i < lines.length; i++) {
+      if (/^\};/.test(lines[i])) { closed = true; break; }
+      const km = lines[i].match(/^\s+([a-zA-Z]+)\s*:/);
+      if (km) defined.add(km[1]);
+    }
+  }
+  ok(closed && defined.size >= 50, 'INTERCEPT_MSG found with >= 50 keys (got ' + defined.size + ')');
+  const refs = new Set((scriptSrc.match(/pushIntercept\('([a-zA-Z]+)'\)/g) || [])
+    .map(s => s.match(/'([a-zA-Z]+)'/)[1]));
+  let allDefined = true, undef = [];
+  for (const r of refs) { if (!defined.has(r)) { allDefined = false; undef.push(r); } }
+  ok(allDefined, 'every literal pushIntercept id is defined in INTERCEPT_MSG' + (undef.length ? ' (undefined: ' + undef.join(', ') + ')' : ''));
+}
+
+// ============================================================
 section('pickRunHighlights returns a sorted, capped list');
 if (typeof G.pickRunHighlights === 'function') {
   const g = fresh();
