@@ -1020,6 +1020,28 @@ section('CHECKPOINT_OPTIONS ⊇ MILESTONE_STAGES (every milestone is a startable
 }
 
 // ============================================================
+section('pickRunTitle reflects the run\'s dominant playstyle');
+if (typeof G.pickRunTitle === 'function') {
+  const g = fresh();
+  g.stats = { kills: 0, shotsFired: 0, shotsHit: 0, maxStage: 1 };
+  eq(G.pickRunTitle(), 'THE PILOT', 'baseline run = THE PILOT');
+  g.runFlawlessBosses = 1;
+  eq(G.pickRunTitle(), 'THE SURGEON', 'flawless boss = THE SURGEON (top priority)');
+  g.runFlawlessBosses = 0; g.bossKills = 3;
+  eq(G.pickRunTitle(), 'THE SLAYER', '3 bosses = THE SLAYER');
+  g.bossKills = 0; g.parryCount = 20;
+  eq(G.pickRunTitle(), 'THE DEFLECTOR', 'many parries = THE DEFLECTOR');
+  g.parryCount = 0; g.comboBest = 30;
+  eq(G.pickRunTitle(), 'THE CHAINMASTER', 'combo 30 = THE CHAINMASTER');
+  g.comboBest = 0; g.stats = { shotsFired: 100, shotsHit: 95, maxStage: 5 };
+  eq(G.pickRunTitle(), 'THE MARKSMAN', '95% acc = THE MARKSMAN');
+  g.stats = { shotsFired: 0, shotsHit: 0, maxStage: 35 };
+  eq(G.pickRunTitle(), 'THE VOIDWALKER', 'stage 35 = THE VOIDWALKER');
+  // always returns a non-empty THE-prefixed title
+  ok(/^THE /.test(G.pickRunTitle()), 'title is THE-prefixed');
+} else { console.log('  (skipped — pickRunTitle not exposed)'); }
+
+// ============================================================
 section('pickRunHighlights returns a sorted, capped list');
 if (typeof G.pickRunHighlights === 'function') {
   const g = fresh();

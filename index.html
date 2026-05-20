@@ -13053,6 +13053,8 @@ function killPlayer(srcX, srcY, cause, srcType) {
       // EPITAPH — narrative bookend that contextualizes this run's death.
       // Voice matches TRANSMISSION_LOGS: terse, in-world, second-person command-room tone.
       game.runEpitaph = pickEpitaph(game.stage, acc);
+      // RUN TITLE — playstyle epithet for the personalized epitaph header.
+      game.runTitle = (typeof pickRunTitle === 'function') ? pickRunTitle() : 'THE PILOT';
       // RUN HIGHLIGHTS — top 3 stats from this run, shown below epitaph on GAME_OVER.
       game.runHighlights = pickRunHighlights();
       // RUN TIP — random pilot tip surfaced on GAME_OVER so each death teaches one
@@ -16478,6 +16480,28 @@ function pickEpitaph(stage, acc) {
 // RUN HIGHLIGHTS — produce up to 3 "best moments" lines summarizing the run.
 // Candidates are scored by impressiveness; top 3 picked for compact display.
 // All values come from stats already tracked elsewhere — no new bookkeeping needed.
+// RUN TITLE — a one-line epithet earned from this run's dominant playstyle, shown
+// in the GAME_OVER epitaph header so each run gets a memorable identity ("how you
+// flew") on top of the death-tier epitaph ("how you fell"). Priority order runs
+// rarest/most-distinctive first. Pure read of existing run stats; no score impact.
+function pickRunTitle() {
+  if (!game) return 'THE PILOT';
+  const s = game.stats || {};
+  const acc = (s.shotsFired || 0) > 50 ? Math.round((s.shotsHit / s.shotsFired) * 100) : 0;
+  if ((game.runFlawlessBosses || 0) >= 1)   return 'THE SURGEON';
+  if ((game.bossKills || 0) >= 3)            return 'THE SLAYER';
+  if ((game.clusterParryBest || 0) >= 5)     return 'THE STORM-DANCER';
+  if ((game.parryCount || 0) >= 15)          return 'THE DEFLECTOR';
+  if ((game.comboBest || 0) >= 30)           return 'THE CHAINMASTER';
+  if ((game.nearMissChainBest || 0) >= 8)    return 'THE GHOSTWALKER';
+  if ((game.revengeCount || 0) >= 3)         return 'THE AVENGER';
+  if ((game.eliteKills || 0) >= 5)           return 'THE ELITE HUNTER';
+  if (acc >= 90)                             return 'THE MARKSMAN';
+  if ((s.maxStage || 0) >= 30)               return 'THE VOIDWALKER';
+  if (game.dualFighter)                      return 'THE TWIN-WING';
+  if ((s.maxStage || 0) >= 10)               return 'THE VETERAN';
+  return 'THE PILOT';
+}
 function pickRunHighlights() {
   const out = [];
   const s = game.stats || {};
@@ -21166,8 +21190,13 @@ function drawGameOverScreen() {
     else if (_epStage >= 10) _epCol = '#fc8'; // veteran
     else if (_epStage >= 5)  _epCol = '#cfc'; // scout
     ctx.save();
-    ctx.globalAlpha = 0.5 * fade;
-    drawRetroText('— FINAL TRANSMISSION —', BASE_W/2, cy + 70, 4, '#888');
+    // Personalized header: the run title (earned from playstyle) + callsign, so the
+    // epitaph reads as THIS pilot's closing — "how you flew" framing "how you fell".
+    const _hdr = (game.runTitle)
+      ? ('— [' + (playerCallsign || '???') + '] · ' + game.runTitle + ' —')
+      : '— FINAL TRANSMISSION —';
+    ctx.globalAlpha = 0.55 * fade;
+    drawRetroText(_hdr, BASE_W/2, cy + 70, 4, '#9ab');
     ctx.globalAlpha = 0.85 * fade;
     drawRetroText(game.runEpitaph, BASE_W/2, cy + 78, 5, _epCol);
     ctx.restore();
