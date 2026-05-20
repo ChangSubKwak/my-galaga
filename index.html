@@ -13108,6 +13108,18 @@ function killPlayer(srcX, srcY, cause, srcType) {
           }
         }
         if (!goal) {
+          // BESTIARY completion goal (implements the documented "BESTIARY missing"
+          // tier) — when the codex is within 3 species of complete, point the player
+          // at the holdouts. Adds goal variety beyond pure stage-chasing.
+          const _dexN = (typeof dexUnlocked !== 'undefined') ? dexUnlocked.size : 0;
+          const _dexT = Object.keys(ENEMY_INFO || {}).length;
+          if (_dexN > 0 && _dexN < _dexT && (_dexT - _dexN) <= 3) {
+            const _rem = _dexT - _dexN;
+            goal = 'DISCOVER ' + _rem + ' MORE SPECIES';
+            gColor = '#8f8';
+          }
+        }
+        if (!goal) {
           // Beyond stage 80 — open-ended push
           goal = 'PUSH BEYOND ' + reached + '!';
           gColor = '#0ff';
