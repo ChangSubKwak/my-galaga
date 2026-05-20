@@ -16210,7 +16210,11 @@ function drawTitleScreen() {
     } catch (e) {}
   }
 
-  // Top 5 scores — title shows whichever list matches the current toggle
+  // Top 5 scores — title shows whichever list matches the current toggle.
+  // Hidden while editing the callsign (the editor's CALLSIGN label at y=220 +
+  // letter slots at y=228 sit right on top of the TOP SCORES header at y=222 and
+  // the score rows at y=230+, so the editor needs this space to itself).
+  if (!callsignInput.active) {
   const showMode = dailyModeRequested ? 'daily'
                 : challengeModeRequested ? 'challenge'
                 : 'normal';
@@ -16284,6 +16288,7 @@ function drawTitleScreen() {
       drawRetroText('---', BASE_W/2 - 22, rowY, 6, rowCol, 'left');
     }
   }
+  } // end !callsignInput.active (TOP SCORES block)
 
   // Controls hint (two compact lines at the bottom)
   drawRetroText('ARROWS MOVE   SPACE FIRE', BASE_W/2, BASE_H - 14, 6, COL.gray);
