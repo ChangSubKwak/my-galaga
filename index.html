@@ -20127,11 +20127,13 @@ function drawHUD() {
       ctx.fillRect(bx, by, Math.round(barW * elRatio), 2);
       ctx.restore();
     }
-    // HUD DIFFICULTY — small label under run timer (non-default only)
+    // HUD DIFFICULTY — small label at the bottom of the right rail (non-default
+    // only). Sits at y=56, clear of the CORR readout (y=34): both are persistent
+    // and DIFF used to overprint CORR by 1px on a non-normal run past stage 30.
     if (typeof difficultyMode === 'string' && difficultyMode !== 'normal') {
       const dCol = difficultyMode === 'hard' ? '#f44' : '#0f8';
       const dTag = difficultyMode === 'hard' ? 'HARD' : 'EASY';
-      drawRetroText(dTag, BASE_W - 5, 33, 4, dCol, 'right');
+      drawRetroText(dTag, BASE_W - 5, 56, 4, dCol, 'right');
     }
     }
     // PB ALARM tick — once per second SFX while in alarm zone
