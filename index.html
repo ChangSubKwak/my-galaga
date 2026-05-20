@@ -22212,14 +22212,17 @@ function drawStatsOverlay() {
       const _dxC = (typeof dexUnlocked !== 'undefined') ? dexUnlocked.size : 0;
       const _dxT = Object.keys(ENEMY_INFO || {}).length;
       function _pRow(k, v, col) {
-        drawRetroText(k, px + 8, y, 6, COL.white, 'left');
-        drawRetroText(v, px + panelW - 8, y, 6, col || COL.yellow, 'right');
-        y += 8;
+        // size 5 / 6px line height (was 6 / 8px) so the now-lengthy lifetime-stat
+        // list fits the panel — a fully-unlocked profile (~18 mastery rows + bosses
+        // + last runs) used to overflow past the fixed footer at py+panelH-8.
+        drawRetroText(k, px + 8, y, 5, COL.white, 'left');
+        drawRetroText(v, px + panelW - 8, y, 5, col || COL.yellow, 'right');
+        y += 6;
       }
       function _pDiv() {
         ctx.fillStyle = '#246';
         ctx.fillRect(px + 8, y, panelW - 16, 1);
-        y += 5;
+        y += 4;
       }
       drawRetroText('PILOT PROFILE', BASE_W / 2, y, 9, COL.yellow);
       y += 13;
