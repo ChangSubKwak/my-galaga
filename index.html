@@ -4175,6 +4175,7 @@ const INTERCEPT_MSG = {
   perfectParry:  ['IT TIMED THE DEFLECT!', 'IMPOSSIBLE READ!', 'PILOT MASTERS THE DASH!'],
   firstParry:    ['PILOT GRAZES OUR FIRE!', 'DEFLECTION DETECTED!', 'NEW THREAT VECTOR!'],
   clusterParry:  ['THEY DANCED THROUGH THE VOLLEY!', 'OUR BARRAGE — TURNED ASIDE!', 'IMPOSSIBLE DEFLECTION!'],
+  grazeChain:    ['THEY WEAVE THROUGH IT ALL!', 'OUR FIRE FINDS NOTHING!', 'A GHOST IN THE BARRAGE!'],
   flawlessKill:  ['THE CHAMPION FELL UNTOUCHED!', 'NOT A SCRATCH ON THEM!', 'FLAWLESS — HOW?!'],
   revengeKill:   ['THEY HUNT US BACK!', 'THE PILOT REMEMBERS!', 'VENGEANCE INBOUND!'],
   firstExtra:    ['ENEMY GAINS STRENGTH!', 'IT GROWS RESILIENT!', 'WE LOST GROUND!'],
@@ -12667,6 +12668,13 @@ function updateCollisions() {
             color: '#0ff', life: 36, maxLife: 36, size: 7,
             glow: game.nearMissChain >= 5 ? 5 : 3
           });
+        }
+        // NARRATIVE FUSION — a deep graze chain (sustained bullet-weaving) makes the
+        // enemy comms note the "ghost in the barrage" (once/run at chain 8).
+        if (game.nearMissChain >= 8 && !game._grazeChainInterceptFired
+            && typeof pushIntercept === 'function') {
+          game._grazeChainInterceptFired = true;
+          pushIntercept('grazeChain');
         }
         // GRAZE COMBO GRACE — a graze during an active combo (≥ 5) refreshes the
         // combo decay timer by +20f (capped at COMBO_DECAY). Lets skilled dodging
