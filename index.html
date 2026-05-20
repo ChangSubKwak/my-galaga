@@ -7037,6 +7037,13 @@ function startStage() {
           x: BASE_W/2, y: BASE_H/2 - 64, text: 'NEW DEEPEST STAGE',
           color: '#fc4', life: 120, maxLife: 120, size: 8
         });
+        // Name the depth — a record-setting peak deserves its number, and the
+        // margin over the old best ("+N") frames the achievement.
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 - 54,
+          text: 'STAGE ' + game.stage + '  (+' + (game.stage - _bestEver) + ')',
+          color: '#fff', life: 120, maxLife: 120, size: 5
+        });
         if (typeof playSound === 'function') playSound('milestone');
         if (typeof spawnConfetti === 'function') spawnConfetti(8);
       }
