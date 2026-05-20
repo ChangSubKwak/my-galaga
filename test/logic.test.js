@@ -498,12 +498,13 @@ if (typeof G.getEnemyPoints === 'function' && G.__getEnemyInfo()) {
     if (!(pf > 0) || !(pd > 0)) { allScored = false; bad = type; }
   }
   ok(allScored, 'every ENEMY_INFO type scores > 0' + (bad ? ' (bad: ' + bad + ')' : ''));
-  // ENEMY_INFO entries must carry name + col for HUD/bestiary rendering.
+  // ENEMY_INFO entries must carry name + col + trait (trait is shown on FIRST
+  // CONTACT and in the BESTIARY — a missing one renders an undefined line).
   let metaOk = true, badMeta = '';
   for (const type of Object.keys(info)) {
-    if (!info[type].name || !info[type].col) { metaOk = false; badMeta = type; }
+    if (!info[type].name || !info[type].col || !info[type].trait) { metaOk = false; badMeta = type; }
   }
-  ok(metaOk, 'every ENEMY_INFO entry has name + col' + (badMeta ? ' (bad: ' + badMeta + ')' : ''));
+  ok(metaOk, 'every ENEMY_INFO entry has name + col + trait' + (badMeta ? ' (bad: ' + badMeta + ')' : ''));
 } else { console.log('  (skipped — ENEMY_INFO/getEnemyPoints not exposed)'); }
 
 // ============================================================

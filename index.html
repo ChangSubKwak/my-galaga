@@ -8788,11 +8788,20 @@ function unlockDex(type) {
       x: BASE_W/2, y: 70, text: info.name,
       color: '#fff', life: 90, maxLife: 90, size: 11
     });
+    // TRAIT LINE — surface the new species' defining trait (threat/value) so the
+    // first encounter teaches what to watch for, not just what it's called. Uses
+    // the ENEMY_INFO.trait already shown in the BESTIARY tab.
+    if (info.trait) {
+      game.floatTexts.push({
+        x: BASE_W/2, y: 80, text: info.trait,
+        color: '#aaa', life: 90, maxLife: 90, size: 5
+      });
+    }
     // NEW SPECIES DISCOVERY — celebrate the first encounter with confetti +
     // tag line ("BESTIARY +1"). Visual moment that makes each new enemy type
     // feel like a discovery, not just another kill.
     game.floatTexts.push({
-      x: BASE_W/2, y: 82, text: 'BESTIARY +1',
+      x: BASE_W/2, y: 88, text: 'BESTIARY +1',
       color: '#8f8', life: 90, maxLife: 90, size: 5
     });
     spawnConfetti(10);
