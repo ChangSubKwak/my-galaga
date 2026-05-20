@@ -128,7 +128,7 @@ DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are
 
 - **`stageMutation`** (`rapidFire | fastDives | slowBullets | denseFire`, 30% / normal stages only) — flips one rule for the whole stage. Read sites: `updatePlayer` (rapidFire fire cd), `updateEnemies` diving branch (fastDives pathSpeed), `updateBullets` enemy slowMul (slowBullets), `diffFireMul` (denseFire).
 - **`stageBiome`** (`biomeForStage(stage)`, stage 8+, 12-cycle, 4 stages each) — `planet | ruins | dawn | asteroid | desert | ice | gasGiant | corona | canyon | blackhole | nebula | starfield` (interleaves terrestrial biomes among the space ones). Drawn in `drawBiome()` between nebulae and stars; each has a `BIOME_NAMES` label/color and a `BIOME_WHISPERS` set.
-- **`ambientEvent`** (`cargoShip | supernova`, 35% / stage > 3) — atmospheric one-shot. Ticked in `updateAmbientEvent`.
+- **`ambientEvent`** (`cargoShip | supernova | satellite | comet | pulsar | meteorShower`, 35% / stage > 3) — atmospheric one-shot. Ticked in `updateAmbientEvent`.
 - **`worldCorruption`** (computed from stage) — scales 0→1 over stages 30-80. Adds edge noise / glitch bars / corner haze. Drawn after game content, before scanlines.
 - **Difficulty shapes the economy** — beyond speed/fire scaling (`diffSpeedMul`/`diffFireMul`), difficulty shifts loot: `eliteRateForStage(stage, mode)` scales elite spawns (hard ×1.5 / easy ×0.5) and `powerUpDropRate(isElite, mode)` shifts drops (hard −5% / easy +5%, floored 5%). `difficultyDescriptor(mode)` surfaces the trade-off as G-toggle feedback so it's legible. Both rate fns are pure/extracted for testability.
 
