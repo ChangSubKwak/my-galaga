@@ -19787,7 +19787,7 @@ function drawHUD() {
     // STAGE WEATHER LIVE CHIP — active weather label always visible in HUD so the
     // player can identify their stage condition even after the entry banner fades.
     // Color matches the weather's signature tone (e.g. sandstorm orange, blizzard cyan).
-    if (game.stageWeather && typeof WEATHER_TABLE !== 'undefined') {
+    if (!minimalHud && game.stageWeather && typeof WEATHER_TABLE !== 'undefined') {
       const _w = WEATHER_TABLE[game.stageWeather.id];
       if (_w) {
         ctx.save();
@@ -19799,7 +19799,7 @@ function drawHUD() {
     // STAGE BIOME LIVE CHIP — current biome label always visible. Pairs with weather
     // chip directly above for a complete "where am I" HUD column. Hidden in stages 1-7
     // where biomeForStage returns null.
-    if (typeof biomeForStage === 'function' && typeof BIOME_NAMES !== 'undefined') {
+    if (!minimalHud && typeof biomeForStage === 'function' && typeof BIOME_NAMES !== 'undefined') {
       const _bId = biomeForStage(game.stage);
       if (_bId && BIOME_NAMES[_bId]) {
         const _bInfo = BIOME_NAMES[_bId];
@@ -19936,7 +19936,7 @@ function drawHUD() {
   // Hidden during ACT I (stages 1-10, implicit). Color matches act accent.
   {
     let _actCur = null;
-    if (typeof ACT_TITLES !== 'undefined' && ACT_TITLES) {
+    if (!minimalHud && typeof ACT_TITLES !== 'undefined' && ACT_TITLES) {
       for (let i = ACT_TITLES.length - 1; i >= 0; i--) {
         if (game.stage >= ACT_TITLES[i].startStage) { _actCur = ACT_TITLES[i]; break; }
       }
@@ -20324,7 +20324,7 @@ function drawHUD() {
   }
   // ENEMY MORALE chip — bottom-left, above lives row, tiny pulse on state changes.
   // Only shown in active combat states. State color signals enemy mindset at a glance.
-  if (game.enemyMorale && typeof MORALE_STATES !== 'undefined'
+  if (!minimalHud && game.enemyMorale && typeof MORALE_STATES !== 'undefined'
       && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING
           || game.state === STATE.BOSS_STAGE)) {
     const ms = MORALE_STATES[game.enemyMorale];
@@ -20353,7 +20353,7 @@ function drawHUD() {
   // PILOT MOMENTUM chip — player composure, stacked just above the enemy MORALE
   // chip to form a paired faction-vs-pilot readout. Only shown when non-STEADY
   // so typical play keeps a clean HUD. Mirrors the STAGE_INTRO pilot chip.
-  if (typeof computePilotMomentum === 'function' && typeof PILOT_MOMENTUM !== 'undefined'
+  if (!minimalHud && typeof computePilotMomentum === 'function' && typeof PILOT_MOMENTUM !== 'undefined'
       && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING
           || game.state === STATE.BOSS_STAGE)) {
     const _pmHs = computePilotMomentum();
