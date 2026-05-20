@@ -22706,6 +22706,27 @@ function drawStatsOverlay() {
     y += 7;
   }
 
+  // Tab-page directory — fills the lower panel and makes the dedicated pages
+  // discoverable (the grids/bestiary/profile are no longer appended here, so
+  // without this the page model is invisible from the summary).
+  {
+    const _gP = statsAchGridPages();
+    y += 12;
+    drawRetroText('— TAB FOR MORE —', BASE_W / 2, y, 5, '#9ab', 'center');
+    y += 11;
+    const _dir = [
+      ['ACHIEVEMENTS', ach + '/' + totalAch, _gP === 1 ? 'P2' : 'P2-' + (1 + _gP)],
+      ['BESTIARY', (typeof dexUnlocked !== 'undefined' ? dexUnlocked.size : 0) + '/' + Object.keys(ENEMY_INFO).length, 'P' + (_gP + 2)],
+      ['PILOT PROFILE', '', 'P' + (_gP + 3)]
+    ];
+    for (const [_lab, _val, _pg] of _dir) {
+      drawRetroText(_lab, px + 10, y, 5, COL.cyan, 'left');
+      if (_val) drawRetroText(_val, px + panelW - 26, y, 5, '#fff', 'right');
+      drawRetroText(_pg, px + panelW - 8, y, 4, '#667', 'right');
+      y += 9;
+    }
+  }
+
   // Page-0 footer. This is the STATS SUMMARY page; the ACHIEVEMENT grids,
   // BESTIARY, and PROFILE are their own Tab pages with early-returns above.
   drawRetroText('1/' + statsTotalPages() + '  TAB', px + panelW - 8, py + panelH - 8, 5, COL.gray, 'right');
