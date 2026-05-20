@@ -9,11 +9,39 @@ The entire game is a single static file. To play:
 - Open `index.html` directly in a browser, or
 - Serve the directory: `python3 -m http.server 8000` then visit `http://localhost:8000/`
 
-There is no build step, no package manager, no test suite, and no lint config. All edits go into `index.html`. After every meaningful change, run a syntax check:
+There is no build step, no package manager, and no lint config. All game code goes into `index.html`. After every meaningful change, run the full verification (JS parse + logic tests) in one command:
 
 ```bash
-node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=h.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);console.log('JS parse OK');"
+bash test/run.sh        # JS parse check + logic tests; exit 0 only if both pass
 ```
+
+Or run either half on its own:
+
+```bash
+# 1) syntax check the inline <script>
+node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=h.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);console.log('JS parse OK');"
+# 2) logic tests only
+node test/logic.test.js   # exit 0 = pass, 1 = failure
+```
+
+### Logic tests
+
+A standalone Node harness lives at `test/logic.test.js` (160+ assertions, no test
+framework or dependencies). It extracts the inline `<script>`, runs it inside a
+`vm` sandbox with hand-rolled browser-API stubs (canvas/2d ctx, `localStorage`,
+`document`, `window`, `AudioContext`, RAF), and asserts pure-ish logic plus
+registry-consistency invariants: `computePilotMomentum`, `evalBonusResult`,
+`bonusSkillStop`, `checkPbHalfMark`, `killPlayer` revenge-seeding, `addScore`
+extra-life/cap, `comboMultiplier`/`bumpCombo`, `bezierPoint`, `eliteRateForStage`/
+`powerUpDropRate`, `fmtScore`/`fmtFrameTime`, and source-level guards that every
+STATE / PERK / boss-archetype / biome / weather / ship / enemy entry stays wired
+on both sides (so extending a registry can't silently half-break).
+
+Note: top-level `let`/`const` bindings (e.g. `game`, `stagePBs`, `SHIPS`) are not
+visible on the vm context global — the harness appends accessor shims (`__getGame`,
+`__getStagePBs`, `__getShips`...) to reach them. Add new shims there if a test
+needs another closure binding. This covers logic only; visual/feel changes still
+need a browser.
 
 ## Architecture
 
@@ -50,7 +78,7 @@ A normal stage's enemies move through `entering → formation → diving → ret
 
 ### Enemy variety
 
-11 enemy types in `ENEMY_INFO`: `bee` / `butterfly` / `boss` / `mirror` / `splitter` / `shielded` / `ufo` / `hoverer` / `kamikaze` / `goldenBee` / `minibee`. Each has unique sprite, behavior, points, and (for 4 types: mirror/shielded/kamikaze/ufo) **type-specific death visuals** layered on top of base explosion. First kill of each type unlocks a `dexUnlocked` entry persisted to `galagaDexUnlocked` — viewable in the BESTIARY tab of stats overlay (last Tab page).
+12 enemy types in `ENEMY_INFO`: `bee` / `butterfly` / `boss` / `mirror` / `splitter` / `shielded` / `ufo` / `hoverer` / `kamikaze` / `goldenBee` / `minibee` / `warper` (warper teleports while diving; spawns stage 8+ in place of a bee/butterfly). Each has unique sprite, behavior, points, and (for several types: mirror/shielded/kamikaze/ufo) **type-specific death visuals** layered on top of base explosion. First kill of each type unlocks a `dexUnlocked` entry persisted to `galagaDexUnlocked` — viewable in the BESTIARY tab of stats overlay (last Tab page).
 
 **Elite variants**: stage 5+ formation enemies of common types (bee/butterfly/mirror/kamikaze) have a 3-5% chance to spawn as `e.elite` — +1 HP, red pulsing outline + gold corner pips, 1.5× score, 35% drop rate (vs 20%), and a "ELITE!" floatText on kill. Tracked via `game.eliteKills`.
 
@@ -80,7 +108,11 @@ Multiple save mechanisms applied in priority order on fatal hit (`tryTriggerWitc
 3. WITCH TIME — 30-frame slow-mo window (slowMul 0.2×); if `dashTimer > 0` within window → save (no death), else death resolves. `witchCooldown = 720` between activations.
 4. Dash i-frames — manual evasion via Shift (12 invincible frames)
 
-DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are deflected: removed + 50 score + cyan spark + "PARRY +50" text + metallic ping. Tracked via `game.parryCount`.
+DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are deflected: removed + 50 score + cyan spark + "PARRY +50" text + metallic ping. Tracked via `game.parryCount`. PARRY STREAK chains within 90f for escalating tiers (cyan→gold→white-gold ULTRA at 10). **CLUSTER PARRY**: deflecting 3+ bullets in a *single* dash frame fires a gold banner + size-scaled hit-stop (4–8f) + `game.clusterParryBest`. PERFECT PARRY: deflect within first 3 frames of dash → +50 + gold "PERFECT".
+
+**Dual fighter as a life buffer**: when `game.dualFighter` is true, a fatal hit downgrades to single (`dualFighter = false`) and enters RESPAWN **without** spending a life or recording a death-cause tally — the wingman absorbs the cost. `stageDied` is still set (the stage is no longer clean), so grade/CLEAN STREAK treat it as a hit.
+
+**REVENGE**: `killPlayer(srcX, srcY, cause, srcType)` seeds `game._revengeType` **only on a confirmed death** (after the cheat/shield early-returns), from the colliding enemy's type or the killing bullet's `fromType`. The next kill of that type fires "REVENGE!" + `revengeCount` (+ lifetime `galagaRevengeTotal`). Pairs with the respawn DEATH RECAP whisper (cause-specific coaching line).
 
 ### Combo system
 
@@ -90,20 +122,24 @@ DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are
 
 `COMBO_MILESTONE = 40` — extra ship granted every 40 combo (or +5000 in challenge mode).
 
+**GRAZE COMBO GRACE**: a near-miss (graze) while combo ≥ 5 refreshes `comboTimer` by +20f (capped at `COMBO_DECAY`) so skilled dodging bridges kill gaps without dropping the multiplier. Only extends, never grows the combo (kills do that), and the 24f near-miss cooldown prevents farming. Surfaces "COMBO HELD" only when the timer was actually in danger (< 40).
+
 ### Dynamic systems (set per-stage, read per-frame)
 
 - **`stageMutation`** (`rapidFire | fastDives | slowBullets | denseFire`, 30% / normal stages only) — flips one rule for the whole stage. Read sites: `updatePlayer` (rapidFire fire cd), `updateEnemies` diving branch (fastDives pathSpeed), `updateBullets` enemy slowMul (slowBullets), `diffFireMul` (denseFire).
 - **`stageBiome`** (`biomeForStage(stage)`, stage 8+, 8-cycle alternating dark/bright) — `planet | dawn | asteroid | ice | gasGiant | corona | blackhole | starfield`. Drawn in `drawBiome()` between nebulae and stars.
 - **`ambientEvent`** (`cargoShip | supernova`, 35% / stage > 3) — atmospheric one-shot. Ticked in `updateAmbientEvent`.
 - **`worldCorruption`** (computed from stage) — scales 0→1 over stages 30-80. Adds edge noise / glitch bars / corner haze. Drawn after game content, before scanlines.
+- **Difficulty shapes the economy** — beyond speed/fire scaling (`diffSpeedMul`/`diffFireMul`), difficulty shifts loot: `eliteRateForStage(stage, mode)` scales elite spawns (hard ×1.5 / easy ×0.5) and `powerUpDropRate(isElite, mode)` shifts drops (hard −5% / easy +5%, floored 5%). `difficultyDescriptor(mode)` surfaces the trade-off as G-toggle feedback so it's legible. Both rate fns are pure/extracted for testability.
 
 ### Narrative layer
 
 - **`TRANSMISSION_LOGS`** — typed-out 3-line beats during STAGE_INTRO at stages 5/10/15/20/25/30/40/50/60/70/80.
 - **`BOSS_NAMES`** — 8 unique names (THE OVERSEER, TWIN SOVEREIGNS, APEX, THE DEVOURER, IRON SWARM, NULLIFIER, OBSIDIAN PRIME, THE FINAL WALL), cycled past stage 90.
-- **`BOSS_TAUNTS`** — 4 archetype × 5 situations dialogue dictionary. Speech bubble above boss, fades over 90 frames.
-- **`EPITAPHS`** — 6 stage-tier buckets × 3 variants. `pickEpitaph()` runs once at game over, stored on `game.runEpitaph`.
-- **`pickRunHighlights()`** — top 3 stats (max combo / parries / stages / bosses / accuracy / dual fighter / elites) sorted by priority, displayed below epitaph.
+- **`BOSS_TAUNTS`** — dialogue dictionary keyed by archetype × situation (intro/phase2/lowHp/dash/death/finalStand). Only the 4 base archetypes have entries; `tauntFor(archetype, situation)` falls back to `standard` for `phantom`/`rune` and returns `null` for an absent situation (never throws). Speech bubble above boss, fades over 90 frames.
+- **`EPITAPHS`** — 7 stage-tier buckets (rookie/scout/veteran/deepDive/apex/voidwalker/legend) × 3 variants. `pickEpitaph(stage, acc)` runs once at game over, stored on `game.runEpitaph`.
+- **`pickRunHighlights()`** — top 3 stats (max combo / parries / graze chain / cluster parry / revenge / flawless boss / stages / bosses / accuracy / dual fighter / elites …) sorted by priority, displayed below epitaph.
+- **Faction MORALE vs PILOT MOMENTUM** — two mirrored psychological gauges. `updateEnemyMorale()` swings enemy state (CONFIDENT/NORMAL/SHAKEN/ROUTED) off player performance; `computePilotMomentum()` reads the player's own composure (ASCENDING = combo ≥ 20 + clean streak ≥ 3 / CORNERED = last life / STRAINED = post-death low combo / STEADY). PILOT MOMENTUM expresses across **6 channels**: STAGE_INTRO chip, HUD chip, ASCENDING ship spark-aura, ASCENDING BGM intensity lift (`computeBgmIntensity`), CORNERED nebula red-tint, and a transition banner (`updatePilotMomentum`, mirrors the MORALE shift banner).
 
 ### Player identity
 
@@ -135,6 +171,8 @@ Each read site uses `try/catch` and falls back to a default — corrupt storage 
 - Touch: `#touchControls` shown only when `'ontouchstart' in window`. Joystick on the left, fire/pause buttons on the right. Synthesizes same `keys` map.
 
 Player firing is rate-capped via `game.fireCooldown` (6 frames base, halved by R rapid pickup, further reduced by stageMutation 'rapidFire', min 2 frames).
+
+**Fire-as-action in non-PLAYING states** (BONUS_GAME skill-stop, STAGE_INTRO skip) is detected by **polling `keys[' ']`/`keys['Enter']` with rising-edge tracking inside `update()`**, NOT in the keydown handler. Keep it that way: keyboard, touch (`btnFire` → `keys[' ']`), and gamepad (`pollGamepad`) all feed the same `keys` map, so polling makes these actions work on every input device for free, and the edge-tracking flag (e.g. `_introSkipPrev`, `bonusGame._firePrev`) ensures a held fire button triggers the action only once.
 
 #### Hidden hotkeys (debug)
 - **`` ` ``** (backtick) — cheat invincibility toggle ("GOD MODE")
