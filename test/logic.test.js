@@ -999,6 +999,26 @@ section('ACHIEVEMENTS: every defined achievement is unlockable & no unlock is un
 }
 
 // ============================================================
+section('CHECKPOINT_OPTIONS ⊇ MILESTONE_STAGES (every milestone is a startable checkpoint)');
+{
+  // Source-level guard. highestCheckpoint can only become a MILESTONE_STAGES value,
+  // and availableStartStages() offers CHECKPOINT_OPTIONS ≤ highestCheckpoint. If a
+  // milestone isn't also a checkpoint option, clearing it would never unlock a
+  // matching start-stage entry. Keep CHECKPOINT_OPTIONS ⊇ MILESTONE_STAGES (+ stage 1).
+  const coM = scriptSrc.match(/CHECKPOINT_OPTIONS = \[([^\]]*)\]/);
+  const msM = scriptSrc.match(/MILESTONE_STAGES = \[([^\]]*)\]/);
+  ok(!!coM && !!msM, 'CHECKPOINT_OPTIONS + MILESTONE_STAGES found in source');
+  if (coM && msM) {
+    const co = new Set(coM[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)));
+    const ms = msM[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+    ok(co.has(1), 'CHECKPOINT_OPTIONS includes stage 1 (always startable)');
+    let allCovered = true, missing = [];
+    for (const m of ms) { if (!co.has(m)) { allCovered = false; missing.push(m); } }
+    ok(allCovered, 'every MILESTONE_STAGES value is a CHECKPOINT_OPTIONS entry' + (missing.length ? ' (missing: ' + missing.join(', ') + ')' : ''));
+  }
+}
+
+// ============================================================
 section('pickRunHighlights returns a sorted, capped list');
 if (typeof G.pickRunHighlights === 'function') {
   const g = fresh();
