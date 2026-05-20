@@ -84,7 +84,7 @@ A normal stage's enemies move through `entering → formation → diving → ret
 
 ### Power-up system
 
-Drops are 20% chance per kill (35% for elites), plus a guaranteed S+N+P trio from the mega-boss. Power-up types:
+Drops are 20% per kill / 35% for elites **at normal difficulty**, plus a guaranteed S+N+P trio from the mega-boss. The rate is computed by `powerUpDropRate(isElite, mode)` and shifts with difficulty (easy +5%, hard −5%, floored at 5%) — see "Difficulty shapes the economy". Power-up types:
 
 | Type | Effect | Notes |
 |------|--------|-------|
@@ -95,7 +95,7 @@ Drops are 20% chance per kill (35% for elites), plus a guaranteed S+N+P trio fro
 | H | `homingTimer` — bullets steer toward enemies | 360 frames |
 | L | `laserTimer` — piercing beam, 1.4× speed, +1 dmg | 300 frames (rare) |
 | B | BOMB — instant: clear bullets + 1 dmg all + 5% maxHp on mega-bosses | One-shot |
-| E | SHIELD — +1 absorb charge, max `SHIELD_MAX=2` | Consumed in `killPlayer` before life loss |
+| E | SHIELD — +1 absorb charge, max `SHIELD_MAX=3` | Consumed in `killPlayer` before life loss |
 
 Visual: ship sprite changes with S/N/P levels via `drawPlayer(x, y, color, levels)` 4th param — engine flame size, winglet extensions, cockpit ring glow.
 
