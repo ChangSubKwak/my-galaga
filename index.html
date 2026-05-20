@@ -20104,8 +20104,11 @@ function drawHUD() {
       ctx.restore();
     }
     // HUD RUN TIMER — cumulative run time under the stage clock. Speedrun aid.
-    // Hidden in minimal HUD mode to keep clean view.
-    if (!minimalHud && (game.runFrames || 0) > 0) {
+    // Hidden in minimal HUD mode to keep clean view. Also yields its y=28 slot to
+    // the transient DIVE SURGE alert (commander rage) so the two don't overprint;
+    // the timer reappears the moment the surge ends.
+    if (!minimalHud && (game.runFrames || 0) > 0
+        && !((game.commanderRageTimer || 0) > 0 && game.state === STATE.PLAYING)) {
       const runStr = fmtFrameTime(game.runFrames || 0);
       drawRetroText('R ' + runStr, BASE_W - 5, 28, 4, '#888', 'right');
     // EXTRA LIFE PROGRESS — 30px green bar showing distance to next 30K threshold.
@@ -20270,20 +20273,22 @@ function drawHUD() {
       if (m) {
         const pStr = (typeof m.progress === 'function') ? m.progress(game) : '';
         const label = pStr ? ('M: ' + m.label + ' ' + pStr) : ('M: ' + m.label);
-        drawRetroText(label, BASE_W - 5, 44, 4, '#f6f', 'right');
+        // y=50 (one row below the biome chip at y=44) — daily mode and stage 8+
+        // both put a chip on the right rail, and biome owns y=44.
+        drawRetroText(label, BASE_W - 5, 50, 4, '#f6f', 'right');
         // Small pulse dot to the left of the mission label — daily mode signal
         ctx.save();
         const dotPulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.18);
         ctx.globalAlpha = dotPulse;
         ctx.fillStyle = '#f6f';
         const dotX = BASE_W - 5 - label.length * 4 - 5;
-        ctx.fillRect(dotX, 45, 2, 2);
+        ctx.fillRect(dotX, 51, 2, 2);
         ctx.restore();
       }
     } else {
       // DAILY MISSION DONE — show ✓ in green so the player has a persistent
       // visual confirmation that today's mission was completed.
-      drawRetroText('M: ✓ DONE', BASE_W - 5, 44, 4, '#0f8', 'right');
+      drawRetroText('M: ✓ DONE', BASE_W - 5, 50, 4, '#0f8', 'right');
     }
   }
 
