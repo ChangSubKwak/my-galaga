@@ -20059,8 +20059,12 @@ function drawHUD() {
   // STAGE TIME CLOCK — real-time mm:ss.t timer + PB delta indicator. Only renders
   // during active gameplay states (no TITLE/INTRO/GAME_OVER pollution). Color shifts
   // green when ahead of PB, red when behind. PB compare requires existing record.
+  // Yields its y=22 row to the transient stage-mutation descriptor for the first
+  // ~5s (the clock reads ~0:00 then and PB compare is meaningless that early), so
+  // the two stop overprinting; the full clock cluster returns the moment it fades.
+  const _mutIntro = game.stageMutation && game.stageMutation.desc && (game.stageFrames || 0) < 300;
   if ((game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
-      && (game.stageFrames || 0) > 0) {
+      && (game.stageFrames || 0) > 0 && !_mutIntro) {
     const timeStr = fmtFrameTime(game.stageFrames || 0);
     let clockCol = '#aaa';
     const pb = stagePBs && stagePBs[String(game.stage)];
