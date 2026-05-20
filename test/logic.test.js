@@ -1029,7 +1029,9 @@ if (typeof G.pickRunTitle === 'function') {
   eq(G.pickRunTitle(), 'THE SURGEON', 'flawless boss = THE SURGEON (top priority)');
   g.runFlawlessBosses = 0; g.bossKills = 3;
   eq(G.pickRunTitle(), 'THE SLAYER', '3 bosses = THE SLAYER');
-  g.bossKills = 0; g.parryCount = 20;
+  g.bossKills = 0; g.witchSaves = 3;
+  eq(G.pickRunTitle(), 'THE TIME-BENDER', '3 witch saves = THE TIME-BENDER');
+  g.witchSaves = 0; g.parryCount = 20;
   eq(G.pickRunTitle(), 'THE DEFLECTOR', 'many parries = THE DEFLECTOR');
   g.parryCount = 0; g.comboBest = 30;
   eq(G.pickRunTitle(), 'THE CHAINMASTER', 'combo 30 = THE CHAINMASTER');
