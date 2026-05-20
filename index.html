@@ -13079,12 +13079,9 @@ function killPlayer(srcX, srcY, cause, srcType) {
       game.runTitle = (typeof pickRunTitle === 'function') ? pickRunTitle() : 'THE PILOT';
       // RUN HIGHLIGHTS — top 3 stats from this run, shown below epitaph on GAME_OVER.
       game.runHighlights = pickRunHighlights();
-      // RUN TIP — random pilot tip surfaced on GAME_OVER so each death teaches one
-      // mechanic the player might not know yet. Lighter than EPITAPHS (no death-tier
-      // pick), pure mechanic surfacing.
-      if (typeof PILOT_TIPS !== 'undefined') {
-        game.runTip = PILOT_TIPS[Math.floor(Math.random() * PILOT_TIPS.length)];
-      }
+      // (Removed the unused RUN TIP computation — it was never rendered on the
+      // game-over screen, and mechanic tips are already surfaced by the TITLE
+      // rotation + STAGE_INTRO adaptive hints, so a death-screen tip was redundant.)
       // RUN NEXT GOAL — pick the nearest reachable milestone so the death screen
       // ends with a concrete forward target ("NEXT: STAGE 10"). Priority order:
       // next stage milestone within +5 → next boss (×10) → BESTIARY missing → fallback.
@@ -21237,6 +21234,17 @@ function drawGameOverScreen() {
     drawRetroText(_hdr, BASE_W/2, cy + 70, 4, '#9ab');
     ctx.globalAlpha = 0.85 * fade;
     drawRetroText(game.runEpitaph, BASE_W/2, cy + 78, 5, _epCol);
+    ctx.restore();
+  }
+
+  // RUN NEXT GOAL — concrete forward target (computed at game-over in game.runGoal:
+  // next stage milestone / boss / bestiary completion / push beyond). Sits between
+  // the epitaph and the highlights so the screen reads fate → aim → achievements,
+  // giving the player a reason to retry. Was computed but never rendered — now shown.
+  if (game.runGoal && elapsedGo > 138) {
+    ctx.save();
+    ctx.globalAlpha = 0.8 * Math.min(1, (elapsedGo - 138) / 18);
+    drawRetroText(game.runGoal, BASE_W/2, cy + 85, 4, game.runGoalCol || '#fc4');
     ctx.restore();
   }
 
