@@ -1401,6 +1401,35 @@ if (typeof G.commitGameToCumStats === 'function' && typeof G.loadCumStats === 'f
 } else { console.log('  (skipped — commitGameToCumStats/loadCumStats not exposed)'); }
 
 // ============================================================
+section('recordStagePB — strictly-faster-only PB recording (feeds grade + clock)');
+if (typeof G.recordStagePB === 'function' && G.__getStagePBs && G.__getStagePBs()) {
+  const pbs = G.__getStagePBs();
+  const TS = 999; // isolated throwaway stage so we don't touch real PBs
+  const savedPB = pbs[String(TS)];
+  delete pbs[String(TS)];
+
+  eq(G.recordStagePB(0, 100).isNew, false, 'no stage → not recorded');
+  eq(G.recordStagePB(TS, 0).isNew, false, 'frames <= 0 → not recorded');
+  eq(G.recordStagePB(TS, -5).isNew, false, 'negative frames → not recorded');
+
+  const r1 = G.recordStagePB(TS, 600);
+  ok(r1.isNew === true && r1.prev == null, 'first run → new PB, no prev');
+  eq(pbs[String(TS)], 600, 'PB stored (600)');
+
+  const r2 = G.recordStagePB(TS, 500);
+  ok(r2.isNew === true && r2.prev === 600, 'faster → new PB, returns prev');
+  eq(pbs[String(TS)], 500, 'PB updated to the faster time');
+
+  const r3 = G.recordStagePB(TS, 700);
+  ok(r3.isNew === false && r3.prev === 500, 'slower → not a PB');
+  eq(pbs[String(TS)], 500, 'slower run does NOT overwrite the PB');
+
+  eq(G.recordStagePB(TS, 500).isNew, false, 'equal time → not new (strictly faster only)');
+
+  if (savedPB === undefined) delete pbs[String(TS)]; else pbs[String(TS)] = savedPB;
+} else { console.log('  (skipped — recordStagePB / stagePBs not exposed)'); }
+
+// ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
 if (typeof G.comboKillDetune === 'function') {
   eq(G.comboKillDetune(0),   0,   'combo 0 → base pitch (no detune)');
