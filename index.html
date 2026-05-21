@@ -16134,26 +16134,21 @@ function drawTitleScreen() {
     const sCol = challengeModeRequested ? COL.red : dailyModeRequested ? COL.green : COL.cyan;
     drawRetroText('PRESS SPACE TO START', BASE_W/2, 190, 8, sCol);
   }
-  // LAST RUN SUMMARY — small one-line previous run summary at bottom-center
-  // so players can compare new attempts. Hidden when first ever run, or when
-  // daily mode is showing its extras at the bottom (which reuse this slot).
+  // LAST RUN SUMMARY — small one-line previous run summary in the bottom-LEFT
+  // corner so players can compare new attempts. Left-aligned to clear the
+  // centered controls hint at this same y (it used to be centered and
+  // overprinted "ARROWS MOVE SPACE FIRE"). Forms a tidy left column with the
+  // ACH count above and the BGM tag below. Hidden on first-ever run / daily mode.
+  // A PB run tints the whole line gold-blink + stars it (replaces the old
+  // separate centered ★ PB badge).
   try {
     const _lrRaw = localStorage.getItem('galagaLastRun');
     if (_lrRaw && !callsignInput.active && !dailyModeRequested) {
       const _lr = JSON.parse(_lrRaw);
       if (_lr && _lr.stage > 0) {
-        const _lrStr = 'LAST  S' + _lr.stage + '  ' + fmtScore(_lr.score) + '  C×' + _lr.combo;
-        drawRetroText(_lrStr, BASE_W/2, BASE_H - 14, 4, '#555', 'center');
-        if (_lr.wasPb) {
-          const _pbB = (t >> 2) % 2 === 0 ? '#fc4' : '#ff8';
-          // Gold glow on the PB star — matches the 10-peak-threshold GLOW
-          // pattern so PB pride reads on TITLE without extra elements.
-          ctx.save();
-          ctx.shadowColor = '#fc4';
-          ctx.shadowBlur = 4;
-          drawRetroText('★ PB', BASE_W/2 + 60, BASE_H - 14, 4, _pbB, 'left');
-          ctx.restore();
-        }
+        const _lrStr = (_lr.wasPb ? '★ ' : '') + 'LAST S' + _lr.stage + ' ' + fmtScore(_lr.score) + ' C×' + _lr.combo;
+        const _lrCol = _lr.wasPb ? ((t >> 2) % 2 === 0 ? '#fc4' : '#ff8') : '#555';
+        drawRetroText(_lrStr, 4, BASE_H - 14, 4, _lrCol, 'left');
       }
     }
   } catch (e) {}
