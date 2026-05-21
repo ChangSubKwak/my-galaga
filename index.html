@@ -7952,6 +7952,12 @@ function bossBounty(stage, combo, bountyHunter) {
   return b;
 }
 
+// Graze score: 100 for a close pass (≤8px), 50 for a mid pass (9-10px), ×3 with
+// the ghostWake perk.
+function grazeScore(close, ghostWake) {
+  return (close ? 100 : 50) * (ghostWake ? 3 : 1);
+}
+
 const SCORE_MILESTONES = [10000, 50000, 100000, 500000];
 const SCORE_CAP = 999999999;
 function addScore(pts) {
@@ -8561,18 +8567,14 @@ function updateBullets() {
         b.grazed = true;
         // Two-tier graze: only the inner band (≤8px) and mid band (9-10px) score now.
         // Wider passes (11-13px) used to grant +25, but were trivially farmable at low risk.
-        let bonus, label, lcol;
-        if (dx <= 8) {
-          bonus = 100; label = 'CLOSE +100'; lcol = '#ff4';
+        const close = dx <= 8;
+        if (close) {
           game.stageCloseCount = (game.stageCloseCount || 0) + 1;
           if (game.stageCloseCount === 10) unlockAchievement('closeCall');
         }
-        else { bonus = 50; label = 'GRAZE +50'; lcol = '#0ff'; }
-        // PERK 'ghostWake' — graze score 3×, label uses the multiplied number
-        if (game.activePerk === 'ghostWake') {
-          bonus *= 3;
-          label = label.replace(/\+\d+/, '+' + bonus);
-        }
+        const bonus = grazeScore(close, game.activePerk === 'ghostWake');
+        const label = (close ? 'CLOSE +' : 'GRAZE +') + bonus;
+        const lcol = close ? '#ff4' : '#0ff';
         addScore(bonus);
         game.grazeCount = (game.grazeCount || 0) + 1;
         if (game.grazeCount === 50) unlockAchievement('ghostPilot');

@@ -479,6 +479,15 @@ if (typeof G.killScore === 'function') {
 } else { console.log('  (skipped — killScore not exposed)'); }
 
 // ============================================================
+section('grazeScore — close/mid band × ghostWake perk');
+if (typeof G.grazeScore === 'function') {
+  eq(G.grazeScore(true, false), 100, 'close pass = 100');
+  eq(G.grazeScore(false, false), 50, 'mid pass = 50');
+  eq(G.grazeScore(true, true), 300, 'close + ghostWake = 100×3');
+  eq(G.grazeScore(false, true), 150, 'mid + ghostWake = 50×3');
+} else { console.log('  (skipped — grazeScore not exposed)'); }
+
+// ============================================================
 section('bossBounty — stage-scaled base × combo × bountyHunter perk');
 if (typeof G.bossBounty === 'function') {
   eq(G.bossBounty(1, 0, false), 5500, 'stage 1, no combo = 5000+500');
