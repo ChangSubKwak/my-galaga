@@ -1211,6 +1211,17 @@ if (typeof G.blinkPhase === 'function') {
 } else { console.log('  (skipped — blinkPhase not exposed)'); }
 
 // ============================================================
+section('flashAlpha — impact-flash alpha, dampened under reduce-motion');
+if (typeof G.flashAlpha === 'function') {
+  eq(G.flashAlpha(8, false), 0.7, 'full timer, normal → 0.7');
+  eq(G.flashAlpha(0, false), 0,   'no flash → 0');
+  ok(Math.abs(G.flashAlpha(8, true) - 0.21) < 1e-9, 'full timer, reduce-motion → 30% (0.21)');
+  ok(G.flashAlpha(8, true) < G.flashAlpha(8, false), 'reduce-motion always dimmer than normal');
+  eq(G.flashAlpha(undefined, false), 0, 'undefined timer → 0 (no NaN)');
+  ok(G.flashAlpha(4, false) > G.flashAlpha(4, true), 'dampening holds at partial timer too');
+} else { console.log('  (skipped — flashAlpha not exposed)'); }
+
+// ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
 if (typeof G.comboKillDetune === 'function') {
   eq(G.comboKillDetune(0),   0,   'combo 0 → base pitch (no detune)');

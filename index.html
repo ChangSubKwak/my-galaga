@@ -210,6 +210,14 @@ let colorBlindMode = localStorage.getItem('galagaColorBlind') === '1';
 // Minimal HUD — toggles off non-essential widgets (accuracy %, kill counter,
 // pity dots, etc.) for clean screenshot / focused gameplay. Persisted toggle.
 let minimalHud = localStorage.getItem('galagaMinimalHud') === '1';
+// ACCESSIBILITY — respect the OS "reduce motion" preference (WCAG): when set, the
+// full-screen impact flashes are dampened (photosensitivity safety). Read once at
+// load; guarded so a missing matchMedia (e.g. test harness) is a safe false.
+let reduceMotion = (() => {
+  try { return !!(typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  catch (e) { return false; }
+})();
 
 // Debug overlay (F3) — shows FPS + entity counts in the top-left
 let debugOverlay = false;
@@ -9592,6 +9600,13 @@ function computeStageAccuracy() {
 // `const blink = blinkPhase(n)` locals.
 function blinkPhase(shift) { return (game.animFrame >> shift) % 2 === 0; }
 
+// Full-screen impact-flash alpha. Dampened to 30% when reduce-motion is on, so the
+// strobe is gentle for photosensitive players without losing the hit-feedback cue.
+function flashAlpha(timer, reduce) {
+  const a = (timer || 0) / 8 * 0.7;
+  return reduce ? a * 0.3 : a;
+}
+
 // Run grade — composite of final score (50%, capped at 100K), accuracy (30%) and
 // depth (20%, capped at stage 30). Shared by the GAME_OVER grade letter and the
 // grade audio cue so the two can never drift apart.
@@ -15524,7 +15539,7 @@ function draw() {
   // Screen flash overlay (drawn last, before transform restore so shake stays applied)
   if (game.flashTimer > 0) {
     ctx.save();
-    ctx.globalAlpha = game.flashTimer / 8 * 0.7;
+    ctx.globalAlpha = flashAlpha(game.flashTimer, reduceMotion);
     ctx.fillStyle = game.flashColor;
     ctx.fillRect(-20, -20, BASE_W + 40, BASE_H + 40);
     ctx.restore();
