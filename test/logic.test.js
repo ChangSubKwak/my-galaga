@@ -462,6 +462,23 @@ if (typeof G.fmtScore === 'function') {
 } else { console.log('  (skipped — fmtScore not exposed)'); }
 
 // ============================================================
+section('killScore — base × combo × elite × ghost product');
+if (typeof G.killScore === 'function') {
+  // bee formation = 50, combo<3 → ×1
+  eq(G.killScore('bee', true, 0, false, false), 50, 'bee/no-combo = 50');
+  // combo 20 → ×3
+  eq(G.killScore('bee', true, 20, false, false), 150, 'combo 20 → ×3 = 150');
+  // elite ×1.5
+  eq(G.killScore('bee', true, 0, true, false), 75, 'elite → ×1.5 = 75');
+  // ghost ×2
+  eq(G.killScore('bee', true, 0, false, true), 100, 'ghost → ×2 = 100');
+  // all factors stack: 50 × 3 (combo20) × 1.5 (elite) × 2 (ghost) = 450
+  eq(G.killScore('bee', true, 20, true, true), 450, 'all factors stack (rounded)');
+  // diving bee = 100 base
+  eq(G.killScore('bee', false, 0, false, false), 100, 'diving bee base = 100');
+} else { console.log('  (skipped — killScore not exposed)'); }
+
+// ============================================================
 section('getEnemyPoints values + formation/diving + fallback');
 if (typeof G.getEnemyPoints === 'function') {
   eq(G.getEnemyPoints('bee', true), 50,        'bee in formation = 50');

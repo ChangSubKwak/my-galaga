@@ -7937,6 +7937,15 @@ function getEnemyPoints(type, inFormation) {
   }
 }
 
+// Score for a single kill: base points × combo multiplier × elite (1.5×) × ghost
+// (2×), rounded. Single source so the four factors always combine the same way.
+function killScore(type, inFormation, combo, elite, ghost) {
+  return Math.round(getEnemyPoints(type, inFormation)
+    * comboMultiplier(combo)
+    * (elite ? 1.5 : 1)
+    * (ghost ? 2 : 1));
+}
+
 const SCORE_MILESTONES = [10000, 50000, 100000, 500000];
 const SCORE_CAP = 999999999;
 function addScore(pts) {
@@ -11809,11 +11818,8 @@ function updateCollisions() {
           // EARLY INTERCEPT — kill while enemy is still in entering path.
           // Small flat bonus + callout. Rewards aggressive opening play.
           const isIntercept = e.state === 'entering';
-          const basePts = getEnemyPoints(e.type, inForm);
-          const mult = comboMultiplier(game.combo);
-          const eliteMul = e.elite ? 1.5 : 1;
-          const ghostMul = e.ghost ? 2 : 1;
-          const pts = Math.round(basePts * mult * eliteMul * ghostMul);
+          const mult = comboMultiplier(game.combo); // also used by the score-pop visual below
+          const pts = killScore(e.type, inForm, game.combo, e.elite, e.ghost);
           addScore(pts);
           if (isIntercept) {
             addScore(50);
