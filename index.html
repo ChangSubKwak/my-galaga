@@ -8586,7 +8586,7 @@ function updateBullets() {
           color: lcol, life: 28, maxLife: 28, size: 5
         });
         game.hitSparks.push({ x: b.x, y: b.y, life: 0 });
-        playSound('graze');
+        playSound('graze', b.x);
       }
     }
     if (b.y > BASE_H + 5 || b.x < -5 || b.x > BASE_W + 5) {
@@ -11679,7 +11679,7 @@ function updateCollisions() {
               x: e.x, y: e.y, life: 0, maxLife: 16, maxR: 12, color: '#0ff'
             });
           }
-          if (typeof playSound === 'function') playSound('graze');
+          if (typeof playSound === 'function') playSound('graze', e.x);
         }
         const _prevHp = e.hp;
         e.hp -= b.dmg || 1;
@@ -11737,7 +11737,7 @@ function updateCollisions() {
             x: e.x, y: e.y - 10, text: 'REVEALED',
             color: '#a8f', life: 32, maxLife: 32, size: 5
           });
-          if (typeof playSound === 'function') playSound('graze');
+          if (typeof playSound === 'function') playSound('graze', e.x);
         }
         // Shield-break feedback (only when not killed in same hit)
         if (e.hp > 0 && e.type === 'shielded' && !e.shieldBroken) {
@@ -11850,7 +11850,7 @@ function updateCollisions() {
               x: e.x, y: e.y - 18, text: 'REVENGE!',
               color: '#f44', life: 50, maxLife: 50, size: 11, glow: 5
             });
-            if (typeof playSound === 'function') playSound('graze');
+            if (typeof playSound === 'function') playSound('graze', e.x);
             // REVENGE COUNT — track per-run revenges + persist lifetime total.
             // Mirrors parryCount / nearMissCount / witchSaves pattern. Surfaced
             // in runHighlights and stats overlay with tier labels.
@@ -12729,7 +12729,7 @@ function updateCollisions() {
           game.flashColor = tierCol;
           rumble(110, 0.5, 0.25);
         }
-        playSound('graze'); // metallic ping reused — short, bright, fits parry feel
+        playSound('graze', b.x); // metallic ping reused — short, bright, fits parry feel (panned to deflect spot)
       }
     }
     // CLUSTER PARRY — deflecting 3+ bullets in a single dash frame is a high-skill
@@ -12868,7 +12868,7 @@ function updateCollisions() {
           x: b.x, y: b.y - 7, text: '·',
           color: '#fff', life: 18, maxLife: 18, size: 6
         });
-        if (typeof playSound === 'function') playSound('graze');
+        if (typeof playSound === 'function') playSound('graze', b.x);
         break;
       }
     }
