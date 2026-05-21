@@ -8640,6 +8640,7 @@ const RAPID_DURATION  = 360; // R — halved fire cooldown, 6 seconds
 const WAVE_DURATION   = 360; // W — sine-wave zigzag bullets, 6 seconds
 const HOMING_DURATION = 360; // H — bullets steer toward nearest enemy, 6 seconds
 const LASER_DURATION  = 300; // L — piercing beam (slightly shorter — it's strong)
+const FORK_DURATION   = 360; // F — 3-way spread shot, 6 seconds
 // WITCH TIME — fatal-hit slow window. Player can escape via dash within these frames.
 // 30 frames at 60fps = 0.5s real time, but world ticks at 0.25× during it (effective 2s).
 const WITCH_WINDOW    = 30;
@@ -9923,7 +9924,7 @@ function updatePowerUps() {
         // angled bullets inherit the same kind. 6-second duration like other
         // timer pickups; stacks with rapid for dense triangular cones.
         const wasActive = (game.forkTimer || 0) > 0;
-        game.forkTimer = Math.round(360 * _scavMul);
+        game.forkTimer = Math.round(FORK_DURATION * _scavMul);
         // SIGNAL INTERCEPT — first FORK activation of run (spread weapon reveal)
         if (!game._forkSeen && typeof pushIntercept === 'function') {
           game._forkSeen = true;
@@ -20840,7 +20841,7 @@ function drawHUD() {
       { t: game.waveTimer   || 0, max: WAVE_DURATION,   label: 'W', col: '#f8a' },
       { t: game.homingTimer || 0, max: HOMING_DURATION, label: 'H', col: '#0ef' },
       { t: game.laserTimer  || 0, max: LASER_DURATION,  label: 'L', col: '#f6c' },
-      { t: game.forkTimer   || 0, max: 360,             label: 'F', col: '#fa0' },
+      { t: game.forkTimer   || 0, max: FORK_DURATION,   label: 'F', col: '#fa0' },
       { t: game.slowTimer   || 0, max: SLOW_DURATION,   label: 'T', col: '#8df' },
     ].filter(b => b.t > 0);
     if (_bDefs.length > 0) {
