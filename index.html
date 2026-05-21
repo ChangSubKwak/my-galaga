@@ -19823,6 +19823,8 @@ function drawHUD() {
   // HIGH SCORE CHASE DISTANCE — numeric gap remaining when within 10K of personal best.
   // Sits below the score (y=25) so it doesn't crowd the score itself. Color tier
   // intensifies as gap shrinks: white(10K) → cyan(5K) → gold(1K) → red(100-).
+  // Owns the y=25 row — the stage-score "+N" further below yields while this shows.
+  let _highChaseShown = false;
   if (!game.crossedHighOnce && game.liveHighThreshold > 0
       && game.score > 0 && game.score < game.liveHighThreshold) {
     const _gap = game.liveHighThreshold - game.score;
@@ -19842,6 +19844,7 @@ function drawHUD() {
       ctx.globalAlpha = _gapPulse;
       drawRetroText('↑ HIGH: -' + fmtScore(_gap), 50, 25, 4, _gapCol, 'right');
       ctx.restore();
+      _highChaseShown = true;
     }
   }
   // Combat-state HUD chips (parry streak, weather, biome, act title, …). The
@@ -20637,10 +20640,11 @@ function drawHUD() {
     }
   }
 
-  // HUD STAGE SCORE EARNED — '+N' label below main score showing what was
+  // HUD STAGE SCORE EARNED — '+N' label below main score (y=25) showing what was
   // gained THIS stage. Helps player gauge per-stage performance. Hidden when
-  // minimal HUD or stage just started (delta 0).
-  if (!minimalHud
+  // minimal HUD, stage just started (delta < 100), or while the high-score chase
+  // readout owns the y=25 row (the PB chase is the more urgent cue there).
+  if (!minimalHud && !_highChaseShown
       && (isCombatState())) {
     const _stgScore = (game.score || 0) - (game.stageScoreStart || 0);
     if (_stgScore >= 100) {
