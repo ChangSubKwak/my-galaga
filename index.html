@@ -7371,6 +7371,19 @@ function tryStartDash() {
   playSound('powerUp');
   rumble(80, 0.5, 0.2);
 }
+// Quit the current run back to the title — submits the score + commits stats first
+// (so abandoning still records progress). Shared by the keyboard 'Q' and the gamepad
+// Back button so both input paths can leave a run, not just resume it.
+function quitToTitle() {
+  if (game.score > 0 && !game.isDemo) {
+    const acc = computeAccuracy(game.stats);
+    submitTopScore(game.score, game.stats.maxStage, acc);
+    commitGameToCumStats();
+  }
+  resetGame();
+  game.state = STATE.TITLE;
+  stopBGM();
+}
 function initInput() {
   keys = {};
   document.addEventListener('keydown', e => {
@@ -7780,16 +7793,7 @@ function initInput() {
     // top-5 lists, cumulative stats, and per-mode leaderboards all stay in sync
     // (previously only the legacy `galagaHigh` key was updated, which dropped
     // daily/challenge runs entirely and never reached the top-5 lists).
-    if (game.state === STATE.PAUSED && k === 'q') {
-      if (game.score > 0 && !game.isDemo) {
-        const acc = computeAccuracy(game.stats);
-        submitTopScore(game.score, game.stats.maxStage, acc);
-        commitGameToCumStats();
-      }
-      resetGame();
-      game.state = STATE.TITLE;
-      stopBGM();
-    }
+    if (game.state === STATE.PAUSED && k === 'q') quitToTitle();
   });
   document.addEventListener('keyup', e => {
     keys[e.key] = false;
@@ -14557,7 +14561,7 @@ function aiInput() {
 }
 
 // --- Gamepad input + haptics ---
-let _prevGpFire = false, _prevGpStart = false, _prevGpDash = false;
+let _prevGpFire = false, _prevGpStart = false, _prevGpDash = false, _prevGpSel = false;
 let _prevGpLeft = false, _prevGpRight = false;
 
 function rumble(duration, strong, weak) {
@@ -14586,7 +14590,7 @@ function pollGamepad() {
   const pads = navigator.getGamepads();
   let pad = null;
   for (const p of pads) if (p) { pad = p; break; }
-  if (!pad) { _prevGpFire = false; _prevGpStart = false; _prevGpDash = false; return; }
+  if (!pad) { _prevGpFire = false; _prevGpStart = false; _prevGpDash = false; _prevGpSel = false; return; }
 
   const ax = pad.axes[0] || 0;
   const dpadL = pad.buttons[14] && pad.buttons[14].pressed;
@@ -14657,6 +14661,12 @@ function pollGamepad() {
   const dash = pad.buttons[1] && pad.buttons[1].pressed;
   if (dash && !_prevGpDash) tryStartDash();
   _prevGpDash = dash;
+
+  // Back/Select button (8) while paused — quit to title (mirrors keyboard 'Q'), so
+  // controller players can abandon a run instead of being limited to resume.
+  const sel = pad.buttons[8] && pad.buttons[8].pressed;
+  if (sel && !_prevGpSel && game.state === STATE.PAUSED) quitToTitle();
+  _prevGpSel = sel;
 }
 
 function update() {
