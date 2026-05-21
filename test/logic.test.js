@@ -479,6 +479,16 @@ if (typeof G.killScore === 'function') {
 } else { console.log('  (skipped — killScore not exposed)'); }
 
 // ============================================================
+section('bossBounty — stage-scaled base × combo × bountyHunter perk');
+if (typeof G.bossBounty === 'function') {
+  eq(G.bossBounty(1, 0, false), 5500, 'stage 1, no combo = 5000+500');
+  eq(G.bossBounty(10, 0, false), 10000, 'stage 10 base = 5000+5000');
+  eq(G.bossBounty(1, 20, false), 16500, 'combo 20 → ×3');
+  eq(G.bossBounty(1, 0, true), 8250, 'bountyHunter perk → +50%');
+  eq(G.bossBounty(10, 20, true), 45000, 'stage 10 + combo 20 + perk stack');
+} else { console.log('  (skipped — bossBounty not exposed)'); }
+
+// ============================================================
 section('getEnemyPoints values + formation/diving + fallback');
 if (typeof G.getEnemyPoints === 'function') {
   eq(G.getEnemyPoints('bee', true), 50,        'bee in formation = 50');

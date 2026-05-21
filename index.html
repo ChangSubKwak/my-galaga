@@ -6618,11 +6618,9 @@ function updateOneMegaBoss(mb) {
             color: '#0ef', life: 60, maxLife: 60, size: 7
           });
         }
-        const mbBase = 5000 + game.stage * 500;
-        let mbBounty = Math.round(mbBase * comboMultiplier(game.combo));
         // PERK 'bountyHunter' — boss bounty +50%. Surfaced in the bounty banner.
         const _bountyHunter = game.activePerk === 'bountyHunter';
-        if (_bountyHunter) mbBounty = Math.round(mbBounty * 1.5);
+        const mbBounty = bossBounty(game.stage, game.combo, _bountyHunter);
         addScore(mbBounty);
         // BOSS BOUNTY label — large yellow score popup at the boss kill site
         game.floatTexts.push({
@@ -7944,6 +7942,14 @@ function killScore(type, inFormation, combo, elite, ghost) {
     * comboMultiplier(combo)
     * (elite ? 1.5 : 1)
     * (ghost ? 2 : 1));
+}
+
+// Mega-boss bounty: stage-scaled base (5000 + stage×500) × combo multiplier,
+// then +50% with the bountyHunter perk. Rounded at each step.
+function bossBounty(stage, combo, bountyHunter) {
+  let b = Math.round((5000 + (stage || 1) * 500) * comboMultiplier(combo));
+  if (bountyHunter) b = Math.round(b * 1.5);
+  return b;
 }
 
 const SCORE_MILESTONES = [10000, 50000, 100000, 500000];
