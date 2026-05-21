@@ -17190,12 +17190,12 @@ function drawStageIntro() {
     // Active buff (single highest-priority)
     {
       let _bp = null, _bpCol = '#fff';
-      if ((game.laserTimer  || 0) > 0)      { _bp = 'LASER'; _bpCol = '#f6c'; }
-      else if ((game.forkTimer  || 0) > 0)  { _bp = 'FORK'; _bpCol = '#fa0'; }
-      else if ((game.homingTimer || 0) > 0) { _bp = 'HOMING'; _bpCol = '#0f8'; }
-      else if ((game.waveTimer   || 0) > 0) { _bp = 'WAVE'; _bpCol = '#6cf'; }
-      else if ((game.rapidTimer  || 0) > 0) { _bp = 'RAPID'; _bpCol = '#fc4'; }
-      else if ((game.slowTimer   || 0) > 0) { _bp = 'SLOW'; _bpCol = '#8ff'; }
+      if ((game.laserTimer  || 0) > 0)      { _bp = 'LASER';  _bpCol = POWERUP_COL.L; }
+      else if ((game.forkTimer  || 0) > 0)  { _bp = 'FORK';   _bpCol = POWERUP_COL.F; }
+      else if ((game.homingTimer || 0) > 0) { _bp = 'HOMING'; _bpCol = POWERUP_COL.H; }
+      else if ((game.waveTimer   || 0) > 0) { _bp = 'WAVE';   _bpCol = POWERUP_COL.W; }
+      else if ((game.rapidTimer  || 0) > 0) { _bp = 'RAPID';  _bpCol = POWERUP_COL.R; }
+      else if ((game.slowTimer   || 0) > 0) { _bp = 'SLOW';   _bpCol = POWERUP_COL.T; }
       if (_bp) drawRetroText(_bp, BASE_W - 4, BASE_H/2 - 4, 4, _bpCol, 'right');
     }
     // High score — glows yellow once the current run crosses 80% of the
@@ -21939,11 +21939,12 @@ function drawPauseScreen() {
   // before committing to a dive / long engagement.
   {
     const _buffs = [
-      { t: game.rapidTimer  || 0, max: RAPID_DURATION,  label: 'R', col: '#fc4' },
-      { t: game.waveTimer   || 0, max: WAVE_DURATION,   label: 'W', col: '#6cf' },
-      { t: game.homingTimer || 0, max: HOMING_DURATION, label: 'H', col: '#0f8' },
-      { t: game.laserTimer  || 0, max: LASER_DURATION,  label: 'L', col: '#f6c' },
-      { t: game.slowTimer   || 0, max: SLOW_DURATION,   label: 'T', col: '#8ff' }
+      { t: game.rapidTimer  || 0, max: RAPID_DURATION,  label: 'R', col: POWERUP_COL.R },
+      { t: game.waveTimer   || 0, max: WAVE_DURATION,   label: 'W', col: POWERUP_COL.W },
+      { t: game.homingTimer || 0, max: HOMING_DURATION, label: 'H', col: POWERUP_COL.H },
+      { t: game.laserTimer  || 0, max: LASER_DURATION,  label: 'L', col: POWERUP_COL.L },
+      { t: game.forkTimer   || 0, max: FORK_DURATION,   label: 'F', col: POWERUP_COL.F },
+      { t: game.slowTimer   || 0, max: SLOW_DURATION,   label: 'T', col: POWERUP_COL.T }
     ].filter(b => b.t > 0);
 
     const _barX = px + 20;
