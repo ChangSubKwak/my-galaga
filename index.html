@@ -8600,19 +8600,23 @@ function updateBullets() {
   // temp weapon timer crosses from 1 → 0 (or expires). Lets player know to
   // pickup again. Each timer checked independently so multiple expirations
   // surface as separate texts.
+  // Color comes from POWERUP_COL[letter] (single source) so each "X OFF" alert
+  // matches that buff's gem / timer color. FORK included so all six timed buffs
+  // warn on expiry (it was previously the only one without an alert).
   const _expiryTimers = [
-    { key: 'slowTimer',   label: 'TIME UP',   col: '#8ff' },
-    { key: 'rapidTimer',  label: 'RAPID OUT', col: '#fc4' },
-    { key: 'waveTimer',   label: 'WAVE OFF',  col: '#6cf' },
-    { key: 'homingTimer', label: 'HOMING END',col: '#0f8' },
-    { key: 'laserTimer',  label: 'LASER OFF', col: '#f6c' }
+    { key: 'slowTimer',   label: 'TIME UP',    letter: 'T' },
+    { key: 'rapidTimer',  label: 'RAPID OUT',  letter: 'R' },
+    { key: 'waveTimer',   label: 'WAVE OFF',   letter: 'W' },
+    { key: 'homingTimer', label: 'HOMING END', letter: 'H' },
+    { key: 'laserTimer',  label: 'LASER OFF',  letter: 'L' },
+    { key: 'forkTimer',   label: 'FORK OFF',   letter: 'F' }
   ];
   for (const _et of _expiryTimers) {
     if ((game[_et.key] || 0) === 1 && game.playerAlive) {
       // Will decrement to 0 below — capture transition
       game.floatTexts.push({
         x: game.playerX, y: game.playerY - 14,
-        text: _et.label, color: _et.col, life: 36, maxLife: 36, size: 5
+        text: _et.label, color: POWERUP_COL[_et.letter] || '#fff', life: 36, maxLife: 36, size: 5
       });
       if (typeof playSound === 'function') playSound('tick');
     }
