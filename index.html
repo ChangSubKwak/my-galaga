@@ -138,6 +138,7 @@ const STAR_COUNT = 80;
 // --- Game state enum ---
 const STATE = { TITLE: 0, STAGE_INTRO: 1, PLAYING: 2, CHALLENGING: 3, GAME_OVER: 4, PAUSED: 5, CAPTURED: 6, RESPAWN: 7, BOSS_STAGE: 8, BONUS_GAME: 9 };
 const BOSS_STAGE_INTERVAL = 10; // production cadence
+const EXTRA_LIFE_SCORE = 30000; // award an extra life each time score crosses a multiple (normal mode only)
 // Single source of truth for which mode a stage runs in (mirrors startStage's
 // branching): every BOSS_STAGE_INTERVAL-th stage is a boss stage, otherwise every
 // 4th is a CHALLENGING bonus wave, otherwise a normal formation stage.
@@ -8109,8 +8110,8 @@ function addScore(pts) {
     rumble(220, 0.7, 0.4);
     spawnConfetti(16);
   }
-  // Extra life every 30000 — disabled in challenge mode (hardcore = 1 life)
-  if (!game.challengeMode && Math.floor(old / 30000) < Math.floor(game.score / 30000)) {
+  // Extra life every EXTRA_LIFE_SCORE — disabled in challenge mode (hardcore = 1 life)
+  if (!game.challengeMode && Math.floor(old / EXTRA_LIFE_SCORE) < Math.floor(game.score / EXTRA_LIFE_SCORE)) {
     game.lives++;
     // Re-arm LAST LIFE ALERT — leaving 1-life state means next drop to 1 can re-fire
     if (game.lives >= 2) game._lastLifeAlertFired = false;
@@ -20203,8 +20204,8 @@ function drawHUD() {
     // EXTRA LIFE PROGRESS — 30px green bar showing distance to next 30K threshold.
     // Skipped in challenge mode (hardcore = 1 life, no extras). Pulse at >=90%.
     if (!game.challengeMode && !minimalHud) {
-      const intoNext = (game.score || 0) % 30000;
-      const elRatio = intoNext / 30000;
+      const intoNext = (game.score || 0) % EXTRA_LIFE_SCORE;
+      const elRatio = intoNext / EXTRA_LIFE_SCORE;
       const barW = 30;
       const bx = BASE_W - 5 - barW;
       const by = 39;
@@ -20556,7 +20557,7 @@ function drawHUD() {
 
   // Extra-life threshold indicator — small note showing distance to next 30K extra life
   if (!game.challengeMode && game.score > 0 && (game.state === STATE.PLAYING || game.state === STATE.BOSS_STAGE || game.state === STATE.CHALLENGING)) {
-    const next = Math.ceil(game.score / 30000) * 30000;
+    const next = Math.ceil(game.score / EXTRA_LIFE_SCORE) * EXTRA_LIFE_SCORE;
     const diff = next - game.score;
     if (diff < 5000) {
       drawRetroText('+1UP IN ' + diff, BASE_W/2, 35, 5, COL.green);
