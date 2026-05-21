@@ -947,6 +947,20 @@ if (typeof G.createLoopPath === 'function') {
 } else { console.log('  (skipped — createLoopPath not exposed)'); }
 
 // ============================================================
+section('comboTierName — combo medal tiers (HUD ↔ carry banner share)');
+if (typeof G.comboTierName === 'function') {
+  eq(G.comboTierName(0), null, 'combo 0 → no tier');
+  eq(G.comboTierName(4), null, 'below 5 → no tier (BRONZE floor)');
+  eq(G.comboTierName(5), 'BRONZE', '5 → BRONZE');
+  eq(G.comboTierName(10), 'SILVER', '10 → SILVER');
+  eq(G.comboTierName(15), 'GOLD', '15 → GOLD');
+  eq(G.comboTierName(20), 'PLATINUM', '20 → PLATINUM');
+  eq(G.comboTierName(30), 'MAX', '30 → MAX (peak)');
+  eq(G.comboTierName(100), 'MAX', 'caps at MAX');
+  eq(G.comboTierName(19), 'GOLD', 'just under PLATINUM → GOLD');
+} else { console.log('  (skipped — comboTierName not exposed)'); }
+
+// ============================================================
 section('computeRunGradeScore / runGradeLetter — run grade');
 if (typeof G.computeRunGradeScore === 'function' && typeof G.runGradeLetter === 'function') {
   const near = (a, b, m) => ok(Math.abs(a - b) < 1e-9, m);

@@ -7048,12 +7048,8 @@ function startStage() {
   // COMBO CARRY BANNER — surface when combo >= 5 carries into the new stage.
   // Reminds the player to keep killing fast to preserve the multiplier.
   if ((game.combo || 0) >= 5) {
-    // TIER NAME — same scale as HUD combo tier label
-    const _ctN = game.combo >= 30 ? 'MAX'
-              : game.combo >= 20 ? 'PLATINUM'
-              : game.combo >= 15 ? 'GOLD'
-              : game.combo >= 10 ? 'SILVER'
-              : 'BRONZE';
+    // TIER NAME — same scale as HUD combo tier label (shared helper)
+    const _ctN = comboTierName(game.combo);
     game.floatTexts.push({
       x: BASE_W/2, y: BASE_H/2 + 50,
       text: 'COMBO CARRIES x' + game.combo + ' (' + _ctN + ')',
@@ -10345,6 +10341,16 @@ function comboMultiplier(c) {
   if (c >= 5) return 1.5;
   if (c >= 3) return 1.25;
   return 1;
+}
+// Combo medal tier label — shared by the HUD combo readout and the cross-stage
+// combo-carry banner so the two scales can't drift. null below the BRONZE floor.
+function comboTierName(combo) {
+  if (combo >= 30) return 'MAX';
+  if (combo >= 20) return 'PLATINUM';
+  if (combo >= 15) return 'GOLD';
+  if (combo >= 10) return 'SILVER';
+  if (combo >= 5)  return 'BRONZE';
+  return null;
 }
 
 const COMBO_MILESTONE = 40; // every N kills in a combo grants a milestone reward (was 20 — life inflation curbed)
@@ -20909,12 +20915,7 @@ function drawHUD() {
     // COMBO TIER NAME — tier label by combo level. MAX tier (30+) adds a
     // soft glow so the peak threshold reads as a visual reward.
     {
-      let _tierN = null;
-      if (game.combo >= 30) _tierN = 'MAX';
-      else if (game.combo >= 20) _tierN = 'PLATINUM';
-      else if (game.combo >= 15) _tierN = 'GOLD';
-      else if (game.combo >= 10) _tierN = 'SILVER';
-      else if (game.combo >= 5) _tierN = 'BRONZE';
+      const _tierN = comboTierName(game.combo);
       if (_tierN) {
         ctx.save();
         if (_tierN === 'MAX') {
