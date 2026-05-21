@@ -20226,7 +20226,7 @@ function drawHUD() {
   // HUD DIFFICULTY — single HARD/EASY label (right rail, y56) on non-default runs.
   // (Previously duplicated: a left-side y30 copy overlapped the combo box; removed.)
   if (isCombatState() && (difficultyMode === 'hard' || difficultyMode === 'easy')) {
-    const dCol = difficultyMode === 'hard' ? '#f44' : '#0f8';
+    const dCol = difficultyMode === 'hard' ? COL.red : COL.green;
     drawRetroText(difficultyMode === 'hard' ? 'HARD' : 'EASY', BASE_W - 5, 56, 4, dCol, 'right');
   }
   // INCOMING WAVE ALERT CINEMATIC — between CHALLENGING waves the 35-frame
@@ -21013,12 +21013,9 @@ function drawHUD() {
     }
   }
 
-  // Difficulty indicator on HUD when not normal — small badge
-  if (difficultyMode !== 'normal' && (game.state === STATE.PLAYING || game.state === STATE.BOSS_STAGE || game.state === STATE.CHALLENGING)) {
-    const dCol = difficultyMode === 'hard' ? COL.red : COL.green;
-    const tag = difficultyMode === 'hard' ? '!H!' : '~E~';
-    drawRetroText(tag, BASE_W - 5, 26, 5, dCol, 'right');
-  }
+  // (Difficulty is shown once — the clear HARD/EASY badge at y56. The old cryptic
+  // "!H!/~E~" indicator that lived here at y26 was a duplicate that also collided
+  // with the PB readout at y23, so it was removed.)
   // Boss HP bar moved to drawBossStage() combined bar — no duplicate needed here.
 
   drawMiniRadar();
