@@ -6231,7 +6231,7 @@ function updateOneMegaBoss(mb) {
         mb.spiralRemaining = 8;
         mb.spiralAngleStart = (mb.spiralAngle || 0);
         mb.spiralAngle = (mb.spiralAngle || 0) + 0.5;
-        playSound('enemyDive');
+        playSound('enemyDive', mb.x);
       } else {
         const count = mb.spreadCount;
         const step = count > 1 ? 0.45 : 0;
@@ -6298,7 +6298,7 @@ function updateOneMegaBoss(mb) {
           splitFan: 0.45,
           splitSpeed: sp
         });
-        playSound('enemyDive');
+        playSound('enemyDive', mb.x);
       } else if (mb.archetype === 'tendril') {
         // LASER SWEEP — wide horizontal beam (4 bullets along horizontal line, slow)
         const sp = Math.min(1.5, 0.9 + game.stage * 0.012) * diffSpeedMul();
@@ -6309,7 +6309,7 @@ function updateOneMegaBoss(mb) {
             kind: 'spiral'
           });
         }
-        playSound('enemyDive');
+        playSound('enemyDive', mb.x);
       } else if (mb.archetype === 'crystal') {
         // FRAGMENT BURST — 6-shot quick fan all aimed at player (denser than base aimed spread)
         const dx0 = game.playerX - mb.x, dy0 = game.playerY - mb.y;
@@ -6325,7 +6325,7 @@ function updateOneMegaBoss(mb) {
             kind: 'mega'
           });
         }
-        playSound('enemyDive');
+        playSound('enemyDive', mb.x);
       } else if (mb.archetype === 'rune') {
         // GLYPH VOLLEY — 4 bullets in a slowly-rotating cross (cardinal ward).
         // Distinct from aimed (horned/crystal) and sweep (tendril): a spinning
@@ -6341,7 +6341,7 @@ function updateOneMegaBoss(mb) {
             kind: 'spiral'
           });
         }
-        playSound('enemyDive');
+        playSound('enemyDive', mb.x);
       }
       // 'standard' archetype gets no signature — keeps it as the base experience.
       // 'phantom' has no bullet signature by design — its identity is the phase-2
@@ -6365,7 +6365,7 @@ function updateOneMegaBoss(mb) {
             kind: 'spiral'
           });
         }
-        playSound('enemyDive');
+        playSound('enemyDive', mb.x);
       }
       // PHANTOM teleFlash tick
       if ((mb.teleFlash || 0) > 0) mb.teleFlash--;
