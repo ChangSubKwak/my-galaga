@@ -828,6 +828,33 @@ section('computePilotTitle / computePilotNextRank — rank ladder');
 }
 
 // ============================================================
+section('daily mode — determinism + structural validity');
+if (typeof G.dailySeed === 'function') {
+  const seed = G.dailySeed();
+  ok(Number.isInteger(seed) && seed > 20000000, 'dailySeed → YYYYMMDD-encoded integer');
+  eq(G.dailySeed(), seed, 'dailySeed is stable within a day (the whole point of "daily")');
+  if (typeof G.dailyLabel === 'function') {
+    const lbl = G.dailyLabel();
+    eq(typeof lbl, 'string', 'dailyLabel is a string');
+    eq(lbl.length, 6, 'dailyLabel → 6-char YYMMDD');
+  }
+  if (typeof G.dailyShipFor === 'function') {
+    const order = G.__getShipOrder && G.__getShipOrder();
+    if (order) {
+      ok(order.includes(G.dailyShipFor(seed)), 'dailyShipFor → a real ship key');
+      eq(G.dailyShipFor(0), G.dailyShipFor(order.length), 'dailyShipFor cycles with the seed');
+      eq(G.dailyShipFor(seed), G.dailyShipFor(seed), 'dailyShipFor deterministic for a seed');
+    }
+  }
+  if (typeof G.dailyMutation === 'function') {
+    const m1 = G.dailyMutation(), m2 = G.dailyMutation();
+    ok(m1 && typeof m1 === 'object', 'dailyMutation → a mutation object');
+    ok(typeof m1.label === 'string' && m1.label.length > 0, 'mutation has a label');
+    eq(m1, m2, 'same day → same mutation (deterministic, identical object)');
+  }
+} else { console.log('  (skipped — dailySeed not exposed)'); }
+
+// ============================================================
 section('bulletCap — performance caps trim the oldest entries');
 {
   const bc = G.__getGame && G.__getGame();
