@@ -1178,6 +1178,22 @@ if (typeof G.computeAccuracy === 'function') {
 } else { console.log('  (skipped — computeAccuracy not exposed)'); }
 
 // ============================================================
+section('computeStageAccuracy — reads current stage tallies (wraps computeAccuracy)');
+if (typeof G.computeStageAccuracy === 'function') {
+  const g = fresh();
+  g.stageShotsFired = 0; g.stageShotsHit = 0;
+  eq(G.computeStageAccuracy(), 0, 'no stage shots → 0 (zero-shot safe)');
+  g.stageShotsFired = 100; g.stageShotsHit = 90;
+  eq(G.computeStageAccuracy(), 90, '90/100 → 90');
+  g.stageShotsFired = 3; g.stageShotsHit = 1;
+  eq(G.computeStageAccuracy(), 33, 'rounds (1/3 → 33)');
+  // Must agree with computeAccuracy fed the same tallies (single source).
+  g.stageShotsFired = 8; g.stageShotsHit = 7;
+  eq(G.computeStageAccuracy(), G.computeAccuracy({ shotsFired: 8, shotsHit: 7 }),
+     'matches computeAccuracy on identical tallies');
+} else { console.log('  (skipped — computeStageAccuracy not exposed)'); }
+
+// ============================================================
 section('stageModeFor — boss / challenge / normal dispatch');
 if (typeof G.stageModeFor === 'function') {
   eq(G.stageModeFor(10), 'boss', 'stage 10 → boss');

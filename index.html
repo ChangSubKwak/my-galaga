@@ -9577,6 +9577,13 @@ function computeAccuracy(stats) {
   if (fired === 0) return 0;
   return Math.round((((stats && stats.shotsHit) || 0) / fired) * 100);
 }
+// Stage-level accuracy (hit %), zero-shot-safe — same formula as computeAccuracy
+// but on the current stage's shot tallies. Single source for the per-stage grade,
+// bonus, and HUD readouts (was inlined identically in 4 sites).
+function computeStageAccuracy() {
+  return computeAccuracy({ shotsFired: (game && game.stageShotsFired) || 0,
+                           shotsHit:  (game && game.stageShotsHit)  || 0 });
+}
 
 // Run grade — composite of final score (50%, capped at 100K), accuracy (30%) and
 // depth (20%, capped at stage 30). Shared by the GAME_OVER grade letter and the
@@ -14200,8 +14207,7 @@ function checkStageComplete() {
           if (game.stage + 1 >= 20) unlockAchievement('marathoner');
           // Iron pilot: no death + 90%+ accuracy this stage
           {
-            const accStage = game.stageShotsFired === 0 ? 0
-              : Math.round((game.stageShotsHit / game.stageShotsFired) * 100);
+            const accStage = computeStageAccuracy();
             if (!game.stageDied && accStage >= 90 && game.stageShotsFired >= 10) unlockAchievement('ironPilot');
           }
           // Performance bonuses
@@ -14260,8 +14266,7 @@ function checkStageComplete() {
           // reward the same axes). Counters per grade persisted to localStorage for
           // long-term progression visibility on the PROFILE page.
           {
-            const accForGrade = game.stageShotsFired === 0 ? 0
-              : Math.round((game.stageShotsHit / game.stageShotsFired) * 100);
+            const accForGrade = computeStageAccuracy();
             const fastClear = timeBonus >= 3500;
             let grade, gradeCol;
             if (!game.stageDied && accForGrade >= 90 && fastClear) {
@@ -14351,8 +14356,7 @@ function checkStageComplete() {
           // recognition; no score bonus (perfectStage achievement / per-stage tallies
           // already incentivize precision — this is just the named celebration).
           {
-            const accStage = game.stageShotsFired === 0 ? 0
-              : Math.round((game.stageShotsHit / game.stageShotsFired) * 100);
+            const accStage = computeStageAccuracy();
             if (!game.stageDied && accStage >= 85 && game.stageShotsFired >= 10) {
               game.floatTexts.push({
                 x: BASE_W/2, y: cy - 12, text: 'PERFECT CLEAR!',
@@ -21012,7 +21016,7 @@ function drawHUD() {
 
   // Real-time stage accuracy (top-left, second row) — only after some shots fired
   if (!minimalHud && (game.stageShotsFired || 0) >= 4) {
-    const acc = Math.round((game.stageShotsHit / game.stageShotsFired) * 100);
+    const acc = computeStageAccuracy();
     const accCol = acc >= 90 ? '#0f8' : acc >= 70 ? COL.cyan : acc >= 40 ? COL.yellow : '#f88';
     drawRetroText('ACC ' + acc + '%', 6, game.combo >= 3 ? 41 : 30, 6, accCol, 'left');
   }
