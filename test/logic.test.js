@@ -1430,6 +1430,32 @@ if (typeof G.recordStagePB === 'function' && G.__getStagePBs && G.__getStagePBs(
 } else { console.log('  (skipped — recordStagePB / stagePBs not exposed)'); }
 
 // ============================================================
+section('unlockDex — first-contact bestiary unlock (valid-type only, idempotent)');
+if (typeof G.unlockDex === 'function' && G.__getDexUnlocked && G.__getDexUnlocked()) {
+  const dex = G.__getDexUnlocked();
+  const savedDex = sandbox.localStorage.getItem('galagaDexUnlocked');
+  const TYPE = 'bee'; // a known ENEMY_INFO type
+  const had = dex.has(TYPE);
+  dex.delete(TYPE);
+  const g = fresh(); g.state = 0; // TITLE → skip the in-game floatText path
+
+  G.unlockDex('notARealEnemyType');
+  ok(!dex.has('notARealEnemyType'), 'invalid type → not unlocked');
+
+  G.unlockDex(TYPE);
+  ok(dex.has(TYPE), 'valid type → unlocked');
+  ok(JSON.parse(sandbox.localStorage.getItem('galagaDexUnlocked') || '[]').includes(TYPE),
+     'unlock persisted to localStorage');
+
+  const sizeBefore = dex.size;
+  G.unlockDex(TYPE);
+  eq(dex.size, sizeBefore, 'already unlocked → idempotent (no duplicate)');
+
+  if (!had) dex.delete(TYPE);
+  if (savedDex === null) sandbox.localStorage.removeItem('galagaDexUnlocked'); else sandbox.localStorage.setItem('galagaDexUnlocked', savedDex);
+} else { console.log('  (skipped — unlockDex / dexUnlocked not exposed)'); }
+
+// ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
 if (typeof G.comboKillDetune === 'function') {
   eq(G.comboKillDetune(0),   0,   'combo 0 → base pitch (no detune)');
