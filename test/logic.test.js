@@ -827,6 +827,34 @@ section('computePilotTitle / computePilotNextRank — rank ladder');
 }
 
 // ============================================================
+section('computeCompositeCompletion — aggregate progression %');
+{
+  const dex = G.__getDexUnlocked && G.__getDexUnlocked();
+  const ach = G.__getUnlockedAch && G.__getUnlockedAch();
+  if (typeof G.computeCompositeCompletion === 'function' && dex && ach) {
+    const dexSave = [...dex], achSave = [...ach];
+    const keys = ['galagaBiomesSeen', 'galagaShipsUsed', 'galagaDifficultiesUsed', 'galagaPerkPicks'];
+    const lsSave = keys.map(k => sandbox.localStorage.getItem(k));
+    // Fresh save → every category 0 → 0%
+    dex.clear(); ach.clear();
+    keys.forEach(k => sandbox.localStorage.removeItem(k));
+    eq(G.computeCompositeCompletion(), 0, 'fresh save → 0%');
+    // Max the 4 cap-based categories (biomes 8 / dex 8 / ships 4 / difficulties 3),
+    // leave perks + achievements empty → (1+1+1+1+0+0)/6 → 67% (avoids needing the
+    // perk/achievement totals, which vary).
+    for (let i = 0; i < 8; i++) dex.add('d' + i);
+    sandbox.localStorage.setItem('galagaBiomesSeen', JSON.stringify(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']));
+    sandbox.localStorage.setItem('galagaShipsUsed', JSON.stringify(['s1', 's2', 's3', 's4']));
+    sandbox.localStorage.setItem('galagaDifficultiesUsed', JSON.stringify(['easy', 'normal', 'hard']));
+    eq(G.computeCompositeCompletion(), 67, 'biomes/dex/ships/diff maxed (perks+ach empty) → 67%');
+    // restore
+    dex.clear(); dexSave.forEach(x => dex.add(x));
+    ach.clear(); achSave.forEach(x => ach.add(x));
+    keys.forEach((k, i) => { if (lsSave[i] === null) sandbox.localStorage.removeItem(k); else sandbox.localStorage.setItem(k, lsSave[i]); });
+  } else { console.log('  (skipped — computeCompositeCompletion / sets not exposed)'); }
+}
+
+// ============================================================
 section('stats overlay page model — Tab navigation invariants');
 if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'function') {
   const gp = G.statsAchGridPages();
