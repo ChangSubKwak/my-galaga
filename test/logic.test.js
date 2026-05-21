@@ -1211,6 +1211,19 @@ if (typeof G.blinkPhase === 'function') {
 } else { console.log('  (skipped — blinkPhase not exposed)'); }
 
 // ============================================================
+section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
+if (typeof G.comboKillDetune === 'function') {
+  eq(G.comboKillDetune(0),   0,   'combo 0 → base pitch (no detune)');
+  eq(G.comboKillDetune(1),   10,  'combo 1 → +10c');
+  eq(G.comboKillDetune(10),  100, 'combo 10 → +100c');
+  eq(G.comboKillDetune(30),  300, 'combo 30 (MAX tier) → +300c cap');
+  eq(G.comboKillDetune(99),  300, 'caps at +300c past combo 30');
+  eq(G.comboKillDetune(-5),  0,   'negative/garbage → 0 (clamped)');
+  eq(G.comboKillDetune(),    0,   'undefined → 0 (no NaN)');
+  ok(G.comboKillDetune(20) > G.comboKillDetune(5), 'monotonic: higher combo → higher pitch');
+} else { console.log('  (skipped — comboKillDetune not exposed)'); }
+
+// ============================================================
 section('stageModeFor — boss / challenge / normal dispatch');
 if (typeof G.stageModeFor === 'function') {
   eq(G.stageModeFor(10), 'boss', 'stage 10 → boss');

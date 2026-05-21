@@ -1143,7 +1143,7 @@ function panForX(x) {
 // transposition — the sound stays in tune, just nudged in pitch each trigger.
 const SFX_DETUNE_CENTS = 55;
 const SFX_VARY = new Set(['shoot', 'hit', 'explode', 'crit', 'enemyDive', 'graze']);
-function playSound(type, panX) {
+function playSound(type, panX, detuneAdd) {
   ensureAudio();
   if (!audioCtx) return;
   const now = audioCtx.currentTime;
@@ -1161,7 +1161,9 @@ function playSound(type, panX) {
   g.connect(_out);
   const o = audioCtx.createOscillator();
   o.connect(g);
-  if (SFX_VARY.has(type)) o.detune.value = (Math.random() * 2 - 1) * SFX_DETUNE_CENTS;
+  // Per-shot pitch wobble (SFX_VARY) + optional caller-supplied detune (e.g. the
+  // COMBO HARMONICS escalation passed by enemy-kill SFX). They compose additively.
+  o.detune.value = (SFX_VARY.has(type) ? (Math.random() * 2 - 1) * SFX_DETUNE_CENTS : 0) + (detuneAdd || 0);
   switch(type) {
     case 'shoot':
       o.type = 'square'; o.frequency.setValueAtTime(880, now);
@@ -10398,6 +10400,14 @@ function comboTierColor(mult) {
   return mult >= 2.5 ? '#f6f' : mult >= 2 ? '#f80' : mult >= 1.5 ? '#ff4' : '#0ff';
 }
 
+// COMBO HARMONICS — enemy-kill SFX detune (cents) that climbs with the combo so a
+// chain audibly rises in pitch, then drops back when the combo breaks. Linear ramp
+// to a +300-cent (minor-third) cap at combo 30 (the MAX tier). Pure; only enemy-kill
+// sites pass it to playSound, so player-death / boss explosions stay at base pitch.
+function comboKillDetune(combo) {
+  return Math.min(Math.max(combo || 0, 0), 30) * 10;
+}
+
 const COMBO_MILESTONE = 40; // every N kills in a combo grants a milestone reward (was 20 — life inflation curbed)
 
 // COMBO ARSENAL ladder — each combo threshold auto-grants a temporary weapon for 3 seconds.
@@ -11727,7 +11737,7 @@ function updateCollisions() {
           for (let s = 0; s < 6; s++) {
             game.hitSparks.push({x: e.x + (Math.random()-0.5)*10, y: e.y + (Math.random()-0.5)*8, life: -s});
           }
-          playSound('crit', e.x);
+          playSound('crit', e.x, comboKillDetune(game.combo));
         }
         if (e.hp <= 0) {
           e.alive = false;
@@ -12169,7 +12179,7 @@ function updateCollisions() {
           // Use 'crit' SFX as a high-tier substitute when chain ≥ 5; keeps the
           // type-specific killSfx for solo kills and short chains.
           if (game._killChainAudio >= 5) {
-            playSound('crit');
+            playSound('crit', null, comboKillDetune(game.combo));
           } else {
             playSound(killSfx);
           }
@@ -12874,7 +12884,7 @@ function updateCollisions() {
         const _eX = e.x, _eY = e.y, _eType = e.type;
         e.alive = false;
         game.explosions.push({x: e.x, y: e.y, timer: 0, maxTime: 20});
-        playSound('explode', e.x);
+        playSound('explode', e.x, comboKillDetune(game.combo));
         // REVENGE: pass the colliding enemy's type; killPlayer seeds the avenge
         // target only on a confirmed death (shield/cheat absorb won't false-trigger).
         killPlayer(_eX, _eY, 'collision', _eType);
