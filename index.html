@@ -112,12 +112,12 @@ body::before {
 </style>
 </head>
 <body>
-<canvas id="gc"></canvas>
-<div id="touchControls">
-  <div id="joyPad"><div id="joyKnob"></div></div>
-  <div class="touch-btn" id="btnFire">&#9679;</div>
+<canvas id="gc" aria-label="Galaga game screen" role="img"></canvas>
+<div id="touchControls" role="group" aria-label="Touch controls">
+  <div id="joyPad" role="application" aria-label="Movement joystick"><div id="joyKnob"></div></div>
+  <div class="touch-btn" id="btnFire" role="button" aria-label="Fire">&#9679;</div>
 </div>
-<div id="btnPause">&#10073;&#10073;</div>
+<div id="btnPause" role="button" aria-label="Pause">&#10073;&#10073;</div>
 <script>
 "use strict";
 // ============================================================
