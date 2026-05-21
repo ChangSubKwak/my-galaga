@@ -8668,6 +8668,11 @@ function isPowerMaxed() {
 }
 
 const POWERUP_COL = {S: '#0ff', N: '#0f8', P: '#f6f', T: '#8df', R: '#fc4', W: '#f8a', B: '#f44', H: '#0ef', L: '#f6c', E: '#4f8', F: '#fa0'};
+// Stage-grade letter colors — single source so the same letter is the same color
+// on every stage type (the per-stage pop on boss/challenge AND the normal-stage
+// STAGE GRADE bracket previously used divergent palettes). Intuitive gradient:
+// S gold → A green → B cyan → C white → D red (worst).
+const GRADE_COL = {S: '#fc4', A: '#0f8', B: '#0cf', C: '#fff', D: '#f88'};
 const SHIELD_MAX = 3;
 const SLOW_DURATION   = 360; // T — slow enemy bullets, 6 seconds at 60fps
 const RAPID_DURATION  = 360; // R — halved fire cooldown, 6 seconds
@@ -13789,11 +13794,12 @@ function spawnStageClear(label, sub) {
       }
     } catch (e) {}
     let _grade, _gCol;
-    if (_died) { _grade = 'D'; _gCol = '#f88'; }
-    else if (_accPct >= 95 && _pbBeat)  { _grade = 'S'; _gCol = '#fc4'; }
-    else if (_accPct >= 85)             { _grade = 'A'; _gCol = '#0f8'; }
-    else if (_accPct >= 70)             { _grade = 'B'; _gCol = '#0cf'; }
-    else                                { _grade = 'C'; _gCol = '#fff'; }
+    if (_died)                          { _grade = 'D'; }
+    else if (_accPct >= 95 && _pbBeat)  { _grade = 'S'; }
+    else if (_accPct >= 85)             { _grade = 'A'; }
+    else if (_accPct >= 70)             { _grade = 'B'; }
+    else                                { _grade = 'C'; }
+    _gCol = GRADE_COL[_grade];
     // Normal stages (state PLAYING) are graded by the richer STAGE GRADE system
     // in checkStageComplete (bracket pop + ace streak + SFX + cinematic + persist).
     // This grade is only for BOSS/CHALLENGE clears, which that system doesn't reach
@@ -14328,16 +14334,17 @@ function checkStageComplete() {
             const fastClear = timeBonus >= 3500;
             let grade, gradeCol;
             if (!game.stageDied && accForGrade >= 90 && fastClear) {
-              grade = 'S'; gradeCol = '#fc4';
+              grade = 'S';
             } else if (!game.stageDied && accForGrade >= 80) {
-              grade = 'A'; gradeCol = '#0ff';
+              grade = 'A';
             } else if (accForGrade >= 65) {
-              grade = 'B'; gradeCol = '#0f8';
+              grade = 'B';
             } else if (accForGrade >= 40) {
-              grade = 'C'; gradeCol = '#fff';
+              grade = 'C';
             } else {
-              grade = 'D'; gradeCol = '#aaa';
+              grade = 'D';
             }
+            gradeCol = GRADE_COL[grade]; // single source — same color per letter on every stage type
             // ACE STREAK — track consecutive S/A grades. Banner at 3/5/10/15.
             // Resets on B or below. Lifetime best persisted for run highlights.
             const _isAce = (grade === 'S' || grade === 'A');

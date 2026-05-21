@@ -174,6 +174,7 @@ const shim = `
 ;try { globalThis.__getComboArsenal = function () { return (typeof COMBO_ARSENAL !== 'undefined') ? COMBO_ARSENAL : null; }; } catch (e) {}
 ;try { globalThis.__getAchievements = function () { return (typeof ACHIEVEMENTS !== 'undefined') ? ACHIEVEMENTS : null; }; } catch (e) {}
 ;try { globalThis.__getPowerupCol = function () { return (typeof POWERUP_COL !== 'undefined') ? POWERUP_COL : null; }; } catch (e) {}
+;try { globalThis.__getGradeCol = function () { return (typeof GRADE_COL !== 'undefined') ? GRADE_COL : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -1272,6 +1273,18 @@ if (typeof G.__getPowerupCol === 'function' && G.__getPowerupCol()) {
   }
   ok(!('D' in col), 'D (dash) intentionally absent from POWERUP_COL (custom-colored)');
 } else { console.log('  (skipped — POWERUP_COL not exposed)'); }
+
+// ============================================================
+section('GRADE_COL — single source, every grade letter has a valid color');
+// Both stage-grade systems (boss/challenge pop + normal STAGE GRADE) now read this,
+// so a letter is the same color everywhere. Guard completeness + valid hex.
+if (typeof G.__getGradeCol === 'function' && G.__getGradeCol()) {
+  const gc = G.__getGradeCol();
+  const hex = /^#[0-9a-fA-F]{3,6}$/;
+  for (const g of ['S','A','B','C','D']) {
+    ok(typeof gc[g] === 'string' && hex.test(gc[g]), 'GRADE_COL.' + g + ' valid hex (' + gc[g] + ')');
+  }
+} else { console.log('  (skipped — GRADE_COL not exposed)'); }
 
 // ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
