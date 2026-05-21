@@ -734,6 +734,36 @@ section('computeBgmIntensity / computeBgmPitch — BGM modulation');
 }
 
 // ============================================================
+section('bgmForGameState — track selection by state/stage/phase');
+{
+  const bg = G.__getGame && G.__getGame();
+  if (bg && typeof G.bgmForGameState === 'function') {
+    const save = { stage: bg.stage, megaBosses: bg.megaBosses };
+    bg.megaBosses = [];
+    bg.stage = 1;  eq(G.bgmForGameState(2), 'normal',    'early normal stage → normal');
+    bg.stage = 15; eq(G.bgmForGameState(2), 'normalMid', 'stage 15+ normal → normalMid');
+    bg.stage = 10; eq(G.bgmForGameState(8), 'boss',      'boss stage <30 → boss');
+    bg.stage = 30; eq(G.bgmForGameState(8), 'bossSuper', 'boss stage 30+ → bossSuper');
+    bg.megaBosses = [{ alive: true, phase2: true }];
+    bg.stage = 10; eq(G.bgmForGameState(8), 'bossEnrage', 'phase-2 boss → bossEnrage (overrides super)');
+    bg.stage = 30; eq(G.bgmForGameState(8), 'bossEnrage', 'phase-2 wins even at stage 30+');
+    Object.assign(bg, save);
+  } else { console.log('  (skipped — bgmForGameState / game not exposed)'); }
+}
+
+// ============================================================
+section('fmtMS — frame count → mm:ss');
+if (typeof G.fmtMS === 'function') {
+  eq(G.fmtMS(0), '00:00', '0 frames → 00:00');
+  eq(G.fmtMS(60), '00:01', '60 frames = 1s → 00:01');
+  eq(G.fmtMS(3600), '01:00', '3600 frames = 60s → 01:00');
+  eq(G.fmtMS(90 * 60), '01:30', '90s → 01:30');
+  eq(G.fmtMS(3599), '00:59', 'rounds down to whole seconds');
+  eq(G.fmtMS(undefined), '--:--', 'non-number → placeholder');
+  eq(G.fmtMS(null), '--:--', 'null → placeholder');
+} else { console.log('  (skipped — fmtMS not exposed)'); }
+
+// ============================================================
 section('stats overlay page model — Tab navigation invariants');
 if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'function') {
   const gp = G.statsAchGridPages();
