@@ -827,6 +827,27 @@ section('computePilotTitle / computePilotNextRank — rank ladder');
 }
 
 // ============================================================
+section('createEntryPath — entry bezier endpoints + curve direction');
+if (typeof G.createEntryPath === 'function') {
+  const path = G.createEntryPath(10, 20, 100, 200, 1);
+  eq(path.p0.x, 10, 'p0 = start x'); eq(path.p0.y, 20, 'p0 = start y');
+  eq(path.p3.x, 100, 'p3 = end x'); eq(path.p3.y, 200, 'p3 = end y');
+  eq(path.p1.y, 20, 'p1.y aligns to the start row');
+  eq(path.p2.y, 200, 'p2.y aligns to the end row');
+  eq(path.p1.x, path.p2.x, 'both control points share the detour x (vertical bow)');
+  const left = G.createEntryPath(10, 20, 100, 200, -1);
+  ok(left.p1.x < path.p1.x, 'curveDir -1 bows to the opposite side');
+  // The path must be consumable by bezierPoint (the movement evaluator): the curve
+  // starts exactly at the entry point and lands exactly on the formation slot.
+  if (typeof G.bezierPoint === 'function') {
+    const a = G.bezierPoint(path.p0, path.p1, path.p2, path.p3, 0);
+    const b = G.bezierPoint(path.p0, path.p1, path.p2, path.p3, 1);
+    ok(Math.abs(a.x - 10) < 1e-9 && Math.abs(a.y - 20) < 1e-9, 'bezier t=0 → start point');
+    ok(Math.abs(b.x - 100) < 1e-9 && Math.abs(b.y - 200) < 1e-9, 'bezier t=1 → end point');
+  }
+} else { console.log('  (skipped — createEntryPath not exposed)'); }
+
+// ============================================================
 section('computeCompositeCompletion — aggregate progression %');
 {
   const dex = G.__getDexUnlocked && G.__getDexUnlocked();
