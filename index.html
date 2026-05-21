@@ -9822,7 +9822,7 @@ function updatePowerUps() {
     if (!game.playerAlive) continue;
     const hitW = game.dualFighter ? 16 : 7;
     if (Math.abs(p.x - game.playerX) < hitW + 4 && Math.abs(p.y - game.playerY) < 8) {
-      const color = POWERUP_COL[p.type];
+      const color = POWERUP_COL[p.type] || '#fff';
       // PERK 'scavenger' — timer pickups (T/R/W/H/L) last 1.5×. Applied at pickup
       // time so a non-scavenger run's timer can't be retro-extended by perk swap.
       const _scavMul = game.activePerk === 'scavenger' ? 1.5 : 1;
