@@ -161,6 +161,8 @@ const shim = `
 ;try { globalThis.__getDailyMissions = function () { return (typeof DAILY_MISSIONS !== 'undefined') ? DAILY_MISSIONS : null; }; } catch (e) {}
 ;try { globalThis.__setDifficulty = function (m) { if (typeof difficultyMode !== 'undefined') difficultyMode = m; }; } catch (e) {}
 ;try { globalThis.__getSfxVary = function () { return (typeof SFX_VARY !== 'undefined') ? SFX_VARY : null; }; } catch (e) {}
+;try { globalThis.__getDexUnlocked = function () { return (typeof dexUnlocked !== 'undefined') ? dexUnlocked : null; }; } catch (e) {}
+;try { globalThis.__getUnlockedAch = function () { return (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -785,6 +787,43 @@ section('computeMoraleScore — enemy-confidence weighted inputs');
     near(G.computeMoraleScore(), 70, 'witch saves ×5 stack on depth');
     Object.assign(mg, save);
   } else { console.log('  (skipped — computeMoraleScore / game not exposed)'); }
+}
+
+// ============================================================
+section('computePilotTitle / computePilotNextRank — rank ladder');
+{
+  const dex = G.__getDexUnlocked && G.__getDexUnlocked();
+  const ach = G.__getUnlockedAch && G.__getUnlockedAch();
+  if (typeof G.computePilotTitle === 'function' && dex && ach) {
+    const dexSave = [...dex], achSave = [...ach];
+    const lsN = sandbox.localStorage.getItem('galagaCumStats');
+    const lsC = sandbox.localStorage.getItem('galagaCumStatsChallenge');
+    const setStats = (o) => {
+      sandbox.localStorage.setItem('galagaCumStats', JSON.stringify(o));
+      sandbox.localStorage.setItem('galagaCumStatsChallenge', JSON.stringify({}));
+    };
+    dex.clear(); ach.clear();
+    // Ladder climbs in priority order; each tier needs the prior thresholds + its own.
+    setStats({ sessions: 0, kills: 0, bestStage: 0 });
+    eq(G.computePilotTitle(), 'ROOKIE', 'fresh pilot → ROOKIE');
+    eq(G.computePilotNextRank().next, 'PILOT', 'ROOKIE next rank → PILOT');
+    setStats({ sessions: 10, kills: 0, bestStage: 0 });
+    eq(G.computePilotTitle(), 'PILOT', '10 runs → PILOT');
+    setStats({ sessions: 10, kills: 1000, bestStage: 0 });
+    eq(G.computePilotTitle(), 'VETERAN', '1000 kills → VETERAN');
+    setStats({ sessions: 10, kills: 1000, bestStage: 30 });
+    eq(G.computePilotTitle(), 'APEX SURVIVOR', 'best stage 30 → APEX SURVIVOR');
+    for (let i = 0; i < 8; i++) dex.add('dex' + i);
+    eq(G.computePilotTitle(), 'BESTIARY MASTER', '8 dex entries outrank APEX');
+    for (let i = 0; i < 200; i++) ach.add('ach' + i); // > any plausible total → >=80%
+    eq(G.computePilotTitle(), 'ACE PILOT', '80%+ achievements → ACE PILOT (peak)');
+    eq(G.computePilotNextRank().next, null, 'ACE PILOT → no next rank (MAX)');
+    // restore
+    dex.clear(); dexSave.forEach(x => dex.add(x));
+    ach.clear(); achSave.forEach(x => ach.add(x));
+    if (lsN === null) sandbox.localStorage.removeItem('galagaCumStats'); else sandbox.localStorage.setItem('galagaCumStats', lsN);
+    if (lsC === null) sandbox.localStorage.removeItem('galagaCumStatsChallenge'); else sandbox.localStorage.setItem('galagaCumStatsChallenge', lsC);
+  } else { console.log('  (skipped — pilot-title helpers / sets not exposed)'); }
 }
 
 // ============================================================
