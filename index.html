@@ -146,6 +146,14 @@ function stageModeFor(stage) {
   if (stage % 4 === 0) return 'challenge';
   return 'normal';
 }
+// True during the three active-combat states (formation / challenge wave / boss
+// fight) — the gate used by per-frame timers, morale, BGM, last-life cues, etc.
+// Excludes TITLE / INTRO / GAME_OVER / PAUSED / CAPTURED / RESPAWN / BONUS.
+function isCombatState() {
+  if (!game) return false;
+  const s = game.state;
+  return s === STATE.PLAYING || s === STATE.CHALLENGING || s === STATE.BOSS_STAGE;
+}
 
 // --- Colors ---
 const COL = {
@@ -970,7 +978,7 @@ function computeBgmIntensity() {
   // Boss phase 2 — fight intensity peaks here
   if (game.megaBosses && game.megaBosses.some(mb => mb.alive && mb.phase2)) m += 0.30;
   // Last life — urgency cue
-  if (game.lives === 1 && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+  if (game.lives === 1 && (isCombatState())) {
     m += 0.20;
   }
   // PILOT MOMENTUM — ASCENDING (combo ≥ 20 AND clean streak ≥ 3, the in-zone peak
@@ -2334,7 +2342,7 @@ function drawStar(s) {
   // Tier 1 (30-49): 1px tail / Tier 2 (50-69): 2px / Tier 3 (70+): 3px hyperspace.
   // Active only during gameplay states (TITLE / STAGE_INTRO stay clean).
   if (s.layer === 'near' && game && game.stage >= 30
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const tailLen = game.stage >= 70 ? 3 : game.stage >= 50 ? 2 : 1;
     for (let t = 1; t <= tailLen; t++) {
       ctx.globalAlpha = a * (1 - t / (tailLen + 1)) * 0.7;
@@ -3479,7 +3487,7 @@ function drawNebulae() {
   if (game) {
     const bossPhase2 = (game.megaBosses || []).some(mb => mb.alive && mb.phase2);
     const _cornered = game.lives === 1
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE);
+      && (isCombatState());
     if (bossPhase2) {
       reactTint = '#911';
       reactAlpha = 0.22 + 0.10 * Math.sin(game.animFrame * 0.08);
@@ -3493,7 +3501,7 @@ function drawNebulae() {
       reactTint = '#722';
       reactAlpha = (game.comboLostVignette / 60) * 0.20;
     } else if (game.stageDied && (game.combo || 0) < 5
-        && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+        && (isCombatState())) {
       // STRAINED — PILOT MOMENTUM regrouping state (post-death, combo not yet rebuilt).
       // A faint desaturated blue-grey haze reads as "shaken focus" — the quiet third
       // pole between ASCENDING (bright aura) and CORNERED (red unease). Dissolves
@@ -7466,7 +7474,7 @@ function initInput() {
     }
     // Dash — Shift (any side). Costs 60-frame cooldown, gives 12 frames of invincible movement.
     if (e.key === 'Shift') {
-      if ((game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      if ((isCombatState())
           && game.playerAlive && game.dashCooldown === 0 && game.dashTimer === 0) {
         const dir = (keys['ArrowLeft'] || keys['a'] || keys['A']) ? -1
                   : (keys['ArrowRight'] || keys['d'] || keys['D']) ? 1
@@ -7503,7 +7511,7 @@ function initInput() {
       if (game.state === STATE.PAUSED) {
         game.state = game.pausedState;
         startBGM(bgmForGameState(game.pausedState));
-      } else if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE) {
+      } else if (isCombatState()) {
         game.pausedState = game.state;
         game.state = STATE.PAUSED;
         stopBGM();
@@ -7726,7 +7734,7 @@ function initInput() {
         // resume — same as pressing P from paused
         game.state = game.pausedState;
         startBGM(bgmForGameState(game.pausedState));
-      } else if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE) {
+      } else if (isCombatState()) {
         game.pausedState = game.state;
         game.state = STATE.PAUSED;
         stopBGM();
@@ -7792,7 +7800,7 @@ function initInput() {
       if (game.state === STATE.PAUSED) {
         game.state = game.pausedState;
         startBGM(bgmForGameState(game.pausedState));
-      } else if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE) {
+      } else if (isCombatState()) {
         game.pausedState = game.state;
         game.state = STATE.PAUSED;
         stopBGM();
@@ -7897,7 +7905,7 @@ window.addEventListener('resize', resize);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     // Auto-pause active gameplay so the player doesn't lose lives while away
-    if (game && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+    if (game && (isCombatState())) {
       game.pausedState = game.state;
       game.state = STATE.PAUSED;
       stopBGM();
@@ -8035,7 +8043,7 @@ function addScore(pts) {
   // BIG HIT FLASH — single-call gain ≥ 1500 triggers a centered "BIG HIT! +N"
   // banner plus a short gold edge flash. Differentiated from SCORE_MILESTONES
   // (which fire on *cumulative* thresholds). Only during active gameplay states.
-  if (pts >= 1500 && game && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+  if (pts >= 1500 && game && (isCombatState())) {
     game.floatTexts.push({
       x: BASE_W/2, y: BASE_H/2 - 36, text: 'BIG HIT! +' + fmtScore(pts),
       color: '#fc4', life: 70, maxLife: 70,
@@ -8168,7 +8176,7 @@ function updateStars() {
       const fromLeft = Math.random() < 0.5;
       // SHOOTING STAR WISH — 5% chance the shooting star is a *golden* wish target.
       // Shootable for +100 score and a small celebration. Only during active gameplay.
-      const isWish = (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      const isWish = (isCombatState())
                     && Math.random() < 0.05;
       game.shootingStars.push({
         x: fromLeft ? -5 : BASE_W + 5,
@@ -14520,7 +14528,7 @@ function pollGamepad() {
     if (game.state === STATE.PAUSED) {
       game.state = game.pausedState;
       startBGM(bgmForGameState(game.pausedState));
-    } else if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE) {
+    } else if (isCombatState()) {
       game.pausedState = game.state;
       game.state = STATE.PAUSED;
       stopBGM();
@@ -14707,7 +14715,7 @@ function update() {
     // 1-word whispers at random screen position. Adds narrative voice layer to
     // the existing purely-visual worldCorruption system. Score-neutral.
     if (game.stage >= 50 && game.playerAlive
-        && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+        && (isCombatState())) {
       // Spawn chance ramps from 0.0008 at stage 50 to 0.004 at stage 80 (~once per 4-15s)
       const _voiceChance = Math.min(0.006, 0.0008 + (game.stage - 50) * 0.00013);
       if (Math.random() < _voiceChance) {
@@ -15354,7 +15362,7 @@ function draw() {
     ctx.restore();
   }
   // Stage 50+ — golden persistent edge pulse (legendary territory)
-  if (game.stage >= 50 && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+  if (game.stage >= 50 && (isCombatState())) {
     ctx.save();
     const p = 0.6 + 0.4 * Math.sin(game.animFrame * 0.1);
     ctx.globalAlpha = 0.15 * p;
@@ -15366,7 +15374,7 @@ function draw() {
     ctx.restore();
   }
   // High-combo edge glow — frames border with combo-tier color when combo >= 30
-  if (game.combo >= 30 && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+  if (game.combo >= 30 && (isCombatState())) {
     const tierCol = game.combo >= 60 ? '#f6f' : game.combo >= 45 ? '#f80' : '#ff4';
     ctx.save();
     const pulse = 0.55 + 0.35 * Math.sin(game.animFrame * 0.22);
@@ -15444,7 +15452,7 @@ function draw() {
       // LAST LIFE HEARTBEAT — when lives === 1 in active gameplay, paint thin red
   // top/bottom band synced to ~80bpm pulse. Reinforces existing dangerLives cue.
   if (game.lives === 1
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     // 80bpm = 1.33 beats/sec at 60fps = 45 frames/beat; double-beat pattern
     const _hbT = (game.animFrame % 45) / 45;
     const _hbA = Math.max(0, 0.18 * (1 - Math.abs(_hbT - 0.15)) - 0.04
@@ -15761,7 +15769,7 @@ function draw() {
   // DEEP STAGE FOG — additional subtle fog gradient at stage 60+. Pure visual
   // atmosphere on top of standard vignette. Animated alpha for slight breathing.
   if (game && game.stage >= 60
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     ctx.save();
     const fogPulse = 0.6 + 0.4 * Math.sin(game.animFrame * 0.04);
     ctx.fillStyle = '#445';
@@ -19385,7 +19393,7 @@ function drawHUD() {
   // 20px of that edge. Alpha grows as player approaches the wall, peaking at
   // touching. Helps spatial awareness without compromising the playfield read.
   if (game.playerAlive
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const _edgeMax = 20;
     const _distL = Math.max(0, game.playerX);
     const _distR = Math.max(0, BASE_W - game.playerX);
@@ -19410,7 +19418,7 @@ function drawHUD() {
   //   CHALLENGING: completed waves / total waves
   //   BOSS_STAGE:  cumulative damage dealt to bosses
   // Drawn here so the bar reads above the score row without competing.
-  if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE) {
+  if (isCombatState()) {
     let prog = 0, barCol = COL.cyan;
     if (game.state === STATE.PLAYING) {
       const total = game.enemies ? game.enemies.length : 0;
@@ -19535,7 +19543,7 @@ function drawHUD() {
   // preview of the upcoming stage type so the player can mentally prepare during
   // the bonus tally. Reads game.stage as still-current; next stage = stage+1.
   if ((game.stageEndGraceTimer || 0) > 30 && game.stageEndGraceTimer < 110
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const nextStage = (game.stage || 0) + 1;
     const isBossNext = nextStage % BOSS_STAGE_INTERVAL === 0;
     const isChallNext = !isBossNext && nextStage % 4 === 0;
@@ -19555,7 +19563,7 @@ function drawHUD() {
   // Positions below the rising "STAGE CLEAR!" float text (y≈134→80) and above
   // the NEXT STAGE PREVIEW banner (y=270). Shows grade, accuracy, time, earned PT.
   if ((game.stageEndGraceTimer || 0) >= 60 && game.stageEndGraceTimer < 115
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (isCombatState())
       && game.lastStageGrade) {
     const _sgt  = game.stageEndGraceTimer;
     const _sfi  = Math.min(1, (_sgt - 60) / 10);
@@ -20061,7 +20069,7 @@ function drawHUD() {
   // best across both modes. Hidden when not yet exceeded stage 3. Visible
   // throughout gameplay so the chase is continuously felt.
   if (!minimalHud
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     try {
       const _csN3 = loadCumStats(false);
       const _csC3 = loadCumStats(true);
@@ -20088,7 +20096,7 @@ function drawHUD() {
   // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
   // pure context cue for late-game depth.
   if (game.stage >= 30
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (isCombatState())
       && !minimalHud) {
     let _corr = 0;
     if (game.stage >= 80)      _corr = 1.0;
@@ -20120,7 +20128,7 @@ function drawHUD() {
   // ~5s (the clock reads ~0:00 then and PB compare is meaningless that early), so
   // the two stop overprinting; the full clock cluster returns the moment it fades.
   const _mutIntro = game.stageMutation && game.stageMutation.desc && (game.stageFrames || 0) < 300;
-  if ((game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+  if ((isCombatState())
       && (game.stageFrames || 0) > 0 && !_mutIntro) {
     const timeStr = fmtFrameTime(game.stageFrames || 0);
     let clockCol = '#aaa';
@@ -20328,7 +20336,7 @@ function drawHUD() {
   // of today's objective. Only shows when mission is incomplete + during active
   // gameplay. Provides live progress (X/Y or ✓/—) via mission.progress(g).
   if (game.dailyMode && typeof dailyMission === 'function'
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const isDone = game._dailyMissionFired
                   || (typeof isDailyMissionDoneToday === 'function' && isDailyMissionDoneToday());
     if (!isDone) {
@@ -20386,7 +20394,7 @@ function drawHUD() {
   }
   // SECONDARY OBJECTIVE mini-badge — small two-line under stage label (or below
   // mutation if both active). Soft green so it doesn't shout for attention.
-  if (game.stageObjective && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+  if (game.stageObjective && (isCombatState())) {
     const obj = game.stageObjective;
     const baseY = game.stageMutation ? 22 : 16;
     const met = obj.met(game);
@@ -20596,7 +20604,7 @@ function drawHUD() {
     }
     ctx.restore();
   }
-  if (dangerLives && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+  if (dangerLives && (isCombatState())) {
     if ((game.animFrame >> 3) % 2 === 0) {
       drawRetroText('LAST LIFE', BASE_W/2, BASE_H - 22, 6, COL.red);
     }
@@ -20623,7 +20631,7 @@ function drawHUD() {
   // gained THIS stage. Helps player gauge per-stage performance. Hidden when
   // minimal HUD or stage just started (delta 0).
   if (!minimalHud
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const _stgScore = (game.score || 0) - (game.stageScoreStart || 0);
     if (_stgScore >= 100) {
       drawRetroText('+' + fmtScore(_stgScore), 50, 25, 4, '#888', 'right');
@@ -20633,7 +20641,7 @@ function drawHUD() {
   // current score toward the live high threshold. Hidden under minimal HUD
   // or when no high score is set yet.
   if (!minimalHud
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (isCombatState())
       && (game.liveHighThreshold || 0) > 0) {
     const _hsRatio = Math.min(1, (game.score || 0) / game.liveHighThreshold);
     const _hsBarX = 12, _hsBarY = 21, _hsBarW = 36;
@@ -20648,19 +20656,19 @@ function drawHUD() {
   // HUD PICKUP STREAK — small "P×N" cyan counter when consecutive no-death
   // pickups reach 2+. Hides on death (streak resets). Visible in normal HUD only.
   if (!minimalHud && (game.pickupStreak || 0) >= 2
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const psStr = 'P×' + game.pickupStreak;
     const psCol = game.pickupStreak >= 10 ? '#fc4' : '#0ff';
     drawRetroText(psStr, BASE_W - 5, 38, 4, psCol, 'right');
   }
   // HUD STAGE PICKUP COUNTER — stage-level pickup count for thrifty awareness
   if (!minimalHud && (game.stagePowerUpsPicked || 0) >= 1
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     drawRetroText('S:' + game.stagePowerUpsPicked, BASE_W - 5, 46, 4, '#fc8', 'right');
   }
   // ENEMY BULLET COUNT — 'B N' when bullet density is meaningful (>=10).
   if (!minimalHud
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)
+      && (isCombatState())
       && (game.enemyBullets || []).length >= 10) {
     const _bN = game.enemyBullets.length;
     const _bCol = _bN >= 40 ? '#f44' : _bN >= 25 ? '#f88' : '#fa8';
@@ -20671,7 +20679,7 @@ function drawHUD() {
   // top-right (under S:N stage counter). Newest at right, oldest at left. Fades
   // older entries (alpha drop). Surfaces only mid-stage when there's data.
   if (!minimalHud && game.pickupHistory && game.pickupHistory.length > 0
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const _pColors = { S:'#f44', N:'#0ff', P:'#f6f', T:'#8ff', R:'#fc4',
                        W:'#6cf', H:'#0f8', L:'#f6c', B:'#fff', E:'#0f8' };
     const _phHist = game.pickupHistory;
@@ -20690,7 +20698,7 @@ function drawHUD() {
   // (kills without a drop). Filled dots = kills accumulated; empty = headroom.
   // Drops invisibly when 0 — only surfaces when there's something to communicate.
   if (!minimalHud && (game.killsSincePowerUp || 0) >= 4
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const pityCount = Math.min(15, game.killsSincePowerUp || 0);
     const py = BASE_H - 30;
     ctx.save();
@@ -21002,7 +21010,7 @@ function drawHUD() {
   // Activates only after the player has actually killed something (≥ 10 kills) so
   // the HUD stays clean for the opening stage.
   if (!minimalHud && (game.stats && game.stats.kills) >= 10
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING || game.state === STATE.BOSS_STAGE)) {
+      && (isCombatState())) {
     const kY = game.combo >= 3
               ? ((game.stageShotsFired || 0) >= 4 ? 49 : 41)
               : ((game.stageShotsFired || 0) >= 4 ? 38 : 30);

@@ -975,6 +975,21 @@ if (typeof G.stageModeFor === 'function') {
 } else { console.log('  (skipped — stageModeFor not exposed)'); }
 
 // ============================================================
+section('isCombatState — active-combat state gate');
+{
+  const cg = G.__getGame && G.__getGame();
+  if (cg && typeof G.isCombatState === 'function') {
+    const save = cg.state;
+    cg.state = 2; ok(G.isCombatState(), 'PLAYING → true');
+    cg.state = 3; ok(G.isCombatState(), 'CHALLENGING → true');
+    cg.state = 8; ok(G.isCombatState(), 'BOSS_STAGE → true');
+    // TITLE/INTRO/GAME_OVER/PAUSED/CAPTURED/RESPAWN/BONUS are not combat
+    [0, 1, 4, 5, 6, 7, 9].forEach(s => { cg.state = s; ok(!G.isCombatState(), 'state ' + s + ' → not combat'); });
+    cg.state = save;
+  } else { console.log('  (skipped — isCombatState / game not exposed)'); }
+}
+
+// ============================================================
 section('createEntryPath — entry bezier endpoints + curve direction');
 if (typeof G.createEntryPath === 'function') {
   const path = G.createEntryPath(10, 20, 100, 200, 1);
