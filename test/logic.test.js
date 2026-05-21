@@ -698,6 +698,42 @@ if (typeof G.playSound === 'function') {
 } else { console.log('  (skipped — playSound not exposed)'); }
 
 // ============================================================
+section('computeBgmIntensity / computeBgmPitch — BGM modulation');
+{
+  const bg = G.__getGame && G.__getGame();
+  if (bg && typeof G.computeBgmIntensity === 'function') {
+    const save = { combo: bg.combo, lives: bg.lives, state: bg.state,
+                   cleanStreak: bg.cleanStreak, megaBosses: bg.megaBosses, stageDied: bg.stageDied };
+    const near = (a, b, m) => ok(Math.abs(a - b) < 1e-9, m);
+    // Baseline (PLAYING==2, no combo/boss, 3 lives, no clean streak)
+    bg.combo = 0; bg.lives = 3; bg.cleanStreak = 0; bg.megaBosses = []; bg.state = 2; bg.stageDied = false;
+    near(G.computeBgmIntensity(), 1.0, 'baseline intensity = 1.0');
+    bg.combo = 30;  near(G.computeBgmIntensity(), 1.2, 'combo 30 → +0.20');
+    bg.combo = 60;  near(G.computeBgmIntensity(), 1.3, 'combo 60 → +0.30');
+    bg.combo = 100; near(G.computeBgmIntensity(), 1.4, 'combo 100 → +0.40');
+    bg.combo = 0; bg.lives = 1; near(G.computeBgmIntensity(), 1.2, 'last life (PLAYING) → +0.20');
+    bg.lives = 3; near(G.computeBgmIntensity(), 1.0, 'last-life lift gated on lives===1');
+    // stacked lifts clamp at 1.55 (combo .40 + boss .30 + last-life .20 = 1.90)
+    bg.combo = 100; bg.lives = 1; bg.megaBosses = [{ alive: true, phase2: true }];
+    near(G.computeBgmIntensity(), 1.55, 'stacked lifts cap at 1.55');
+    if (typeof G.computeBgmPitch === 'function') {
+      bg.megaBosses = []; near(G.computeBgmPitch(), 1.0, 'no boss → pitch 1.0');
+      bg.megaBosses = [{ alive: true, archetype: 'horned' }];
+      ok(G.computeBgmPitch() > 1.0, 'horned boss → pitched up');
+      bg.megaBosses = [{ alive: true, archetype: 'tendril' }];
+      ok(G.computeBgmPitch() < 1.0, 'tendril boss → pitched down');
+      bg.megaBosses = [{ alive: true, archetype: 'crystal' }];
+      ok(G.computeBgmPitch() > 1.1, 'crystal boss → +2 semitones');
+      bg.megaBosses = [{ alive: true, super: true, archetype: 'crystal' }];
+      near(G.computeBgmPitch(), 1.0, 'super boss keeps base pitch (track already distinct)');
+      bg.megaBosses = [{ alive: false, archetype: 'horned' }];
+      near(G.computeBgmPitch(), 1.0, 'dead boss ignored → 1.0');
+    }
+    Object.assign(bg, save);
+  } else { console.log('  (skipped — computeBgmIntensity / game not exposed)'); }
+}
+
+// ============================================================
 section('stats overlay page model — Tab navigation invariants');
 if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'function') {
   const gp = G.statsAchGridPages();
