@@ -47,7 +47,14 @@ ENDURANCE_TIERS (ascending), COMBO_ARSENAL (buff↔timer), ACHIEVEMENTS
 (every definition has an `unlockAchievement()` call and vice-versa — scanned from
 source text so an unreachable or dead achievement can't slip in), plus STATE / PERK /
 boss-archetype / biome / weather / ship / enemy entries (so extending a registry
-can't silently half-break).
+can't silently half-break). Also covers the **four persistence paths**
+(`submitTopScore`/`loadTopScores` leaderboard sort/cap/rank/galagaHigh-sync +
+corrupt-JSON graceful, `commitGameToCumStats` demo-guard + accumulation + last-run,
+`recordStagePB` strictly-faster-only, `unlockDex` valid-only/idempotent), the
+shared `tryStartDash` gating (cooldown/i-frames/combat), the `comboTierColor` /
+`comboKillDetune` / `moraleDiveDetune` / `flashAlpha` / `effectiveShakeMul` /
+`blinkPhase` / `computeStageAccuracy` helpers, and `POWERUP_COL` / `GRADE_COL`
+completeness guards.
 
 Note: top-level `let`/`const` bindings (e.g. `game`, `stagePBs`, `SHIPS`) are not
 visible on the vm context global — the harness appends accessor shims (`__getGame`,
@@ -197,6 +204,10 @@ Player firing is rate-capped via `game.fireCooldown` (6 frames base, halved by R
 - **`` ` ``** (backtick) — cheat invincibility toggle ("GOD MODE")
 - **`,` / `.`** — previous / next stage (preserves score/lives/lvl)
 - **`1`–`9`** — jump to stage 1/5/10/15/20/30/40/50/80 milestones
+
+### Accessibility
+- **Reduce motion** — `reduceMotion` reads the OS `prefers-reduced-motion` media query once at load (guarded). When set, the four intense motion/strobe effects are dampened: full-screen impact flash → 30% (`flashAlpha`), screen shake → capped to 'low' (`effectiveShakeMul`), and the camera zoom-punch + spiral-entry rotation are disabled. Both tunable cores are pure + logic-tested. No toggle UI (respects the OS preference). Deep-stage world-corruption glitch is left alone (verified non-strobing — holds steady ~1s, not a flicker risk).
+- **Colorblind** — `colorBlindMode` (toggle 'X') adds white outlines + shape markers to enemy bullets and enemy auras; color-coded gameplay (power-ups, grades, difficulty) carries letter/number/shape redundancy.
 
 ## Working methodology — Quantum Leap default
 
