@@ -166,6 +166,8 @@ const shim = `
 ;try { globalThis.__getBossNames = function () { return (typeof BOSS_NAMES !== 'undefined') ? BOSS_NAMES : null; }; } catch (e) {}
 ;try { globalThis.__getInterceptMsg = function () { return (typeof INTERCEPT_MSG !== 'undefined') ? INTERCEPT_MSG : null; }; } catch (e) {}
 ;try { globalThis.__getMoraleTrig = function () { return (typeof _MORALE_TRIG !== 'undefined') ? _MORALE_TRIG : null; }; } catch (e) {}
+;try { globalThis.__getMoraleStates = function () { return (typeof MORALE_STATES !== 'undefined') ? MORALE_STATES : null; }; } catch (e) {}
+;try { globalThis.__getPilotMomentum = function () { return (typeof PILOT_MOMENTUM !== 'undefined') ? PILOT_MOMENTUM : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -915,6 +917,28 @@ section('bulletCap — performance caps trim the oldest entries');
     eq(bc.enemyBullets.length, 2, 'arrays under the cap are left alone');
     Object.assign(bc, save);
   } else { console.log('  (skipped — bulletCap / game not exposed)'); }
+}
+
+// ============================================================
+section('MORALE_STATES / PILOT_MOMENTUM — compute outputs all have render entries');
+{
+  // moraleStateFor can only return these; each must have a label+color or the HUD
+  // morale chip / banner would render undefined.
+  const ms = G.__getMoraleStates && G.__getMoraleStates();
+  if (ms) {
+    ['CONFIDENT', 'NORMAL', 'SHAKEN', 'ROUTED'].forEach(s => {
+      ok(ms[s] && typeof ms[s].label === 'string' && ms[s].label.length, 'MORALE_STATES.' + s + ' has a label');
+      ok(ms[s] && typeof ms[s].col === 'string', 'MORALE_STATES.' + s + ' has a color');
+    });
+  } else { console.log('  (skipped — MORALE_STATES not exposed)'); }
+  // computePilotMomentum can only return these; same requirement for its 6 channels.
+  const pm = G.__getPilotMomentum && G.__getPilotMomentum();
+  if (pm) {
+    ['ASCENDING', 'STEADY', 'STRAINED', 'CORNERED'].forEach(s => {
+      ok(pm[s] && typeof pm[s].label === 'string' && pm[s].label.length, 'PILOT_MOMENTUM.' + s + ' has a label');
+      ok(pm[s] && typeof pm[s].col === 'string', 'PILOT_MOMENTUM.' + s + ' has a color');
+    });
+  } else { console.log('  (skipped — PILOT_MOMENTUM not exposed)'); }
 }
 
 // ============================================================
