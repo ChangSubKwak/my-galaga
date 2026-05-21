@@ -22228,12 +22228,14 @@ function drawHelpOverlay() {
     ['H', 'HOMING SEEKING BULLETS 6S',      '#0ef'],
     ['L', 'LASER  PIERCING BEAM 5S',        '#fff'],
     ['B', 'BOMB   CLEAR BULLETS + 1DMG ALL','#f44'],
-    ['E', 'SHIELD ABSORB 1 HIT (STACK 3)',  '#4f8']
+    ['E', 'SHIELD ABSORB 1 HIT (STACK 3)',  '#4f8'],
+    ['F', 'FORK   3-WAY SPREAD SHOT 6S',    '#fa0'],
+    ['D', 'DASH   RESET DASH COOLDOWN',     '#0ff']
   ];
   for (const [tag, desc, col] of items) {
-    drawRetroText(tag, px + 8, y, 6, col, 'left');
+    drawRetroText(tag, px + 8, y, 5, col, 'left');
     drawRetroText(desc, px + 22, y, 5, COL.white, 'left');
-    y += 6;
+    y += 5;
   }
 
   y += 2;
