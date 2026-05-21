@@ -828,6 +828,28 @@ section('computePilotTitle / computePilotNextRank — rank ladder');
 }
 
 // ============================================================
+section('bulletCap — performance caps trim the oldest entries');
+{
+  const bc = G.__getGame && G.__getGame();
+  if (bc && typeof G.bulletCap === 'function') {
+    const save = { enemyBullets: bc.enemyBullets, floatTexts: bc.floatTexts, itemBursts: bc.itemBursts };
+    bc.enemyBullets = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+    bc.floatTexts   = Array.from({ length: 70 },  (_, i) => ({ id: i }));
+    bc.itemBursts   = Array.from({ length: 130 }, (_, i) => ({ id: i }));
+    G.bulletCap();
+    eq(bc.enemyBullets.length, 80, 'enemy bullets capped at 80');
+    eq(bc.floatTexts.length, 50, 'float texts capped at 50');
+    eq(bc.itemBursts.length, 100, 'item bursts capped at 100');
+    eq(bc.enemyBullets[0].id, 20, 'drops the oldest, keeps the newest 80');
+    eq(bc.floatTexts[bc.floatTexts.length - 1].id, 69, 'newest float text retained');
+    // under the cap → untouched
+    bc.enemyBullets = [{ id: 1 }, { id: 2 }]; G.bulletCap();
+    eq(bc.enemyBullets.length, 2, 'arrays under the cap are left alone');
+    Object.assign(bc, save);
+  } else { console.log('  (skipped — bulletCap / game not exposed)'); }
+}
+
+// ============================================================
 section('bossNameFor — boss name by stage + cycling past the list');
 if (typeof G.bossNameFor === 'function') {
   eq(G.bossNameFor(5), 'BOSS', 'pre-first-boss stage → generic BOSS');
