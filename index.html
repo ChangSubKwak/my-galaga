@@ -22598,6 +22598,18 @@ function drawStatsOverlay() {
                       px + panelW - 8, y + 1, 5, got ? '#fff' : '#333', 'right');
         y += 9;
       }
+      // Codex completion bar — anchored above the footer, mirroring the achievement
+      // grid pages; green to match the bestiary's own unlocked-row tint.
+      {
+        const _ratio = dexIds.length > 0 ? unlockedCount / dexIds.length : 0;
+        const _bw = panelW - 20, _bx = px + 10, _by = py + panelH - 20;
+        drawRetroText('CODEX', px + 8, _by - 6, 4, '#888', 'left');
+        drawRetroText(Math.round(_ratio * 100) + '%', px + panelW - 8, _by - 6, 4, COL.green, 'right');
+        ctx.fillStyle = '#222';
+        ctx.fillRect(_bx, _by, _bw, 3);
+        ctx.fillStyle = COL.green;
+        ctx.fillRect(_bx, _by, Math.round(_bw * _ratio), 3);
+      }
       drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
       return;
     }
