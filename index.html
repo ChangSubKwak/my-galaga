@@ -7344,34 +7344,35 @@ function normalizeKey(e) {
   return e.key;
 }
 
+// Dash trigger — shared by the Shift key, the touch dash button, and the gamepad
+// dash button so all input paths get identical behavior (cooldown, i-frames, burst,
+// sfx). Direction reads the current move keys; falls back to the last dash direction.
+// Top-level so pollGamepad() (outside initInput) can call it too.
+function tryStartDash() {
+  if (!(isCombatState() && game.playerAlive && game.dashCooldown === 0 && game.dashTimer === 0)) return;
+  const dir = (keys['ArrowLeft'] || keys['a'] || keys['A']) ? -1
+            : (keys['ArrowRight'] || keys['d'] || keys['D']) ? 1
+            : (game.dashDir || 1);
+  game.dashDir = dir;
+  game.dashTimer = 12;
+  game.dashCooldown = 60;
+  game.invincibleTimer = Math.max(game.invincibleTimer, 14);
+  game.dashCount = (game.dashCount || 0) + 1;
+  if (game.dashCount === 30) unlockAchievement('dashMaster');
+  if (game.shockwaves) {
+    game.shockwaves.push({ x: game.playerX, y: game.playerY, life: 0, maxLife: 14, maxR: 16, color: '#0ff' });
+  }
+  if (game.itemBursts) {
+    for (let k = 0; k < 8; k++) {
+      const _a = (k / 8) * Math.PI * 2;
+      game.itemBursts.push({ x: game.playerX + Math.cos(_a) * 5, y: game.playerY + Math.sin(_a) * 5, life: -k, color: k & 1 ? '#0ff' : '#fff' });
+    }
+  }
+  playSound('powerUp');
+  rumble(80, 0.5, 0.2);
+}
 function initInput() {
   keys = {};
-  // Dash trigger — shared by the Shift key and the touch dash button so both input
-  // paths get identical behavior (cooldown, i-frames, burst, sfx). Direction reads
-  // the current move keys; falls back to the last dash direction.
-  function tryStartDash() {
-    if (!(isCombatState() && game.playerAlive && game.dashCooldown === 0 && game.dashTimer === 0)) return;
-    const dir = (keys['ArrowLeft'] || keys['a'] || keys['A']) ? -1
-              : (keys['ArrowRight'] || keys['d'] || keys['D']) ? 1
-              : (game.dashDir || 1);
-    game.dashDir = dir;
-    game.dashTimer = 12;
-    game.dashCooldown = 60;
-    game.invincibleTimer = Math.max(game.invincibleTimer, 14);
-    game.dashCount = (game.dashCount || 0) + 1;
-    if (game.dashCount === 30) unlockAchievement('dashMaster');
-    if (game.shockwaves) {
-      game.shockwaves.push({ x: game.playerX, y: game.playerY, life: 0, maxLife: 14, maxR: 16, color: '#0ff' });
-    }
-    if (game.itemBursts) {
-      for (let k = 0; k < 8; k++) {
-        const _a = (k / 8) * Math.PI * 2;
-        game.itemBursts.push({ x: game.playerX + Math.cos(_a) * 5, y: game.playerY + Math.sin(_a) * 5, life: -k, color: k & 1 ? '#0ff' : '#fff' });
-      }
-    }
-    playSound('powerUp');
-    rumble(80, 0.5, 0.2);
-  }
   document.addEventListener('keydown', e => {
     const k = normalizeKey(e);
     keys[e.key] = true;
@@ -14556,7 +14557,7 @@ function aiInput() {
 }
 
 // --- Gamepad input + haptics ---
-let _prevGpFire = false, _prevGpStart = false;
+let _prevGpFire = false, _prevGpStart = false, _prevGpDash = false;
 let _prevGpLeft = false, _prevGpRight = false;
 
 function rumble(duration, strong, weak) {
@@ -14585,7 +14586,7 @@ function pollGamepad() {
   const pads = navigator.getGamepads();
   let pad = null;
   for (const p of pads) if (p) { pad = p; break; }
-  if (!pad) { _prevGpFire = false; _prevGpStart = false; return; }
+  if (!pad) { _prevGpFire = false; _prevGpStart = false; _prevGpDash = false; return; }
 
   const ax = pad.axes[0] || 0;
   const dpadL = pad.buttons[14] && pad.buttons[14].pressed;
@@ -14650,6 +14651,12 @@ function pollGamepad() {
     }
   }
   _prevGpStart = start;
+
+  // Dash on the B button (1) — rising edge, shared tryStartDash() so controller
+  // players also get parry / witch-time / evasion (was keyboard/touch only).
+  const dash = pad.buttons[1] && pad.buttons[1].pressed;
+  if (dash && !_prevGpDash) tryStartDash();
+  _prevGpDash = dash;
 }
 
 function update() {
