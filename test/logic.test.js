@@ -163,6 +163,7 @@ const shim = `
 ;try { globalThis.__getSfxVary = function () { return (typeof SFX_VARY !== 'undefined') ? SFX_VARY : null; }; } catch (e) {}
 ;try { globalThis.__getDexUnlocked = function () { return (typeof dexUnlocked !== 'undefined') ? dexUnlocked : null; }; } catch (e) {}
 ;try { globalThis.__getUnlockedAch = function () { return (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements : null; }; } catch (e) {}
+;try { globalThis.__getBossNames = function () { return (typeof BOSS_NAMES !== 'undefined') ? BOSS_NAMES : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -825,6 +826,37 @@ section('computePilotTitle / computePilotNextRank — rank ladder');
     if (lsC === null) sandbox.localStorage.removeItem('galagaCumStatsChallenge'); else sandbox.localStorage.setItem('galagaCumStatsChallenge', lsC);
   } else { console.log('  (skipped — pilot-title helpers / sets not exposed)'); }
 }
+
+// ============================================================
+section('bossNameFor — boss name by stage + cycling past the list');
+if (typeof G.bossNameFor === 'function') {
+  eq(G.bossNameFor(5), 'BOSS', 'pre-first-boss stage → generic BOSS');
+  eq(G.bossNameFor(9), 'BOSS', 'stage 9 (still pre-boss) → BOSS');
+  ok(G.bossNameFor(10) !== 'BOSS', 'first boss stage → a named boss');
+  ok(G.bossNameFor(20) !== G.bossNameFor(10), 'consecutive boss stages → different names');
+  const names = G.__getBossNames && G.__getBossNames();
+  if (names && names.length) {
+    eq(G.bossNameFor(10), names[0], 'stage 10 → first name');
+    eq(G.bossNameFor(20), names[1 % names.length], 'stage 20 → second name');
+    // wraps after the list is exhausted
+    eq(G.bossNameFor(10 + 10 * names.length), G.bossNameFor(10), 'names cycle once the list is exhausted');
+  }
+} else { console.log('  (skipped — bossNameFor not exposed)'); }
+
+// ============================================================
+section('createLoopPath — multi-segment dive path is continuous');
+if (typeof G.createLoopPath === 'function') {
+  const segs = G.createLoopPath(112, 40, 1);
+  ok(Array.isArray(segs) && segs.length === 3, 'returns 3 chained segments');
+  eq(segs[0].p0.x, 112, 'starts at given x');
+  eq(segs[0].p0.y, 40, 'starts at given y');
+  // each segment's end must equal the next segment's start (no teleport mid-dive)
+  ok(segs[0].p3.x === segs[1].p0.x && segs[0].p3.y === segs[1].p0.y, 'seg0 → seg1 join is continuous');
+  ok(segs[1].p3.x === segs[2].p0.x && segs[1].p3.y === segs[2].p0.y, 'seg1 → seg2 join is continuous');
+  // mirror side bows the other way on the first control point
+  const segsL = G.createLoopPath(112, 40, -1);
+  ok((segsL[0].p1.x - 112) === -(segs[0].p1.x - 112), 'side -1 mirrors the dive horizontally');
+} else { console.log('  (skipped — createLoopPath not exposed)'); }
 
 // ============================================================
 section('createEntryPath — entry bezier endpoints + curve direction');
