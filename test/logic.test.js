@@ -764,6 +764,30 @@ if (typeof G.fmtMS === 'function') {
 } else { console.log('  (skipped — fmtMS not exposed)'); }
 
 // ============================================================
+section('computeMoraleScore — enemy-confidence weighted inputs');
+{
+  const mg = G.__getGame && G.__getGame();
+  if (mg && typeof G.computeMoraleScore === 'function') {
+    const save = { stats: mg.stats, lives: mg.lives, witchSaves: mg.witchSaves,
+                   bossesKilledThisRun: mg.bossesKilledThisRun, parryCount: mg.parryCount,
+                   eliteKills: mg.eliteKills };
+    const near = (a, b, m) => ok(Math.abs(a - b) < 1e-9, m);
+    const reset = () => { mg.stats = { kills: 0, maxStage: 1 }; mg.lives = 3; mg.witchSaves = 0;
+                          mg.bossesKilledThisRun = 0; mg.parryCount = 0; mg.eliteKills = 0; };
+    reset(); near(G.computeMoraleScore(), 0, 'baseline = 0');
+    reset(); mg.stats = { kills: 10, maxStage: 1 }; near(G.computeMoraleScore(), 5, 'kills ×0.5');
+    reset(); mg.lives = 1; near(G.computeMoraleScore(), -24, 'lost 2 lives → -24 (enemies confident)');
+    reset(); mg.bossesKilledThisRun = 1; near(G.computeMoraleScore(), 30, 'boss kill → +30');
+    reset(); mg.parryCount = 10; near(G.computeMoraleScore(), 15, 'parries ×1.5');
+    reset(); mg.eliteKills = 5; near(G.computeMoraleScore(), 15, 'elite kills ×3');
+    reset(); mg.stats = { kills: 0, maxStage: 11 }; near(G.computeMoraleScore(), 50, 'depth (maxStage-1)×5');
+    reset(); mg.stats = { kills: 0, maxStage: 11 }; mg.witchSaves = 4;
+    near(G.computeMoraleScore(), 70, 'witch saves ×5 stack on depth');
+    Object.assign(mg, save);
+  } else { console.log('  (skipped — computeMoraleScore / game not exposed)'); }
+}
+
+// ============================================================
 section('stats overlay page model — Tab navigation invariants');
 if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'function') {
   const gp = G.statsAchGridPages();
