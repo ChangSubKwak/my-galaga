@@ -14609,6 +14609,15 @@ function update() {
   // Gameplay-logic timers — frozen during PAUSED so post-respawn / dash iframes aren't
   // silently consumed while the player is in the pause menu.
   if (game.state !== STATE.PAUSED) {
+    // LAST-LIFE AUDIO CUES — heartbeat (96f) + lowLife (240f) tick here at the sim
+    // rate, NOT in drawHUD, so they fire exactly once per cycle instead of doubling
+    // on high-refresh (120/144Hz) displays where draw() runs faster than animFrame
+    // advances. The matching red edge-pulse visual stays in drawHUD (renders fine at
+    // refresh rate). Condition mirrors drawHUD's dangerLives && isCombatState().
+    if (game.lives === 1 && isCombatState()) {
+      if (game.animFrame % 240 === 0 && typeof playSound === 'function') playSound('lowLife');
+      if (game.animFrame % 96 === 0 && typeof playSound === 'function') playSound('heartbeat');
+    }
     if (game.flashTimer > 0) game.flashTimer--;
     if (game.invincibleTimer > 0) game.invincibleTimer--;
     // NEW HIGH SCORE glow — moved here from addScore() so it ticks once per frame
@@ -20636,10 +20645,8 @@ function drawHUD() {
     if ((game.animFrame >> 3) % 2 === 0) {
       drawRetroText('LAST LIFE', BASE_W/2, BASE_H - 22, 6, COL.red);
     }
-    // Audio cue every 240 frames (existing)
-    if (game.animFrame % 240 === 0) playSound('lowLife');
-    // HEARTBEAT — additional low-thump sfx every 96 frames (1.6s) for visceral urgency
-    if (game.animFrame % 96 === 0) playSound('heartbeat');
+    // (lowLife + heartbeat SFX now fire in update() at sim rate — see "LAST-LIFE
+    // AUDIO CUES" — so they don't double on high-refresh monitors. Visual pulse stays.)
     // Screen edge red pulse — synced with heartbeat (peaks at the start of each cycle)
     const beatPhase = (game.animFrame % 96) / 96;
     const beatPulse = Math.max(0, 1 - beatPhase * 3.5); // sharp peak at phase 0, fade by 0.3
