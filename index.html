@@ -66,6 +66,9 @@ body::before {
   background: rgba(255,255,68,0.55);
 }
 #btnFire { width: 92px; height: 92px; right: 28px; bottom: 30px; }
+/* Touch DASH — left of the fire button (within the control band, right-thumb
+   reachable). Inherits the .touch-btn cyan look (fits dash) + active state. */
+#btnDash { width: 64px; height: 64px; right: 130px; bottom: 36px; font-size: 26px; }
 /* Touch pause — small button anchored to the top-right of the viewport, outside #touchControls
    (which lives at bottom). Same look as .touch-btn but smaller and dimmer so it stays out of the way. */
 #btnPause {
@@ -116,6 +119,7 @@ body::before {
 <canvas id="gc" aria-label="Galaga game screen" role="img"></canvas>
 <div id="touchControls" role="group" aria-label="Touch controls">
   <div id="joyPad" role="application" aria-label="Movement joystick"><div id="joyKnob"></div></div>
+  <div class="touch-btn" id="btnDash" role="button" aria-label="Dash">&#187;</div>
   <div class="touch-btn" id="btnFire" role="button" aria-label="Fire">&#9679;</div>
 </div>
 <div id="btnPause" role="button" aria-label="Pause">&#10073;&#10073;</div>
@@ -7342,6 +7346,32 @@ function normalizeKey(e) {
 
 function initInput() {
   keys = {};
+  // Dash trigger — shared by the Shift key and the touch dash button so both input
+  // paths get identical behavior (cooldown, i-frames, burst, sfx). Direction reads
+  // the current move keys; falls back to the last dash direction.
+  function tryStartDash() {
+    if (!(isCombatState() && game.playerAlive && game.dashCooldown === 0 && game.dashTimer === 0)) return;
+    const dir = (keys['ArrowLeft'] || keys['a'] || keys['A']) ? -1
+              : (keys['ArrowRight'] || keys['d'] || keys['D']) ? 1
+              : (game.dashDir || 1);
+    game.dashDir = dir;
+    game.dashTimer = 12;
+    game.dashCooldown = 60;
+    game.invincibleTimer = Math.max(game.invincibleTimer, 14);
+    game.dashCount = (game.dashCount || 0) + 1;
+    if (game.dashCount === 30) unlockAchievement('dashMaster');
+    if (game.shockwaves) {
+      game.shockwaves.push({ x: game.playerX, y: game.playerY, life: 0, maxLife: 14, maxR: 16, color: '#0ff' });
+    }
+    if (game.itemBursts) {
+      for (let k = 0; k < 8; k++) {
+        const _a = (k / 8) * Math.PI * 2;
+        game.itemBursts.push({ x: game.playerX + Math.cos(_a) * 5, y: game.playerY + Math.sin(_a) * 5, life: -k, color: k & 1 ? '#0ff' : '#fff' });
+      }
+    }
+    playSound('powerUp');
+    rumble(80, 0.5, 0.2);
+  }
   document.addEventListener('keydown', e => {
     const k = normalizeKey(e);
     keys[e.key] = true;
@@ -7488,41 +7518,9 @@ function initInput() {
       playSound('stageStart');
       triggerTransitionFade();
     }
-    // Dash — Shift (any side). Costs 60-frame cooldown, gives 12 frames of invincible movement.
-    if (e.key === 'Shift') {
-      if ((isCombatState())
-          && game.playerAlive && game.dashCooldown === 0 && game.dashTimer === 0) {
-        const dir = (keys['ArrowLeft'] || keys['a'] || keys['A']) ? -1
-                  : (keys['ArrowRight'] || keys['d'] || keys['D']) ? 1
-                  : (game.dashDir || 1);
-        game.dashDir = dir;
-        game.dashTimer = 12;
-        game.dashCooldown = 60;
-        game.invincibleTimer = Math.max(game.invincibleTimer, 14);
-        game.dashCount = (game.dashCount || 0) + 1;
-        if (game.dashCount === 30) unlockAchievement('dashMaster');
-        // DASH START BURST — small cyan shockwave + 8 radial sparks at the
-        // dash origin so the launch reads as a deliberate kinetic event.
-        if (game.shockwaves) {
-          game.shockwaves.push({
-            x: game.playerX, y: game.playerY,
-            life: 0, maxLife: 14, maxR: 16, color: '#0ff'
-          });
-        }
-        if (game.itemBursts) {
-          for (let k = 0; k < 8; k++) {
-            const _a = (k / 8) * Math.PI * 2;
-            game.itemBursts.push({
-              x: game.playerX + Math.cos(_a) * 5,
-              y: game.playerY + Math.sin(_a) * 5,
-              life: -k, color: k & 1 ? '#0ff' : '#fff'
-            });
-          }
-        }
-        playSound('powerUp');
-        rumble(80, 0.5, 0.2);
-      }
-    }
+    // Dash — Shift (any side). Costs 60-frame cooldown, gives 12 frames of invincible
+    // movement. Shared with the touch dash button via tryStartDash().
+    if (e.key === 'Shift') tryStartDash();
     if (k === 'p') {
       if (game.state === STATE.PAUSED) {
         game.state = game.pausedState;
@@ -7845,6 +7843,15 @@ function initInput() {
     });
     btnF.addEventListener('touchend', e => { e.preventDefault(); keys[' '] = false; btnF.classList.remove('active'); });
     btnF.addEventListener('touchcancel', e => { keys[' '] = false; btnF.classList.remove('active'); });
+
+    // Dash button — fires the shared tryStartDash() once per tap (dash is a one-shot,
+    // not a held input), giving touch players access to parry / witch-time / evasion.
+    const btnD = document.getElementById('btnDash');
+    if (btnD) {
+      btnD.addEventListener('touchstart', e => { e.preventDefault(); ensureAudio(); btnD.classList.add('active'); tryStartDash(); });
+      btnD.addEventListener('touchend',    e => { e.preventDefault(); btnD.classList.remove('active'); });
+      btnD.addEventListener('touchcancel', e => { btnD.classList.remove('active'); });
+    }
 
     // Joystick pad — analog horizontal control with deadzone
     let joyId = null;

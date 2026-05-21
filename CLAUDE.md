@@ -185,7 +185,7 @@ Each read site uses `try/catch` and falls back to a default — corrupt storage 
 
 - Keyboard: `ArrowLeft/Right` / `A/D` (move), `Space` (fire/start), `Shift` (dash), `P`/`Esc` (pause). Normalized via `normalizeKey(e)` using `e.code` so layout (Hangul/Cyrillic etc.) doesn't break letter hotkeys.
 - Gamepad: left stick / D-pad horizontal, A-button fire, Start pause — polled in `pollGamepad()` at the top of `update()`. Synthesizes the same `keys` map keyboard uses.
-- Touch: `#touchControls` shown only when `'ontouchstart' in window`. Joystick on the left, fire/pause buttons on the right. Synthesizes same `keys` map.
+- Touch: `#touchControls` shown only when `'ontouchstart' in window`. Joystick on the left; dash + fire buttons on the right (dash left of fire); pause top-right. Fire synthesizes `keys[' ']`; the dash button calls the shared `tryStartDash()` directly (one-shot per tap) — the same function the Shift key uses, so touch gets full parry/witch-time/evasion access.
 
 Player firing is rate-capped via `game.fireCooldown` (6 frames base, halved by R rapid pickup, further reduced by stageMutation 'rapidFire', min 2 frames).
 
