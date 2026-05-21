@@ -20893,8 +20893,11 @@ function drawHUD() {
       const secs = (game.comboTimer / 60).toFixed(1);
       drawRetroText(secs + 's', 66, 33, 5, '#f44', 'left');
     }
-    // COMBO MILESTONE PROGRESS — find next unclaimed arsenal tier and draw a tiny
-    // bar showing distance-to-next-unlock. Bar at y=45, 60px wide.
+    // COMBO ARSENAL PROGRESS (milestone bar + "→N" + IMMINENT + 4-tier dots) is
+    // secondary meta-progression detail, so it yields to MINIMAL HUD for cleaner
+    // play — matching how accuracy/kills/pity hide. The combo multiplier core
+    // above always stays. Bar at y=45, 60px wide.
+    if (!minimalHud) {
     const arsenalTiers = [25, 50, 75, 100];
     const arsenalColors = ['#fc4', '#f8a', '#0ef', '#fff'];
     let nextTier = null, nextCol = '#fff', prevTier = 0;
@@ -20960,6 +20963,7 @@ function drawHUD() {
         ctx.restore();
       }
     }
+    } // end !minimalHud arsenal-progress detail
     // Tier transition flash — within 12 frames of hitting tier-up combo (5/10/15/30)
     if ([5, 10, 15, 30, 60, 100].some(t => game.combo === t)) {
       ctx.save();
