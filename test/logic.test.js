@@ -1287,6 +1287,36 @@ if (typeof G.__getGradeCol === 'function' && G.__getGradeCol()) {
 } else { console.log('  (skipped — GRADE_COL not exposed)'); }
 
 // ============================================================
+section('tryStartDash — shared dash trigger gating (keyboard/touch/gamepad)');
+// One function now backs all three input paths, so its cooldown + i-frame + combat
+// gates are load-bearing. Verify the dash starts only when ready and is a no-op
+// otherwise (PLAYING = 2).
+if (typeof G.tryStartDash === 'function') {
+  let g = fresh(); g.state = 2; g.playerAlive = true; g.dashCooldown = 0; g.dashTimer = 0; g.invincibleTimer = 0;
+  G.tryStartDash();
+  eq(g.dashTimer, 12, 'ready → dash starts (12 i-frames)');
+  eq(g.dashCooldown, 60, 'ready → 60f cooldown set');
+  ok(g.invincibleTimer >= 14, 'ready → invincibility granted');
+
+  g = fresh(); g.state = 2; g.playerAlive = true; g.dashCooldown = 30; g.dashTimer = 0;
+  G.tryStartDash();
+  eq(g.dashTimer, 0, 'cooldown active → no dash');
+  eq(g.dashCooldown, 30, 'cooldown active → cooldown untouched');
+
+  g = fresh(); g.state = 2; g.playerAlive = true; g.dashCooldown = 0; g.dashTimer = 5;
+  G.tryStartDash();
+  eq(g.dashTimer, 5, 'already dashing → no re-trigger');
+
+  g = fresh(); g.state = 0; g.playerAlive = true; g.dashCooldown = 0; g.dashTimer = 0;
+  G.tryStartDash();
+  eq(g.dashTimer, 0, 'non-combat state (TITLE) → no dash');
+
+  g = fresh(); g.state = 2; g.playerAlive = false; g.dashCooldown = 0; g.dashTimer = 0;
+  G.tryStartDash();
+  eq(g.dashTimer, 0, 'dead player → no dash');
+} else { console.log('  (skipped — tryStartDash not exposed)'); }
+
+// ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
 if (typeof G.comboKillDetune === 'function') {
   eq(G.comboKillDetune(0),   0,   'combo 0 → base pitch (no detune)');
