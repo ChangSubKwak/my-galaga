@@ -20309,11 +20309,13 @@ function drawHUD() {
 
   // Wave counter + pip row superseded by drawChallengeWaveHUD() (called from drawGameplay).
   // STAGE MUTATION mini-badge — under the stage label, blinks between mutation color/white
-  // so the player remembers the rule change is active for the whole stage.
+  // so the player remembers the rule change is active for the whole stage. Sits at
+  // y=18 size 4 (was y=16 size 5, whose 13.5-18.5 span overprinted the ACT chip at
+  // y=14): it now clears ACT (touches at y16) and only sub-pixel-touches the clock.
   if (game.stageMutation && game.state === STATE.PLAYING) {
     const m = game.stageMutation;
     const blink = (game.animFrame >> 3) % 2 === 0 ? m.color : '#fff';
-    drawRetroText(m.label, BASE_W - 5, 16, 5, blink, 'right');
+    drawRetroText(m.label, BASE_W - 5, 18, 4, blink, 'right');
     // MUTATION DESCRIPTOR — show desc for the first ~5 seconds of the stage so
     // the player learns the rule change before settling into play.
     if (m.desc && (game.stageFrames || 0) < 300) {
