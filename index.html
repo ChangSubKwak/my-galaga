@@ -20885,11 +20885,8 @@ function drawHUD() {
         ctx.restore();
       }
     }
-    // Running combo total (small, just below)
-    const accum = game.comboBonusAccum || 0;
-    if (accum > 0) {
-      drawRetroText('+' + fmtScore(accum), 6, 39, 5, '#ff4', 'left');
-    }
+    // (Running combo-bonus total moved out of the HUD — it overlapped the live
+    // accuracy readout and is still shown at combo break + on the PAUSE screen.)
     // COMBO DECAY SECONDS — when timer drops below 1s (60 frames), show countdown
     // text to the right of combo bar so the player sees how much time is left.
     if (game.comboTimer < 60 && game.comboTimer > 0) {
