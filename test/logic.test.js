@@ -682,6 +682,22 @@ if (typeof G.panForX === 'function') {
 } else { console.log('  (skipped — panForX not exposed)'); }
 
 // ============================================================
+section('playSound — spatial + detune branches execute cleanly');
+if (typeof G.playSound === 'function') {
+  let threw = null;
+  try {
+    G.playSound('explode', 50);      // panned (StereoPanner) + varied (detune)
+    G.playSound('crit', 200);        // panned right + varied
+    G.playSound('shoot', undefined); // varied, centered (no panner)
+    G.playSound('hit');              // varied, no panX
+    G.playSound('milestone');        // melodic: centered, NOT detuned
+    G.playSound('explode', -999);    // out-of-range x still routes
+  } catch (e) { threw = e; }
+  ok(threw === null, 'playSound runs panner/detune branches without throwing'
+     + (threw ? ' — ' + threw.message : ''));
+} else { console.log('  (skipped — playSound not exposed)'); }
+
+// ============================================================
 section('stats overlay page model — Tab navigation invariants');
 if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'function') {
   const gp = G.statsAchGridPages();
