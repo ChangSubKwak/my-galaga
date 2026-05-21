@@ -1194,6 +1194,23 @@ if (typeof G.computeStageAccuracy === 'function') {
 } else { console.log('  (skipped — computeStageAccuracy not exposed)'); }
 
 // ============================================================
+section('blinkPhase — HUD blink phase (single source for ~42 inline checks)');
+if (typeof G.blinkPhase === 'function') {
+  const g = fresh();
+  // blinkPhase(3) toggles every 8 frames (2^3): on for [0,8), off for [8,16)...
+  g.animFrame = 0;  ok(G.blinkPhase(3) === true,  'frame 0, >>3 → on');
+  g.animFrame = 7;  ok(G.blinkPhase(3) === true,  'frame 7, >>3 → still on');
+  g.animFrame = 8;  ok(G.blinkPhase(3) === false, 'frame 8, >>3 → off');
+  g.animFrame = 16; ok(G.blinkPhase(3) === true,  'frame 16, >>3 → on again');
+  // shift controls rate: >>1 toggles every 2 frames.
+  g.animFrame = 0;  ok(G.blinkPhase(1) === true,  'frame 0, >>1 → on');
+  g.animFrame = 2;  ok(G.blinkPhase(1) === false, 'frame 2, >>1 → off');
+  // Identity vs the inline form it replaced.
+  g.animFrame = 37;
+  ok(G.blinkPhase(2) === (((g.animFrame >> 2) % 2) === 0), 'matches inline (game.animFrame >> 2) % 2 === 0');
+} else { console.log('  (skipped — blinkPhase not exposed)'); }
+
+// ============================================================
 section('stageModeFor — boss / challenge / normal dispatch');
 if (typeof G.stageModeFor === 'function') {
   eq(G.stageModeFor(10), 'boss', 'stage 10 → boss');

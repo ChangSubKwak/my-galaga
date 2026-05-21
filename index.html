@@ -9405,7 +9405,7 @@ function drawBonusGame() {
   // SKILL STOP HINT — while any reel still spins, prompt the player to tap fire
   // to lock it. Pulses for visibility; shows the skill-stop count once used.
   if (!bg.resultShown && bg.elapsed < bg.stopAt[2]) {
-    if ((game.animFrame >> 3) % 2 === 0) {
+    if (blinkPhase(3)) {
       drawRetroText('TAP FIRE TO STOP', BASE_W / 2, cy + 40, 6, '#0ff');
     }
     if (bg.skillStopped) {
@@ -9584,6 +9584,11 @@ function computeStageAccuracy() {
   return computeAccuracy({ shotsFired: (game && game.stageShotsFired) || 0,
                            shotsHit:  (game && game.stageShotsHit)  || 0 });
 }
+// Blink phase — true for half of each 2^shift-frame cycle (higher shift = slower
+// blink). Single source for the ~40 inline `(game.animFrame >> N) % 2 === 0` HUD
+// blink checks. Named blinkPhase (not blink) to avoid colliding with the many
+// `const blink = blinkPhase(n)` locals.
+function blinkPhase(shift) { return (game.animFrame >> shift) % 2 === 0; }
 
 // Run grade — composite of final score (50%, capped at 100K), accuracy (30%) and
 // depth (20%, capped at stage 30). Shared by the GAME_OVER grade letter and the
@@ -15767,7 +15772,7 @@ function draw() {
       ctx.fillRect(cx, cardY, 1, cardH);
       ctx.fillRect(cx + cardW - 1, cardY, 1, cardH);
       // Number key indicator (top center)
-      const numCol = (game.animFrame >> 3) % 2 === 0 ? p.col : '#fff';
+      const numCol = blinkPhase(3) ? p.col : '#fff';
       drawRetroText(String(i + 1), cx + cardW / 2, cardY + 8, 11, numCol);
       // Perk name (mid)
       drawRetroText(p.name, cx + cardW / 2, cardY + 28, 6, p.col);
@@ -16264,7 +16269,7 @@ function drawTitleScreen() {
       ctx.fillRect(bx, 226, slotW, 1);
       ctx.fillRect(bx, 226 + 11, slotW, 1);
       // Letter
-      const flick = isCur && (game.animFrame >> 3) % 2 === 0;
+      const flick = isCur && blinkPhase(3);
       drawRetroText(cs[i], bx + slotW/2, 228, 9, flick ? '#fff' : (isCur ? '#fc4' : '#fff'));
     }
     drawRetroText('UP DN  L R   ENTER OK   ESC', BASE_W/2, 244, 5, COL.gray);
@@ -16384,7 +16389,7 @@ function drawTitleScreen() {
       drawRetroText('STREAK ' + streak + 'D', BASE_W/2 - 50, 266, 4, streakCol, 'center');
     }
     if (dailyMod) {
-      const blink = (game.animFrame >> 3) % 2 === 0 ? dailyMod.color : '#fff';
+      const blink = blinkPhase(3) ? dailyMod.color : '#fff';
       drawRetroText('TODAY ' + dailyMod.label, BASE_W/2 + 20, 266, 4, blink, 'center');
     }
     if (typeof dailySeedCode === 'function') {
@@ -16448,7 +16453,7 @@ function drawTitleScreen() {
     let connected = false;
     for (const p of pads) if (p) { connected = true; break; }
     if (connected) {
-      const blink = (game.animFrame >> 5) % 2 === 0;
+      const blink = blinkPhase(5);
       ctx.fillStyle = blink ? COL.green : '#080';
       ctx.fillRect(BASE_W - 30, BASE_H - 22, 2, 2);
       drawRetroText('GP', BASE_W - 16, BASE_H - 22, 5, '#888', 'right');
@@ -17041,7 +17046,7 @@ function drawStageIntro() {
     ctx.restore();
     // Milestone caption
     if (isMilestone && slide >= 1) {
-      const blink = (game.animFrame >> 3) % 2 === 0;
+      const blink = blinkPhase(3);
       const captionCol = blink ? '#ff8' : '#fc4';
       const bt = loadBestTimes();
       const prev = bt[game.stage];
@@ -17534,7 +17539,7 @@ function drawStageIntro() {
     // Mutation banner — clear space below the panel (PB info is in right stat column)
     if (game.stageMutation) {
       const m = game.stageMutation;
-      const blink = (game.animFrame >> 2) % 2 === 0 ? m.color : '#fff';
+      const blink = blinkPhase(2) ? m.color : '#fff';
       drawRetroText('* ' + m.label + ' *', BASE_W/2 + offX, BASE_H/2 + 16, 8, blink);
       drawRetroText(m.desc, BASE_W/2 + offX, BASE_H/2 + 26, 5, '#fff');
     }
@@ -17580,7 +17585,7 @@ function drawStageIntro() {
         if (charBudget < 0) break;
       }
       // Cursor blink at end of last revealed line
-      if ((game.animFrame >> 2) % 2 === 0 && revealed < fullChars) {
+      if (blinkPhase(2) && revealed < fullChars) {
         // Find current line for cursor position
         let cursorLine = 0, cursorCol = 0, used = 0;
         for (let i = 0; i < log.length; i++) {
@@ -17633,17 +17638,17 @@ function drawStageIntro() {
     drawRetroText('POWER', BASE_W/2 - 36, pcY, 5, '#888', 'left');
     // S / N / P with type-specific colors. MAX cap: gold pulse on letter.
     const _sMax = lvS >= MAX_POWER_LVL.S, _nMax = lvN >= MAX_POWER_LVL.N, _pMax = lvP >= MAX_POWER_LVL.P;
-    const _maxPulse = (game.animFrame >> 3) % 2 === 0 ? '#fc4' : '#fff';
+    const _maxPulse = blinkPhase(3) ? '#fc4' : '#fff';
     drawRetroText('S' + lvS, BASE_W/2 - 10, pcY, 6, _sMax ? _maxPulse : '#f44', 'left');
     drawRetroText('N' + lvN, BASE_W/2 + 4,  pcY, 6, _nMax ? _maxPulse : '#0ff', 'left');
     drawRetroText('P' + lvP, BASE_W/2 + 18, pcY, 6, _pMax ? _maxPulse : '#f6f', 'left');
     // POWER MAX INDICATOR — small "MAX" label when all three caps reached
     if (_sMax && _nMax && _pMax) {
-      const _mxBlink = (game.animFrame >> 2) % 2 === 0 ? '#fc4' : '#fff';
+      const _mxBlink = blinkPhase(2) ? '#fc4' : '#fff';
       drawRetroText('MAX', BASE_W/2 + 33, pcY, 5, _mxBlink, 'left');
     }
     if (synergyLabel) {
-      const synBlink = (game.animFrame >> 2) % 2 === 0 ? synergyCol : '#fff';
+      const synBlink = blinkPhase(2) ? synergyCol : '#fff';
       drawRetroText(synergyLabel + ' BUILD', BASE_W/2, pcY + 7, 5, synBlink);
     }
   }
@@ -17652,7 +17657,7 @@ function drawStageIntro() {
   // get a special "ENDLESS LEGEND" gold blink at top so the player knows they
   // crossed a marathon threshold beyond the canonical 80-stage arc.
   if (slide >= 1 && (game.stage === 100 || game.stage === 150 || game.stage === 200)) {
-    const eb = (game.animFrame >> 2) % 2 === 0;
+    const eb = blinkPhase(2);
     drawRetroText('★ ENDLESS LEGEND ★', BASE_W/2, 18, 7, eb ? '#fc4' : '#fff');
     drawRetroText('STAGE ' + game.stage, BASE_W/2, 27, 5, '#888');
   }
@@ -17660,7 +17665,7 @@ function drawStageIntro() {
   // BOSS APPROACH WARNING — when this stage's clear will be followed by a boss
   // stage, paint a small red 'BOSS NEXT' tag near the bottom-center of the intro.
   if (isBossNext && slide >= 1) {
-    const blink = (game.animFrame >> 2) % 2 === 0;
+    const blink = blinkPhase(2);
     // SUPER BOSS NEXT — stage 30+ boss approach picks up a gold/red alternation
     // instead of the standard red/white so the player reads the higher tier.
     const _isSuperNext = (game.stage + 1) >= 30;
@@ -17683,7 +17688,7 @@ function drawStageIntro() {
       && (game.stage + 1) % BOSS_STAGE_INTERVAL !== 0
       && (game.stage + 1) % 4 === 0) {
     // CHALLENGE NEXT — next stage is a challenging stage (every 4 except boss)
-    const _cnBlink = (game.animFrame >> 2) % 2 === 0;
+    const _cnBlink = blinkPhase(2);
     drawRetroText('CHALLENGE NEXT', BASE_W/2, BASE_H - 38, 5, _cnBlink ? '#f6f' : '#fff');
   } else if (slide >= 1 && !isBoss && !isChallenge) {
     // CHALLENGE-IN-N PEEK — when next challenge is 2-4 stages away, show small
@@ -17783,7 +17788,7 @@ function drawStageIntro() {
       if (Array.isArray(_mem)) {
         const _recent = _mem.slice(0, 3);
         if (_recent.some(m => m && m.stage === game.stage)) {
-          const _pdBl = (game.animFrame >> 3) % 2 === 0;
+          const _pdBl = blinkPhase(3);
           drawRetroText('PREV DEATH HERE', BASE_W/2, BASE_H - 50, 5,
                         _pdBl ? '#f44' : '#f88');
         }
@@ -17951,7 +17956,7 @@ function drawStageIntro() {
   if (slide >= 1 && elapsed > 40) {
     if (threat) {
       // Pulsing red WARNING caption
-      const blink = (game.animFrame >> 2) % 2 === 0;
+      const blink = blinkPhase(2);
       const wcol = blink ? COL.red : '#f88';
       drawRetroText('! WARNING !', BASE_W/2, BASE_H/2 + 32, 9, wcol);
       drawRetroText('NEW THREAT: ' + threat.name, BASE_W/2, BASE_H/2 + 44, 6, COL.yellow);
@@ -18082,7 +18087,7 @@ function drawStageIntro() {
 
   // STAGE_INTRO SKIP HINT — once skipping is allowed (≥ 30 frames shown), prompt
   // the player they can fast-forward. Subtle gray, bottom of screen, pulsing.
-  if (game.stageTimer <= 90 && game.stageTimer > 2 && (game.animFrame >> 3) % 2 === 0) {
+  if (game.stageTimer <= 90 && game.stageTimer > 2 && blinkPhase(3)) {
     drawRetroText('FIRE: SKIP', BASE_W / 2, BASE_H - 8, 4, '#888', 'center');
   }
 
@@ -18169,7 +18174,7 @@ function drawGameplay() {
         const leadX = e.x + e.vx * dt;
         if (leadX >= 4 && leadX <= BASE_W - 4) {
           ctx.save();
-          const _blk = (game.animFrame >> 2) % 2 === 0;
+          const _blk = blinkPhase(2);
           ctx.globalAlpha = _blk ? 0.75 : 0.35;
           ctx.fillStyle = '#f44';
           // Down-triangle marker at predicted landing point on player Y line
@@ -19343,7 +19348,7 @@ function drawCaptureDanger() {
   ctx.fillRect(0, 0, 4, BASE_H);
   ctx.fillRect(BASE_W - 4, 0, 4, BASE_H);
   ctx.restore();
-  if ((game.animFrame >> 3) % 2 === 0) {
+  if (blinkPhase(3)) {
     drawRetroText('!! BEAM !!', BASE_W/2, 60, 8, COL.red);
   }
 }
@@ -19768,7 +19773,7 @@ function drawHUD() {
   // Center-top red bracketed banner, shorter life than rare-spawn alert.
   if ((game.swarmWarnLife || 0) > 0) {
     const sRatio = Math.min(1, game.swarmWarnLife / 36);
-    const sBlink = (game.animFrame >> 1) % 2 === 0;
+    const sBlink = blinkPhase(1);
     ctx.save();
     ctx.globalAlpha = sRatio;
     const sText = 'SWARM DIVE!';
@@ -19786,7 +19791,7 @@ function drawHUD() {
   // RARE SPAWN ALERT — flashing banner near top of screen when UFO / golden bee enters
   if ((game.rareSpawnAlertLife || 0) > 0 && game.rareSpawnAlertText) {
     const ratio = Math.min(1, game.rareSpawnAlertLife / 90);
-    const blink = (game.animFrame >> 2) % 2 === 0;
+    const blink = blinkPhase(2);
     ctx.save();
     ctx.globalAlpha = ratio;
     // Bracket box around the text
@@ -19813,7 +19818,7 @@ function drawHUD() {
     else if (tf < 900)   hint = 'SHIFT : DASH (INVINCIBLE)';
     else if (tf < 1080)  hint = 'H : HELP, I : STATS';
     if (hint) {
-      const blink = (game.animFrame >> 3) % 2 === 0 ? '#fc4' : '#fff';
+      const blink = blinkPhase(3) ? '#fc4' : '#fff';
       drawRetroText(hint, BASE_W/2, 30, 6, blink);
       // (Removed the decorative "FIRST FLIGHT" label at y=38 — it overlapped the
       // "SWARM DIVE!" combat alert at y=39 on stage 1, and the control hint above
@@ -19825,7 +19830,7 @@ function drawHUD() {
     ctx.save();
     ctx.shadowColor = '#ff4';
     ctx.shadowBlur = 6 + 4 * Math.sin(game.animFrame * 0.3);
-    const flick = (game.animFrame >> 2) % 2 === 0 ? '#ff4' : '#fff';
+    const flick = blinkPhase(2) ? '#ff4' : '#fff';
     drawRetroText(fmtScore(game.scoreDisplay || 0), 50, 17, 7, flick, 'right');
     ctx.restore();
   } else if ((game.comboLostFlashTimer || 0) > 0) {
@@ -20100,7 +20105,7 @@ function drawHUD() {
     ctx.save();
     if (isSuperBoss) {
       // Double-skull (×2 stacked) — gold/red blink
-      const blink = (game.animFrame >> 3) % 2 === 0 ? '#fc4' : '#f44';
+      const blink = blinkPhase(3) ? '#fc4' : '#f44';
       ctx.fillStyle = blink;
       ctx.fillRect(iconX, iconY, 5, 5);
       ctx.fillStyle = '#000';
@@ -20208,7 +20213,7 @@ function drawHUD() {
       // PB ALARM — when within 90-100% of PB, pulse the clock urgent yellow
       // to signal "hurry, you can still beat your record".
       if (game.stageFrames >= pb * 0.9 && game.stageFrames < pb) {
-        pbAlarm = (game.animFrame >> 2) % 2 === 0;
+        pbAlarm = blinkPhase(2);
         if (pbAlarm) clockCol = '#ff4';
       }
     }
@@ -20429,7 +20434,7 @@ function drawHUD() {
   // y=14): it now clears ACT (touches at y16) and only sub-pixel-touches the clock.
   if (game.stageMutation && game.state === STATE.PLAYING) {
     const m = game.stageMutation;
-    const blink = (game.animFrame >> 3) % 2 === 0 ? m.color : '#fff';
+    const blink = blinkPhase(3) ? m.color : '#fff';
     drawRetroText(m.label, BASE_W - 5, 18, 4, blink, 'right');
     // MUTATION DESCRIPTOR — show desc for the first ~5 seconds of the stage so
     // the player learns the rule change before settling into play.
@@ -20605,9 +20610,9 @@ function drawHUD() {
   const dangerLives = game.lives === 1;
   // LIFE GAIN PULSE — when lives++ just fired, overlay gold flash on row.
   const _lifePulse = (game.lifeGainPulseTimer || 0) > 0;
-  const _lifePulseCol = (game.animFrame >> 1) % 2 === 0 ? '#fc4' : '#fff';
+  const _lifePulseCol = blinkPhase(1) ? '#fc4' : '#fff';
   const lifeCol = dangerLives
-    ? ((game.animFrame >> 3) % 2 === 0 ? COL.red : '#fa8')
+    ? (blinkPhase(3) ? COL.red : '#fa8')
     : (_lifePulse ? _lifePulseCol : ((game.ship && game.ship.color) || '#0cf'));
   for (let i = 0; i < Math.min(game.lives, 5); i++) {
     drawPlayer(15 + i * 16, BASE_H - 8, lifeCol);
@@ -20634,7 +20639,7 @@ function drawHUD() {
   let badgeX = 15 + Math.min(game.lives, 5) * 16 + 4;
   if (game.lives > 5) badgeX += 16; // make room for the +N overflow label
   if (game.dualFighter) {
-    const blink = (game.animFrame >> 2) % 2 === 0 ? COL.yellow : '#fc4';
+    const blink = blinkPhase(2) ? COL.yellow : '#fc4';
     drawRetroText('DUAL', badgeX, BASE_H - 8, 6, blink, 'left');
     badgeX += 24;
   }
@@ -20664,7 +20669,7 @@ function drawHUD() {
     ctx.restore();
   }
   if (dangerLives && (isCombatState())) {
-    if ((game.animFrame >> 3) % 2 === 0) {
+    if (blinkPhase(3)) {
       drawRetroText('LAST LIFE', BASE_W/2, BASE_H - 22, 6, COL.red);
     }
     // (lowLife + heartbeat SFX now fire in update() at sim rate — see "LAST-LIFE
@@ -20794,12 +20799,12 @@ function drawHUD() {
 
   // Challenge mode badge (red, blinking) — top center under HIGH SCORE
   if (game.challengeMode) {
-    const blink = (game.animFrame >> 3) % 2 === 0;
+    const blink = blinkPhase(3);
     drawRetroText('CHALLENGE', BASE_W/2, 35, 6, blink ? COL.red : '#f88');
   }
   // Daily mode 1.25× score multiplier badge
   if (game.dailyMode) {
-    const blink = (game.animFrame >> 3) % 2 === 0;
+    const blink = blinkPhase(3);
     drawRetroText('DAILY  1.25x', BASE_W/2, 35, 6, blink ? COL.green : '#8c8');
   }
   // (Difficulty badge consolidated to a single right-rail HARD/EASY label at y56 —
@@ -20842,7 +20847,7 @@ function drawHUD() {
         ctx.fillRect(_bx + 7, _by - 2, Math.round(10 * _ratio), 2);
         // Critical-phase "!" tick — small vertical glyph above the slot, blinks
         // at ~7Hz so it reads as an alert distinct from the slower bar pulse.
-        if (_crit && (game.animFrame >> 2) % 2 === 0) {
+        if (_crit && blinkPhase(2)) {
           ctx.fillStyle = '#f44';
           ctx.fillRect(_bx + 4, _by - 7, 1, 3);
           ctx.fillRect(_bx + 4, _by - 3, 1, 1);
@@ -20873,7 +20878,7 @@ function drawHUD() {
   }
   // Cheat indicator — small blinking GOD tag in the corner so it's obviously not legit
   if (game.cheatInvincible) {
-    const blink = (game.animFrame >> 3) % 2 === 0;
+    const blink = blinkPhase(3);
     drawRetroText('GOD', 4, 35, 6, blink ? '#fc4' : '#fa0', 'left');
   }
   // ACTIVE PERK BADGE — small label in the timed-buff region so the player always
@@ -20885,7 +20890,7 @@ function drawHUD() {
 
   // Demo mode banner
   if (game.isDemo) {
-    if ((game.animFrame >> 4) % 2 === 0) {
+    if (blinkPhase(4)) {
       drawRetroText('* DEMO MODE *', BASE_W/2, 35, 9, COL.yellow);
     }
     drawRetroText('PRESS ANY KEY', BASE_W/2, 46, 6, COL.gray);
@@ -20971,7 +20976,7 @@ function drawHUD() {
       drawRetroText('→' + nextTier, 66, 45, 5, nextCol, 'left');
       // ARSENAL TIER IMMINENT — within 3 combo of next tier, blink gold tag
       if ((nextTier - game.combo) <= 3 && (nextTier - game.combo) > 0) {
-        const _aiB = (game.animFrame >> 2) % 2 === 0;
+        const _aiB = blinkPhase(2);
         if (_aiB) drawRetroText('IMMINENT', 4, 53, 4, '#fc4', 'left');
       }
     }
@@ -21204,7 +21209,7 @@ function drawGameOverScreen() {
   // SCORE PB COMPARE — when count finishes (linearT >=1) show 'NEW HIGH!' or 'HI: N'.
   if (linearT >= 1 && (game.highScore || 0) > 0) {
     if (game.score >= game.highScore) {
-      const _hsB = (game.animFrame >> 2) % 2 === 0 ? '#fc4' : '#ff4';
+      const _hsB = blinkPhase(2) ? '#fc4' : '#ff4';
       drawRetroText('NEW HIGH!', BASE_W/2 + 40, cy - 4, 4, _hsB, 'right');
     } else {
       drawRetroText('HI: ' + fmtScore(game.highScore), BASE_W/2 + 40, cy - 4, 4, '#888', 'right');
@@ -21273,7 +21278,7 @@ function drawGameOverScreen() {
   // bottom. Only when this run made the top-5; otherwise nothing (the score
   // row already shows NEW HIGH! / HI: N).
   if (game.topRank >= 0 && elapsedGo > 140) {
-    const nhsCol = (game.animFrame >> 3) % 2 === 0 ? COL.yellow : COL.magenta;
+    const nhsCol = blinkPhase(3) ? COL.yellow : COL.magenta;
     const prefix = game.dailyMode ? 'DAILY ' : game.challengeMode ? 'CHAL ' : '';
     const text = game.topRank === 0
       ? (prefix ? prefix + 'BEST!' : 'NEW HIGH SCORE!')
@@ -21424,7 +21429,7 @@ function drawBossStage() {
       }
     };
     if (mb.telegraphing) {
-      const blink = (game.animFrame >> 1) % 2 === 0;
+      const blink = blinkPhase(1);
       renderBoss(blink);
       ctx.save();
       ctx.globalAlpha = 0.35 + 0.25 * Math.sin(game.animFrame * 0.4);
@@ -21536,13 +21541,13 @@ function drawBossStage() {
       ctx.fillRect(x + 4, BASE_H - 17, 4, 3);
     }
     // Side flickers
-    if ((game.animFrame >> 1) % 2 === 0) {
+    if (blinkPhase(1)) {
       ctx.globalAlpha = 0.55;
       ctx.fillRect(0, 24, 3, BASE_H - 40);
       ctx.fillRect(BASE_W - 3, 24, 3, BASE_H - 40);
     }
     ctx.restore();
-    drawRetroText('PHASE INCOMING', BASE_W/2, BASE_H/2 - 30, 9, (game.animFrame >> 2) % 2 === 0 ? COL.red : '#f88');
+    drawRetroText('PHASE INCOMING', BASE_W/2, BASE_H/2 - 30, 9, blinkPhase(2) ? COL.red : '#f88');
   }
 
   // BOSS TACTICAL DISPLAY — full-width HP bar with per-archetype segment coloring
@@ -21985,7 +21990,7 @@ function drawPauseScreen() {
       // Use the buffer space for active mutation reminder (no buffs to show)
       if (game.stageMutation) {
         const _m = game.stageMutation;
-        const _mblink = (game.animFrame >> 3) % 2 === 0 ? _m.color : '#fff';
+        const _mblink = blinkPhase(3) ? _m.color : '#fff';
         ctx.save();
         ctx.globalAlpha = 0.80;
         drawRetroText('★ ' + _m.label, BASE_W/2, _buffY + 3, 5, _mblink);
