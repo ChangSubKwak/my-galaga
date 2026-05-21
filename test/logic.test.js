@@ -173,6 +173,7 @@ const shim = `
 ;try { globalThis.__getEnduranceTiers = function () { return (typeof ENDURANCE_TIERS !== 'undefined') ? ENDURANCE_TIERS : null; }; } catch (e) {}
 ;try { globalThis.__getComboArsenal = function () { return (typeof COMBO_ARSENAL !== 'undefined') ? COMBO_ARSENAL : null; }; } catch (e) {}
 ;try { globalThis.__getAchievements = function () { return (typeof ACHIEVEMENTS !== 'undefined') ? ACHIEVEMENTS : null; }; } catch (e) {}
+;try { globalThis.__getPowerupCol = function () { return (typeof POWERUP_COL !== 'undefined') ? POWERUP_COL : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -1254,6 +1255,23 @@ if (typeof G.__getAchievements === 'function' && G.__getAchievements()) {
      (dead.length ? ' (dead: ' + dead.join(', ') + ')' : ''));
   ok(defined.size >= 50, 'achievement registry is populated (' + defined.size + ' defined)');
 } else { console.log('  (skipped — ACHIEVEMENTS not exposed)'); }
+
+// ============================================================
+section('POWERUP_COL — every power-up type has a valid color (load-bearing source)');
+// POWERUP_COL is the single source for ~10 buff-color display sites (gem, spawn
+// burst, mini-gem, in-game + pause buff strips, bullet-profile, expiry alert, HELP
+// legend, combo-unlock label). A missing/garbled key would break all of them, so
+// guard that each power-up type resolves to a valid hex color. (D = dash is custom-
+// colored and intentionally absent.)
+if (typeof G.__getPowerupCol === 'function' && G.__getPowerupCol()) {
+  const col = G.__getPowerupCol();
+  const hex = /^#[0-9a-fA-F]{3,6}$/;
+  for (const t of ['S','N','P','T','R','W','H','L','B','E','F']) {
+    ok(typeof col[t] === 'string' && hex.test(col[t]),
+       'POWERUP_COL.' + t + ' is a valid hex color (' + col[t] + ')');
+  }
+  ok(!('D' in col), 'D (dash) intentionally absent from POWERUP_COL (custom-colored)');
+} else { console.log('  (skipped — POWERUP_COL not exposed)'); }
 
 // ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
