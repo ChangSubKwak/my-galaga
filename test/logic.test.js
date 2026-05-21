@@ -651,6 +651,24 @@ if (typeof G.powerUpDropRate === 'function') {
 } else { console.log('  (skipped — powerUpDropRate not exposed)'); }
 
 // ============================================================
+section('panForX — spatial SFX stereo mapping');
+if (typeof G.panForX === 'function') {
+  const BW = 224; // BASE_W
+  eq(G.panForX(BW / 2), 0, 'screen centre → centered (pan 0)');
+  ok(G.panForX(0) < 0, 'left edge pans left (negative)');
+  ok(G.panForX(BW) > 0, 'right edge pans right (positive)');
+  ok(Math.abs(G.panForX(0)) <= 1 && Math.abs(G.panForX(BW)) <= 1, 'pan stays within [-1,1]');
+  ok(Math.abs(G.panForX(0)) <= 0.85 + 1e-9, 'softened — edges not hard-panned past 0.85');
+  ok(G.panForX(BW * 0.25) < G.panForX(BW * 0.75), 'monotonic left→right');
+  // non-positional / global cues collapse to centre
+  eq(G.panForX(undefined), 0, 'undefined x → centered');
+  eq(G.panForX(NaN), 0, 'NaN x → centered');
+  // out-of-range x clamps rather than exceeding the field
+  ok(Math.abs(G.panForX(-500)) <= 0.85 + 1e-9, 'x below 0 clamps');
+  ok(Math.abs(G.panForX(99999)) <= 0.85 + 1e-9, 'x above BASE_W clamps');
+} else { console.log('  (skipped — panForX not exposed)'); }
+
+// ============================================================
 section('stats overlay page model — Tab navigation invariants');
 if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'function') {
   const gp = G.statsAchGridPages();

@@ -1111,12 +1111,30 @@ function scheduleBGMNotes() {
   bgmTimerId = setTimeout(scheduleBGMNotes, 120);
 }
 
-function playSound(type) {
+// SPATIAL SFX — map a screen x (0..BASE_W) to a stereo pan in [-0.85, 0.85].
+// Softened (×0.85) so edge events aren't hard-panned to a single ear; pure so the
+// test harness can pin the curve. Non-numeric x (UI / player / global cues) → 0.
+function panForX(x) {
+  if (typeof x !== 'number' || !isFinite(x)) return 0;
+  const c = (x / BASE_W) * 2 - 1; // 0..BASE_W → -1..1
+  return Math.max(-1, Math.min(1, c)) * 0.85;
+}
+function playSound(type, panX) {
   ensureAudio();
   if (!audioCtx) return;
   const now = audioCtx.currentTime;
+  // Spatial routing: when an event x is supplied, insert a StereoPanner before the
+  // SFX bus so the sound is placed in the stereo field by where it happened.
+  // No panX (or no StereoPanner support) → bus directly, i.e. centered as before.
+  let _out = sfxGain || masterGain || audioCtx.destination;
+  if (typeof panX === 'number' && audioCtx.createStereoPanner) {
+    const _pan = audioCtx.createStereoPanner();
+    _pan.pan.value = panForX(panX);
+    _pan.connect(_out);
+    _out = _pan;
+  }
   const g = audioCtx.createGain();
-  g.connect(sfxGain || masterGain || audioCtx.destination);
+  g.connect(_out);
   const o = audioCtx.createOscillator();
   o.connect(g);
   switch(type) {
@@ -1419,7 +1437,7 @@ function playSound(type) {
       o2.frequency.exponentialRampToValueAtTime(55, now + 0.55);
       g2.gain.setValueAtTime(0.06, now);
       g2.gain.linearRampToValueAtTime(0, now + 0.6);
-      o2.connect(g2); g2.connect(sfxGain || masterGain || audioCtx.destination);
+      o2.connect(g2); g2.connect(_out);
       o2.start(now); o2.stop(now + 0.6);
       return; // we handled start/stop manually
     }
@@ -4555,7 +4573,7 @@ function updateSupplyCrate() {
       game.bullets.splice(bi, 1);
       game.itemBursts.push({ x: b.x, y: b.y, life: 0, color: '#fc4' });
       game.shakeTimer = Math.max(game.shakeTimer || 0, 2);
-      playSound('hit');
+      playSound('hit', b.x);
       if (c.hp <= 0) {
         // BREAK — spawn random timed power-up. Permanent S/N/P excluded to keep
         // mid-stage event from inflating long-term progression.
@@ -11202,7 +11220,7 @@ function updateEnemies() {
           // Telegraph the dive: 30-frame preview where the path is visible but the enemy stays put.
           e.previewTimer = 30;
           e.previewPath = createLoopPath(e.x, e.y, e.x < BASE_W/2 ? 1 : -1);
-          playSound('enemyDive');
+          playSound('enemyDive', e.x);
           // If boss, escorts get a slightly-delayed preview
           if (e.type === 'boss') {
             const escorts = game.enemies.filter(es => es.alive && es.state === 'formation' && es.type === 'butterfly' && Math.abs(es.col - e.col) <= 1 && es.row === 1);
@@ -11237,7 +11255,7 @@ function updateEnemies() {
         frame: 0, frameTimer: 0
       };
       game.enemies.push(k);
-      playSound('enemyDive');
+      playSound('enemyDive', k.x);
     }
   }
 
@@ -11608,7 +11626,7 @@ function updateCollisions() {
           for (let s = 0; s < 6; s++) {
             game.hitSparks.push({x: e.x + (Math.random()-0.5)*10, y: e.y + (Math.random()-0.5)*8, life: -s});
           }
-          playSound('crit');
+          playSound('crit', e.x);
         }
         if (e.hp <= 0) {
           e.alive = false;
@@ -12758,7 +12776,7 @@ function updateCollisions() {
         const _eX = e.x, _eY = e.y, _eType = e.type;
         e.alive = false;
         game.explosions.push({x: e.x, y: e.y, timer: 0, maxTime: 20});
-        playSound('explode');
+        playSound('explode', e.x);
         // REVENGE: pass the colliding enemy's type; killPlayer seeds the avenge
         // target only on a confirmed death (shield/cheat absorb won't false-trigger).
         killPlayer(_eX, _eY, 'collision', _eType);
