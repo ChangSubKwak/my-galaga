@@ -14618,6 +14618,15 @@ function update() {
       if (game.animFrame % 240 === 0 && typeof playSound === 'function') playSound('lowLife');
       if (game.animFrame % 96 === 0 && typeof playSound === 'function') playSound('heartbeat');
     }
+    // PB-ALARM TICK — once/sec while within 90-100% of the stage PB time. Computed
+    // here at sim rate (mirrors drawHUD's pbAlarm) so it doesn't double on high-refresh
+    // displays; the clock's urgent-yellow glow visual stays in drawHUD.
+    if (isCombatState() && game.animFrame % 60 === 0 && typeof stagePBs !== 'undefined' && stagePBs) {
+      const _pbA = stagePBs[String(game.stage)];
+      if (typeof _pbA === 'number' && _pbA > 0
+          && (game.stageFrames || 0) >= _pbA * 0.9 && (game.stageFrames || 0) < _pbA
+          && typeof playSound === 'function') playSound('tick');
+    }
     if (game.flashTimer > 0) game.flashTimer--;
     if (game.invincibleTimer > 0) game.invincibleTimer--;
     // NEW HIGH SCORE glow — moved here from addScore() so it ticks once per frame
@@ -14745,6 +14754,10 @@ function update() {
     // if no choice is made (game.perkOffered = null reset on next boss).
     if ((game.perkSelectFrames || 0) > 0) {
       game.perkSelectFrames--;
+      // URGENCY TICK fires here at sim rate (not in draw) so it doesn't double on
+      // high-refresh displays. Mirrors draw's <90f (1.5s) urgency window + 30f cadence.
+      if (game.perkSelectFrames > 0 && game.perkSelectFrames < 90 && game.animFrame % 30 === 0
+          && typeof playSound === 'function') playSound('tick');
       if (game.perkSelectFrames === 0) game.perkOffered = null;
     }
     // Weapon activation callout life tick
@@ -15105,6 +15118,13 @@ function update() {
 
     case STATE.GAME_OVER: {
       game.gameOverTimer--;
+      // STAT-ROW TICKS fire here at sim rate (not in drawGameOverScreen) so they don't
+      // double on high-refresh displays as each game-over stat row begins counting.
+      if (game.gameOverTimer === 180 - 95 || game.gameOverTimer === 180 - 103
+          || game.gameOverTimer === 180 - 111 || game.gameOverTimer === 180 - 119
+          || game.gameOverTimer === 180 - 127) {
+        if (typeof playSound === 'function') playSound('tick');
+      }
       updateExplosions();
       // Score tick during count-up window (frames 30-90 of the entrance)
       const elapsedGo = 180 - game.gameOverTimer;
@@ -15715,8 +15735,8 @@ function draw() {
       ctx.fillRect(0, BASE_H - 3, BASE_W, 3);
       ctx.fillRect(0, 0, 3, BASE_H);
       ctx.fillRect(BASE_W - 3, 0, 3, BASE_H);
-      // Tick sfx every 30 frame
-      if (game.animFrame % 30 === 0 && typeof playSound === 'function') playSound('tick');
+      // (urgency tick SFX moved to update() at sim rate — see perkSelectFrames-- — so
+      // it doesn't double on high-refresh monitors. Visual border stays here.)
     }
     ctx.globalAlpha = fadeIn;
     const titleCol = remaining < 90 ? '#f44' : '#fc4';
@@ -20219,10 +20239,8 @@ function drawHUD() {
     // (Run time is shown once, prominently, as the mm:ss endurance clock at y16 —
     // the old redundant "R <time>" readout at y28 was removed. The extra-life bar
     // and difficulty badge that used to nest here moved to top level below.)
-    // PB ALARM tick — once per second SFX while in alarm zone
-    if (pbAlarm && game.animFrame % 60 === 0 && typeof playSound === 'function') {
-      playSound('tick');
-    }
+    // (PB-alarm tick SFX moved to update() at sim rate so it doesn't double on
+    // high-refresh monitors; pbAlarm still drives the clock's urgent-yellow glow here.)
   }
   // EXTRA LIFE PROGRESS — 30px green bar (right rail, y39) toward the next 30K
   // extra-life threshold. Top-level so it no longer blinks out during dive surges
@@ -21230,12 +21248,8 @@ function drawGameOverScreen() {
   drawRetroText('TIME', _cxL, cy + 28, 5, COL.cyan, 'left');
   drawRetroText(mmgo + ':' + ssgo, _cvL, cy + 28, 6, COL.yellow, 'right');
 
-  // Tick sounds as each stat row begins counting
-  if (game.gameOverTimer === 180 - 95 || game.gameOverTimer === 180 - 103
-      || game.gameOverTimer === 180 - 111 || game.gameOverTimer === 180 - 119
-      || game.gameOverTimer === 180 - 127) {
-    playSound('tick');
-  }
+  // (stat-row tick SFX moved to update()'s GAME_OVER case at sim rate so they don't
+  // double on high-refresh monitors.)
 
   // GRADE — composite S/A/B/C/D from score + accuracy + stage. Big letter in
   // the right column next to the stat rows, vertically centered.
