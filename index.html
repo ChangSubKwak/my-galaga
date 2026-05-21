@@ -9438,7 +9438,7 @@ function drawBonusGame() {
       ctx.shadowBlur = 16 * glow;
       drawRetroText('MEGA JACKPOT!', BASE_W / 2, cy + 38, 14, '#fc4');
       ctx.restore();
-      drawRetroText('+' + Math.floor(bg.bonus * cT), BASE_W / 2, cy + 56, 12, COL.yellow);
+      drawRetroText('+' + fmtScore(Math.floor(bg.bonus * cT)), BASE_W / 2, cy + 56, 12, COL.yellow);
     } else if (bg.bonus >= 5000) {
       // JACKPOT — cyan ring pulse + alternating text color
       const phase2 = elapsedSinceResult % 60;
@@ -9451,11 +9451,11 @@ function drawBonusGame() {
       ctx.stroke();
       const pulseCol = Math.sin(elapsedSinceResult * 0.3) > 0 ? COL.yellow : COL.cyan;
       drawRetroText(bg.matchText, BASE_W / 2, cy + 38, 14, pulseCol);
-      drawRetroText('+' + Math.floor(bg.bonus * cT), BASE_W / 2, cy + 56, 12, COL.yellow);
+      drawRetroText('+' + fmtScore(Math.floor(bg.bonus * cT)), BASE_W / 2, cy + 56, 12, COL.yellow);
     } else {
       drawRetroText(bg.matchText, BASE_W / 2, cy + 38, 14,
         bg.bonus >= 1000 ? COL.cyan : COL.white);
-      drawRetroText('+' + Math.floor(bg.bonus * cT), BASE_W / 2, cy + 56, 12, COL.yellow);
+      drawRetroText('+' + fmtScore(Math.floor(bg.bonus * cT)), BASE_W / 2, cy + 56, 12, COL.yellow);
     }
 
     // Post-reveal intel panels — slide in 20 frames after result
@@ -11910,7 +11910,7 @@ function updateCollisions() {
             game.floatTexts.push({
               x: e.x + (Math.random() * 4 - 2),
               y: e.y - 6,
-              text: '+' + pts,
+              text: '+' + fmtScore(pts),
               color: ksCol, life: 22, maxLife: 22,
               size: pts >= 1000 ? 7 : 5,
               glow: pts >= 1000 ? 4 : 0
@@ -12320,7 +12320,7 @@ function updateCollisions() {
                   color: col, life: 70, maxLife: 70, size
                 });
                 game.floatTexts.push({
-                  x: BASE_W/2, y: BASE_H/3 + size, text: '+' + bonus,
+                  x: BASE_W/2, y: BASE_H/3 + size, text: '+' + fmtScore(bonus),
                   color: '#ff4', life: 70, maxLife: 70, size: 10
                 });
                 game.overkillCooldown = 90;
