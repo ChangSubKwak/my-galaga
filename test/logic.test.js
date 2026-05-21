@@ -947,6 +947,18 @@ if (typeof G.createLoopPath === 'function') {
 } else { console.log('  (skipped — createLoopPath not exposed)'); }
 
 // ============================================================
+section('computeAccuracy — hit % with zero-shot guard');
+if (typeof G.computeAccuracy === 'function') {
+  eq(G.computeAccuracy({ shotsFired: 0, shotsHit: 0 }), 0, 'no shots → 0 (no divide-by-zero)');
+  eq(G.computeAccuracy({ shotsFired: 100, shotsHit: 100 }), 100, 'all hits → 100');
+  eq(G.computeAccuracy({ shotsFired: 100, shotsHit: 50 }), 50, 'half → 50');
+  eq(G.computeAccuracy({ shotsFired: 3, shotsHit: 1 }), 33, 'rounds (1/3 → 33)');
+  eq(G.computeAccuracy({ shotsFired: 8, shotsHit: 7 }), 88, 'rounds (7/8 → 88)');
+  eq(G.computeAccuracy({}), 0, 'missing fields → 0');
+  eq(G.computeAccuracy(null), 0, 'null stats → 0 (no throw)');
+} else { console.log('  (skipped — computeAccuracy not exposed)'); }
+
+// ============================================================
 section('stageModeFor — boss / challenge / normal dispatch');
 if (typeof G.stageModeFor === 'function') {
   eq(G.stageModeFor(10), 'boss', 'stage 10 → boss');

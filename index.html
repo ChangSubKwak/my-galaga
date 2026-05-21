@@ -6508,8 +6508,7 @@ function updateOneMegaBoss(mb) {
         unlockAchievement('bossSlayer');
         if (mb.super) {
           unlockAchievement('superSlayer');
-          const accTotal = game.stats.shotsFired === 0 ? 0
-            : Math.round((game.stats.shotsHit / game.stats.shotsFired) * 100);
+          const accTotal = computeAccuracy(game.stats);
           if (accTotal >= 80) unlockAchievement('superBeat');
         }
         if (game.megaBosses && game.megaBosses.length === 2 && game.megaBosses.every(b => !b.alive)) {
@@ -7760,8 +7759,7 @@ function initInput() {
     // daily/challenge runs entirely and never reached the top-5 lists).
     if (game.state === STATE.PAUSED && k === 'q') {
       if (game.score > 0 && !game.isDemo) {
-        const acc = game.stats.shotsFired === 0 ? 0
-          : Math.round((game.stats.shotsHit / game.stats.shotsFired) * 100);
+        const acc = computeAccuracy(game.stats);
         submitTopScore(game.score, game.stats.maxStage, acc);
         commitGameToCumStats();
       }
@@ -9540,6 +9538,14 @@ function fmtScore(n) {
   if (n < 10000000)  return (n / 1000000).toFixed(2) + 'M';
   if (n < 100000000) return (n / 1000000).toFixed(1) + 'M';
   return Math.floor(n / 1000000) + 'M';
+}
+
+// Hit accuracy as an integer percent from a {shotsFired, shotsHit} stats object.
+// Single source for the GAME_OVER / STATS / per-mode readouts (0 when no shots).
+function computeAccuracy(stats) {
+  const fired = (stats && stats.shotsFired) || 0;
+  if (fired === 0) return 0;
+  return Math.round((((stats && stats.shotsHit) || 0) / fired) * 100);
 }
 
 // --- Cumulative lifetime stats (separate buckets per mode) ---
@@ -13118,8 +13124,7 @@ function killPlayer(srcX, srcY, cause, srcType) {
         } catch (e) {}
         game._comboPbPending = 0;
       }
-      const acc = game.stats.shotsFired === 0 ? 0
-        : Math.round((game.stats.shotsHit / game.stats.shotsFired) * 100);
+      const acc = computeAccuracy(game.stats);
       if (acc >= 80 && game.stats.shotsFired > 30) unlockAchievement('deadEye');
       game.topRank = submitTopScore(game.score, game.stats.maxStage, acc);
       commitGameToCumStats();
@@ -14930,8 +14935,7 @@ function update() {
         if (game.lives <= 0) {
           game.state = STATE.GAME_OVER;
           game.gameOverTimer = 180;
-          const acc = game.stats.shotsFired === 0 ? 0
-            : Math.round((game.stats.shotsHit / game.stats.shotsFired) * 100);
+          const acc = computeAccuracy(game.stats);
           game.topRank = submitTopScore(game.score, game.stats.maxStage, acc);
           commitGameToCumStats();
           playSound('gameOver');
@@ -15036,7 +15040,7 @@ function update() {
       if (elapsedGo === 145 && !game.gradeCueFired) {
         game.gradeCueFired = true;
         const sStat = game.stats || {};
-        const accLocal = sStat.shotsFired === 0 ? 0 : Math.round((sStat.shotsHit / sStat.shotsFired) * 100);
+        const accLocal = computeAccuracy(sStat);
         const tot = Math.min(1, (game.score || 0) / 100000) * 0.5
                   + (accLocal / 100) * 0.3
                   + Math.min(1, (sStat.maxStage || 1) / 30) * 0.2;
@@ -21194,7 +21198,7 @@ function drawGameOverScreen() {
   // lives in the PROFILE tab. Game over now shows just: identity, score,
   // 5 stats, grade, death cause, epitaph, 3 highlights, restart prompt.
   const s = game.stats || { kills: 0, shotsFired: 0, shotsHit: 0, maxStage: game.stage };
-  const acc = s.shotsFired === 0 ? 0 : Math.round((s.shotsHit / s.shotsFired) * 100);
+  const acc = computeAccuracy(s);
 
   // Sequential count-up windows so the stats roll in after SCORE finishes.
   function rollT(start, end) {
@@ -22257,7 +22261,7 @@ function drawStatsOverlay() {
     runFrames:  (csN.runFrames  || 0) + (csC.runFrames  || 0),
     bestStage:  Math.max(csN.bestStage || 0, csC.bestStage || 0)
   };
-  const acc = cs.shotsFired === 0 ? 0 : Math.round((cs.shotsHit / cs.shotsFired) * 100);
+  const acc = computeAccuracy(cs);
   const fmtTime = (frames) => {
     const t = Math.floor((frames || 0) / 60);
     return String(Math.floor(t / 3600)).padStart(2, '0') + ':' +
