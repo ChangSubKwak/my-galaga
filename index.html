@@ -13729,7 +13729,12 @@ function spawnStageClear(label, sub) {
     else if (_accPct >= 85)             { _grade = 'A'; _gCol = '#0f8'; }
     else if (_accPct >= 70)             { _grade = 'B'; _gCol = '#0cf'; }
     else                                { _grade = 'C'; _gCol = '#fff'; }
-    if (_sf >= 5) {  // skip grade on near-zero-shot stages (boss insta-clears, etc.)
+    // Normal stages (state PLAYING) are graded by the richer STAGE GRADE system
+    // in checkStageComplete (bracket pop + ace streak + SFX + cinematic + persist).
+    // This grade is only for BOSS/CHALLENGE clears, which that system doesn't reach
+    // — without this gate a normal clear showed TWO grades and double-counted the
+    // galagaStageGrades tally (often into different letter buckets).
+    if (_sf >= 5 && game.state !== STATE.PLAYING) {  // skip near-zero-shot (boss insta-clear) + normal (System B owns it)
       game.floatTexts.push({
         x: BASE_W/2 + 56, y: BASE_H/2 - 10, text: _grade,
         color: _gCol, life: 90, maxLife: 90, size: 16,
