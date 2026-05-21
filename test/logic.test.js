@@ -1362,6 +1362,45 @@ if (typeof G.submitTopScore === 'function' && typeof G.loadTopScores === 'functi
 } else { console.log('  (skipped — submitTopScore/loadTopScores not exposed)'); }
 
 // ============================================================
+section('commitGameToCumStats — cumulative stats: demo guard + accumulation + last-run');
+if (typeof G.commitGameToCumStats === 'function' && typeof G.loadCumStats === 'function') {
+  const keys = ['galagaCumStats', 'galagaCumStatsChallenge', 'galagaLastRun'];
+  const savedKV = keys.map(k => [k, sandbox.localStorage.getItem(k)]);
+  keys.forEach(k => sandbox.localStorage.removeItem(k));
+
+  // Demo runs must NOT pollute cumulative stats.
+  let g = fresh(); g.isDemo = true; g.challengeMode = false;
+  g.stats = { kills: 99, shotsFired: 0, shotsHit: 0, maxStage: 9 }; g.score = 99999;
+  G.commitGameToCumStats();
+  eq((G.loadCumStats(false).sessions || 0), 0, 'demo run → not committed (0 sessions)');
+  eq(sandbox.localStorage.getItem('galagaLastRun'), null, 'demo run → no last-run snapshot');
+
+  // Real run → accumulates + saves last-run snapshot.
+  g = fresh(); g.isDemo = false; g.challengeMode = false;
+  g.stats = { kills: 10, shotsFired: 20, shotsHit: 15, maxStage: 7 };
+  g.score = 5000; g.runFrames = 600; g.comboBest = 12;
+  G.commitGameToCumStats();
+  const cs = G.loadCumStats(false);
+  eq(cs.sessions, 1, 'real run → sessions = 1');
+  eq(cs.kills, 10, 'kills accumulated');
+  eq(cs.scoreTotal, 5000, 'scoreTotal accumulated');
+  eq(cs.bestStage, 7, 'bestStage recorded');
+  const lr = JSON.parse(sandbox.localStorage.getItem('galagaLastRun') || '{}');
+  eq(lr.stage, 7, 'last-run snapshot: stage'); eq(lr.score, 5000, 'last-run snapshot: score');
+
+  // Second run accumulates on top (sessions 2, kills 10+3, bestStage stays max).
+  g = fresh(); g.isDemo = false; g.challengeMode = false;
+  g.stats = { kills: 3, shotsFired: 4, shotsHit: 2, maxStage: 4 }; g.score = 1000;
+  G.commitGameToCumStats();
+  const cs2 = G.loadCumStats(false);
+  eq(cs2.sessions, 2, 'second run → sessions = 2');
+  eq(cs2.kills, 13, 'kills accumulate across runs');
+  eq(cs2.bestStage, 7, 'bestStage keeps the higher prior run');
+
+  savedKV.forEach(([k, v]) => { if (v === null) sandbox.localStorage.removeItem(k); else sandbox.localStorage.setItem(k, v); });
+} else { console.log('  (skipped — commitGameToCumStats/loadCumStats not exposed)'); }
+
+// ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
 if (typeof G.comboKillDetune === 'function') {
   eq(G.comboKillDetune(0),   0,   'combo 0 → base pitch (no detune)');
