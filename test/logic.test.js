@@ -1317,6 +1317,51 @@ if (typeof G.tryStartDash === 'function') {
 } else { console.log('  (skipped — tryStartDash not exposed)'); }
 
 // ============================================================
+section('submitTopScore / loadTopScores — leaderboard sort / cap / rank / integrity');
+if (typeof G.submitTopScore === 'function' && typeof G.loadTopScores === 'function') {
+  const key = 'galagaTopScoresNormal';
+  const saved = sandbox.localStorage.getItem(key);
+  const savedHigh = sandbox.localStorage.getItem('galagaHigh');
+  sandbox.localStorage.removeItem(key);
+  sandbox.localStorage.removeItem('galagaHigh');
+  const g = fresh(); g.dailyMode = false; g.challengeMode = false; // normal-mode leaderboard
+
+  eq(G.submitTopScore(0, 1, 50), -1, 'score 0 → not submitted (-1)');
+  eq(G.submitTopScore(-5, 1, 50), -1, 'negative score → not submitted (-1)');
+
+  G.submitTopScore(1000, 3, 80);
+  eq(G.submitTopScore(5000, 5, 90), 0, 'highest → rank #1 (index 0)');
+  eq(G.submitTopScore(2000, 4, 70), 1, 'mid → rank #2 (index 1)');
+  const list = G.loadTopScores('normal');
+  ok(list.length === 3, '3 scores recorded');
+  ok(list[0].score === 5000 && list[1].score === 2000 && list[2].score === 1000, 'sorted descending');
+  ok(list[0].stage === 5 && list[0].accuracy === 90, 'entry keeps its stage + accuracy');
+
+  G.submitTopScore(100, 1, 10); G.submitTopScore(200, 1, 10); G.submitTopScore(300, 1, 10);
+  const capped = G.loadTopScores('normal');
+  ok(capped.length === 5, 'capped at 5 entries (' + capped.length + ')');
+  ok(capped[0].score === 5000, 'top entry preserved through cap');
+  ok(!capped.some(e => e.score === 100), 'lowest over-cap score dropped');
+
+  eq(parseInt(sandbox.localStorage.getItem('galagaHigh') || '0', 10), 5000, 'galagaHigh synced to max score');
+
+  // Corrupt JSON: challenge mode (no legacy fallback) → clean []; normal mode
+  // gracefully recovers via the galagaHigh legacy migration. Neither throws.
+  const ckey = 'galagaTopScoresChallenge';
+  const savedC = sandbox.localStorage.getItem(ckey);
+  sandbox.localStorage.setItem(ckey, '{not valid json');
+  const cl = G.loadTopScores('challenge');
+  ok(Array.isArray(cl) && cl.length === 0, 'corrupt JSON (no legacy) → [] (no throw)');
+  if (savedC === null) sandbox.localStorage.removeItem(ckey); else sandbox.localStorage.setItem(ckey, savedC);
+
+  sandbox.localStorage.setItem(key, '{not valid json');
+  ok(Array.isArray(G.loadTopScores('normal')), 'corrupt normal JSON → array, recovers galagaHigh (no throw)');
+
+  if (saved === null) sandbox.localStorage.removeItem(key); else sandbox.localStorage.setItem(key, saved);
+  if (savedHigh === null) sandbox.localStorage.removeItem('galagaHigh'); else sandbox.localStorage.setItem('galagaHigh', savedHigh);
+} else { console.log('  (skipped — submitTopScore/loadTopScores not exposed)'); }
+
+// ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
 if (typeof G.comboKillDetune === 'function') {
   eq(G.comboKillDetune(0),   0,   'combo 0 → base pitch (no detune)');
