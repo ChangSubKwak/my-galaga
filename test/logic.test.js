@@ -171,6 +171,7 @@ const shim = `
 ;try { globalThis.__getStageMutations = function () { return (typeof STAGE_MUTATIONS !== 'undefined') ? STAGE_MUTATIONS : null; }; } catch (e) {}
 ;try { globalThis.__getActTitles = function () { return (typeof ACT_TITLES !== 'undefined') ? ACT_TITLES : null; }; } catch (e) {}
 ;try { globalThis.__getEnduranceTiers = function () { return (typeof ENDURANCE_TIERS !== 'undefined') ? ENDURANCE_TIERS : null; }; } catch (e) {}
+;try { globalThis.__getComboArsenal = function () { return (typeof COMBO_ARSENAL !== 'undefined') ? COMBO_ARSENAL : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -920,6 +921,27 @@ section('bulletCap — performance caps trim the oldest entries');
     eq(bc.enemyBullets.length, 2, 'arrays under the cap are left alone');
     Object.assign(bc, save);
   } else { console.log('  (skipped — bulletCap / game not exposed)'); }
+}
+
+// ============================================================
+section('COMBO_ARSENAL — buffs map to real weapon timers, ascending tiers');
+{
+  const ars = G.__getComboArsenal && G.__getComboArsenal();
+  if (ars) {
+    // the grant logic sets game[<buff>Timer] only for these four; an unknown buff
+    // would claim the tier but grant nothing.
+    const handled = new Set(['rapid', 'wave', 'homing', 'laser']);
+    let validBuffs = true, ascending = true, wellFormed = true;
+    for (let i = 0; i < ars.length; i++) {
+      const a = ars[i];
+      if (!handled.has(a.buff)) validBuffs = false;
+      if (!(typeof a.combo === 'number' && typeof a.duration === 'number' && a.duration > 0 && a.label && a.color)) wellFormed = false;
+      if (i > 0 && !(a.combo > ars[i - 1].combo)) ascending = false;
+    }
+    ok(validBuffs, 'every arsenal buff is a granted weapon (rapid/wave/homing/laser)');
+    ok(ascending, 'combo thresholds strictly ascending');
+    ok(wellFormed, 'every tier has combo/duration/label/color');
+  } else { console.log('  (skipped — COMBO_ARSENAL not exposed)'); }
 }
 
 // ============================================================
