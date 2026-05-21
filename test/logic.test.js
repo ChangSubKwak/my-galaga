@@ -170,6 +170,7 @@ const shim = `
 ;try { globalThis.__getPilotMomentum = function () { return (typeof PILOT_MOMENTUM !== 'undefined') ? PILOT_MOMENTUM : null; }; } catch (e) {}
 ;try { globalThis.__getStageMutations = function () { return (typeof STAGE_MUTATIONS !== 'undefined') ? STAGE_MUTATIONS : null; }; } catch (e) {}
 ;try { globalThis.__getActTitles = function () { return (typeof ACT_TITLES !== 'undefined') ? ACT_TITLES : null; }; } catch (e) {}
+;try { globalThis.__getEnduranceTiers = function () { return (typeof ENDURANCE_TIERS !== 'undefined') ? ENDURANCE_TIERS : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -919,6 +920,24 @@ section('bulletCap — performance caps trim the oldest entries');
     eq(bc.enemyBullets.length, 2, 'arrays under the cap are left alone');
     Object.assign(bc, save);
   } else { console.log('  (skipped — bulletCap / game not exposed)'); }
+}
+
+// ============================================================
+section('ENDURANCE_TIERS — strictly ascending frames, well-formed');
+{
+  const tiers = G.__getEnduranceTiers && G.__getEnduranceTiers();
+  if (tiers) {
+    let ascending = true, wellFormed = true, bonusUp = true;
+    for (let i = 0; i < tiers.length; i++) {
+      const t = tiers[i];
+      if (!(typeof t.frames === 'number' && t.label && typeof t.bonus === 'number' && t.col && typeof t.size === 'number')) wellFormed = false;
+      if (i > 0 && !(t.frames > tiers[i - 1].frames)) ascending = false; // strict → fired-flag keys (by frames) stay unique
+      if (i > 0 && !(t.bonus >= tiers[i - 1].bonus)) bonusUp = false;
+    }
+    ok(wellFormed, 'every tier has frames/label/bonus/col/size');
+    ok(ascending, 'frames strictly ascending (unique fired-flag keys, in-order firing)');
+    ok(bonusUp, 'reward grows (or holds) with each later milestone');
+  } else { console.log('  (skipped — ENDURANCE_TIERS not exposed)'); }
 }
 
 // ============================================================
