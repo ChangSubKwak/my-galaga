@@ -2681,11 +2681,14 @@ function drawFloatText(ft) {
     ctx.shadowColor = ft.color;
     ctx.shadowBlur = ft.glow;
   }
-  // Keep the (centered) text on-screen — celebratory popups like CLUSTER PARRY /
-  // REVENGE! spawn at an event's x, which can be hard against either edge.
+  // Keep the (centered) text on-screen on BOTH axes — popups spawn at an event's
+  // x/y (hard against an edge), and rising ones (vy<0, e.g. kill points from a
+  // top-row enemy) can drift their centre off the top mid-life. drawRetroText uses
+  // a middle baseline, so clamp the centre by half the glyph box.
   const _w = txt.length * 0.6 * _sz;
   const _cx = Math.max(_w / 2 + 2, Math.min(BASE_W - _w / 2 - 2, ft.x));
-  drawRetroText(txt, _cx, ft.y, _sz, ft.color);
+  const _cy = Math.max(_sz / 2 + 1, Math.min(BASE_H - _sz / 2 - 1, ft.y));
+  drawRetroText(txt, _cx, _cy, _sz, ft.color);
   ctx.restore();
 }
 
