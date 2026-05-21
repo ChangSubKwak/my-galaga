@@ -19844,34 +19844,11 @@ function drawHUD() {
       ctx.restore();
     }
   }
-  // POWER-UP TIMER DISPLAY — top-left HUD row of active timed power-ups with
-  // remaining seconds. Letter color matches power-up identity. Last 2 seconds
-  // pulse to warn imminent expiry. Hides when no timed buffs are active.
+  // Combat-state HUD chips (parry streak, weather, biome, act title, …). The
+  // active-buff timers live in the ACTIVE BUFF STRIP further below — a single
+  // canonical display, not duplicated here.
   if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING
       || game.state === STATE.BOSS_STAGE) {
-    const _puList = [];
-    if ((game.slowTimer || 0) > 0)   _puList.push({ l: 'T', f: game.slowTimer,   c: '#8ff' });
-    if ((game.rapidTimer || 0) > 0)  _puList.push({ l: 'R', f: game.rapidTimer,  c: '#fc4' });
-    if ((game.waveTimer || 0) > 0)   _puList.push({ l: 'W', f: game.waveTimer,   c: '#6cf' });
-    if ((game.homingTimer || 0) > 0) _puList.push({ l: 'H', f: game.homingTimer, c: '#0f8' });
-    if ((game.laserTimer || 0) > 0)  _puList.push({ l: 'L', f: game.laserTimer,  c: '#f6c' });
-    if ((game.forkTimer || 0) > 0)   _puList.push({ l: 'F', f: game.forkTimer,   c: '#fa6' });
-    if (_puList.length > 0) {
-      let _puX = 4;
-      ctx.save();
-      for (const _pa of _puList) {
-        const _sec = (_pa.f / 60).toFixed(1);
-        // Last 2s: blink to warn expiry
-        const _expSoon = _pa.f <= 120;
-        const _puAlpha = _expSoon
-          ? (0.50 + 0.50 * Math.sin(game.animFrame * 0.40))
-          : 0.92;
-        ctx.globalAlpha = _puAlpha;
-        drawRetroText(_pa.l + _sec, _puX, 32, 4, _pa.c, 'left');
-        _puX += 22;
-      }
-      ctx.restore();
-    }
     // PARRY STREAK CHIP — current parry streak count with tier color escalation.
     // Cyan (2-3) → purple (4-5) → gold (6-9) → white-gold (10+). Disappears on streak
     // break (parryStreakTimer === 0). Hidden when streak < 2 to keep HUD clean.
