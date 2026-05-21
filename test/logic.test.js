@@ -873,6 +873,27 @@ if (typeof G.dailySeed === 'function') {
 } else { console.log('  (skipped — dailySeed not exposed)'); }
 
 // ============================================================
+section('computeDailyStreak — consecutive-day counting');
+if (typeof G.computeDailyStreak === 'function') {
+  const key = 'galagaDailyDays';
+  const saved = sandbox.localStorage.getItem(key);
+  // Build day keys relative to *today* so the test is date-agnostic (matches the
+  // function's own YYYYMMDD construction).
+  const dayKey = (off) => {
+    const d = new Date(Date.now() - off * 86400000);
+    return '' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  };
+  const setDays = (arr) => sandbox.localStorage.setItem(key, JSON.stringify(arr));
+  setDays([]);                                  eq(G.computeDailyStreak(), 0, 'no recorded days → 0');
+  setDays([dayKey(0)]);                          eq(G.computeDailyStreak(), 1, 'today only → 1');
+  setDays([dayKey(0), dayKey(1)]);               eq(G.computeDailyStreak(), 2, 'today + yesterday → 2');
+  setDays([dayKey(0), dayKey(1), dayKey(2)]);    eq(G.computeDailyStreak(), 3, '3 consecutive days → 3');
+  setDays([dayKey(0), dayKey(2)]);               eq(G.computeDailyStreak(), 1, 'gap at yesterday ends the streak at 1');
+  setDays([dayKey(1)]);                          eq(G.computeDailyStreak(), 0, "today not played → 0 (streak requires today)");
+  if (saved === null) sandbox.localStorage.removeItem(key); else sandbox.localStorage.setItem(key, saved);
+} else { console.log('  (skipped — computeDailyStreak not exposed)'); }
+
+// ============================================================
 section('bulletCap — performance caps trim the oldest entries');
 {
   const bc = G.__getGame && G.__getGame();
