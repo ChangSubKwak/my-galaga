@@ -22640,6 +22640,19 @@ function drawStatsOverlay() {
         drawRetroText(name.length > 12 ? name.slice(0, 12) : name,
                       cx + 9, cy + (cellH - 1) / 2, 5, got ? '#fff' : '#666', 'left');
       }
+      // Completion bar — anchored above the footer so the open lower panel reads
+      // as progress rather than emptiness; mirrors the magenta ACHIEVEMENTS bar on
+      // the summary page so the two views share one visual language.
+      {
+        const _ratio = totalAch > 0 ? ach / totalAch : 0;
+        const _bw = panelW - 20, _bx = px + 10, _by = py + panelH - 20;
+        drawRetroText('COMPLETION', px + 8, _by - 6, 4, '#888', 'left');
+        drawRetroText(Math.round(_ratio * 100) + '%', px + panelW - 8, _by - 6, 4, COL.magenta, 'right');
+        ctx.fillStyle = '#222';
+        ctx.fillRect(_bx, _by, _bw, 3);
+        ctx.fillStyle = COL.magenta;
+        ctx.fillRect(_bx, _by, Math.round(_bw * _ratio), 3);
+      }
       drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
       return;
     }
