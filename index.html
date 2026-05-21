@@ -2638,7 +2638,11 @@ function drawFloatText(ft) {
     ctx.shadowColor = ft.color;
     ctx.shadowBlur = ft.glow;
   }
-  drawRetroText(txt, ft.x, ft.y, _sz, ft.color);
+  // Keep the (centered) text on-screen — celebratory popups like CLUSTER PARRY /
+  // REVENGE! spawn at an event's x, which can be hard against either edge.
+  const _w = txt.length * 0.6 * _sz;
+  const _cx = Math.max(_w / 2 + 2, Math.min(BASE_W - _w / 2 - 2, ft.x));
+  drawRetroText(txt, _cx, ft.y, _sz, ft.color);
   ctx.restore();
 }
 
