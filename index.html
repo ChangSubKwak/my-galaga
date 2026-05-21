@@ -20189,43 +20189,36 @@ function drawHUD() {
       ctx.fillRect(BASE_W - 33, 28, Math.round(Math.min(28, 28 * _pbR)), 1);
       ctx.restore();
     }
-    // HUD RUN TIMER — cumulative run time under the stage clock. Speedrun aid.
-    // Hidden in minimal HUD mode to keep clean view. Also yields its y=28 slot to
-    // the transient DIVE SURGE alert (commander rage) so the two don't overprint;
-    // the timer reappears the moment the surge ends.
-    if (!minimalHud && (game.runFrames || 0) > 0
-        && !((game.commanderRageTimer || 0) > 0 && game.state === STATE.PLAYING)) {
-      const runStr = fmtFrameTime(game.runFrames || 0);
-      drawRetroText('R ' + runStr, BASE_W - 5, 28, 4, '#888', 'right');
-    // EXTRA LIFE PROGRESS — 30px green bar showing distance to next 30K threshold.
-    // Skipped in challenge mode (hardcore = 1 life, no extras). Pulse at >=90%.
-    if (!game.challengeMode && !minimalHud) {
-      const intoNext = (game.score || 0) % EXTRA_LIFE_SCORE;
-      const elRatio = intoNext / EXTRA_LIFE_SCORE;
-      const barW = 30;
-      const bx = BASE_W - 5 - barW;
-      const by = 39;
-      ctx.save();
-      ctx.fillStyle = '#020';
-      ctx.fillRect(bx, by, barW, 2);
-      ctx.fillStyle = elRatio >= 0.9 ? '#0f8' : '#0a4';
-      if (elRatio >= 0.9) ctx.globalAlpha = 0.5 + 0.5 * Math.sin(game.animFrame * 0.3);
-      ctx.fillRect(bx, by, Math.round(barW * elRatio), 2);
-      ctx.restore();
-    }
-    // HUD DIFFICULTY — small label at the bottom of the right rail (non-default
-    // only). Sits at y=56, clear of the CORR readout (y=34): both are persistent
-    // and DIFF used to overprint CORR by 1px on a non-normal run past stage 30.
-    if (typeof difficultyMode === 'string' && difficultyMode !== 'normal') {
-      const dCol = difficultyMode === 'hard' ? '#f44' : '#0f8';
-      const dTag = difficultyMode === 'hard' ? 'HARD' : 'EASY';
-      drawRetroText(dTag, BASE_W - 5, 56, 4, dCol, 'right');
-    }
-    }
+    // (Run time is shown once, prominently, as the mm:ss endurance clock at y16 —
+    // the old redundant "R <time>" readout at y28 was removed. The extra-life bar
+    // and difficulty badge that used to nest here moved to top level below.)
     // PB ALARM tick — once per second SFX while in alarm zone
     if (pbAlarm && game.animFrame % 60 === 0 && typeof playSound === 'function') {
       playSound('tick');
     }
+  }
+  // EXTRA LIFE PROGRESS — 30px green bar (right rail, y39) toward the next 30K
+  // extra-life threshold. Top-level so it no longer blinks out during dive surges
+  // or mutation-intros (it used to be nested under the run-timer/stage-clock).
+  if (isCombatState() && !minimalHud && !game.challengeMode) {
+    const intoNext = (game.score || 0) % EXTRA_LIFE_SCORE;
+    const elRatio = intoNext / EXTRA_LIFE_SCORE;
+    const barW = 30;
+    const bx = BASE_W - 5 - barW;
+    const by = 39;
+    ctx.save();
+    ctx.fillStyle = '#020';
+    ctx.fillRect(bx, by, barW, 2);
+    ctx.fillStyle = elRatio >= 0.9 ? '#0f8' : '#0a4';
+    if (elRatio >= 0.9) ctx.globalAlpha = 0.5 + 0.5 * Math.sin(game.animFrame * 0.3);
+    ctx.fillRect(bx, by, Math.round(barW * elRatio), 2);
+    ctx.restore();
+  }
+  // HUD DIFFICULTY — single HARD/EASY label (right rail, y56) on non-default runs.
+  // (Previously duplicated: a left-side y30 copy overlapped the combo box; removed.)
+  if (isCombatState() && (difficultyMode === 'hard' || difficultyMode === 'easy')) {
+    const dCol = difficultyMode === 'hard' ? '#f44' : '#0f8';
+    drawRetroText(difficultyMode === 'hard' ? 'HARD' : 'EASY', BASE_W - 5, 56, 4, dCol, 'right');
   }
   // INCOMING WAVE ALERT CINEMATIC — between CHALLENGING waves the 35-frame
   // telegraph window becomes a 3-phase tactical briefing (backdrop flash-in →
@@ -20759,11 +20752,8 @@ function drawHUD() {
     const blink = (game.animFrame >> 3) % 2 === 0;
     drawRetroText('DAILY  1.25x', BASE_W/2, 35, 6, blink ? COL.green : '#8c8');
   }
-  // HUD DIFFICULTY BADGE — small badge in lower-left when not on default 'normal'.
-  if (difficultyMode === 'hard' || difficultyMode === 'easy') {
-    const _diffCol = difficultyMode === 'hard' ? COL.red : COL.green;
-    drawRetroText(difficultyMode.toUpperCase(), 4, 30, 4, _diffCol, 'left');
-  }
+  // (Difficulty badge consolidated to a single right-rail HARD/EASY label at y56 —
+  // the old left-side y30 copy overlapped the combo box and was removed.)
 
   // ACTIVE BUFF STRIP — compact horizontal row replacing stacked bars.
   // All active buffs in one line: letter + 10px ratio bar, 18px per slot.
