@@ -168,6 +168,8 @@ const shim = `
 ;try { globalThis.__getMoraleTrig = function () { return (typeof _MORALE_TRIG !== 'undefined') ? _MORALE_TRIG : null; }; } catch (e) {}
 ;try { globalThis.__getMoraleStates = function () { return (typeof MORALE_STATES !== 'undefined') ? MORALE_STATES : null; }; } catch (e) {}
 ;try { globalThis.__getPilotMomentum = function () { return (typeof PILOT_MOMENTUM !== 'undefined') ? PILOT_MOMENTUM : null; }; } catch (e) {}
+;try { globalThis.__getStageMutations = function () { return (typeof STAGE_MUTATIONS !== 'undefined') ? STAGE_MUTATIONS : null; }; } catch (e) {}
+;try { globalThis.__getActTitles = function () { return (typeof ACT_TITLES !== 'undefined') ? ACT_TITLES : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -917,6 +919,39 @@ section('bulletCap — performance caps trim the oldest entries');
     eq(bc.enemyBullets.length, 2, 'arrays under the cap are left alone');
     Object.assign(bc, save);
   } else { console.log('  (skipped — bulletCap / game not exposed)'); }
+}
+
+// ============================================================
+section('STAGE_MUTATIONS — ids match read-sites, fields well-formed');
+{
+  const muts = G.__getStageMutations && G.__getStageMutations();
+  if (muts) {
+    // The four mutation effects are gated by `stageMutation.id === 'X'` at their
+    // read-sites (updatePlayer/updateEnemies/updateBullets/diffFireMul). The id set
+    // must match exactly, or a renamed/added mutation silently does nothing.
+    const ids = muts.map(m => m.id).sort();
+    const expected = ['denseFire', 'fastDives', 'rapidFire', 'slowBullets'];
+    eq(JSON.stringify(ids), JSON.stringify(expected), 'mutation ids exactly match the four read-site gates');
+    let wellFormed = muts.every(m => typeof m.id === 'string' && m.label && m.color && m.desc);
+    ok(wellFormed, 'every mutation has id/label/color/desc (HUD badge fields)');
+  } else { console.log('  (skipped — STAGE_MUTATIONS not exposed)'); }
+}
+
+// ============================================================
+section('ACT_TITLES — contiguous stage ranges, well-formed');
+{
+  const acts = G.__getActTitles && G.__getActTitles();
+  if (acts) {
+    let wellFormed = acts.every(a => a.num && typeof a.startStage === 'number' && a.col);
+    ok(wellFormed, 'every act has num/startStage/col');
+    // Ranges must chain with no gap/overlap so no stage falls between acts.
+    let contiguous = true;
+    for (let i = 0; i < acts.length - 1; i++) {
+      if (acts[i].endStage == null || acts[i].endStage + 1 !== acts[i + 1].startStage) contiguous = false;
+    }
+    ok(contiguous, 'act ranges are contiguous (endStage+1 === next startStage)');
+    eq(acts[acts.length - 1].endStage, null, 'final act is open-ended (endStage null)');
+  } else { console.log('  (skipped — ACT_TITLES not exposed)'); }
 }
 
 // ============================================================
