@@ -947,6 +947,29 @@ if (typeof G.createLoopPath === 'function') {
 } else { console.log('  (skipped — createLoopPath not exposed)'); }
 
 // ============================================================
+section('computeRunGradeScore / runGradeLetter — run grade');
+if (typeof G.computeRunGradeScore === 'function' && typeof G.runGradeLetter === 'function') {
+  const near = (a, b, m) => ok(Math.abs(a - b) < 1e-9, m);
+  // maxStage floors at 1, so even a 0-score/0-acc run carries a tiny depth credit
+  near(G.computeRunGradeScore(0, 0, 1), 0.2 / 30, 'stage-1 floor: only the depth term, capped fraction');
+  // components cap; use maxStage 30 (full 0.2 depth) for clean sums
+  near(G.computeRunGradeScore(100000, 0, 30), 0.7, 'score 0.5 + capped depth 0.2');
+  near(G.computeRunGradeScore(0, 100, 30), 0.5, 'accuracy 0.3 + capped depth 0.2');
+  near(G.computeRunGradeScore(0, 0, 30), 0.2, 'depth caps at 0.2 weight');
+  near(G.computeRunGradeScore(200000, 100, 60), 1.0, 'all maxed (over-cap) → 1.0');
+  // letter thresholds
+  eq(G.runGradeLetter(0.85), 'S', '0.85 → S');
+  eq(G.runGradeLetter(0.84), 'A', 'just under → A');
+  eq(G.runGradeLetter(0.70), 'A', '0.70 → A');
+  eq(G.runGradeLetter(0.55), 'B', '0.55 → B');
+  eq(G.runGradeLetter(0.40), 'C', '0.40 → C');
+  eq(G.runGradeLetter(0.39), 'D', 'below 0.40 → D');
+  eq(G.runGradeLetter(0), 'D', '0 → D');
+  // a flawless deep run earns S
+  eq(G.runGradeLetter(G.computeRunGradeScore(150000, 95, 35)), 'S', 'flawless deep run → S');
+} else { console.log('  (skipped — run-grade helpers not exposed)'); }
+
+// ============================================================
 section('computeAccuracy — hit % with zero-shot guard');
 if (typeof G.computeAccuracy === 'function') {
   eq(G.computeAccuracy({ shotsFired: 0, shotsHit: 0 }), 0, 'no shots → 0 (no divide-by-zero)');

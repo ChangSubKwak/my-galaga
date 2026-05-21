@@ -9556,6 +9556,22 @@ function computeAccuracy(stats) {
   return Math.round((((stats && stats.shotsHit) || 0) / fired) * 100);
 }
 
+// Run grade — composite of final score (50%, capped at 100K), accuracy (30%) and
+// depth (20%, capped at stage 30). Shared by the GAME_OVER grade letter and the
+// grade audio cue so the two can never drift apart.
+function computeRunGradeScore(score, acc, maxStage) {
+  return Math.min(1, (score || 0) / 100000) * 0.5
+       + ((acc || 0) / 100) * 0.3
+       + Math.min(1, (maxStage || 1) / 30) * 0.2;
+}
+function runGradeLetter(t) {
+  if (t >= 0.85) return 'S';
+  if (t >= 0.70) return 'A';
+  if (t >= 0.55) return 'B';
+  if (t >= 0.40) return 'C';
+  return 'D';
+}
+
 // --- Cumulative lifetime stats (separate buckets per mode) ---
 const CUM_STATS_KEY = 'galagaCumStats';
 const CUM_STATS_KEY_CH = 'galagaCumStatsChallenge';
@@ -15049,9 +15065,7 @@ function update() {
         game.gradeCueFired = true;
         const sStat = game.stats || {};
         const accLocal = computeAccuracy(sStat);
-        const tot = Math.min(1, (game.score || 0) / 100000) * 0.5
-                  + (accLocal / 100) * 0.3
-                  + Math.min(1, (sStat.maxStage || 1) / 30) * 0.2;
+        const tot = computeRunGradeScore(game.score, accLocal, sStat.maxStage);
         if      (tot >= 0.85) { playSound('extraLife'); setTimeout(() => playSound('dualFighter'), 220); rumble(280, 0.7, 0.4); }
         else if (tot >= 0.70) { playSound('comboStep'); setTimeout(() => playSound('powerUp'), 160); }
         else if (tot >= 0.55) { playSound('powerUp'); }
@@ -21250,16 +21264,9 @@ function drawGameOverScreen() {
   // GRADE — composite S/A/B/C/D from score + accuracy + stage. Big letter in
   // the right column next to the stat rows, vertically centered.
   if (elapsedGo > 138) {
-    const sF = Math.min(1, (game.score || 0) / 100000) * 0.5;
-    const aF = (acc / 100) * 0.3;
-    const stF = Math.min(1, (s.maxStage || 1) / 30) * 0.2;
-    const total = sF + aF + stF;
-    let grade, gcol;
-    if      (total >= 0.85) { grade = 'S'; gcol = '#f6f'; }
-    else if (total >= 0.70) { grade = 'A'; gcol = COL.yellow; }
-    else if (total >= 0.55) { grade = 'B'; gcol = COL.green; }
-    else if (total >= 0.40) { grade = 'C'; gcol = COL.cyan; }
-    else                    { grade = 'D'; gcol = COL.gray; }
+    const grade = runGradeLetter(computeRunGradeScore(game.score, acc, s.maxStage));
+    const gcol = grade === 'S' ? '#f6f' : grade === 'A' ? COL.yellow
+               : grade === 'B' ? COL.green : grade === 'C' ? COL.cyan : COL.gray;
     drawRetroText('GRADE', BASE_W/2 + 64, cy + 22, 5, COL.cyan);
     ctx.save();
     ctx.shadowColor = gcol;
