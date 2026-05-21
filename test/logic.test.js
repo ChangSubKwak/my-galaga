@@ -852,6 +852,24 @@ if (typeof G.dailySeed === 'function') {
     ok(typeof m1.label === 'string' && m1.label.length > 0, 'mutation has a label');
     eq(m1, m2, 'same day → same mutation (deterministic, identical object)');
   }
+  if (typeof G.dailyMission === 'function') {
+    const missions = G.__getDailyMissions && G.__getDailyMissions();
+    const mm1 = G.dailyMission(), mm2 = G.dailyMission();
+    ok(mm1 && typeof mm1 === 'object', 'dailyMission → a mission object');
+    eq(mm1, mm2, 'same day → same mission (deterministic)');
+    if (missions) ok(missions.includes(mm1), 'dailyMission is a member of DAILY_MISSIONS');
+  }
+  if (typeof G.isDailyMissionDoneToday === 'function') {
+    const key = 'galagaDailyMissionDone';
+    const saved = sandbox.localStorage.getItem(key);
+    sandbox.localStorage.removeItem(key);
+    ok(!G.isDailyMissionDoneToday(), 'no record → mission not done');
+    sandbox.localStorage.setItem(key, String(G.dailySeed()));
+    ok(G.isDailyMissionDoneToday(), "today's seed recorded → done");
+    sandbox.localStorage.setItem(key, '19990101');
+    ok(!G.isDailyMissionDoneToday(), 'a stale (different-day) record does not count as done');
+    if (saved === null) sandbox.localStorage.removeItem(key); else sandbox.localStorage.setItem(key, saved);
+  }
 } else { console.log('  (skipped — dailySeed not exposed)'); }
 
 // ============================================================
