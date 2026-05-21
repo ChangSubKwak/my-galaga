@@ -20677,7 +20677,7 @@ function drawHUD() {
   // milestone bonuses (x5/x10/x15) still pop via floatText regardless.
   if (!minimalHud && !_weatherChipShown && (game.pickupStreak || 0) >= 2
       && (isCombatState())) {
-    const psStr = 'P×' + game.pickupStreak;
+    const psStr = 'PU×' + game.pickupStreak;
     const psCol = game.pickupStreak >= 10 ? '#fc4' : '#0ff';
     drawRetroText(psStr, BASE_W - 5, 38, 4, psCol, 'right');
   }
