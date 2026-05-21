@@ -160,6 +160,7 @@ const shim = `
 ;try { globalThis.__getKeys = function () { return (typeof keys !== 'undefined') ? keys : null; }; } catch (e) {}
 ;try { globalThis.__getDailyMissions = function () { return (typeof DAILY_MISSIONS !== 'undefined') ? DAILY_MISSIONS : null; }; } catch (e) {}
 ;try { globalThis.__setDifficulty = function (m) { if (typeof difficultyMode !== 'undefined') difficultyMode = m; }; } catch (e) {}
+;try { globalThis.__getSfxVary = function () { return (typeof SFX_VARY !== 'undefined') ? SFX_VARY : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -649,6 +650,18 @@ if (typeof G.powerUpDropRate === 'function') {
   // floor: never below 5% even if base+delta would dip lower
   ok(G.powerUpDropRate(false, 'hard') >= 0.05, 'floored at >= 5%');
 } else { console.log('  (skipped — powerUpDropRate not exposed)'); }
+
+// ============================================================
+section('SFX_VARY — pitch-wobble set excludes melodic cues');
+if (G.__getSfxVary && G.__getSfxVary()) {
+  const vary = G.__getSfxVary();
+  // Percussive combat SFX should get per-shot variation
+  ['shoot', 'explode', 'hit', 'crit'].forEach(t =>
+    ok(vary.has(t), 'combat SFX "' + t + '" gets pitch variation'));
+  // Melodic / sequenced cues must NOT be detuned (would wobble the tune)
+  ['milestone', 'fanfareChallenge', 'comboStep', 'stageStart', 'extraLife', 'powerUp'].forEach(t =>
+    ok(!vary.has(t), 'melodic cue "' + t + '" stays consistent (no wobble)'));
+} else { console.log('  (skipped — SFX_VARY not exposed)'); }
 
 // ============================================================
 section('panForX — spatial SFX stereo mapping');

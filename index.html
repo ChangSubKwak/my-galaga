@@ -1119,6 +1119,13 @@ function panForX(x) {
   const c = (x / BASE_W) * 2 - 1; // 0..BASE_W → -1..1
   return Math.max(-1, Math.min(1, c)) * 0.85;
 }
+// Combat SFX that get a subtle per-shot pitch wobble so rapid repeats (machine-gun
+// fire, chained explosions) don't sound mechanically identical. Melodic cues
+// (milestone / fanfare / comboStep note sequences) are deliberately EXCLUDED so
+// they stay consistent. ±SFX_DETUNE_CENTS is a uniform oscillator detune, i.e. a
+// transposition — the sound stays in tune, just nudged in pitch each trigger.
+const SFX_DETUNE_CENTS = 55;
+const SFX_VARY = new Set(['shoot', 'hit', 'explode', 'crit', 'enemyDive', 'graze']);
 function playSound(type, panX) {
   ensureAudio();
   if (!audioCtx) return;
@@ -1137,6 +1144,7 @@ function playSound(type, panX) {
   g.connect(_out);
   const o = audioCtx.createOscillator();
   o.connect(g);
+  if (SFX_VARY.has(type)) o.detune.value = (Math.random() * 2 - 1) * SFX_DETUNE_CENTS;
   switch(type) {
     case 'shoot':
       o.type = 'square'; o.frequency.setValueAtTime(880, now);
