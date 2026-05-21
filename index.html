@@ -19850,6 +19850,9 @@ function drawHUD() {
   // Combat-state HUD chips (parry streak, weather, biome, act title, …). The
   // active-buff timers live in the ACTIVE BUFF STRIP further below — a single
   // canonical display, not duplicated here.
+  // The weather chip and the pickup-streak counter both target the right-rail
+  // y=38 slot; this flag lets the streak yield when weather (stage context) owns it.
+  let _weatherChipShown = false;
   if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING
       || game.state === STATE.BOSS_STAGE) {
     // PARRY STREAK CHIP — current parry streak count with tier color escalation.
@@ -19880,6 +19883,7 @@ function drawHUD() {
         ctx.globalAlpha = 0.75;
         drawRetroText('W:' + _w.label, BASE_W - 5, 38, 4, _w.col, 'right');
         ctx.restore();
+        _weatherChipShown = true;
       }
     }
     // STAGE BIOME LIVE CHIP — current biome label always visible. Pairs with weather
@@ -20669,7 +20673,9 @@ function drawHUD() {
   }
   // HUD PICKUP STREAK — small "P×N" cyan counter when consecutive no-death
   // pickups reach 2+. Hides on death (streak resets). Visible in normal HUD only.
-  if (!minimalHud && (game.pickupStreak || 0) >= 2
+  // Yields the y=38 slot to the weather chip (stage context wins); the streak's
+  // milestone bonuses (x5/x10/x15) still pop via floatText regardless.
+  if (!minimalHud && !_weatherChipShown && (game.pickupStreak || 0) >= 2
       && (isCombatState())) {
     const psStr = 'P×' + game.pickupStreak;
     const psCol = game.pickupStreak >= 10 ? '#fc4' : '#0ff';
