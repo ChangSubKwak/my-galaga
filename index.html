@@ -8633,7 +8633,7 @@ function isPowerMaxed() {
       && game.lvl.P === MAX_POWER_LVL.P;
 }
 
-const POWERUP_COL = {S: '#0ff', N: '#0f8', P: '#f6f', T: '#8df', R: '#fc4', W: '#f8a', B: '#f44', H: '#0ef', L: '#fff', E: '#4f8', F: '#fa0'};
+const POWERUP_COL = {S: '#0ff', N: '#0f8', P: '#f6f', T: '#8df', R: '#fc4', W: '#f8a', B: '#f44', H: '#0ef', L: '#f6c', E: '#4f8', F: '#fa0'};
 const SHIELD_MAX = 3;
 const SLOW_DURATION   = 360; // T — slow enemy bullets, 6 seconds at 60fps
 const RAPID_DURATION  = 360; // R — halved fire cooldown, 6 seconds
@@ -12403,10 +12403,10 @@ function updateCollisions() {
             // origin so the player visually catches the moment a pickup appears.
             // Rare types (L/B) get a stronger 2x-radius gold ring for emphasis.
             {
-              const _puCols = { S:'#f44', N:'#0ff', P:'#f6f', T:'#8ff', R:'#fc4',
-                                W:'#6cf', H:'#0f8', L:'#f6c', B:'#fff', E:'#0f8',
-                                F:'#fa6', D:'#0ff' };
-              const _puCol = _puCols[type] || '#fff';
+              // Burst tint matches the pickup gem (POWERUP_COL, single source) so
+              // the spawn flash and the falling gem read as the same item. D (dash
+              // refresh) isn't in POWERUP_COL — it keeps its cyan identity.
+              const _puCol = POWERUP_COL[type] || (type === 'D' ? '#0ff' : '#fff');
               // Rare-tier includes L/B (legendary one-shots) + D (dash refresh, weight 4)
               // + F (fork spread, weight 7). All four get bigger gold drop ring.
               const _rare = (type === 'L' || type === 'B' || type === 'D' || type === 'F');
@@ -22164,7 +22164,7 @@ function drawHelpOverlay() {
     ['R', 'RAPID  HALF FIRE COOLDOWN 6S',   '#fc4'],
     ['W', 'WAVE   ZIGZAG BULLETS 6S',       '#f8a'],
     ['H', 'HOMING SEEKING BULLETS 6S',      '#0ef'],
-    ['L', 'LASER  PIERCING BEAM 5S',        '#fff'],
+    ['L', 'LASER  PIERCING BEAM 5S',        '#f6c'],
     ['B', 'BOMB   CLEAR BULLETS + 1DMG ALL','#f44'],
     ['E', 'SHIELD ABSORB 1 HIT (STACK 3)',  '#4f8'],
     ['F', 'FORK   3-WAY SPREAD SHOT 6S',    '#fa0'],
