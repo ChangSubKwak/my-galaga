@@ -1039,6 +1039,24 @@ section('computeCompositeCompletion — aggregate progression %');
 }
 
 // ============================================================
+section('corrupt localStorage is non-fatal (documented invariant)');
+{
+  const keys = ['galagaBiomesSeen', 'galagaShipsUsed', 'galagaDifficultiesUsed', 'galagaPerkPicks', 'galagaDailyDays'];
+  const saved = keys.map(k => sandbox.localStorage.getItem(k));
+  keys.forEach(k => sandbox.localStorage.setItem(k, '{not valid json['));
+  let threw = null;
+  try {
+    if (G.computeCompositeCompletion) G.computeCompositeCompletion();
+    if (G.computeDailyStreak) G.computeDailyStreak();
+    if (G.computePilotTitle) G.computePilotTitle();
+  } catch (e) { threw = e; }
+  ok(threw === null, 'garbage JSON in storage does not throw' + (threw ? ' — ' + threw.message : ''));
+  if (G.computeCompositeCompletion) ok(typeof G.computeCompositeCompletion() === 'number', 'composite completion still returns a number');
+  if (G.computeDailyStreak) eq(G.computeDailyStreak(), 0, 'daily streak falls back to 0 on corrupt data');
+  keys.forEach((k, i) => { if (saved[i] === null) sandbox.localStorage.removeItem(k); else sandbox.localStorage.setItem(k, saved[i]); });
+}
+
+// ============================================================
 section('stats overlay page model — Tab navigation invariants');
 if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'function') {
   const gp = G.statsAchGridPages();
