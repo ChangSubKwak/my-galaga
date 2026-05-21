@@ -19235,10 +19235,12 @@ function drawLastEnemyAlert() {
   const r = 12 + Math.sin(t * 0.3) * 2;
   ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
-  // 'LAST!' label above enemy (clamped within screen)
+  // 'LAST!' label above enemy (clamped within screen on both axes — a diving
+  // last enemy can reach the left/right edge where the centered label would clip)
   const lblY = Math.max(34, e.y - 16);
+  const lblX = Math.max(11, Math.min(BASE_W - 11, e.x));
   if ((t >> 2) % 2 === 0) {
-    drawRetroText('LAST!', e.x, lblY, 6, COL.yellow);
+    drawRetroText('LAST!', lblX, lblY, 6, COL.yellow);
   }
 }
 
