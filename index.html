@@ -10408,6 +10408,14 @@ function comboKillDetune(combo) {
   return Math.min(Math.max(combo || 0, 0), 30) * 10;
 }
 
+// MORALE TONE — formation-dive SFX detune (cents) by enemy morale, so the swarm's
+// confidence is audible: CONFIDENT dives lower/menacing, ROUTED higher/frantic.
+// Pure; passed only by formation/kamikaze dives (boss attacks omit it — morale is a
+// formation concept). Bounded [-120, +160], composes with the SFX_VARY wobble.
+function moraleDiveDetune(state) {
+  return state === 'CONFIDENT' ? -120 : state === 'SHAKEN' ? 80 : state === 'ROUTED' ? 160 : 0;
+}
+
 const COMBO_MILESTONE = 40; // every N kills in a combo grants a milestone reward (was 20 — life inflation curbed)
 
 // COMBO ARSENAL ladder — each combo threshold auto-grants a temporary weapon for 3 seconds.
@@ -11331,7 +11339,7 @@ function updateEnemies() {
           // Telegraph the dive: 30-frame preview where the path is visible but the enemy stays put.
           e.previewTimer = 30;
           e.previewPath = createLoopPath(e.x, e.y, e.x < BASE_W/2 ? 1 : -1);
-          playSound('enemyDive', e.x);
+          playSound('enemyDive', e.x, moraleDiveDetune(game.enemyMorale));
           // If boss, escorts get a slightly-delayed preview
           if (e.type === 'boss') {
             const escorts = game.enemies.filter(es => es.alive && es.state === 'formation' && es.type === 'butterfly' && Math.abs(es.col - e.col) <= 1 && es.row === 1);
@@ -11366,7 +11374,7 @@ function updateEnemies() {
         frame: 0, frameTimer: 0
       };
       game.enemies.push(k);
-      playSound('enemyDive', k.x);
+      playSound('enemyDive', k.x, moraleDiveDetune(game.enemyMorale));
     }
   }
 

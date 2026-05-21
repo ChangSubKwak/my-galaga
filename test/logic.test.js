@@ -1224,6 +1224,19 @@ if (typeof G.comboKillDetune === 'function') {
 } else { console.log('  (skipped — comboKillDetune not exposed)'); }
 
 // ============================================================
+section('moraleDiveDetune — MORALE TONE dive-pitch by enemy morale (cents)');
+if (typeof G.moraleDiveDetune === 'function') {
+  eq(G.moraleDiveDetune('NORMAL'),    0,    'NORMAL → base pitch');
+  eq(G.moraleDiveDetune('CONFIDENT'), -120, 'CONFIDENT → lower/menacing');
+  eq(G.moraleDiveDetune('SHAKEN'),    80,   'SHAKEN → slightly higher');
+  eq(G.moraleDiveDetune('ROUTED'),    160,  'ROUTED → higher/frantic');
+  eq(G.moraleDiveDetune(undefined),   0,    'undefined → 0 (no NaN)');
+  eq(G.moraleDiveDetune('GARBAGE'),   0,    'unknown state → 0');
+  ok(G.moraleDiveDetune('CONFIDENT') < G.moraleDiveDetune('ROUTED'),
+     'morale axis: confident lower-pitched than routed');
+} else { console.log('  (skipped — moraleDiveDetune not exposed)'); }
+
+// ============================================================
 section('stageModeFor — boss / challenge / normal dispatch');
 if (typeof G.stageModeFor === 'function') {
   eq(G.stageModeFor(10), 'boss', 'stage 10 → boss');
