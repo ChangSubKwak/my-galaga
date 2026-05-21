@@ -1126,6 +1126,23 @@ if (typeof G.comboTierName === 'function') {
 } else { console.log('  (skipped — comboTierName not exposed)'); }
 
 // ============================================================
+section('comboTierColor — combo multiplier tier color (3 HUD sites share)');
+if (typeof G.comboTierColor === 'function') {
+  // Tiers keyed on the multiplier value from comboMultiplier (1 / 1.5 / 2 / 2.5 / 3).
+  eq(G.comboTierColor(1),   '#0ff', 'base mult → cyan');
+  eq(G.comboTierColor(1.25),'#0ff', 'below 1.5 → cyan');
+  eq(G.comboTierColor(1.5), '#ff4', '1.5 → yellow');
+  eq(G.comboTierColor(2),   '#f80', '2 → orange');
+  eq(G.comboTierColor(2.5), '#f6f', '2.5 → magenta');
+  eq(G.comboTierColor(3),   '#f6f', '3 (max) → magenta');
+  // Cross-check: the tier color matches what comboMultiplier yields per combo.
+  if (typeof G.comboMultiplier === 'function') {
+    eq(G.comboTierColor(G.comboMultiplier(20)), '#f6f', 'combo 20 (×2.5+) → magenta');
+    eq(G.comboTierColor(G.comboMultiplier(3)),  '#0ff', 'combo 3 (×1.25) → cyan');
+  }
+} else { console.log('  (skipped — comboTierColor not exposed)'); }
+
+// ============================================================
 section('computeRunGradeScore / runGradeLetter — run grade');
 if (typeof G.computeRunGradeScore === 'function' && typeof G.runGradeLetter === 'function') {
   const near = (a, b, m) => ok(Math.abs(a - b) < 1e-9, m);

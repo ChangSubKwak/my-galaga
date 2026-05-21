@@ -10375,6 +10375,13 @@ function comboTierName(combo) {
   return null;
 }
 
+// Combo multiplier tier color — single source for the HUD combo readout, the
+// score-pop tint, and the combo carry banner (was inlined identically in 3
+// sites). Takes the multiplier value (from comboMultiplier).
+function comboTierColor(mult) {
+  return mult >= 2.5 ? '#f6f' : mult >= 2 ? '#f80' : mult >= 1.5 ? '#ff4' : '#0ff';
+}
+
 const COMBO_MILESTONE = 40; // every N kills in a combo grants a milestone reward (was 20 — life inflation curbed)
 
 // COMBO ARSENAL ladder — each combo threshold auto-grants a temporary weapon for 3 seconds.
@@ -18723,7 +18730,7 @@ function drawGameplay() {
   if ((game.combo || 0) >= 3 && game.recentKillPositions && game.recentKillPositions.length >= 2) {
     const kc = game.recentKillPositions;
     const mult = comboMultiplier(game.combo);
-    const lineCol = mult >= 2.5 ? '#f6f' : mult >= 2 ? '#f80' : mult >= 1.5 ? '#ff4' : '#0ff';
+    const lineCol = comboTierColor(mult);
     ctx.save();
     ctx.fillStyle = lineCol;
     for (let i = 0; i < kc.length - 1; i++) {
@@ -19938,7 +19945,7 @@ function drawHUD() {
   if (game.combo >= 3) {
     const mult = comboMultiplier(game.combo);
     if (mult > 1) {
-      const mCol = mult >= 2.5 ? '#f6f' : mult >= 2 ? '#f80' : mult >= 1.5 ? '#ff4' : '#0ff';
+      const mCol = comboTierColor(mult);
       // COMBO MULTIPLIER BACKGROUND — subtle dark rect for readability against
       // busy backdrops (combo edge flame, biome rainbow, etc.). Width sized to "x2.5".
       ctx.save();
@@ -20849,7 +20856,7 @@ function drawHUD() {
   // Combo indicator (only when combo ≥ 3) — top-left under HUD
   if (game.combo >= 3) {
     const mult = comboMultiplier(game.combo);
-    const col = mult >= 2.5 ? '#f6f' : mult >= 2 ? '#f80' : mult >= 1.5 ? '#ff4' : '#0ff';
+    const col = comboTierColor(mult);
     const decay = game.comboTimer / COMBO_DECAY;
     // Decay bar — pulse glow when combo just bumped (timer near full)
     ctx.save();
