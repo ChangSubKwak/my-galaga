@@ -21427,10 +21427,15 @@ function drawBossStage() {
     // TAUNT BUBBLE — speech above boss when tauntLife > 0. Fades over its lifetime.
     // Position: above boss (y - 30 ish, scaled with boss size). Width auto-fits text.
     if ((mb.tauntLife || 0) > 0 && mb.tauntText) {
-      const tx = mb.x;
       const ty = mb.y - 28 - (mb.scale > 1 ? 10 : 0);
       const fade = Math.min(1, mb.tauntLife / 30); // fade in last 0.5s
       const padW = mb.tauntText.length * 3 + 6;
+      // Clamp the bubble centre so it never clips off-screen when the boss is near
+      // an edge (taunts fire on dashes, which is exactly when it's moving outward).
+      const _half = padW / 2;
+      const tx = Math.max(_half + 2, Math.min(BASE_W - _half - 2, mb.x));
+      // Tail stays under the bubble but leans toward the boss's real position.
+      const tailX = Math.max(tx - _half + 3, Math.min(tx + _half - 3, mb.x));
       ctx.save();
       ctx.globalAlpha = 0.75 * fade;
       // Bubble background (semi-transparent dark)
@@ -21447,8 +21452,8 @@ function drawBossStage() {
       ctx.fillRect(tx - padW / 2, ty - 5, 1, 9);
       ctx.fillRect(tx + padW / 2 - 1, ty - 5, 1, 9);
       // Tail pointing down toward boss
-      ctx.fillRect(tx - 2, ty + 4, 4, 1);
-      ctx.fillRect(tx - 1, ty + 5, 2, 1);
+      ctx.fillRect(tailX - 2, ty + 4, 4, 1);
+      ctx.fillRect(tailX - 1, ty + 5, 2, 1);
       // Text
       ctx.globalAlpha = fade;
       drawRetroText(mb.tauntText, tx, ty - 1, 5, '#fff');
