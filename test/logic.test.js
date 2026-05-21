@@ -947,6 +947,22 @@ if (typeof G.createLoopPath === 'function') {
 } else { console.log('  (skipped — createLoopPath not exposed)'); }
 
 // ============================================================
+section('stageModeFor — boss / challenge / normal dispatch');
+if (typeof G.stageModeFor === 'function') {
+  eq(G.stageModeFor(10), 'boss', 'stage 10 → boss');
+  eq(G.stageModeFor(30), 'boss', 'stage 30 → boss');
+  eq(G.stageModeFor(100), 'boss', 'stage 100 → boss');
+  eq(G.stageModeFor(4), 'challenge', 'stage 4 → challenge');
+  eq(G.stageModeFor(8), 'challenge', 'stage 8 → challenge');
+  eq(G.stageModeFor(12), 'challenge', 'stage 12 → challenge');
+  // Boss takes priority where the cadences collide (20/40/60/80 are %10 AND %4)
+  eq(G.stageModeFor(20), 'boss', 'stage 20 (÷10 and ÷4) → boss wins over challenge');
+  eq(G.stageModeFor(40), 'boss', 'stage 40 → boss (priority)');
+  [1, 2, 3, 5, 6, 7, 9, 11].forEach(s =>
+    eq(G.stageModeFor(s), 'normal', 'stage ' + s + ' → normal'));
+} else { console.log('  (skipped — stageModeFor not exposed)'); }
+
+// ============================================================
 section('createEntryPath — entry bezier endpoints + curve direction');
 if (typeof G.createEntryPath === 'function') {
   const path = G.createEntryPath(10, 20, 100, 200, 1);

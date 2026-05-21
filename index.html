@@ -138,6 +138,14 @@ const STAR_COUNT = 80;
 // --- Game state enum ---
 const STATE = { TITLE: 0, STAGE_INTRO: 1, PLAYING: 2, CHALLENGING: 3, GAME_OVER: 4, PAUSED: 5, CAPTURED: 6, RESPAWN: 7, BOSS_STAGE: 8, BONUS_GAME: 9 };
 const BOSS_STAGE_INTERVAL = 10; // production cadence
+// Single source of truth for which mode a stage runs in (mirrors startStage's
+// branching): every BOSS_STAGE_INTERVAL-th stage is a boss stage, otherwise every
+// 4th is a CHALLENGING bonus wave, otherwise a normal formation stage.
+function stageModeFor(stage) {
+  if (stage % BOSS_STAGE_INTERVAL === 0) return 'boss';
+  if (stage % 4 === 0) return 'challenge';
+  return 'normal';
+}
 
 // --- Colors ---
 const COL = {
@@ -3626,8 +3634,9 @@ const WEATHER_TABLE = {
 
 function pickStageWeather() {
   if (!game) return null;
-  const isBoss = game.stage % BOSS_STAGE_INTERVAL === 0;
-  const isChallenge = !isBoss && game.stage % 4 === 0;
+  const _stageMode = stageModeFor(game.stage);
+  const isBoss = _stageMode === 'boss';
+  const isChallenge = _stageMode === 'challenge';
   if (isBoss || isChallenge) return null;
   const biome = biomeForStage(game.stage);
   if (!biome) return null;
@@ -4510,8 +4519,9 @@ function drawGuardian() {
 
 function pickSupplyCrate() {
   if (!game) return false;
-  const isBoss = game.stage % BOSS_STAGE_INTERVAL === 0;
-  const isChallenge = !isBoss && game.stage % 4 === 0;
+  const _stageMode = stageModeFor(game.stage);
+  const isBoss = _stageMode === 'boss';
+  const isChallenge = _stageMode === 'challenge';
   if (isBoss || isChallenge) return false;
   if (game.stage < 5) return false;
   return Math.random() < 0.30;
@@ -7183,8 +7193,9 @@ function startStage() {
   // GUARDIAN VARIANT — combo 50+ trigger fires once per RUN (not stage). Initialized
   // in resetGame; stage start does not reset so the player only gets one ATTACK drone per run.
 
-  const isBoss = game.stage % BOSS_STAGE_INTERVAL === 0;
-  const isChallenge = !isBoss && game.stage % 4 === 0;
+  const _stageMode = stageModeFor(game.stage);
+  const isBoss = _stageMode === 'boss';
+  const isChallenge = _stageMode === 'challenge';
   // Roll a mutation BEFORE branching so isBoss/isChallenge gates inside pickStageMutation
   // already filter it out. Stored on game so update() / draw() can read it any time.
   game.stageMutation = pickStageMutation();
@@ -16861,8 +16872,9 @@ function drawStageIntro() {
     }
     ctx.restore();
   }
-  const isBoss = game.stage % BOSS_STAGE_INTERVAL === 0;
-  const isChallenge = !isBoss && game.stage % 4 === 0;
+  const _stageMode = stageModeFor(game.stage);
+  const isBoss = _stageMode === 'boss';
+  const isChallenge = _stageMode === 'challenge';
   const isMilestone = MILESTONE_STAGES.indexOf(game.stage) >= 0;
   // BOSS APPROACH WARNING — stage 9/19/29/.../79 are one stage before a boss.
   // Surface "BOSS NEXT" text on the intro so the player knows to prep.
