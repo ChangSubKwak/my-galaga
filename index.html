@@ -10894,6 +10894,7 @@ function updateEnemies() {
   for (const e of game.enemies) {
     if (e.criticalPulseTimer && e.criticalPulseTimer > 0) e.criticalPulseTimer--;
     if (e.hitFlashTimer && e.hitFlashTimer > 0) e.hitFlashTimer--;
+    if (e.diveFlashTimer && e.diveFlashTimer > 0) e.diveFlashTimer--; // sim-rate tick (was draining at draw rate)
     if (e.divePathLife && e.divePathLife > 0) {
       e.divePathLife--;
       if (e.divePathLife <= 0) { e.divePathDots = null; }
@@ -18310,9 +18311,9 @@ function drawGameplay() {
         ctx.restore();
       }
       // DIVE TELEGRAPH FLASH — red chevron above enemy for 16 frames after dive start.
-      // Tick down here so the timer expires in lockstep with the visual.
+      // Read-only here; the timer is ticked in updateEnemies (sim rate) so the flash
+      // lasts the same wall-clock time on 60/120/144Hz displays.
       if (e.diveFlashTimer && e.diveFlashTimer > 0) {
-        e.diveFlashTimer--;
         const flashRatio = e.diveFlashTimer / 16;
         ctx.save();
         ctx.globalAlpha = flashRatio * 0.9;
