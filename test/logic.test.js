@@ -172,6 +172,7 @@ const shim = `
 ;try { globalThis.__getActTitles = function () { return (typeof ACT_TITLES !== 'undefined') ? ACT_TITLES : null; }; } catch (e) {}
 ;try { globalThis.__getEnduranceTiers = function () { return (typeof ENDURANCE_TIERS !== 'undefined') ? ENDURANCE_TIERS : null; }; } catch (e) {}
 ;try { globalThis.__getComboArsenal = function () { return (typeof COMBO_ARSENAL !== 'undefined') ? COMBO_ARSENAL : null; }; } catch (e) {}
+;try { globalThis.__getAchievements = function () { return (typeof ACHIEVEMENTS !== 'undefined') ? ACHIEVEMENTS : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -1233,6 +1234,26 @@ if (typeof G.effectiveShakeMul === 'function') {
   ok(G.effectiveShakeMul('full', true) <= G.effectiveShakeMul('full', false),
      'reduce-motion never increases shake');
 } else { console.log('  (skipped — effectiveShakeMul not exposed)'); }
+
+// ============================================================
+section('achievements — every definition is reachable and every unlock is defined');
+// Registry guard (matches the "wired on both sides" guards): an achievement with
+// no unlockAchievement() call is unreachable; an unlock call for an undefined key
+// is dead. Defined keys come from runtime ACHIEVEMENTS; unlock calls are scanned
+// from the source text (they're conditional code, not runtime-observable).
+if (typeof G.__getAchievements === 'function' && G.__getAchievements()) {
+  const defined = new Set(Object.keys(G.__getAchievements()));
+  const called = new Set();
+  { let mm; const re = /unlockAchievement\(\s*['"]([A-Za-z0-9_]+)['"]\s*\)/g;
+    while ((mm = re.exec(scriptSrc))) called.add(mm[1]); }
+  const unreachable = [...defined].filter(k => !called.has(k));
+  const dead        = [...called].filter(k => !defined.has(k));
+  ok(unreachable.length === 0, 'every defined achievement has an unlock call' +
+     (unreachable.length ? ' (unreachable: ' + unreachable.join(', ') + ')' : ''));
+  ok(dead.length === 0, 'every unlockAchievement() targets a defined key' +
+     (dead.length ? ' (dead: ' + dead.join(', ') + ')' : ''));
+  ok(defined.size >= 50, 'achievement registry is populated (' + defined.size + ' defined)');
+} else { console.log('  (skipped — ACHIEVEMENTS not exposed)'); }
 
 // ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');

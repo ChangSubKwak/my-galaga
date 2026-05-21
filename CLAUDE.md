@@ -43,7 +43,9 @@ pitch-wobble set), the stats-overlay page model (`statsAchGridPages`/
 `statsTotalPages`), corrupt-storage robustness, and **data-registry guards** that
 each entry stays wired on both sides — INTERCEPT_MSG, MORALE_STATES,
 PILOT_MOMENTUM, STAGE_MUTATIONS (id↔read-site), ACT_TITLES (contiguous ranges),
-ENDURANCE_TIERS (ascending), COMBO_ARSENAL (buff↔timer), plus STATE / PERK /
+ENDURANCE_TIERS (ascending), COMBO_ARSENAL (buff↔timer), ACHIEVEMENTS
+(every definition has an `unlockAchievement()` call and vice-versa — scanned from
+source text so an unreachable or dead achievement can't slip in), plus STATE / PERK /
 boss-archetype / biome / weather / ship / enemy entries (so extending a registry
 can't silently half-break).
 
