@@ -365,7 +365,6 @@ function triggerKonamiUnlock() {
   setTimeout(() => playSound('dualFighter'), 220);
   setTimeout(() => playSound('milestoneStage'), 440);
   rumble(500, 0.9, 0.6);
-  try { localStorage.setItem('galagaKonamiUsed', '1'); } catch (e) {}
 }
 
 // PLAYER CALLSIGN — 3-letter monogram (arcade tradition). Persisted across runs.
