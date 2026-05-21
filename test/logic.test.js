@@ -1222,6 +1222,19 @@ if (typeof G.flashAlpha === 'function') {
 } else { console.log('  (skipped — flashAlpha not exposed)'); }
 
 // ============================================================
+section('effectiveShakeMul — shake intensity, capped under reduce-motion');
+if (typeof G.effectiveShakeMul === 'function') {
+  eq(G.effectiveShakeMul('full', false), 1,   'full, normal → 1');
+  eq(G.effectiveShakeMul('low',  false), 0.4, 'low, normal → 0.4');
+  eq(G.effectiveShakeMul('off',  false), 0,   'off → 0');
+  eq(G.effectiveShakeMul('full', true),  0.4, 'full, reduce-motion → capped to 0.4');
+  eq(G.effectiveShakeMul('low',  true),  0.4, 'low, reduce-motion → 0.4 (unchanged)');
+  eq(G.effectiveShakeMul('off',  true),  0,   'off, reduce-motion → 0 (still none)');
+  ok(G.effectiveShakeMul('full', true) <= G.effectiveShakeMul('full', false),
+     'reduce-motion never increases shake');
+} else { console.log('  (skipped — effectiveShakeMul not exposed)'); }
+
+// ============================================================
 section('comboKillDetune — COMBO HARMONICS escalation ramp (cents)');
 if (typeof G.comboKillDetune === 'function') {
   eq(G.comboKillDetune(0),   0,   'combo 0 → base pitch (no detune)');

@@ -189,7 +189,14 @@ let shakeMode = (() => {
   const v = localStorage.getItem('galagaShake');
   return v === 'low' || v === 'off' ? v : 'full';
 })();
-function shakeMul() { return shakeMode === 'off' ? 0 : shakeMode === 'low' ? 0.4 : 1; }
+// Effective shake multiplier from the user's shakeMode, capped to 'low' (0.4) when
+// the OS reduce-motion preference is set — so motion-sensitive players get reduced
+// shake automatically without double-configuring. 'off' stays 0. Pure (testable).
+function effectiveShakeMul(mode, reduce) {
+  const base = mode === 'off' ? 0 : mode === 'low' ? 0.4 : 1;
+  return reduce ? Math.min(base, 0.4) : base;
+}
+function shakeMul() { return effectiveShakeMul(shakeMode, reduceMotion); }
 
 // Difficulty — affects enemy fire cadence + bullet speeds. Default normal.
 let difficultyMode = (() => {
@@ -210,9 +217,10 @@ let colorBlindMode = localStorage.getItem('galagaColorBlind') === '1';
 // Minimal HUD — toggles off non-essential widgets (accuracy %, kill counter,
 // pity dots, etc.) for clean screenshot / focused gameplay. Persisted toggle.
 let minimalHud = localStorage.getItem('galagaMinimalHud') === '1';
-// ACCESSIBILITY — respect the OS "reduce motion" preference (WCAG): when set, the
-// full-screen impact flashes are dampened (photosensitivity safety). Read once at
-// load; guarded so a missing matchMedia (e.g. test harness) is a safe false.
+// ACCESSIBILITY — respect the OS "reduce motion" preference (WCAG): when set,
+// full-screen impact flashes are dampened (photosensitivity) and screen shake is
+// capped to 'low'. Read once at load; guarded so a missing matchMedia (e.g. the
+// test harness) is a safe false.
 let reduceMotion = (() => {
   try { return !!(typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
