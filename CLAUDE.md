@@ -26,16 +26,19 @@ node test/logic.test.js   # exit 0 = pass, 1 = failure
 
 ### Logic tests
 
-A standalone Node harness lives at `test/logic.test.js` (160+ assertions, no test
+A standalone Node harness lives at `test/logic.test.js` (250+ assertions, no test
 framework or dependencies). It extracts the inline `<script>`, runs it inside a
 `vm` sandbox with hand-rolled browser-API stubs (canvas/2d ctx, `localStorage`,
-`document`, `window`, `AudioContext`, RAF), and asserts pure-ish logic plus
-registry-consistency invariants: `computePilotMomentum`, `evalBonusResult`,
-`bonusSkillStop`, `checkPbHalfMark`, `killPlayer` revenge-seeding, `addScore`
-extra-life/cap, `comboMultiplier`/`bumpCombo`, `bezierPoint`, `eliteRateForStage`/
-`powerUpDropRate`, `fmtScore`/`fmtFrameTime`, and source-level guards that every
-STATE / PERK / boss-archetype / biome / weather / ship / enemy entry stays wired
-on both sides (so extending a registry can't silently half-break).
+`document`, `window`, `AudioContext` — including `createStereoPanner` / node
+`detune`, RAF), and asserts pure-ish logic plus registry-consistency invariants:
+`computePilotMomentum`, `evalBonusResult`, `bonusSkillStop`, `checkPbHalfMark`,
+`killPlayer` revenge-seeding, `addScore` extra-life/cap, `comboMultiplier`/
+`bumpCombo`, `bezierPoint`, `eliteRateForStage`/`powerUpDropRate`, `fmtScore`/
+`fmtFrameTime`, `panForX`/`SFX_VARY` (spatial-audio curve + pitch-wobble set),
+the stats-overlay page model (`statsAchGridPages`/`statsTotalPages`), and
+source-level guards that every STATE / PERK / boss-archetype / biome / weather /
+ship / enemy entry stays wired on both sides (so extending a registry can't
+silently half-break).
 
 Note: top-level `let`/`const` bindings (e.g. `game`, `stagePBs`, `SHIPS`) are not
 visible on the vm context global — the harness appends accessor shims (`__getGame`,
@@ -147,7 +150,9 @@ DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are
 
 ### Audio
 
-Sound is generated live through Web Audio (`AudioContext`). `playSound(type)` synthesizes one-shot SFX from oscillators / noise buffers. BGM is a self-rescheduling note scheduler (`scheduleBGMNotes`) that looks ahead 0.4s and re-arms via `setTimeout` every 120 ms — there are no audio files. `ensureAudio()` lazy-creates the context on first user input to satisfy autoplay policies; preserve that gate when adding new sound triggers.
+Sound is generated live through Web Audio (`AudioContext`). `playSound(type, panX)` synthesizes one-shot SFX from oscillators / noise buffers. BGM is a self-rescheduling note scheduler (`scheduleBGMNotes`) that looks ahead 0.4s and re-arms via `setTimeout` every 120 ms — there are no audio files. `ensureAudio()` lazy-creates the context on first user input to satisfy autoplay policies; preserve that gate when adding new sound triggers.
+
+**SPATIAL SFX** — `playSound`'s optional `panX` (a screen x) routes the sound through a per-shot `StereoPanner` placed by `panForX(x)` (pure: `0..BASE_W` → `[-0.85, 0.85]`, softened, clamps, non-numeric → 0 centered). Omitting `panX` keeps the sound centered (UI / player-frame / global cues), and the panner is gated on `createStereoPanner` support. Positional combat events pass it (enemy explode/hit/crit, formation & kamikaze dives, all 6 boss signature attacks via `mb.x`); player fire, pickups, milestones, and the player's own death stay centered. **PER-SHOT PITCH VARIATION** — types in the `SFX_VARY` set (`shoot/hit/explode/crit/enemyDive/graze`) get a `±SFX_DETUNE_CENTS` (55) random `o.detune` per trigger so rapid repeats aren't mechanically identical; melodic/sequenced cues (milestone/fanfare/comboStep) are deliberately excluded so they stay in tune. `panForX` / `SFX_VARY` / the `playSound` branches are covered by the logic tests.
 
 BGM tracks have 5 voices: `lead` (square/saw, detuned chorus) + `bass` (triangle) + `pad` (sine, polyphonic root+fifth+octave) + `kick` + `hat`. The bus has a feedback delay (250ms, 0.32 fb, 0.30 wet) for spatial depth.
 
