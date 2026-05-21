@@ -164,6 +164,8 @@ const shim = `
 ;try { globalThis.__getDexUnlocked = function () { return (typeof dexUnlocked !== 'undefined') ? dexUnlocked : null; }; } catch (e) {}
 ;try { globalThis.__getUnlockedAch = function () { return (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements : null; }; } catch (e) {}
 ;try { globalThis.__getBossNames = function () { return (typeof BOSS_NAMES !== 'undefined') ? BOSS_NAMES : null; }; } catch (e) {}
+;try { globalThis.__getInterceptMsg = function () { return (typeof INTERCEPT_MSG !== 'undefined') ? INTERCEPT_MSG : null; }; } catch (e) {}
+;try { globalThis.__getMoraleTrig = function () { return (typeof _MORALE_TRIG !== 'undefined') ? _MORALE_TRIG : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -913,6 +915,33 @@ section('bulletCap — performance caps trim the oldest entries');
     eq(bc.enemyBullets.length, 2, 'arrays under the cap are left alone');
     Object.assign(bc, save);
   } else { console.log('  (skipped — bulletCap / game not exposed)'); }
+}
+
+// ============================================================
+section('INTERCEPT_MSG registry — every message reachable & well-formed');
+{
+  const msg = G.__getInterceptMsg && G.__getInterceptMsg();
+  const trig = G.__getMoraleTrig && G.__getMoraleTrig();
+  if (msg) {
+    // every entry must be a non-empty array of non-empty strings (pushIntercept
+    // picks a random variant — an empty entry would silently show nothing)
+    let allOk = true;
+    for (const k of Object.keys(msg)) {
+      const v = msg[k];
+      if (!Array.isArray(v) || v.length === 0 || !v.every(s => typeof s === 'string' && s.length)) { allOk = false; }
+    }
+    ok(allOk, 'every INTERCEPT_MSG entry is a non-empty string[]');
+  } else { console.log('  (skipped — INTERCEPT_MSG not exposed)'); }
+  if (msg && trig) {
+    // every morale state maps to a real message key — a renamed message would
+    // otherwise silently drop the morale-shift broadcast
+    let allResolve = true;
+    for (const state of Object.keys(trig)) {
+      if (!msg[trig[state]]) allResolve = false;
+    }
+    ok(allResolve, '_MORALE_TRIG → every state resolves to an INTERCEPT_MSG key');
+    eq(Object.keys(trig).length, 4, 'four morale states mapped (CONFIDENT/NORMAL/SHAKEN/ROUTED)');
+  } else { console.log('  (skipped — _MORALE_TRIG not exposed)'); }
 }
 
 // ============================================================
