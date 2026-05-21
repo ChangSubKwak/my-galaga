@@ -21433,7 +21433,9 @@ function drawBossStage() {
     // TAUNT BUBBLE — speech above boss when tauntLife > 0. Fades over its lifetime.
     // Position: above boss (y - 30 ish, scaled with boss size). Width auto-fits text.
     if ((mb.tauntLife || 0) > 0 && mb.tauntText) {
-      const ty = mb.y - 28 - (mb.scale > 1 ? 10 : 0);
+      // Floor ty so the bubble's top edge (ty-5) never clips off the top of the
+      // screen when a (tall) boss hovers high — mirrors the horizontal clamp below.
+      const ty = Math.max(8, mb.y - 28 - (mb.scale > 1 ? 10 : 0));
       const fade = Math.min(1, mb.tauntLife / 30); // fade in last 0.5s
       const padW = mb.tauntText.length * 3 + 6;
       // Clamp the bubble centre so it never clips off-screen when the boss is near
