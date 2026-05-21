@@ -26,19 +26,26 @@ node test/logic.test.js   # exit 0 = pass, 1 = failure
 
 ### Logic tests
 
-A standalone Node harness lives at `test/logic.test.js` (250+ assertions, no test
+A standalone Node harness lives at `test/logic.test.js` (430+ assertions, no test
 framework or dependencies). It extracts the inline `<script>`, runs it inside a
 `vm` sandbox with hand-rolled browser-API stubs (canvas/2d ctx, `localStorage`,
 `document`, `window`, `AudioContext` — including `createStereoPanner` / node
 `detune`, RAF), and asserts pure-ish logic plus registry-consistency invariants:
 `computePilotMomentum`, `evalBonusResult`, `bonusSkillStop`, `checkPbHalfMark`,
 `killPlayer` revenge-seeding, `addScore` extra-life/cap, `comboMultiplier`/
-`bumpCombo`, `bezierPoint`, `eliteRateForStage`/`powerUpDropRate`, `fmtScore`/
-`fmtFrameTime`, `panForX`/`SFX_VARY` (spatial-audio curve + pitch-wobble set),
-the stats-overlay page model (`statsAchGridPages`/`statsTotalPages`), and
-source-level guards that every STATE / PERK / boss-archetype / biome / weather /
-ship / enemy entry stays wired on both sides (so extending a registry can't
-silently half-break).
+`bumpCombo`, `bezierPoint` + `createEntryPath`/`createLoopPath`, `eliteRateForStage`/
+`powerUpDropRate`, `fmtScore`/`fmtFrameTime`/`fmtMS`, `computeAccuracy`,
+`computeRunGradeScore`/`runGradeLetter`, `comboTierName`, `stageModeFor`,
+`isCombatState`, `computeBgmIntensity`/`computeBgmPitch`/`bgmForGameState`,
+`computeMoraleScore`, `computeDailyStreak`, the pilot rank ladder + composite
+completion, daily-mode determinism, `panForX`/`SFX_VARY` (spatial-audio curve +
+pitch-wobble set), the stats-overlay page model (`statsAchGridPages`/
+`statsTotalPages`), corrupt-storage robustness, and **data-registry guards** that
+each entry stays wired on both sides — INTERCEPT_MSG, MORALE_STATES,
+PILOT_MOMENTUM, STAGE_MUTATIONS (id↔read-site), ACT_TITLES (contiguous ranges),
+ENDURANCE_TIERS (ascending), COMBO_ARSENAL (buff↔timer), plus STATE / PERK /
+boss-archetype / biome / weather / ship / enemy entries (so extending a registry
+can't silently half-break).
 
 Note: top-level `let`/`const` bindings (e.g. `game`, `stagePBs`, `SHIPS`) are not
 visible on the vm context global — the harness appends accessor shims (`__getGame`,
