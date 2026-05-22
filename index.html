@@ -10086,7 +10086,7 @@ function updatePowerUps() {
         });
         if (bombKills > 0) {
           game.floatTexts.push({
-            x: BASE_W/2, y: BASE_H/2, text: bombKills + ' KILLS',
+            x: BASE_W/2, y: BASE_H/2, text: bombKills + (bombKills === 1 ? ' KILL' : ' KILLS'),
             color: '#ff4', life: 70, maxLife: 70, size: 10
           });
         }
@@ -22853,8 +22853,9 @@ function drawStatsOverlay() {
 
   // Mode-specific compact summary row
   y += 2;
-  drawRetroText('N:' + (csN.sessions || 0) + ' RUNS', px + 8, y, 5, '#fff', 'left');
-  drawRetroText('C:' + (csC.sessions || 0) + ' RUNS', px + panelW - 8, y, 5, COL.red, 'right');
+  const _nRuns = csN.sessions || 0, _cRuns = csC.sessions || 0;
+  drawRetroText('N:' + _nRuns + (_nRuns === 1 ? ' RUN' : ' RUNS'), px + 8, y, 5, '#fff', 'left');
+  drawRetroText('C:' + _cRuns + (_cRuns === 1 ? ' RUN' : ' RUNS'), px + panelW - 8, y, 5, COL.red, 'right');
   y += 7;
 
   y += 6;
