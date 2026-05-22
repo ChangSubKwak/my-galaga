@@ -22771,7 +22771,10 @@ function drawStatsOverlay() {
         if (got) drawMiniGem(gemX, gemY, '#fc4');
         else { ctx.fillStyle = '#555'; ctx.fillRect(gemX - 1, gemY - 1, 3, 3); }
         const name = ACHIEVEMENTS[id].name;
-        drawRetroText(name.length > 12 ? name.slice(0, 12) : name,
+        // Cap at 15 (the longest current name) — fits the ~52px cell text area at
+        // size 5 (≈48px) without crossing into the next column. Was 12, which cut
+        // 13 names mid-word (PERFECTIONIST, MARATHON MASTER …) that actually fit.
+        drawRetroText(name.length > 15 ? name.slice(0, 15) : name,
                       cx + 9, cy + (cellH - 1) / 2, 5, got ? '#fff' : '#666', 'left');
       }
       // Completion bar — anchored above the footer so the open lower panel reads
