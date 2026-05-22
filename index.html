@@ -12231,7 +12231,7 @@ function updateCollisions() {
           if (game._killChainAudio >= 5) {
             playSound('crit', null, comboKillDetune(game.combo));
           } else {
-            playSound(killSfx);
+            playSound(killSfx, e.x);
           }
 
           // TRICK SHOT — 2+ kills in the same frame (typically chained off explosions/splitter chain)
