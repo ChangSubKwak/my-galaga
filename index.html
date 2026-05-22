@@ -113,6 +113,15 @@ body::before {
 #joyPad.active #joyKnob {
   background: rgba(255, 255, 68, 0.55);
 }
+/* Narrow screens (<350px, e.g. iPhone SE / small Androids): the full-size
+   joystick (left:24 + 132 = right edge x=156) would overlap the dash button
+   (left edge at viewportW-194, which is < 156 below 350px). Shrink the pad +
+   knob so the two touch targets stay separated. Knob recenters via its 50%/50%
+   transform and the drag math reads getBoundingClientRect(), so both adapt. */
+@media (max-width: 349px) {
+  #joyPad { width: 92px; height: 92px; }
+  #joyKnob { width: 40px; height: 40px; }
+}
 </style>
 </head>
 <body>
