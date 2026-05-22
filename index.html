@@ -21324,7 +21324,7 @@ function drawGameOverScreen() {
   const _cxR = BASE_W/2 + 8,  _cvR = BASE_W/2 + 40;
   // Row 1 — KILLS | ACCURACY
   drawRetroText('KILLS', _cxL, cy + 8, 5, COL.cyan, 'left');
-  drawRetroText(Math.floor(s.kills * tKills).toString(), _cvL, cy + 8, 6, COL.yellow, 'right');
+  drawRetroText(fmtScore(Math.floor(s.kills * tKills)), _cvL, cy + 8, 6, COL.yellow, 'right');
   drawRetroText('ACC', _cxR, cy + 8, 5, COL.cyan, 'left');
   drawRetroText(Math.floor(acc * tAcc) + '%', _cvR, cy + 8, 6, COL.yellow, 'right');
   // Row 2 — MAX STAGE | BEST COMBO
