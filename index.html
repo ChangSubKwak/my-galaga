@@ -20958,11 +20958,15 @@ function drawHUD() {
     const blink = blinkPhase(3);
     drawRetroText('GOD', 4, 35, 6, blink ? '#fc4' : '#fa0', 'left');
   }
-  // ACTIVE PERK BADGE — small label in the timed-buff region so the player always
-  // knows which perk is influencing this stage. Drawn left of the timer column.
+  // ACTIVE PERK BADGE — persistent label so the player always knows which perk
+  // is influencing this stage. Drawn at y=59, BELOW the left-column combo cluster
+  // (arsenal bar y45 / X-LEFT y49 / dots y50 / IMMINENT y53 all end by ~y55) so it
+  // no longer renders on top of the arsenal progress bar. The band y56+ at x=4 is
+  // otherwise clear in combat (challenge-telegraph backdrop draws under it; the
+  // debug FPS panel is dev-only).
   if (game.activePerk && PERKS[game.activePerk]) {
     const p = PERKS[game.activePerk];
-    drawRetroText('PERK: ' + p.name, 4, 47, 5, p.col, 'left');
+    drawRetroText('PERK: ' + p.name, 4, 59, 5, p.col, 'left');
   }
 
   // Demo mode banner
