@@ -6329,7 +6329,7 @@ function updateOneMegaBoss(mb) {
     if (!frozen && mb.sigTimer >= sigInterval - 18 && mb.sigTimer < sigInterval) {
       if (!mb.sigLocking) {
         mb.sigLocking = true;
-        playSound('tick');
+        playSound('tick', mb.x);
       }
     } else {
       mb.sigLocking = false;
