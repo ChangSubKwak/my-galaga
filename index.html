@@ -22006,7 +22006,7 @@ function drawPauseScreen() {
   infoRow('STAGE', String(game.stage || 1));
   infoRow('SCORE', fmtScore(game.score || 0));
   infoRow('LIVES', String(game.lives || 0), game.challengeMode ? COL.red : '#fff');
-  infoRow('COMBO', game.combo >= 3 ? '×' + game.combo + ' (' + (game.comboBonusAccum || 0) + ')' : '—');
+  infoRow('COMBO', game.combo >= 3 ? '×' + game.combo + ' (' + fmtScore(game.comboBonusAccum || 0) + ')' : '—');
   infoRow('TIME',  tm);
   infoRow('ACC',   acc);
   // ry is now py+102
