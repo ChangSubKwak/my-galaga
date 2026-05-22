@@ -10407,9 +10407,11 @@ function drawAchievementToast(t) {
   // Banner texts
   drawRetroText('* UNLOCKED *', tx + 60, ty + 8, 6, COL.yellow);
   drawRetroText(a.name, tx + 60, ty + 17, 7, '#fff');
-  // Subtext: short desc, only during hold
+  // Subtext: short desc, only during hold. Cap at 22 (was 18, which cut many
+  // descriptions mid-word) — centered at tx+60 in the 100px toast, 22 chars
+  // (~73px) stays within the right edge with margin. Longer descs still trim.
   if (t.life > 24 && t.life < 200 && a.desc) {
-    drawRetroText(a.desc.slice(0, 18), tx + 60, ty + 25, 5, COL.gray);
+    drawRetroText(a.desc.length > 22 ? a.desc.slice(0, 22) : a.desc, tx + 60, ty + 25, 5, COL.gray);
   }
 }
 
