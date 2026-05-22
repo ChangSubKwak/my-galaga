@@ -10272,7 +10272,11 @@ function updatePowerUps() {
       //   L → extraLife (triumph, marks the rare/strong piercer)
       //   E → comboStep (heavy clunk, suits shield)
       //   S/N/P → powerUp (standard chime)
-      if (p.type !== 'B') {
+      // D is skipped here: its own branch already fires a dedicated graze ping +
+      // rumble, so routing it through the generic block would double the cue.
+      if (p.type === 'B') {
+        playSound('explode');
+      } else if (p.type !== 'D') {
         const sfx = p.type === 'T' ? 'slowTime'
                   : p.type === 'R' ? 'tick'
                   : p.type === 'W' ? 'graze'
@@ -10284,8 +10288,6 @@ function updatePowerUps() {
         if (p.type === 'T' || p.type === 'R' || p.type === 'W' || p.type === 'H') rumble(180, 0.7, 0.35);
         else if (p.type === 'L') rumble(220, 0.8, 0.45);
         else                                                     rumble(60,  0.4, 0.15);
-      } else {
-        playSound('explode');
       }
     }
   }
