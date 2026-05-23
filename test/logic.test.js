@@ -2094,6 +2094,56 @@ if (typeof G.getFormationPos === 'function') {
 } else { console.log('  (skipped — getFormationPos not exposed)'); }
 
 // ============================================================
+section('pickStageMutation — gates keep boss/challenge/tutorial stages clean');
+if (typeof G.pickStageMutation === 'function' && typeof G.__getStageMutations === 'function') {
+  const g = fresh();
+  g.dailyMode = false; g.challengeMode = false;
+  g.stage = 3;  eq(G.pickStageMutation(), null, 'stage <= 4 (tutorial window) → null');
+  g.stage = 10; eq(G.pickStageMutation(), null, 'boss stage (stage % 10 === 0) → null');
+  g.stage = 8;  eq(G.pickStageMutation(), null, 'challenge stage (stage % 4 === 0) → null');
+  g.stage = 5; g.challengeMode = true;
+  eq(G.pickStageMutation(), null, 'challenge mode → null (fixed ruleset)');
+  g.challengeMode = false;
+  // Eligible normal stage: force the 30% random gate both directions.
+  const muts = G.__getStageMutations();
+  const _r = G.Math.random;
+  G.Math.random = () => 0.99; // >= 0.30 → no trigger
+  eq(G.pickStageMutation(), null, 'eligible stage, roll above 30% → null');
+  G.Math.random = () => 0;    // < 0.30 → trigger, picks index 0
+  const picked = G.pickStageMutation();
+  G.Math.random = _r;         // restore before any other test
+  ok(muts && muts.indexOf(picked) !== -1, 'eligible stage, roll under 30% → a real STAGE_MUTATIONS member');
+} else { console.log('  (skipped — pickStageMutation / __getStageMutations not exposed)'); }
+
+// ============================================================
+section('pickAmbientEvent — tutorial gate + valid event id when triggered');
+if (typeof G.pickAmbientEvent === 'function') {
+  const g = fresh();
+  g.stage = 2; eq(G.pickAmbientEvent(), null, 'stage <= 3 (pure-space tutorial) → null');
+  g.stage = 6;
+  const valid = ['cargoShip', 'supernova', 'satellite', 'comet', 'pulsar', 'meteorShower'];
+  const _r = G.Math.random;
+  G.Math.random = () => 0.99; eq(G.pickAmbientEvent(), null, 'roll above 35% → null');
+  G.Math.random = () => 0;    const ev = G.pickAmbientEvent();
+  G.Math.random = _r;
+  ok(valid.indexOf(ev) !== -1, 'triggered event is one of the six known types');
+} else { console.log('  (skipped — pickAmbientEvent not exposed)'); }
+
+// ============================================================
+section('pickPerkOffer — 3 distinct valid perks (splice-dedup contract)');
+if (typeof G.pickPerkOffer === 'function') {
+  // Run several trials so the random selection is exercised; the distinctness
+  // contract (guaranteed by splice) must hold on every draw — a regression to a
+  // non-removing pick would let the same perk be offered twice.
+  for (let trial = 0; trial < 6; trial++) {
+    const offer = G.pickPerkOffer();
+    ok(Array.isArray(offer) && offer.length === 3, 'returns 3 perks (trial ' + trial + ')');
+    eq(new Set(offer).size, 3, 'all 3 distinct — no duplicate offer (trial ' + trial + ')');
+    ok(offer.every(p => typeof p === 'string' && p.length > 0), 'each is a non-empty perk id (trial ' + trial + ')');
+  }
+} else { console.log('  (skipped — pickPerkOffer not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
