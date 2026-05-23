@@ -8375,16 +8375,17 @@ function updatePlayer() {
   // PERK 'lastStand' — at 1 life, deal +2 damage. Rewards risky play.
   if (game.activePerk === 'lastStand' && game.lives === 1) dmg += 2;
   const maxBullets = ship.bulletCap * n * (game.dualFighter ? 2 : 1);
-  // Guardian-ally bullets share game.bullets (for collision), but the fire cap
-  // limits the PLAYER's own shots — counting ally bullets would let a reward drone
-  // (witch save / combo 50 / boss phase) silently suppress the player's fire rate.
-  // Count is stable through updatePlayer (guardian bullets are pushed elsewhere),
-  // so subtracting it from the live game.bullets.length is correct at both cap sites.
-  const _guardianBullets = game.bullets.reduce((nB, b) => b._guardian ? nB + 1 : nB, 0);
+  // Guardian-ally and parry-echo bullets share game.bullets (for collision) but are
+  // NOT player fire-button shots, so they must not count against maxBullets — else a
+  // reward (guardian drone from witch save / combo 50 / boss phase, or a perfect-parry
+  // echo) would silently suppress the player's own fire rate. Both are pushed outside
+  // updatePlayer, so this count is stable here and correct to subtract from the live
+  // game.bullets.length at both cap sites.
+  const _nonFireBullets = game.bullets.reduce((nB, b) => (b._guardian || b._parryEcho) ? nB + 1 : nB, 0);
   // Per-frame fire-rate cap (~10 shots/sec). Replaces the old `keys[' '] = false`
   // debounce, which broke touch-fire-hold (touch has no auto-repeat to re-set the key).
   if (game.fireCooldown > 0) game.fireCooldown--;
-  if (keys[' '] && (game.bullets.length - _guardianBullets) < maxBullets && game.fireCooldown === 0) {
+  if (keys[' '] && (game.bullets.length - _nonFireBullets) < maxBullets && game.fireCooldown === 0) {
     // RAPID — halved cooldown while active (6 → 3 frames = ~20 shots/sec)
     // Base cooldown: 6 frames; RAPID halves it; RAPID FIRE mutation 1.7× shaves a frame
     // from each tier. Min 2 frames so we don't end up at 0 (infinite shots/frame).
@@ -8427,7 +8428,7 @@ function updatePlayer() {
         // FORK — also spawn two angled side bullets (±15° from vertical). Each
         // inherits the primary bullet's kind/dmg/crit so wave/homing/laser
         // still apply. Tagged with vx so updateBullets carries them sideways.
-        if ((game.forkTimer || 0) > 0 && (game.bullets.length - _guardianBullets) < maxBullets + 8) {
+        if ((game.forkTimer || 0) > 0 && (game.bullets.length - _nonFireBullets) < maxBullets + 8) {
           const _angRad = 0.262;  // ~15° in radians
           const _sin = Math.sin(_angRad);
           const _cos = Math.cos(_angRad);
