@@ -2199,6 +2199,48 @@ if (typeof G.pickStageObjective === 'function') {
 } else { console.log('  (skipped — pickStageObjective not exposed)'); }
 
 // ============================================================
+section('actStartFor / actEndingAt — exact-match act-card lookups');
+if (typeof G.actStartFor === 'function' && typeof G.actEndingAt === 'function') {
+  // Start cards fire ONLY on the exact startStage; null otherwise.
+  const a2 = G.actStartFor(11);
+  ok(a2 && a2.num === 'II' && a2.title === 'THE BREACH', 'actStartFor(11) → ACT II THE BREACH');
+  eq(G.actStartFor(12), null, 'actStartFor(12) → null (not a start stage)');
+  eq(G.actStartFor(10), null, 'actStartFor(10) → null (ACT I has no start card)');
+  ok((G.actStartFor(21) || {}).num === 'III', 'actStartFor(21) → ACT III');
+  // End ceremonies fire on the exact endStage; ACT I's end is a special-cased
+  // standalone object (not in the ACT_TITLES array) — losing that line drops the
+  // very first act-complete ceremony, so it gets its own assertion.
+  const e1 = G.actEndingAt(10);
+  ok(e1 && e1.title === 'AWAKENING', 'actEndingAt(10) → ACT_ONE_END AWAKENING (special case)');
+  ok((G.actEndingAt(20) || {}).num === 'II', 'actEndingAt(20) → ACT II ending');
+  eq(G.actEndingAt(15), null, 'actEndingAt(15) → null (mid-act, no ceremony)');
+} else { console.log('  (skipped — actStartFor/actEndingAt not exposed)'); }
+
+// ============================================================
+section('daily-date helpers — seed monotonicity, code stability, format');
+if (typeof G.dailySeed === 'function') {
+  const s = G.dailySeed();
+  ok(Number.isInteger(s) && s > 20000000, 'dailySeed is a YYYYMMDD-encoded integer');
+  const month = Math.floor((s % 10000) / 100), day = s % 100;
+  ok(month >= 1 && month <= 12, 'encoded month in 1..12');
+  ok(day >= 1 && day <= 31, 'encoded day in 1..31');
+  if (typeof G.dailySeedYesterday === 'function') {
+    // The YYYYMMDD encoding is monotone with the calendar date, so yesterday's
+    // seed always sorts strictly before today's — even across a month/year
+    // rollover. Guards a broken date-subtraction or rollover regression.
+    ok(G.dailySeedYesterday() < s, "yesterday's seed strictly precedes today's");
+  }
+} else { console.log('  (skipped — dailySeed not exposed)'); }
+if (typeof G.dailySeedCode === 'function') {
+  const c1 = G.dailySeedCode(), c2 = G.dailySeedCode();
+  ok(/^[0-9A-Z]{4}$/.test(c1), 'dailySeedCode → 4 uppercase base36 chars');
+  eq(c1, c2, 'dailySeedCode stable within a day (deterministic from seed)');
+}
+if (typeof G.todayShort === 'function') {
+  ok(/^\d{6}$/.test(G.todayShort()), 'todayShort → 6 digits (YYMMDD)');
+}
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
