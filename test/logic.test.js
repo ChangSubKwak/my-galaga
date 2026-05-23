@@ -2144,6 +2144,61 @@ if (typeof G.pickPerkOffer === 'function') {
 } else { console.log('  (skipped — pickPerkOffer not exposed)'); }
 
 // ============================================================
+section('pickFormationVariant — deterministic stage→formation mapping');
+if (typeof G.pickFormationVariant === 'function') {
+  const g = fresh();
+  const fv = (s) => { g.stage = s; return G.pickFormationVariant(); };
+  // s < 8 always 'grid', even when the modulo would otherwise match a variant —
+  // the early guard must take precedence (regression risk if reordered).
+  eq(fv(1), 'grid', 's=1 → grid (s<8 guard beats 1%20===1 diamond)');
+  eq(fv(6), 'grid', 's=6 → grid (s<8 guard beats 6%20===6 wave)');
+  eq(fv(7), 'grid', 's=7 → grid (still inside the <8 window)');
+  // First variant cycle (stages 8..27)
+  eq(fv(8),  'grid',    's=8 → grid (no modulo match)');
+  eq(fv(10), 'grid',    's=10 → grid');
+  eq(fv(11), 'v',       's=11 → v (11%20===11)');
+  eq(fv(16), 'circle',  's=16 → circle (16%20===16)');
+  eq(fv(21), 'diamond', 's=21 → diamond (21%20===1, first eligible)');
+  eq(fv(26), 'wave',    's=26 → wave (26%20===6, first eligible)');
+  // %20 wraparound — second cycle reproduces the same shapes
+  eq(fv(31), 'v',       's=31 → v (31%20===11)');
+  eq(fv(36), 'circle',  's=36 → circle (36%20===16)');
+  eq(fv(41), 'diamond', 's=41 → diamond (41%20===1)');
+} else { console.log('  (skipped — pickFormationVariant not exposed)'); }
+
+// ============================================================
+section('pickSupplyCrate — gates: boss/challenge/early stages never roll');
+if (typeof G.pickSupplyCrate === 'function') {
+  const g = fresh();
+  g.challengeMode = false; g.dailyMode = false;
+  g.stage = 3;  eq(G.pickSupplyCrate(), false, 'stage < 5 → false');
+  g.stage = 10; eq(G.pickSupplyCrate(), false, 'boss stage → false');
+  g.stage = 8;  eq(G.pickSupplyCrate(), false, 'challenge stage → false');
+  g.stage = 5; // eligible normal stage
+  const _r = G.Math.random;
+  G.Math.random = () => 0.99; eq(G.pickSupplyCrate(), false, 'eligible, roll >= 30% → false');
+  G.Math.random = () => 0;    eq(G.pickSupplyCrate(), true,  'eligible, roll < 30% → true');
+  G.Math.random = _r;
+} else { console.log('  (skipped — pickSupplyCrate not exposed)'); }
+
+// ============================================================
+section('pickStageObjective — gates + well-formed objective when triggered');
+if (typeof G.pickStageObjective === 'function') {
+  const g = fresh();
+  g.challengeMode = false;
+  eq(G.pickStageObjective(3), null, 'stage <= 4 → null');
+  g.challengeMode = true;
+  eq(G.pickStageObjective(8), null, 'challenge mode → null (own structure)');
+  g.challengeMode = false;
+  const _r = G.Math.random;
+  G.Math.random = () => 0.99; eq(G.pickStageObjective(8), null, 'roll >= 40% → null');
+  G.Math.random = () => 0;    const obj = G.pickStageObjective(8);
+  G.Math.random = _r;
+  ok(obj && typeof obj.id === 'string' && typeof obj.met === 'function',
+     'triggered → well-formed objective with id + met()');
+} else { console.log('  (skipped — pickStageObjective not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
