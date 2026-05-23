@@ -8385,6 +8385,7 @@ function updatePlayer() {
     const offsets = n === 1 ? [0] : n === 2 ? [-4, 4] : [-6, 0, 6];
     const pods = game.dualFighter ? [game.playerX - 8, game.playerX + 8] : [game.playerX];
     let _critFiredThisShot = false;
+    const _sfBefore = game.stats.shotsFired;
     for (const cx of pods) {
       for (const ox of offsets) {
         const bx = cx + ox;
@@ -8435,16 +8436,6 @@ function updatePlayer() {
             }
           }
         }
-        // SHOTS FIRED MILESTONES — small gray banner at 100/500/1000/2000 to
-        // surface long-run sustainment. One-shot via === check.
-        const _sf = game.stats.shotsFired;
-        if (_sf === 100 || _sf === 500 || _sf === 1000 || _sf === 2000) {
-          game.floatTexts.push({
-            x: BASE_W/2, y: BASE_H/2 + 30,
-            text: 'SHOTS ' + _sf,
-            color: '#888', life: 40, maxLife: 40, size: 5
-          });
-        }
         // MARKSMAN MILESTONE — once per run, when 50+ shots fired AND accuracy
         // >= 90%, surface banner. Skill recognition without score inflation.
         if (!game._marksmanFired && game.stats.shotsFired >= 50) {
@@ -8484,6 +8475,20 @@ function updatePlayer() {
     // was fired this shot. Caps to once-per-shot regardless of pods × offsets
     // to avoid SFX stacking at multi-pod fire.
     if (_critFiredThisShot) playSound('tick');
+    // SHOTS FIRED MILESTONES — gray banner at 100/500/1000/2000. Checked as a
+    // crossing over the whole fire event (not a per-shot === on shotsFired) so a
+    // FORK burst that bumps shotsFired by 3 at a time can't step over the exact
+    // milestone value and silently skip the banner.
+    for (const _m of [100, 500, 1000, 2000]) {
+      if (_sfBefore < _m && game.stats.shotsFired >= _m) {
+        game.floatTexts.push({
+          x: BASE_W/2, y: BASE_H/2 + 30,
+          text: 'SHOTS ' + _m,
+          color: '#888', life: 40, maxLife: 40, size: 5
+        });
+        break;
+      }
+    }
   }
 }
 
