@@ -11683,6 +11683,15 @@ function updateCollisions() {
   const enemies = game.state === STATE.CHALLENGING
     ? (game.challengeWaves[game.challengeWaveIdx] || [])
     : game.enemies;
+  // Splitter-spawned minibees are buffered here and appended to game.enemies AFTER
+  // the bullet loops, not pushed mid-iteration. Pushing into the array the
+  // bullet-vs-enemy `for…of` is currently walking made a piercing LASER visit the
+  // freshly-spawned minibees the same frame and instakill them at the splitter's
+  // position (before they were ever visible) — an accident of iteration order, since
+  // the laser had already passed that point in the sim. Deferring makes a splitter's
+  // fragments survive their spawn frame uniformly across weapons (they can still be
+  // hit next frame once they exist), and removes the modify-while-iterating fragility.
+  const _pendingMinibees = [];
 
   // SHOOTING STAR WISH — player bullets can hit a wish-variant shooting star for
   // +100 score, gold confetti, and a celebratory floatText. Single-hit consumes
@@ -12553,10 +12562,10 @@ function updateCollisions() {
             playSound(dropSfx);
           }
 
-          // Splitter splits into 2 mini-bees on death
+          // Splitter splits into 2 mini-bees on death (deferred — see _pendingMinibees)
           if (e.type === 'splitter') {
             for (let s = 0; s < 2; s++) {
-              game.enemies.push({
+              _pendingMinibees.push({
                 type: 'minibee', alive: true, hp: 1,
                 x: e.x, y: e.y,
                 vx: (s === 0 ? -1 : 1) * (0.7 + Math.random() * 0.4),
@@ -12975,6 +12984,9 @@ function updateCollisions() {
       }
     }
   }
+  // Append splitter fragments now that every per-bullet / per-enemy loop is done,
+  // so no bullet (notably a piercing laser) can hit them on their spawn frame.
+  for (const _mb of _pendingMinibees) game.enemies.push(_mb);
 }
 
 // WITCH TIME — opens a slow-mo grace window before applying a fatal hit. Returns true

@@ -2384,6 +2384,25 @@ if (typeof G.createFormation === 'function' && typeof G.__getGame === 'function'
 } else { console.log('  (skipped — createFormation / __getGame not exposed)'); }
 
 // ============================================================
+section('splitter fragments survive a piercing-laser kill (deferred spawn)');
+if (typeof G.updateCollisions === 'function' && typeof G.createEnemy === 'function') {
+  const g = fresh();
+  // Build a splitter at a known position and a laser sitting on it.
+  const splitter = G.createEnemy('splitter', 0, 0, 100, 100);
+  g.enemies = [splitter];
+  g.bullets = [{ x: 100, y: 100, kind: 'laser', pierced: new Set(), dmg: 5, vy: -7, lvl: 1 }];
+  // Keep the player far from the splitter so body/parry loops don't interfere.
+  g.playerX = 20; g.playerY = 280; g.dashTimer = 0; g.invincibleTimer = 0;
+  G.updateCollisions();
+  ok(splitter.alive === false, 'laser kills the splitter');
+  const minis = g.enemies.filter(e => e.type === 'minibee');
+  eq(minis.length, 2, 'splitter spawned 2 minibees');
+  // The fix: minibees are appended AFTER the bullet loop, so the same piercing
+  // laser cannot instakill them on their spawn frame.
+  ok(minis.every(m => m.alive === true), 'both minibees survive the spawn frame (not laser-instakilled)');
+} else { console.log('  (skipped — updateCollisions / createEnemy not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
