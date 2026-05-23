@@ -2320,6 +2320,24 @@ if (typeof G.setupBossStage === 'function' && typeof G.makeMegaBoss === 'functio
 } else { console.log('  (skipped — setupBossStage / makeMegaBoss not exposed)'); }
 
 // ============================================================
+section('createFormation grid — fixed 40-enemy structure, in-bounds, 4 bosses');
+if (typeof G.createFormation === 'function' && typeof G.__getGame === 'function') {
+  const g = fresh();
+  g.stage = 5; // <8 → pickFormationVariant deterministically returns 'grid'
+  G.createFormation();
+  eq(g.formationVariant, 'grid', 'stage 5 uses grid variant');
+  eq(g.enemies.length, 40, 'grid = 4 bosses + 16 butterflies + 20 bees = 40');
+  // Bosses are hardcoded (row 0, never substituted by the variant type-picks).
+  eq(g.enemies.filter(e => e.type === 'boss').length, 4, 'exactly 4 bosses (hardcoded row 0)');
+  eq(g.enemies.filter(e => e.row >= 3).length, 20, '20 enemies in bee rows 3-4');
+  ok(g.enemies.every(e => e.state === 'formation' && e.alive), 'all start alive in formation');
+  ok(g.enemies.every(e => e.hp >= 1 && e.hp <= 2), 'hp in [1,2] (boss/shielded 2, +1 elite)');
+  ok(g.enemies.every(e => e.homeX >= 0 && e.homeX <= 224 && e.homeY >= 0 && e.homeY <= 288),
+     'every formation home position is on-screen (BASE_W 224 × BASE_H 288)');
+  ok(g.enemies.every(e => e.x === e.homeX && e.y === e.homeY), 'spawn x/y seeded at home position');
+} else { console.log('  (skipped — createFormation / __getGame not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
