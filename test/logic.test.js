@@ -2250,6 +2250,34 @@ if (typeof G.todayShort === 'function') {
 }
 
 // ============================================================
+section('setupChallengingStage — wave structure + depth-scaled counts');
+if (typeof G.setupChallengingStage === 'function') {
+  const g = fresh();
+  // Base stage (<20): GROUP_SIZE 8 → 2 groups × 8 = 16 enemies/wave → 128 total.
+  g.stage = 8;
+  G.setupChallengingStage();
+  eq(g.challengeWaves.length, 8, '8 waves built');
+  ok(g.challengeWaves.every(w => w.length === 16), 'base stage: 16 enemies/wave');
+  eq(g.challengeTotal, 128, 'challengeTotal = 8×16 at base (dynamic, not hardcoded)');
+  // Depth scaling: stage 20+ → GROUP_SIZE 9 → 18/wave; stage 40+ → 10 → 20/wave.
+  // Locks the GROUP_SIZE ramp so it can't silently drift back to "uniform 16".
+  g.stage = 20;
+  G.setupChallengingStage();
+  ok(g.challengeWaves.every(w => w.length === 18), 'stage 20+: 18 enemies/wave');
+  eq(g.challengeTotal, 144, 'challengeTotal = 8×18 at stage 20');
+  g.stage = 40;
+  G.setupChallengingStage();
+  ok(g.challengeWaves.every(w => w.length === 20), 'stage 40+: 20 enemies/wave');
+  eq(g.challengeTotal, 160, 'challengeTotal = 8×20 at stage 40');
+  // challengeTotal must equal the actual built enemy count (drives the
+  // challengeHits === challengeTotal perfect-clear check).
+  const built = g.challengeWaves.reduce((s, w) => s + w.length, 0);
+  eq(g.challengeTotal, built, 'challengeTotal matches summed wave lengths');
+  // Per-group composition: 1 boss each → 2 bosses/wave (1 per sub-group).
+  eq(g.challengeWaves[0].filter(e => e.type === 'boss').length, 2, 'wave has 2 bosses (1 per sub-group)');
+} else { console.log('  (skipped — setupChallengingStage not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {

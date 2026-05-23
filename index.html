@@ -5965,7 +5965,7 @@ function setupChallengingStage() {
   game.enemies = [];
   game.enemyBullets = [];
 
-  const numWaves = 8; // fixed: 8 waves → uniform 128 enemies/challenge stage
+  const numWaves = 8; // fixed 8 waves; 16 enemies/wave at base (128/stage), more at deeper stages via GROUP_SIZE below
   const ALL_PATTERNS = ['sweep_lr', 'sweep_rl', 'pincer', 'top_down', 'diagonal', 'double_row'];
 
   // Shuffle once then cycle so all 6 patterns appear at least once across waves
@@ -5982,7 +5982,7 @@ function setupChallengingStage() {
 
   for (let w = 0; w < numWaves; w++) {
     const pattern = patternOrder[w];
-    const numGroups = 2; // fixed: 2 sub-groups per wave → uniform 16 enemies/wave
+    const numGroups = 2; // 2 sub-groups × GROUP_SIZE → 16 enemies/wave at base (18-20 at deeper stages)
     const wave = [];
 
     for (let g = 0; g < numGroups; g++) {
