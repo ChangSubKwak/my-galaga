@@ -2069,6 +2069,31 @@ if (typeof G.pickRunHighlights === 'function') {
 } else { console.log('  (skipped — pickRunHighlights not exposed)'); }
 
 // ============================================================
+section('getFormationPos — formation grid geometry contract');
+if (typeof G.getFormationPos === 'function') {
+  const o = G.getFormationPos(0, 0);
+  eq(o.x, 32, 'origin x = startX 32');
+  eq(o.y, 36, 'origin y = startY 36');
+  // Column spacing is a constant 16px step in x, independent of row.
+  eq(G.getFormationPos(1, 0).x - G.getFormationPos(0, 0).x, 16, 'col step = spacingX 16');
+  eq(G.getFormationPos(5, 3).x - G.getFormationPos(4, 3).x, 16, 'col step constant across rows');
+  // Row spacing is a constant 14px step in y, independent of column.
+  eq(G.getFormationPos(0, 1).y - G.getFormationPos(0, 0).y, 14, 'row step = spacingY 14');
+  eq(G.getFormationPos(6, 2).y - G.getFormationPos(6, 1).y, 14, 'row step constant across cols');
+  // Linearity: position is purely affine in (col, row).
+  eq(G.getFormationPos(3, 2).x, 32 + 3 * 16, 'x linear in col');
+  eq(G.getFormationPos(3, 2).y, 36 + 2 * 14, 'y linear in row');
+  // Same row shares y across columns; same column shares x across rows.
+  eq(G.getFormationPos(0, 2).y, G.getFormationPos(5, 2).y, 'shared row → shared y');
+  eq(G.getFormationPos(4, 0).x, G.getFormationPos(4, 3).x, 'shared col → shared x');
+  // A standard 8-wide formation (cols 0..7) must stay on-screen (BASE_W 224)
+  // with room for the enemy half-width (~8px) — guards against an origin/spacing
+  // regression silently pushing the rightmost column off the right edge.
+  ok(G.getFormationPos(7, 0).x + 8 < 224, 'rightmost col (7) + half-width on-screen');
+  ok(G.getFormationPos(0, 0).x - 8 > 0, 'leftmost col (0) - half-width on-screen');
+} else { console.log('  (skipped — getFormationPos not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
