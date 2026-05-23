@@ -2364,6 +2364,26 @@ if (typeof G.createFormation === 'function' && typeof G.setupEntryAnimation === 
 } else { console.log('  (skipped — createFormation/setupEntryAnimation not exposed)'); }
 
 // ============================================================
+section('createFormation variants — every enemy spawns on-screen');
+if (typeof G.createFormation === 'function' && typeof G.__getGame === 'function') {
+  const g = fresh();
+  // Variant layouts use floating overrideX/Y math (cx ± n·stepX, radius·cos…). A
+  // regression in a step/radius constant could push enemies off the playfield;
+  // this locks the on-screen guarantee for all four variants.
+  const cases = [[11, 'v'], [16, 'circle'], [21, 'diamond'], [26, 'wave']];
+  for (const [stage, variant] of cases) {
+    g.stage = stage;
+    G.createFormation();
+    eq(g.formationVariant, variant, 'stage ' + stage + ' → ' + variant);
+    ok(g.enemies.length > 0, variant + ': built enemies');
+    ok(g.enemies.every(e => e.homeX >= 0 && e.homeX <= 224 && e.homeY >= 0 && e.homeY <= 288),
+       variant + ': every home position on-screen (BASE_W 224 × BASE_H 288)');
+    ok(g.enemies.every(e => e.x === e.homeX && e.y === e.homeY), variant + ': spawn seeded at home');
+    ok(g.enemies.some(e => e.type === 'boss'), variant + ': has at least one boss');
+  }
+} else { console.log('  (skipped — createFormation / __getGame not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
