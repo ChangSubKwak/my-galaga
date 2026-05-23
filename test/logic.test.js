@@ -2278,6 +2278,48 @@ if (typeof G.setupChallengingStage === 'function') {
 } else { console.log('  (skipped — setupChallengingStage not exposed)'); }
 
 // ============================================================
+section('makeMegaBoss — HP/spread/scale scaling + opts overrides');
+if (typeof G.makeMegaBoss === 'function') {
+  const b10 = G.makeMegaBoss(10);
+  eq(b10.maxHp, 50, 'stage 10 baseHp = 20 + 10×3');
+  eq(b10.hp, b10.maxHp, 'hp starts at full maxHp');
+  eq(b10.spreadCount, 5, 'stage 10 (>=4) → spreadCount 5');
+  eq(b10.scale, 1, 'non-super scale = 1');
+  eq(b10.super, false, 'non-super flag');
+  ok(b10.alive === true && b10.phase2 === false && b10.phase3 === false, 'fresh boss: alive, no phases');
+  eq(b10.x, 112, 'default x = BASE_W/2 (224/2)');
+  eq(G.makeMegaBoss(10, { x: 50 }).x, 50, 'x override honored');
+  eq(G.makeMegaBoss(2).spreadCount, 3, 'stage <4 → spreadCount 3');
+  // SUPER boss (stage 30+ path): hpScale 2.5, scale 1.5, spreadCount 7
+  const bs = G.makeMegaBoss(30, { super: true, hpScale: 2.5 });
+  eq(bs.maxHp, Math.round((20 + 90) * 2.5), 'super hpScale 2.5 applied to baseHp');
+  eq(bs.scale, 1.5, 'super scale = 1.5');
+  eq(bs.spreadCount, 7, 'super spreadCount = 7');
+  eq(bs.super, true, 'super flag set');
+  eq(G.makeMegaBoss(20, { hpScale: 0.65 }).maxHp, Math.round((20 + 60) * 0.65), 'twin-boss hpScale 0.65');
+  // Interval floors hold at deep stages where (90 - s×4) would go negative.
+  ok(G.makeMegaBoss(40).shootInterval >= 28, 'shootInterval floored at >=28');
+  ok(G.makeMegaBoss(40).dashInterval >= 90, 'dashInterval floored at >=90');
+} else { console.log('  (skipped — makeMegaBoss not exposed)'); }
+
+// ============================================================
+section('setupBossStage — boss count + scaling by stage band');
+if (typeof G.setupBossStage === 'function' && typeof G.makeMegaBoss === 'function') {
+  const g = fresh();
+  g.stage = 10; G.setupBossStage();
+  eq(g.megaBosses.length, 1, 'stage 10 (<20) → 1 boss');
+  eq(g.megaBosses[0].super, false, 'stage 10 boss not super');
+  g.stage = 20; G.setupBossStage();
+  eq(g.megaBosses.length, 2, 'stage 20-29 → 2 bosses');
+  ok(g.megaBosses.every(b => !b.super), 'twin bosses not super');
+  ok(g.megaBosses[0].maxHp < G.makeMegaBoss(20).maxHp, 'twin bosses use reduced HP (0.65×) vs solo');
+  g.stage = 30; G.setupBossStage();
+  eq(g.megaBosses.length, 1, 'stage 30+ → 1 SUPER boss');
+  eq(g.megaBosses[0].super, true, 'stage 30 boss is super');
+  ok(g.megaBosses[0].maxHp > G.makeMegaBoss(30).maxHp, 'super boss HP exceeds base (2.5× scale)');
+} else { console.log('  (skipped — setupBossStage / makeMegaBoss not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
