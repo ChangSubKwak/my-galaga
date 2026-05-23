@@ -5927,7 +5927,16 @@ function setupEntryAnimation() {
     && game.formationVariant !== 'circle' && game.formationVariant !== 'diamond';
   game.entrySpiral = useSpiral;
   let totalIdx = 0;
-  waves.forEach((wave, wi) => {
+  // Index among NON-EMPTY waves. Variant formations (v/circle/diamond/wave) tag
+  // every enemy row=0, so the row-keyed waves above collapse to a single populated
+  // wave — using the raw wave index would put it at wi=6 and stamp a 300-frame
+  // (5s) entryDelay, leaving the playfield empty at stage start. Skipping empty
+  // waves makes the lone populated wave effective-wave-0 (immediate entry). The
+  // grid formation populates all 7 waves, so effWave === wi and its pacing is
+  // unchanged.
+  let effWave = 0;
+  waves.forEach((wave) => {
+    if (wave.length === 0) return;
     wave.forEach((e, i) => {
       e.state = 'entering';
       if (useSpiral) {
@@ -5939,16 +5948,17 @@ function setupEntryAnimation() {
         e.y = BASE_H/2 - 20 + Math.sin(e.spiralStartAngle) * 90 * 0.65;
       } else {
         e.spiralEntry = false;
-        e.x = wi % 2 === 0 ? -10 : BASE_W + 10;
+        e.x = effWave % 2 === 0 ? -10 : BASE_W + 10;
         e.y = -10 - i * 8;
-        const side = wi % 2 === 0 ? 1 : -1;
+        const side = effWave % 2 === 0 ? 1 : -1;
         e.path = createEntryPath(e.x, e.y, e.homeX, e.homeY, side);
       }
       e.pathProgress = 0;
       e.pathSpeed = 0.015 + game.stage * 0.001;
-      e.entryDelay = wi * 50 + i * 6;
+      e.entryDelay = effWave * 50 + i * 6;
       totalIdx++;
     });
+    effWave++;
   });
 }
 

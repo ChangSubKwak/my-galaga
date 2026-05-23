@@ -2338,6 +2338,32 @@ if (typeof G.createFormation === 'function' && typeof G.__getGame === 'function'
 } else { console.log('  (skipped — createFormation / __getGame not exposed)'); }
 
 // ============================================================
+section('setupEntryAnimation — no dead lead-time on variant formations');
+if (typeof G.createFormation === 'function' && typeof G.setupEntryAnimation === 'function') {
+  const g = fresh();
+  // Stage 11 → 'v' variant: place() tags every enemy row=0, so the row-keyed entry
+  // waves collapse to ONE populated wave. Before the empty-wave-skip fix this sat
+  // at raw index 6 → entryDelay 300+ → a 5s empty playfield at stage start. Now the
+  // lone populated wave is effective-wave-0 and enemies enter immediately.
+  g.stage = 11; // <18 so spiral entry is off (deterministic side-curve path)
+  G.createFormation();
+  G.setupEntryAnimation();
+  eq(g.formationVariant, 'v', 'stage 11 → v variant');
+  ok(g.enemies.length > 0, 'variant formation built enemies');
+  ok(g.enemies.every(e => e.state === 'entering'), 'all enemies marked entering');
+  const delays = g.enemies.map(e => e.entryDelay);
+  eq(Math.min(...delays), 0, 'first variant enemy enters immediately (no 5s dead lead)');
+  ok(Math.max(...delays) < 300, 'variant entry compressed to one effective wave (<300f, was 300+)');
+  // Grid pacing preserved: all 7 row-waves populated → effWave === wi, bosses last.
+  g.stage = 5;
+  G.createFormation();
+  G.setupEntryAnimation();
+  const gd = g.enemies.map(e => e.entryDelay);
+  eq(Math.min(...gd), 0, 'grid wave 0 enters immediately');
+  ok(Math.max(...gd) >= 300, 'grid bosses (wave 6) still ~300f in — grid pacing unchanged');
+} else { console.log('  (skipped — createFormation/setupEntryAnimation not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
