@@ -574,6 +574,15 @@ if (typeof G.biomeForStage === 'function' && G.__getWeatherTable()) {
     if (!weatherBiomes.has(b)) { allHaveWeather = false; bad = b; }
   }
   ok(allHaveWeather, 'every spawning biome has >=1 weather entry' + (bad ? ' (missing: ' + bad + ')' : ''));
+  // REVERSE direction — every weather entry must target a biome that actually
+  // spawns, else it's dead data: pickStageWeather's `w.biome === biome` filter
+  // can never match a typo'd or orphaned biome, so that weather silently never
+  // appears. (`seen` holds the biomes biomeForStage produces over a full cycle.)
+  let allReachable = true, deadW = '';
+  for (const id of Object.keys(wt)) {
+    if (!seen.has(wt[id].biome)) { allReachable = false; deadW = id + '→' + wt[id].biome; }
+  }
+  ok(allReachable, 'every weather entry targets a real spawning biome (no dead weather)' + (deadW ? ' (dead: ' + deadW + ')' : ''));
   // Every weather entry must carry label + col + whisper for the entry banner.
   let metaOk = true, badW = '';
   for (const id of Object.keys(wt)) {
