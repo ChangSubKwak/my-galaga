@@ -66,7 +66,7 @@ need a browser.
 
 ### Single-file structure
 
-`index.html` (~22,700 lines) contains the entire game: HTML shell, CSS, and an inline `<script>` block that holds all game logic. The two `*.svg` files (`bullet_concepts.svg`, `bullet_readability.svg`) are design references for player-bullet visuals and are not loaded by the game.
+`index.html` (~23,000 lines) contains the entire game: HTML shell, CSS, and an inline `<script>` block that holds all game logic. The two `*.svg` files (`bullet_concepts.svg`, `bullet_readability.svg`) are design references for player-bullet visuals and are not loaded by the game.
 
 ### Fixed-timestep loop with internal resolution
 
