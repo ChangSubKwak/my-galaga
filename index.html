@@ -260,6 +260,14 @@ function cappedStageSpeed(cap, base, perStage, stage, diffMul) {
   return Math.min(cap, base + stage * perStage) * diffMul;
 }
 
+// Enemy spawn/fire cadence: interval shrinks with stage (base − stage·perStage)
+// but is floored so it can never drop to 0/negative (which would spawn or fire
+// every frame at deep stages). Single source for the 7 cadence sites that shared
+// this exact shape. Pure + tested so the floor invariant can't drift.
+function rampedInterval(floor, base, perStage, stage) {
+  return Math.max(floor, base - stage * perStage);
+}
+
 // Aimed-shot velocity: unit vector from (fromX,fromY) toward (toX,toY) scaled by
 // speed, returned as {vx,vy}. The `|| 1` length guard prevents NaN velocity when
 // the shooter sits exactly on the target. Single source for the straight aimed
@@ -6359,7 +6367,7 @@ function updateOneMegaBoss(mb) {
     // ON TOP of base aimed/spiral. Periodicity tuned so they don't dominate gameplay
     // (one signature ~ every 4-5 seconds at stage 10, faster as stage scales).
     mb.sigTimer = (mb.sigTimer || 0) + 1;
-    const sigInterval = Math.max(120, 240 - game.stage * 4);
+    const sigInterval = rampedInterval(120, 240, 4, game.stage);
     // MISSILE LOCK INDICATOR — within the final 18 frames before a signature fires,
     // mark the boss as locking on. drawHUD reads this to render a crosshair on the
     // player. One-shot lock-on tick: play 'tick' sfx when entering the lock window.
@@ -7364,7 +7372,7 @@ function startStage() {
     game.state = STATE.PLAYING;
     startBGM(bgmForGameState(STATE.PLAYING));
   }
-  game.diveInterval = Math.max(80, 200 - game.stage * 10);
+  game.diveInterval = rampedInterval(80, 200, 10, game.stage);
 }
 
 // --- Input ---
@@ -11506,7 +11514,7 @@ function updateEnemies() {
   // Kamikaze spawn (stage 3+, only during normal gameplay after entry)
   if (game.allEntered && game.stage >= 3 && game.playerAlive) {
     game.kamikazeTimer++;
-    const interval = Math.max(180, 540 - game.stage * 25);
+    const interval = rampedInterval(180, 540, 25, game.stage);
     if (game.kamikazeTimer >= interval) {
       game.kamikazeTimer = 0;
       const k = {
@@ -11527,7 +11535,7 @@ function updateEnemies() {
   // UFO bonus spawn (stage 4+, rare)
   if (game.allEntered && game.stage >= 4 && game.playerAlive) {
     game.ufoTimer++;
-    const ufoInterval = Math.max(420, 900 - game.stage * 18);
+    const ufoInterval = rampedInterval(420, 900, 18, game.stage);
     const alreadyOut = game.enemies.some(e => e.alive && e.type === 'ufo');
     if (!alreadyOut && game.ufoTimer >= ufoInterval && Math.random() < 0.6) {
       game.ufoTimer = 0;
@@ -11554,7 +11562,7 @@ function updateEnemies() {
   // Golden bee bonus spawn (stage 6+, rarer than UFO, zig-zags down from top)
   if (game.allEntered && game.stage >= 6 && game.playerAlive) {
     game.goldenBeeTimer++;
-    const gbInterval = Math.max(720, 1500 - game.stage * 24);
+    const gbInterval = rampedInterval(720, 1500, 24, game.stage);
     const alreadyOut = game.enemies.some(e => e.alive && e.type === 'goldenBee');
     if (!alreadyOut && game.goldenBeeTimer >= gbInterval && Math.random() < 0.35) {
       game.goldenBeeTimer = 0;
@@ -11580,7 +11588,7 @@ function updateEnemies() {
   // Boomerang hover (stage 11+) — helicopter that sweeps left-right firing aimed shots
   if (game.allEntered && game.stage >= 11 && game.playerAlive) {
     game.hovererTimer++;
-    const hInterval = Math.max(660, 1320 - game.stage * 22);
+    const hInterval = rampedInterval(660, 1320, 22, game.stage);
     const alreadyOut = game.enemies.some(e => e.alive && e.type === 'hoverer');
     if (!alreadyOut && game.hovererTimer >= hInterval && Math.random() < 0.32) {
       game.hovererTimer = 0;
@@ -11603,7 +11611,7 @@ function updateEnemies() {
   // Mirror clone (stage 13+) — ghosts a mirrored copy of the player at fixed altitude
   if (game.allEntered && game.stage >= 13 && game.playerAlive) {
     game.mirrorTimer++;
-    const mInterval = Math.max(540, 1200 - game.stage * 20);
+    const mInterval = rampedInterval(540, 1200, 20, game.stage);
     const alreadyOut = game.enemies.some(e => e.alive && e.type === 'mirror');
     if (!alreadyOut && game.mirrorTimer >= mInterval && Math.random() < 0.30) {
       game.mirrorTimer = 0;

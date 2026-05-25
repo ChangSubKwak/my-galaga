@@ -2518,6 +2518,19 @@ if (typeof G.aimVelocity === 'function') {
 } else { console.log('  (skipped — aimVelocity not exposed)'); }
 
 // ============================================================
+section('rampedInterval — enemy cadence shrinks with stage, floored');
+if (typeof G.rampedInterval === 'function') {
+  eq(G.rampedInterval(120, 240, 4, 0),  240, 'stage 0 → base interval (240)');
+  eq(G.rampedInterval(120, 240, 4, 10), 200, 'stage 10 → 240 − 40 = 200');
+  eq(G.rampedInterval(120, 240, 4, 30), 120, 'stage 30 → hits floor (120)');
+  // The floor invariant: deep stages clamp to floor, never 0/negative
+  // (else enemies would spawn/fire every frame).
+  eq(G.rampedInterval(120, 240, 4, 1000), 120, 'stage 1000 → clamped to floor, not negative');
+  ok(G.rampedInterval(80, 200, 10, 1000) >= 80, 'interval never drops below floor');
+  ok(G.rampedInterval(80, 200, 10, 1000) > 0,    'interval always positive (no every-frame spawn)');
+} else { console.log('  (skipped — rampedInterval not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
