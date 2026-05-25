@@ -2547,6 +2547,25 @@ if (typeof G.aabbHit === 'function') {
 } else { console.log('  (skipped — aabbHit not exposed)'); }
 
 // ============================================================
+section('clamp01 — saturate to [0,1] (12 normalized-fraction sites)');
+if (typeof G.clamp01 === 'function') {
+  eq(G.clamp01(0.5), 0.5, 'in-range passes through');
+  eq(G.clamp01(0), 0, 'lower bound 0 stays');
+  eq(G.clamp01(1), 1, 'upper bound 1 stays');
+  eq(G.clamp01(-3), 0, 'below 0 → 0');
+  eq(G.clamp01(7), 1, 'above 1 → 1');
+  eq(G.clamp01(1.0001), 1, 'just above 1 → 1');
+  eq(G.clamp01(-0.0001), 0, 'just below 0 → 0');
+  // Identity vs the inlined form across random samples (incl. out-of-range).
+  let drift = 0;
+  for (let i = 0; i < 200; i++) {
+    const x = (Math.random() - 0.5) * 4; // spans roughly [-2, 2]
+    if (G.clamp01(x) !== Math.max(0, Math.min(1, x))) drift++;
+  }
+  eq(drift, 0, 'clamp01 matches Math.max(0,Math.min(1,x)) on 200 samples');
+} else { console.log('  (skipped — clamp01 not exposed)'); }
+
+// ============================================================
 section('rampedInterval — enemy cadence shrinks with stage, floored');
 if (typeof G.rampedInterval === 'function') {
   eq(G.rampedInterval(120, 240, 4, 0),  240, 'stage 0 → base interval (240)');

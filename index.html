@@ -187,7 +187,7 @@ let bgmGain = null;
 let sfxGain = null;
 let audioVolume = (() => {
   const v = parseFloat(localStorage.getItem('galagaVol'));
-  return isNaN(v) ? 1 : Math.max(0, Math.min(1, v));
+  return isNaN(v) ? 1 : clamp01(v);
 })();
 let audioMuted = localStorage.getItem('galagaMute') === '1';
 let bgmEnabled = localStorage.getItem('galagaBGMOff') !== '1';
@@ -293,6 +293,13 @@ function aimVelocity(fromX, fromY, toX, toY, speed) {
 // eager evaluation is behaviorally identical to the original short-circuited &&.
 function aabbHit(dx, dy, halfW, halfH) {
   return Math.abs(dx) < halfW && Math.abs(dy) < halfH;
+}
+// Saturate a value to [0,1] — the normalized-fraction idiom (alpha fades, eased
+// progress t, gauge fills) that appeared as `Math.max(0, Math.min(1, x))` at 12
+// sites. Bounds are fixed literals so naming it states the intent ("this is a
+// 0–1 fraction") and the single arg keeps operands in place (no reorder risk).
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
 }
 // Short human-readable summary of what a difficulty actually changes — surfaced
 // as toggle feedback so the speed/fire/elite/loot trade-offs (diffSpeedMul,
@@ -2345,7 +2352,7 @@ function drawTractorBeam(x, y, h) {
   ctx.lineWidth = 1;
   const off = (t * 3) % 8;
   for (let i = -8 + off; i < h; i += 8) {
-    const tt = Math.max(0, Math.min(1, i / h));
+    const tt = clamp01(i / h);
     const w = w1 + (w2 - w1) * tt;
     ctx.beginPath(); ctx.moveTo(x - w, y + i); ctx.lineTo(x + w, y + i); ctx.stroke();
   }
@@ -2740,7 +2747,7 @@ function drawFloatText(ft) {
   if (typeof ft.countTo === 'number') {
     const dur = ft.countDuration || 30;
     const elapsed = (ft.maxLife || dur) - ft.life;
-    const t = Math.max(0, Math.min(1, elapsed / dur));
+    const t = clamp01(elapsed / dur);
     const v = Math.round(ft.countTo * t);
     txt = (ft.prefix || '') + v + (ft.suffix || '');
   }
@@ -3014,7 +3021,7 @@ function drawPowerUp(p) {
     const floorY = BASE_H - 18;
     if (y < floorY) {
       const dist = floorY - y;
-      const sAlpha = Math.max(0, Math.min(1, 1 - dist / 200));
+      const sAlpha = clamp01(1 - dist / 200);
       const cMap = {
         S: '#0df', N: '#1e6', P: '#e3e', T: '#5af', R: '#fc4',
         W: '#f6a', H: '#0cf', B: '#f44', L: '#fff', E: '#4f8', F: '#fa0'
@@ -9570,7 +9577,7 @@ function drawBonusGame() {
   }
   if (bg.resultShown) {
     const elapsedSinceResult = bg.elapsed - (bg.stopAt[2] + 18);
-    const cT = Math.max(0, Math.min(1, elapsedSinceResult / 30));
+    const cT = clamp01(elapsedSinceResult / 30);
 
     if (bg.bonus >= 10000) {
       // MEGA JACKPOT — gold strobe + concentric ring burst
@@ -11182,7 +11189,7 @@ function updateEnemies() {
         const sx = cx + Math.cos(angle) * radius;
         const sy = cy + Math.sin(angle) * radius * 0.65;
         // Smoothly blend into home position over the last 35% of the path
-        const k = Math.max(0, Math.min(1, (t - 0.65) / 0.35));
+        const k = clamp01((t - 0.65) / 0.35);
         e.x = sx * (1 - k) + e.homeX * k;
         e.y = sy * (1 - k) + e.homeY * k;
       } else {
@@ -19199,7 +19206,7 @@ function drawGameplay() {
 
     if (rt >= 60) {
       // ── PHASE A: TACTICAL CASUALTY REPORT (rt 90→60) ────────────
-      const fadeIn = Math.max(0, Math.min(1, 1 - (rt - 60) / 30));
+      const fadeIn = clamp01(1 - (rt - 60) / 30);
 
       // Deep dark overlay — crisis atmosphere
       ctx.globalAlpha = 0.72 * fadeIn;
@@ -19294,7 +19301,7 @@ function drawGameplay() {
 
     } else if (rt >= 20) {
       // ── PHASE B: HULL REBOOT + DIAGNOSTIC TICKER (rt 60→20) ────
-      const prog = Math.max(0, Math.min(1, (60 - rt) / 40));  // 0→1
+      const prog = clamp01((60 - rt) / 40);  // 0→1
 
       // Lighter vignette — enemies partially visible
       ctx.globalAlpha = 0.38;
@@ -20223,7 +20230,7 @@ function drawHUD() {
     // COMBO DECAY BAR — 12px under the multiplier badge showing remaining combo time
     // before decay (90 frames). Tactical info for combo maintenance. Color tiers:
     // cyan (70%+) → gold (40-70%) → red pulse (<40%).
-    const _cdRatio = Math.max(0, Math.min(1, (game.comboTimer || 0) / COMBO_DECAY));
+    const _cdRatio = clamp01((game.comboTimer || 0) / COMBO_DECAY);
     const _cdW = 12;
     const _cdFillW = Math.round(_cdW * _cdRatio);
     let _cdCol = '#0ff';
@@ -21404,7 +21411,7 @@ function drawGameOverScreen() {
 
   // Score (counts up from 0 during frames 30→90 of the entrance) — eased curve for satisfying tally
   const countStart = 30, countEnd = 90;
-  const linearT = Math.max(0, Math.min(1, (elapsedGo - countStart) / (countEnd - countStart)));
+  const linearT = clamp01((elapsedGo - countStart) / (countEnd - countStart));
   // Ease-out curve so big scores ramp up fast at first then settle
   const countT = 1 - Math.pow(1 - linearT, 2);
   const displayScore = Math.floor(game.score * countT);
@@ -21449,7 +21456,7 @@ function drawGameOverScreen() {
 
   // Sequential count-up windows so the stats roll in after SCORE finishes.
   function rollT(start, end) {
-    return Math.max(0, Math.min(1, (elapsedGo - start) / (end - start)));
+    return clamp01((elapsedGo - start) / (end - start));
   }
   const tKills = rollT(95, 112);
   const tAcc   = rollT(103, 120);
@@ -22575,7 +22582,7 @@ function drawStatsOverlay() {
           else if (_ni.next === 'APEX SURVIVOR')   _rR = _bsR / 30;
           else if (_ni.next === 'BESTIARY MASTER') _rR = _dxC / 8;
           else if (_ni.next === 'ACE PILOT')   _rR = (_aC / _aT) * 100 / 80;
-          _rR = Math.max(0, Math.min(1, _rR));
+          _rR = clamp01(_rR);
           ctx.save();
           ctx.fillStyle = '#222'; ctx.fillRect(px + 8, y, panelW - 16, 2);
           ctx.fillStyle = _rR >= 0.85 ? '#0f8' : _rR >= 0.5 ? '#0cf' : '#fc8';
