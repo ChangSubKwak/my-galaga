@@ -2484,6 +2484,19 @@ if (typeof G.computeBulletSpeed === 'function') {
 } else { console.log('  (skipped — computeBulletSpeed not exposed)'); }
 
 // ============================================================
+section('cappedStageSpeed — enemy aimed-shot ramp/cap × difficulty');
+if (typeof G.cappedStageSpeed === 'function') {
+  // base + stage·perStage, clamped to cap, then × diffMul.
+  eq(G.cappedStageSpeed(3.0, 1.0, 0.1, 0,  1), 1, 'stage 0 → base only (1.0)');
+  eq(G.cappedStageSpeed(3.0, 1.0, 0.1, 10, 1), 2, 'stage 10 below cap → 1.0 + 10×0.1 = 2.0');
+  eq(G.cappedStageSpeed(2.0, 1.0, 0.1, 100, 1), 2, 'high stage clamped to cap 2.0');
+  // Difficulty multiplier applies AFTER the cap (so hard fire can exceed raw cap).
+  ok(Math.abs(G.cappedStageSpeed(3.0, 1.0, 0.1, 10, 1.15) - 2.3) < 1e-9, 'hard ×1.15 after cap (2.0→2.3)');
+  ok(Math.abs(G.cappedStageSpeed(3.0, 1.0, 0.1, 10, 0.85) - 1.7) < 1e-9, 'easy ×0.85 (2.0→1.7)');
+  ok(Math.abs(G.cappedStageSpeed(2.0, 1.0, 0.5, 50, 1.15) - 2.3) < 1e-9, 'cap clamps the base speed, then ×diffMul');
+} else { console.log('  (skipped — cappedStageSpeed not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {

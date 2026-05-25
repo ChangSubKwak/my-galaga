@@ -251,6 +251,14 @@ function diffFireMul()  {
   return m;
 }
 function diffSpeedMul() { return difficultyMode === 'easy' ? 0.85 : difficultyMode === 'hard' ? 1.15 : 1; }
+// Enemy aimed-shot speed: linear stage ramp (base + stage·perStage) clamped to a
+// per-enemy cap, then scaled by the difficulty speed multiplier. Single source for
+// the 10 enemy/boss fire sites that all shared this exact shape. Pure (stage +
+// diffMul passed in) so the cap/ramp behavior is locked by tests; per-site tuning
+// constants stay at the call sites.
+function cappedStageSpeed(cap, base, perStage, stage, diffMul) {
+  return Math.min(cap, base + stage * perStage) * diffMul;
+}
 // Short human-readable summary of what a difficulty actually changes — surfaced
 // as toggle feedback so the speed/fire/elite/loot trade-offs (diffSpeedMul,
 // diffFireMul, eliteRateForStage, powerUpDropRate) are legible at the moment of
@@ -6308,7 +6316,7 @@ function updateOneMegaBoss(mb) {
         const step = count > 1 ? 0.45 : 0;
         const start = -step * (count - 1) / 2;
         // Capped boss aim speed (1.5 base, +stage scaling, max 2.7)
-        const bSpeed = Math.min(2.7, 1.5 + game.stage * 0.03) * diffSpeedMul();
+        const bSpeed = cappedStageSpeed(2.7, 1.5, 0.03, game.stage, diffSpeedMul());
         for (let k = 0; k < count; k++) {
           const offset = start + step * k;
           const dx = game.playerX - mb.x, dy = game.playerY - mb.y;
@@ -6328,7 +6336,7 @@ function updateOneMegaBoss(mb) {
     if (mb.spiralRemaining && mb.spiralRemaining > 0) {
       const k = 8 - mb.spiralRemaining;
       const a = mb.spiralAngleStart + (k / 8) * Math.PI * 2;
-      const bSpeed = Math.min(2.0, 1.1 + game.stage * 0.02) * diffSpeedMul();
+      const bSpeed = cappedStageSpeed(2.0, 1.1, 0.02, game.stage, diffSpeedMul());
       game.enemyBullets.push({
         x: mb.x, y: mb.y + 8,
         vx: Math.cos(a) * bSpeed,
@@ -6359,7 +6367,7 @@ function updateOneMegaBoss(mb) {
         // SPLIT SHOT — single fast bullet that splits into 3 fan after 28 frames
         const dx0 = game.playerX - mb.x, dy0 = game.playerY - mb.y;
         const len0 = Math.sqrt(dx0*dx0 + dy0*dy0) || 1;
-        const sp = Math.min(2.4, 1.4 + game.stage * 0.025) * diffSpeedMul();
+        const sp = cappedStageSpeed(2.4, 1.4, 0.025, game.stage, diffSpeedMul());
         game.enemyBullets.push({
           x: mb.x, y: mb.y + 8,
           vx: (dx0 / len0) * sp,
@@ -6372,7 +6380,7 @@ function updateOneMegaBoss(mb) {
         playSound('enemyDive', mb.x);
       } else if (mb.archetype === 'tendril') {
         // LASER SWEEP — wide horizontal beam (4 bullets along horizontal line, slow)
-        const sp = Math.min(1.5, 0.9 + game.stage * 0.012) * diffSpeedMul();
+        const sp = cappedStageSpeed(1.5, 0.9, 0.012, game.stage, diffSpeedMul());
         for (let k = -2; k <= 2; k++) {
           game.enemyBullets.push({
             x: mb.x + k * 6, y: mb.y + 10,
@@ -6385,7 +6393,7 @@ function updateOneMegaBoss(mb) {
         // FRAGMENT BURST — 6-shot quick fan all aimed at player (denser than base aimed spread)
         const dx0 = game.playerX - mb.x, dy0 = game.playerY - mb.y;
         const len0 = Math.sqrt(dx0*dx0 + dy0*dy0) || 1;
-        const sp = Math.min(2.0, 1.2 + game.stage * 0.02) * diffSpeedMul();
+        const sp = cappedStageSpeed(2.0, 1.2, 0.02, game.stage, diffSpeedMul());
         const baseAng = Math.atan2(dy0, dx0);
         for (let k = -2; k <= 3; k++) {
           const a = baseAng + k * 0.18;
@@ -6402,7 +6410,7 @@ function updateOneMegaBoss(mb) {
         // Distinct from aimed (horned/crystal) and sweep (tendril): a spinning
         // omni-directional pattern that fills space rather than tracking. Brings
         // rune to signature parity with the other classes (was attack-less).
-        const sp = Math.min(1.8, 1.1 + game.stage * 0.018) * diffSpeedMul();
+        const sp = cappedStageSpeed(1.8, 1.1, 0.018, game.stage, diffSpeedMul());
         mb.runeSpin = (mb.runeSpin || 0) + 0.4;
         for (let k = 0; k < 4; k++) {
           const a = mb.runeSpin + k * (Math.PI / 2);
@@ -6424,7 +6432,7 @@ function updateOneMegaBoss(mb) {
       mb.ringTimer = (mb.ringTimer || 0) + 1;
       if (mb.ringTimer >= 180) {
         mb.ringTimer = 0;
-        const ringSpeed = Math.min(1.8, 1.0 + game.stage * 0.015) * diffSpeedMul();
+        const ringSpeed = cappedStageSpeed(1.8, 1.0, 0.015, game.stage, diffSpeedMul());
         const ringCount = 8;
         const offsetA = Math.random() * Math.PI / ringCount;
         for (let r = 0; r < ringCount; r++) {
@@ -11259,7 +11267,7 @@ function updateEnemies() {
         const dx = game.playerX - e.x, dy = game.playerY - e.y;
         const len = Math.sqrt(dx*dx+dy*dy) || 1;
         // Capped speed: 2.0 baseline + smaller stage scaling, max 3.4
-        const spd = Math.min(3.4, 2.0 + game.stage * 0.045) * diffSpeedMul();
+        const spd = cappedStageSpeed(3.4, 2.0, 0.045, game.stage, diffSpeedMul());
         game.enemyBullets.push({
           x: e.x, y: e.y + 4,
           vx: dx / len * spd, vy: dy / len * spd,
@@ -11330,7 +11338,7 @@ function updateEnemies() {
         e.shootTimer = 0;
         const dx = game.playerX - e.x, dy = game.playerY - e.y;
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const spd = Math.min(3.2, 1.8 + game.stage * 0.03) * diffSpeedMul();
+        const spd = cappedStageSpeed(3.2, 1.8, 0.03, game.stage, diffSpeedMul());
         game.enemyBullets.push({
           x: e.x, y: e.y + 6,
           vx: dx / len * spd, vy: dy / len * spd,
@@ -11355,7 +11363,7 @@ function updateEnemies() {
         e.shootTimer = 0;
         const dx = game.playerX - e.x, dy = game.playerY - e.y;
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const spd = Math.min(3.2, 1.9 + game.stage * 0.03) * diffSpeedMul();
+        const spd = cappedStageSpeed(3.2, 1.9, 0.03, game.stage, diffSpeedMul());
         game.enemyBullets.push({
           x: e.x, y: e.y + 6,
           vx: dx / len * spd, vy: dy / len * spd,
