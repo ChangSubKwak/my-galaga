@@ -2497,6 +2497,27 @@ if (typeof G.cappedStageSpeed === 'function') {
 } else { console.log('  (skipped — cappedStageSpeed not exposed)'); }
 
 // ============================================================
+section('aimVelocity — unit-direction × speed, zero-distance NaN guard');
+if (typeof G.aimVelocity === 'function') {
+  // Straight right: from (0,0) to (10,0) at speed 3 → vx=3, vy=0.
+  let v = G.aimVelocity(0, 0, 10, 0, 3);
+  ok(Math.abs(v.vx - 3) < 1e-9 && Math.abs(v.vy) < 1e-9, 'rightward aim → (3, 0)');
+  // Straight down: from (0,0) to (0,-5) at speed 2 → vy=-2.
+  v = G.aimVelocity(0, 0, 0, -5, 2);
+  ok(Math.abs(v.vx) < 1e-9 && Math.abs(v.vy + 2) < 1e-9, 'upward aim → (0, -2)');
+  // 3-4-5 triangle: to (3,4) at speed 5 → (3,4) exactly (unit (0.6,0.8)×5).
+  v = G.aimVelocity(0, 0, 3, 4, 5);
+  ok(Math.abs(v.vx - 3) < 1e-9 && Math.abs(v.vy - 4) < 1e-9, '3-4-5 aim → (3, 4)');
+  // Magnitude always equals the requested speed (normalized).
+  v = G.aimVelocity(7, 2, -4, 9, 6);
+  ok(Math.abs(Math.hypot(v.vx, v.vy) - 6) < 1e-9, 'velocity magnitude == speed');
+  // Zero distance (shooter on target): || 1 guard → no NaN/Infinity, returns 0 vector.
+  v = G.aimVelocity(5, 5, 5, 5, 4);
+  ok(Number.isFinite(v.vx) && Number.isFinite(v.vy), 'same-point aim → finite (no NaN)');
+  ok(v.vx === 0 && v.vy === 0, 'same-point aim → zero velocity');
+} else { console.log('  (skipped — aimVelocity not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {

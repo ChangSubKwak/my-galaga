@@ -259,6 +259,16 @@ function diffSpeedMul() { return difficultyMode === 'easy' ? 0.85 : difficultyMo
 function cappedStageSpeed(cap, base, perStage, stage, diffMul) {
   return Math.min(cap, base + stage * perStage) * diffMul;
 }
+
+// Aimed-shot velocity: unit vector from (fromX,fromY) toward (toX,toY) scaled by
+// speed, returned as {vx,vy}. The `|| 1` length guard prevents NaN velocity when
+// the shooter sits exactly on the target. Single source for the straight aimed
+// enemy/boss shots (dive/hoverer/mirror + horned split). Pure + tested.
+function aimVelocity(fromX, fromY, toX, toY, speed) {
+  const dx = toX - fromX, dy = toY - fromY;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  return { vx: dx / len * speed, vy: dy / len * speed };
+}
 // Short human-readable summary of what a difficulty actually changes — surfaced
 // as toggle feedback so the speed/fire/elite/loot trade-offs (diffSpeedMul,
 // diffFireMul, eliteRateForStage, powerUpDropRate) are legible at the moment of
@@ -6365,13 +6375,12 @@ function updateOneMegaBoss(mb) {
       mb.sigTimer = 0;
       if (mb.archetype === 'horned') {
         // SPLIT SHOT — single fast bullet that splits into 3 fan after 28 frames
-        const dx0 = game.playerX - mb.x, dy0 = game.playerY - mb.y;
-        const len0 = Math.sqrt(dx0*dx0 + dy0*dy0) || 1;
         const sp = cappedStageSpeed(2.4, 1.4, 0.025, game.stage, diffSpeedMul());
+        const av = aimVelocity(mb.x, mb.y, game.playerX, game.playerY, sp);
         game.enemyBullets.push({
           x: mb.x, y: mb.y + 8,
-          vx: (dx0 / len0) * sp,
-          vy: (dy0 / len0) * sp,
+          vx: av.vx,
+          vy: av.vy,
           kind: 'mega',
           splitAt: 28,
           splitFan: 0.45,
@@ -11264,13 +11273,12 @@ function updateEnemies() {
       e.diveTimer++;
       const shootEvery = Math.max(14, Math.round((42 - Math.floor(game.stage * 1.0)) * diffFireMul()));
       if (e.diveTimer % shootEvery === 0 && game.playerAlive) {
-        const dx = game.playerX - e.x, dy = game.playerY - e.y;
-        const len = Math.sqrt(dx*dx+dy*dy) || 1;
         // Capped speed: 2.0 baseline + smaller stage scaling, max 3.4
         const spd = cappedStageSpeed(3.4, 2.0, 0.045, game.stage, diffSpeedMul());
+        const av = aimVelocity(e.x, e.y, game.playerX, game.playerY, spd);
         game.enemyBullets.push({
           x: e.x, y: e.y + 4,
-          vx: dx / len * spd, vy: dy / len * spd,
+          vx: av.vx, vy: av.vy,
           kind: 'dive', fromType: e.type
         });
       }
@@ -11336,12 +11344,11 @@ function updateEnemies() {
       const shootEvery = Math.max(40, Math.round((100 - game.stage * 1.2) * diffFireMul()));
       if (e.shootTimer >= shootEvery && game.playerAlive) {
         e.shootTimer = 0;
-        const dx = game.playerX - e.x, dy = game.playerY - e.y;
-        const len = Math.sqrt(dx * dx + dy * dy) || 1;
         const spd = cappedStageSpeed(3.2, 1.8, 0.03, game.stage, diffSpeedMul());
+        const av = aimVelocity(e.x, e.y, game.playerX, game.playerY, spd);
         game.enemyBullets.push({
           x: e.x, y: e.y + 6,
-          vx: dx / len * spd, vy: dy / len * spd,
+          vx: av.vx, vy: av.vy,
           kind: 'dive', fromType: e.type
         });
       }
@@ -11361,12 +11368,11 @@ function updateEnemies() {
       const shootEvery = Math.max(40, Math.round((110 - game.stage * 1.5) * diffFireMul()));
       if (e.shootTimer >= shootEvery && game.playerAlive) {
         e.shootTimer = 0;
-        const dx = game.playerX - e.x, dy = game.playerY - e.y;
-        const len = Math.sqrt(dx * dx + dy * dy) || 1;
         const spd = cappedStageSpeed(3.2, 1.9, 0.03, game.stage, diffSpeedMul());
+        const av = aimVelocity(e.x, e.y, game.playerX, game.playerY, spd);
         game.enemyBullets.push({
           x: e.x, y: e.y + 6,
-          vx: dx / len * spd, vy: dy / len * spd,
+          vx: av.vx, vy: av.vy,
           kind: 'dive', fromType: e.type
         });
       }
