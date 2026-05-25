@@ -6327,16 +6327,16 @@ function updateOneMegaBoss(mb) {
         const start = -step * (count - 1) / 2;
         // Capped boss aim speed (1.5 base, +stage scaling, max 2.7)
         const bSpeed = cappedStageSpeed(2.7, 1.5, 0.03, game.stage, diffSpeedMul());
+        // Aim vector is identical for every pellet (independent of k) — compute it
+        // once, then rotate by each pellet's spread offset.
+        const aim = aimVelocity(mb.x, mb.y, game.playerX, game.playerY, bSpeed);
         for (let k = 0; k < count; k++) {
           const offset = start + step * k;
-          const dx = game.playerX - mb.x, dy = game.playerY - mb.y;
-          const len = Math.sqrt(dx*dx + dy*dy) || 1;
-          const bvx = (dx/len) * bSpeed, bvy = (dy/len) * bSpeed;
           const cos = Math.cos(offset), sin = Math.sin(offset);
           game.enemyBullets.push({
             x: mb.x, y: mb.y + 8,
-            vx: bvx * cos - bvy * sin,
-            vy: bvx * sin + bvy * cos,
+            vx: aim.vx * cos - aim.vy * sin,
+            vy: aim.vx * sin + aim.vy * cos,
             kind: 'mega'
           });
         }
