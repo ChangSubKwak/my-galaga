@@ -11287,7 +11287,7 @@ function updateEnemies() {
       // Enemy shoots during dive — fires more often at higher stages, but bullet speed is bounded
       // for fairness (no homing trackers — straight aimed shots only).
       e.diveTimer++;
-      const shootEvery = Math.max(14, Math.round((42 - Math.floor(game.stage * 1.0)) * diffFireMul()));
+      const shootEvery = rampedFireInterval(14, 42, 1.0, game.stage, diffFireMul());
       if (e.diveTimer % shootEvery === 0 && game.playerAlive) {
         // Capped speed: 2.0 baseline + smaller stage scaling, max 3.4
         const spd = cappedStageSpeed(3.4, 2.0, 0.045, game.stage, diffSpeedMul());
