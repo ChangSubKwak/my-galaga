@@ -54,7 +54,13 @@ corrupt-JSON graceful, `commitGameToCumStats` demo-guard + accumulation + last-r
 shared `tryStartDash` gating (cooldown/i-frames/combat), the `comboTierColor` /
 `comboKillDetune` / `moraleDiveDetune` / `flashAlpha` / `effectiveShakeMul` /
 `blinkPhase` / `computeStageAccuracy` helpers, and `POWERUP_COL` / `GRADE_COL`
-completeness guards.
+completeness guards. Also covers the pure math/random utility helpers
+(`aabbHit` symmetric-box overlap, `clamp01` saturate-to-[0,1], `jitter` symmetric
+random offset, `randInt` integer-in-[0,n), `magnitude` Euclidean length — each
+with edge cases + a sample-based identity check against the inlined form it
+replaced) and the **boss-taunt voice guard** (`tauntFor` — every one of the 6
+archetypes has a complete, non-empty voice distinct from `standard`, while an
+unknown archetype still falls back to `standard`).
 
 Note: top-level `let`/`const` bindings (e.g. `game`, `stagePBs`, `SHIPS`) are not
 visible on the vm context global — the harness appends accessor shims (`__getGame`,
