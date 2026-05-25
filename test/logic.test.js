@@ -2403,6 +2403,23 @@ if (typeof G.updateCollisions === 'function' && typeof G.createEnemy === 'functi
 } else { console.log('  (skipped — updateCollisions / createEnemy not exposed)'); }
 
 // ============================================================
+section('nonFireBulletCount — excludes guardian/parry-echo from fire cap');
+if (typeof G.nonFireBulletCount === 'function') {
+  eq(G.nonFireBulletCount([]), 0, 'empty → 0');
+  // Plain player + fork bullets are fire-button shots → NOT counted.
+  eq(G.nonFireBulletCount([{}, { fork: true }, { kind: 'laser' }]), 0, 'player/fork/laser shots → 0');
+  // Guardian-ally and parry-echo bullets ARE excluded from the player cap.
+  eq(G.nonFireBulletCount([{ _guardian: true }]), 1, 'guardian bullet counted');
+  eq(G.nonFireBulletCount([{ _parryEcho: true }]), 1, 'parry-echo bullet counted');
+  eq(G.nonFireBulletCount([{}, { _guardian: true }, { fork: true }, { _parryEcho: true }, {}]), 2,
+     'mixed array: only the 2 non-fire bullets counted');
+  // The cap math (live length − nonFire) must reflect only the player's own shots:
+  // 5 bullets, 2 of them ally/echo → 3 count against maxBullets.
+  const mixed = [{}, { _guardian: true }, {}, { _parryEcho: true }, {}];
+  eq(mixed.length - G.nonFireBulletCount(mixed), 3, 'player-owned bullets = length − nonFire');
+} else { console.log('  (skipped — nonFireBulletCount not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {

@@ -8261,6 +8261,18 @@ function updateStars() {
   }
 }
 
+// Count the non-fire bullets sharing game.bullets — guardian-ally shots and
+// perfect-parry echoes. They live in the player bullet array (for shared
+// collision) but are NOT player fire-button shots, so the maxBullets fire cap
+// must exclude them, else a reward (drone / echo) would suppress the player's
+// own fire rate. Pure + tested; subtracted from the live game.bullets.length at
+// the fire-gate and the fork-headroom check.
+function nonFireBulletCount(bullets) {
+  let n = 0;
+  for (const b of bullets) if (b._guardian || b._parryEcho) n++;
+  return n;
+}
+
 function updatePlayer() {
   if (!game.playerAlive) return;
   const ship = game.ship || shipAttrs();
@@ -8381,7 +8393,7 @@ function updatePlayer() {
   // echo) would silently suppress the player's own fire rate. Both are pushed outside
   // updatePlayer, so this count is stable here and correct to subtract from the live
   // game.bullets.length at both cap sites.
-  const _nonFireBullets = game.bullets.reduce((nB, b) => (b._guardian || b._parryEcho) ? nB + 1 : nB, 0);
+  const _nonFireBullets = nonFireBulletCount(game.bullets);
   // Per-frame fire-rate cap (~10 shots/sec). Replaces the old `keys[' '] = false`
   // debounce, which broke touch-fire-hold (touch has no auto-repeat to re-set the key).
   if (game.fireCooldown > 0) game.fireCooldown--;
