@@ -2623,6 +2623,24 @@ if (typeof G.randInt === 'function') {
 } else { console.log('  (skipped — randInt not exposed)'); }
 
 // ============================================================
+section('magnitude — Euclidean vector length (13 Math.sqrt(x*x+y*y) sites)');
+if (typeof G.magnitude === 'function') {
+  eq(G.magnitude(3, 4), 5, '3-4-5 triangle → 5');
+  eq(G.magnitude(0, 0), 0, 'zero vector → 0');
+  eq(G.magnitude(5, 0), 5, 'axis-aligned x → 5');
+  eq(G.magnitude(0, -7), 7, 'negative y → 7 (sign-independent)');
+  eq(G.magnitude(-3, -4), 5, 'both negative → 5');
+  ok(Math.abs(G.magnitude(1, 1) - Math.SQRT2) < 1e-9, 'unit diagonal → √2');
+  // Identity vs the inlined form across random samples.
+  let drift = 0;
+  for (let i = 0; i < 200; i++) {
+    const x = (Math.random() - 0.5) * 100, y = (Math.random() - 0.5) * 100;
+    if (Math.abs(G.magnitude(x, y) - Math.sqrt(x * x + y * y)) > 1e-9) drift++;
+  }
+  eq(drift, 0, 'magnitude matches Math.sqrt(x*x+y*y) on 200 random samples');
+} else { console.log('  (skipped — magnitude not exposed)'); }
+
+// ============================================================
 section('rampedInterval — enemy cadence shrinks with stage, floored');
 if (typeof G.rampedInterval === 'function') {
   eq(G.rampedInterval(120, 240, 4, 0),  240, 'stage 0 → base interval (240)');

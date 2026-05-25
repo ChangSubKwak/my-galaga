@@ -280,9 +280,17 @@ function rampedFireInterval(floor, base, perStage, stage, diffMul) {
 // speed, returned as {vx,vy}. The `|| 1` length guard prevents NaN velocity when
 // the shooter sits exactly on the target. Single source for the straight aimed
 // enemy/boss shots (dive/hoverer/mirror + horned split). Pure + tested.
+// Vector magnitude (Euclidean length) — the `Math.sqrt(x*x + y*y)` idiom that
+// was at 13 sites (velocity/heading normalization, proximity distance).
+// Self-contained inside sqrt's parens, so any `|| fallback` guard stays outside
+// the call unchanged. Same-token-squared form only; chord math
+// (`sqrt(r*r - by*by)`) is deliberately untouched.
+function magnitude(x, y) {
+  return Math.sqrt(x * x + y * y);
+}
 function aimVelocity(fromX, fromY, toX, toY, speed) {
   const dx = toX - fromX, dy = toY - fromY;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const len = magnitude(dx, dy) || 1;
   return { vx: dx / len * speed, vy: dy / len * speed };
 }
 // Symmetric AABB overlap test — true when point (dx,dy) from a box center lies
@@ -3293,7 +3301,7 @@ const BULLET_COLORS = {
 };
 function drawEnemyBullet(b) {
   const t = game.animFrame;
-  const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+  const sp = magnitude(b.vx, b.vy) || 1;
   const ux = -b.vx / sp, uy = -b.vy / sp;
   const C = BULLET_COLORS[b.kind] || BULLET_COLORS.dive;
   // ENEMY BULLET FADE-IN — stamp spawn frame on first draw, then apply 4-frame
@@ -3451,7 +3459,7 @@ function maybeSpawnConstellation() {
   if (b === a) return;
   // Skip if too far apart (avoid edge-to-edge)
   const dx = a.x - b.x, dy = a.y - b.y;
-  if (Math.sqrt(dx*dx + dy*dy) > 80) return;
+  if (magnitude(dx, dy) > 80) return;
   constellationLine = { ax: a.x, ay: a.y, bx: b.x, by: b.y, life: 0, maxLife: 90 };
 }
 function updateConstellation() {
@@ -4238,7 +4246,7 @@ function drawStageWeather() {
     if (w.meteors) {
       for (const m of w.meteors) {
         const lifeFrac = 1 - m.life / m.maxLife;
-        const sp = Math.sqrt(m.vx * m.vx + m.vy * m.vy) || 1;
+        const sp = magnitude(m.vx, m.vy) || 1;
         const ux = -m.vx / sp, uy = -m.vy / sp;
         // Tail — 6 segments fading backward
         for (let s = 0; s < 6; s++) {
@@ -6449,7 +6457,7 @@ function updateOneMegaBoss(mb) {
       } else if (mb.archetype === 'crystal') {
         // FRAGMENT BURST — 6-shot quick fan all aimed at player (denser than base aimed spread)
         const dx0 = game.playerX - mb.x, dy0 = game.playerY - mb.y;
-        const len0 = Math.sqrt(dx0*dx0 + dy0*dy0) || 1;
+        const len0 = magnitude(dx0, dy0) || 1;
         const sp = cappedStageSpeed(2.0, 1.2, 0.02, game.stage, diffSpeedMul());
         const baseAng = Math.atan2(dy0, dx0);
         for (let k = -2; k <= 3; k++) {
@@ -7954,7 +7962,7 @@ function initInput() {
       const dy = touch.clientY - cy;
       const radius = r.width / 2;
       // Clamp displacement to pad radius
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = magnitude(dx, dy);
       const clamped = Math.min(dist, radius);
       const ang = Math.atan2(dy, dx);
       const kx = Math.cos(ang) * Math.min(clamped, KNOB_RANGE);
@@ -8646,14 +8654,14 @@ function updateBullets() {
       // HOMING TARGET LINE — stamp current lock position for draw-side rendering
       if (found) { b.tgtX = tgtX; b.tgtY = tgtY; }
       else { b.tgtX = null; b.tgtY = null; }
-      const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 5;
+      const sp = magnitude(b.vx, b.vy) || 5;
       if (found) {
         const d = Math.sqrt(bestD) || 1;
         const tvx = (nx / d) * sp, tvy = (ny / d) * sp;
         const turn = 0.18;
         b.vx = b.vx + (tvx - b.vx) * turn;
         b.vy = b.vy + (tvy - b.vy) * turn;
-        const cur = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+        const cur = magnitude(b.vx, b.vy) || 1;
         const k = sp / cur;
         b.vx *= k;
         b.vy *= k;
@@ -8715,7 +8723,7 @@ function updateBullets() {
     if (b.splitAt && b.splitAt > 0) {
       b.splitAt -= slowMul;
       if (b.splitAt <= 0) {
-        const sp = b.splitSpeed || Math.sqrt(b.vx*b.vx + b.vy*b.vy) || 1.6;
+        const sp = b.splitSpeed || magnitude(b.vx, b.vy) || 1.6;
         const baseAng = Math.atan2(b.vy, b.vx);
         const fan = b.splitFan || 0.4;
         const splits = [-fan, 0, fan];
@@ -10004,7 +10012,7 @@ function updatePowerUps() {
     if (game.playerAlive) {
       const dx = game.playerX - p.x;
       const dy = game.playerY - p.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = magnitude(dx, dy);
       if (dist < MAGNET_RANGE && dist > 0.5) {
         const pull = 0.6 * (1 - dist / MAGNET_RANGE);
         p.x += (dx / dist) * pull;
@@ -12602,7 +12610,7 @@ function updateCollisions() {
           if (zoomPF > 0) {
             const nudge = e.type === 'goldenBee' ? 4 : e.type === 'ufo' || e.type === 'mirror' ? 3 : 2;
             const dx = e.x - BASE_W/2, dy = e.y - BASE_H/2;
-            const len = Math.sqrt(dx*dx + dy*dy) || 1;
+            const len = magnitude(dx, dy) || 1;
             game.camNudgeX = (dx / len) * nudge;
             game.camNudgeY = (dy / len) * nudge;
           }
@@ -18695,7 +18703,7 @@ function drawGameplay() {
     ctx.fillStyle = '#0f8';
     for (const p of game.powerUps) {
       const dx = game.playerX - p.x, dy = game.playerY - p.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = magnitude(dx, dy);
       if (dist < MAGNET_RANGE_VIS && dist > 6) {
         // Dashed segments — every other 2px step
         const steps = Math.floor(dist / 3);
@@ -19028,7 +19036,7 @@ function drawGameplay() {
       ctx.globalAlpha = fade * 0.45;
       // Bresenham-style chunky pixel line (cheap, ~12 segments)
       const dx = b.x - a.x, dy = b.y - a.y;
-      const steps = Math.max(2, Math.floor(Math.sqrt(dx * dx + dy * dy) / 4));
+      const steps = Math.max(2, Math.floor(magnitude(dx, dy) / 4));
       for (let s = 1; s < steps; s++) {
         const t = s / steps;
         const lx = Math.round(a.x + dx * t);
