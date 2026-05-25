@@ -11415,10 +11415,19 @@ function updateEnemies() {
           e.previewTimer = 30;
           e.previewPath = createLoopPath(e.x, e.y, e.x < BASE_W/2 ? 1 : -1);
           playSound('enemyDive', e.x, moraleDiveDetune(game.enemyMorale));
-          // If boss, escorts get a slightly-delayed preview
+          // If boss, escorts get a slightly-delayed preview. Selected by POSITION
+          // proximity (2 nearest formation butterflies within 30px), not col/row —
+          // variant formations (v/circle/diamond/wave) tag every enemy row=0, so the
+          // old `es.row === 1` filter never matched and variant bosses dove escortless.
           if (e.type === 'boss') {
-            const escorts = game.enemies.filter(es => es.alive && es.state === 'formation' && es.type === 'butterfly' && Math.abs(es.col - e.col) <= 1 && es.row === 1);
-            escorts.slice(0, 2).forEach((es, idx) => {
+            const escorts = game.enemies
+              .filter(es => es.alive && es.state === 'formation' && es.type === 'butterfly')
+              .map(es => ({ es, d: Math.hypot(es.x - e.x, es.y - e.y) }))
+              .filter(o => o.d <= 30)
+              .sort((a, b) => a.d - b.d)
+              .slice(0, 2)
+              .map(o => o.es);
+            escorts.forEach((es, idx) => {
               setTimeout(() => {
                 if (es.alive && es.state === 'formation' && !es.previewTimer) {
                   es.previewTimer = 30;
