@@ -2531,6 +2531,19 @@ if (typeof G.rampedInterval === 'function') {
 } else { console.log('  (skipped — rampedInterval not exposed)'); }
 
 // ============================================================
+section('rampedFireInterval — difficulty-scaled fire cadence, rounded + floored');
+if (typeof G.rampedFireInterval === 'function') {
+  eq(G.rampedFireInterval(40, 100, 1.2, 10, 1), 88, 'stage 10, normal: round(100 − 12) = 88');
+  eq(G.rampedFireInterval(40, 100, 1.2, 5,  1), 94, 'stage 5: round(100 − 6) = 94');
+  eq(G.rampedFireInterval(40, 100, 1.2, 10, 0.5), 44, 'easier fire ×0.5: round(88×0.5) = 44');
+  // Difficulty pushing below the floor still clamps to the floor.
+  eq(G.rampedFireInterval(40, 100, 1.2, 10, 0.4), 40, 'round(88×0.4)=35 → floored to 40');
+  // Deep-stage floor invariant: never below floor, never 0/negative.
+  eq(G.rampedFireInterval(40, 100, 1.2, 1000, 1), 40, 'deep stage clamps to floor (40)');
+  ok(G.rampedFireInterval(40, 100, 1.2, 1000, 1.15) >= 40, 'fire interval never below floor');
+} else { console.log('  (skipped — rampedFireInterval not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {

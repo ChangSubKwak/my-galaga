@@ -268,6 +268,14 @@ function rampedInterval(floor, base, perStage, stage) {
   return Math.max(floor, base - stage * perStage);
 }
 
+// Like rampedInterval but for difficulty-scaled aimed-fire cadence: the stage
+// ramp is scaled by the difficulty fire multiplier and rounded to whole frames,
+// then floored. Floor guards against too-fast fire at deep stages / hard mode.
+// Pure + tested.
+function rampedFireInterval(floor, base, perStage, stage, diffMul) {
+  return Math.max(floor, Math.round((base - stage * perStage) * diffMul));
+}
+
 // Aimed-shot velocity: unit vector from (fromX,fromY) toward (toX,toY) scaled by
 // speed, returned as {vx,vy}. The `|| 1` length guard prevents NaN velocity when
 // the shooter sits exactly on the target. Single source for the straight aimed
@@ -11349,7 +11357,7 @@ function updateEnemies() {
       if (e.x < 12)          { e.x = 12;          e.vx =  Math.abs(e.vx); }
       // Aimed shots (difficulty-scaled, speed capped)
       e.shootTimer++;
-      const shootEvery = Math.max(40, Math.round((100 - game.stage * 1.2) * diffFireMul()));
+      const shootEvery = rampedFireInterval(40, 100, 1.2, game.stage, diffFireMul());
       if (e.shootTimer >= shootEvery && game.playerAlive) {
         e.shootTimer = 0;
         const spd = cappedStageSpeed(3.2, 1.8, 0.03, game.stage, diffSpeedMul());
@@ -11373,7 +11381,7 @@ function updateEnemies() {
       e.y = 30 + Math.sin(e.bobPhase) * 6;
       // Periodic shot aimed at the player (difficulty-scaled, speed capped)
       e.shootTimer++;
-      const shootEvery = Math.max(40, Math.round((110 - game.stage * 1.5) * diffFireMul()));
+      const shootEvery = rampedFireInterval(40, 110, 1.5, game.stage, diffFireMul());
       if (e.shootTimer >= shootEvery && game.playerAlive) {
         e.shootTimer = 0;
         const spd = cappedStageSpeed(3.2, 1.9, 0.03, game.stage, diffSpeedMul());
