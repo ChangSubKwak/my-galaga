@@ -285,6 +285,15 @@ function aimVelocity(fromX, fromY, toX, toY, speed) {
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
   return { vx: dx / len * speed, vy: dy / len * speed };
 }
+// Symmetric AABB overlap test — true when point (dx,dy) from a box center lies
+// within the half-extents (halfW,halfH). Single source for the 9 collision sites
+// that all share the `Math.abs(dx) < hw && Math.abs(dy) < hh` form (player vs
+// bullet/dive/ram, bullet vs mega-boss/satellite/cargo). Strict `<` (not `<=`)
+// matches every original site. Args are pure arithmetic at every call site, so
+// eager evaluation is behaviorally identical to the original short-circuited &&.
+function aabbHit(dx, dy, halfW, halfH) {
+  return Math.abs(dx) < halfW && Math.abs(dy) < halfH;
+}
 // Short human-readable summary of what a difficulty actually changes — surfaced
 // as toggle feedback so the speed/fire/elite/loot trade-offs (diffSpeedMul,
 // diffFireMul, eliteRateForStage, powerUpDropRate) are legible at the moment of
@@ -3761,7 +3770,7 @@ function updateStageWeather() {
       if (r.hp <= 0) continue;
       for (let bi = game.bullets.length - 1; bi >= 0; bi--) {
         const b = game.bullets[bi];
-        if (Math.abs(b.x - r.x) < 5 && Math.abs(b.y - r.y) < 5) {
+        if (aabbHit(b.x - r.x, b.y - r.y, 5, 5)) {
           r.hp = 0;
           game.bullets.splice(bi, 1);
           game.score = (game.score || 0) + 50;
@@ -4663,7 +4672,7 @@ function updateSupplyCrate() {
   // Player bullet collision (3 hp absorbs 3 hits)
   for (let bi = game.bullets.length - 1; bi >= 0; bi--) {
     const b = game.bullets[bi];
-    if (Math.abs(b.x - c.x) < 6 && Math.abs(b.y - c.y) < 6) {
+    if (aabbHit(b.x - c.x, b.y - c.y, 6, 6)) {
       c.hp--;
       game.bullets.splice(bi, 1);
       game.itemBursts.push({ x: b.x, y: b.y, life: 0, color: '#fc4' });
@@ -6513,7 +6522,7 @@ function updateOneMegaBoss(mb) {
     const hitRY = mb.super ? 18 : 12;
     // PHANTOM teleFlash invincibility — boss is intangible during teleport flash
     if ((mb.teleFlash || 0) > 0) continue;
-    if (Math.abs(b.x - mb.x) < hitRX && Math.abs(b.y - mb.y) < hitRY) {
+    if (aabbHit(b.x - mb.x, b.y - mb.y, hitRX, hitRY)) {
       game.bullets.splice(bi, 1);
       game.stats.shotsHit++;
       game.stageShotsHit++;
@@ -6849,7 +6858,7 @@ function updateOneMegaBoss(mb) {
   // Mega-boss ramming player (skip while invincible)
   const ramRX = mb.super ? 21 : 14;
   const ramRY = mb.super ? 27 : 18;
-  if (game.playerAlive && game.invincibleTimer <= 0 && Math.abs(mb.x - game.playerX) < ramRX && Math.abs(mb.y - game.playerY) < ramRY) {
+  if (game.playerAlive && game.invincibleTimer <= 0 && aabbHit(mb.x - game.playerX, mb.y - game.playerY, ramRX, ramRY)) {
     killPlayer();
   }
 }
@@ -10009,7 +10018,7 @@ function updatePowerUps() {
     }
     if (!game.playerAlive) continue;
     const hitW = game.dualFighter ? 16 : 7;
-    if (Math.abs(p.x - game.playerX) < hitW + 4 && Math.abs(p.y - game.playerY) < 8) {
+    if (aabbHit(p.x - game.playerX, p.y - game.playerY, hitW + 4, 8)) {
       const color = POWERUP_COL[p.type] || '#fff';
       // PERK 'scavenger' — timer pickups (T/R/W/H/L) last 1.5×. Applied at pickup
       // time so a non-scavenger run's timer can't be retro-extended by perk swap.
@@ -11790,7 +11799,7 @@ function updateCollisions() {
       for (let si = game.shootingStars.length - 1; si >= 0; si--) {
         const ss = game.shootingStars[si];
         if (!ss.wish) continue;
-        if (Math.abs(b.x - ss.x) < 6 && Math.abs(b.y - ss.y) < 6) {
+        if (aabbHit(b.x - ss.x, b.y - ss.y, 6, 6)) {
           addScore(100);
           try {
             const wt = parseInt(localStorage.getItem('galagaWishCount') || '0', 10) || 0;
@@ -12774,7 +12783,7 @@ function updateCollisions() {
     let _parriedThisFrame = 0;
     for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
       const b = game.enemyBullets[i];
-      if (Math.abs(b.x - game.playerX) < hitW + 2 && Math.abs(b.y - game.playerY) < 9) {
+      if (aabbHit(b.x - game.playerX, b.y - game.playerY, hitW + 2, 9)) {
         _parriedThisFrame++;
         // PARRY DEFLECT GHOST — push 3 fading cyan ghosts upward from bullet pos
         // before removing the bullet. Reads as 'deflected back at sender'.
@@ -12935,7 +12944,7 @@ function updateCollisions() {
     for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
       const b = game.enemyBullets[i];
       const hitW = game.dualFighter ? 16 : 7;
-      if (Math.abs(b.x - game.playerX) < hitW && Math.abs(b.y - game.playerY) < 7) {
+      if (aabbHit(b.x - game.playerX, b.y - game.playerY, hitW, 7)) {
         if (tryTriggerWitchTime(b.x, b.y)) break;  // bullet not consumed; witch window opened
         const _bX = b.x, _bY = b.y, _bType = b.fromType;
         // REVENGE: pass the firing enemy's type (formation/dive/elite bullets carry
@@ -13058,7 +13067,7 @@ function updateCollisions() {
     for (const e of game.enemies) {
       if (!e.alive || e.state === 'formation' || e.state === 'entering') continue;
       const hitW = game.dualFighter ? 16 : 7;
-      if (Math.abs(e.x - game.playerX) < hitW + 6 && Math.abs(e.y - game.playerY) < 10) {
+      if (aabbHit(e.x - game.playerX, e.y - game.playerY, hitW + 6, 10)) {
         if (tryTriggerWitchTime(e.x, e.y)) break;  // collision not resolved; witch window opened
         const _eX = e.x, _eY = e.y, _eType = e.type;
         e.alive = false;

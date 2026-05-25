@@ -2518,6 +2518,35 @@ if (typeof G.aimVelocity === 'function') {
 } else { console.log('  (skipped — aimVelocity not exposed)'); }
 
 // ============================================================
+section('aabbHit — symmetric box overlap (the 9 collision sites)');
+if (typeof G.aabbHit === 'function') {
+  // Dead center is always a hit for any positive half-extents.
+  ok(G.aabbHit(0, 0, 5, 5), 'center → hit');
+  // Inside the box on both axes.
+  ok(G.aabbHit(4, 4, 5, 5), 'inside both axes → hit');
+  ok(G.aabbHit(-4, -4, 5, 5), 'inside (negative quadrant, abs) → hit');
+  // Strict `<`: exactly on an edge is a MISS (matches every original site's `<`).
+  ok(!G.aabbHit(5, 0, 5, 5), 'x exactly on edge → miss (strict <)');
+  ok(!G.aabbHit(0, 5, 5, 5), 'y exactly on edge → miss (strict <)');
+  // Outside on either axis → miss (AND of both axes).
+  ok(!G.aabbHit(6, 0, 5, 5), 'x outside → miss');
+  ok(!G.aabbHit(0, 6, 5, 5), 'y outside → miss');
+  ok(!G.aabbHit(4, 9, 5, 5), 'x in but y out → miss (needs both)');
+  // Asymmetric extents (e.g. player box wider than tall: hitW+N vs literal).
+  ok(G.aabbHit(7, 3, 9, 4), 'asymmetric wide box → hit inside');
+  ok(!G.aabbHit(7, 3, 6, 4), 'same point, narrower halfW → miss');
+  // Identity vs the inlined form it replaces, across random pure-arg samples.
+  let drift = 0;
+  for (let i = 0; i < 200; i++) {
+    const dx = (Math.random() - 0.5) * 40, dy = (Math.random() - 0.5) * 40;
+    const hw = Math.random() * 20, hh = Math.random() * 20;
+    const inlined = Math.abs(dx) < hw && Math.abs(dy) < hh;
+    if (G.aabbHit(dx, dy, hw, hh) !== inlined) drift++;
+  }
+  eq(drift, 0, 'aabbHit matches the inlined Math.abs form on 200 random samples');
+} else { console.log('  (skipped — aabbHit not exposed)'); }
+
+// ============================================================
 section('rampedInterval — enemy cadence shrinks with stage, floored');
 if (typeof G.rampedInterval === 'function') {
   eq(G.rampedInterval(120, 240, 4, 0),  240, 'stage 0 → base interval (240)');
