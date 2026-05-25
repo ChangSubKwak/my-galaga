@@ -2420,6 +2420,25 @@ if (typeof G.nonFireBulletCount === 'function') {
 } else { console.log('  (skipped — nonFireBulletCount not exposed)'); }
 
 // ============================================================
+section('computeSynergy — S/N/P build-mode thresholds');
+if (typeof G.computeSynergy === 'function') {
+  // The three named builds at their trigger combos (S/N/P caps are 5/3/3).
+  eq(G.computeSynergy(5, 3, 3), 'OVERLOAD', 'S5 N3 P3 → OVERLOAD (all maxed)');
+  eq(G.computeSynergy(5, 1, 1), 'BLINK',    'S5 N1 P1 → BLINK (speed build)');
+  eq(G.computeSynergy(1, 1, 3), 'HEAVY',    'S1 N1 P3 → HEAVY (damage build)');
+  // No synergy for off-combo level sets.
+  eq(G.computeSynergy(1, 1, 1), null, 'fresh S1 N1 P1 → null');
+  eq(G.computeSynergy(3, 2, 2), null, 'mid mixed → null');
+  // Boundary precision: BLINK/HEAVY require EXACT 1s, OVERLOAD requires the floors.
+  eq(G.computeSynergy(5, 2, 1), null, 'S5 N2 P1 → null (BLINK needs N===1, OVERLOAD needs N>=3)');
+  eq(G.computeSynergy(4, 1, 1), null, 'S4 N1 P1 → null (BLINK needs S>=5)');
+  eq(G.computeSynergy(2, 1, 3), null, 'S2 N1 P3 → null (HEAVY needs S===1)');
+  eq(G.computeSynergy(5, 3, 2), null, 'S5 N3 P2 → null (OVERLOAD needs P>=3)');
+  // Priority: OVERLOAD is checked before BLINK, so all-maxed is OVERLOAD not BLINK.
+  ok(G.computeSynergy(5, 3, 3) !== 'BLINK', 'all-maxed resolves to OVERLOAD, not BLINK');
+} else { console.log('  (skipped — computeSynergy not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {

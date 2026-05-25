@@ -8273,6 +8273,18 @@ function nonFireBulletCount(bullets) {
   return n;
 }
 
+// WEAPON SYNERGY — specific S/N/P power-level combos grant a named build mode.
+// Pure mapping (s,n,p) → 'OVERLOAD' | 'BLINK' | 'HEAVY' | null. Read every frame
+// in updatePlayer; the result drives bullet speed (BLINK 1.3x), damage (OVERLOAD
+// +1 / HEAVY +2), and fire cooldown (OVERLOAD 0.6x). Extracted + tested so the
+// threshold combos can't silently drift.
+function computeSynergy(s, n, p) {
+  if (s >= 5 && n >= 3 && p >= 3) return 'OVERLOAD';
+  if (s >= 5 && n === 1 && p === 1) return 'BLINK';
+  if (s === 1 && n === 1 && p >= 3) return 'HEAVY';
+  return null;
+}
+
 function updatePlayer() {
   if (!game.playerAlive) return;
   const ship = game.ship || shipAttrs();
@@ -8338,11 +8350,7 @@ function updatePlayer() {
   // WEAPON SYNERGY — specific S/N/P combinations grant a named build mode with
   // distinct buffs. Hard-coded combos so a few intentional pickups land you in a
   // unique playstyle. Detected fresh every frame; first detection toasts the build.
-  const sLv = game.lvl.S, nLv = game.lvl.N, pLv = game.lvl.P;
-  let synergy = null;
-  if      (sLv >= 5 && nLv >= 3 && pLv >= 3) synergy = 'OVERLOAD';
-  else if (sLv >= 5 && nLv === 1 && pLv === 1) synergy = 'BLINK';
-  else if (sLv === 1 && nLv === 1 && pLv >= 3) synergy = 'HEAVY';
+  const synergy = computeSynergy(game.lvl.S, game.lvl.N, game.lvl.P);
   // Toast on FIRST entry into a synergy (track last to avoid spam)
   if (synergy && game.lastSynergy !== synergy) {
     game.lastSynergy = synergy;
