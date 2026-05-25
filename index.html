@@ -8285,6 +8285,19 @@ function computeSynergy(s, n, p) {
   return null;
 }
 
+// Player fire cooldown (frames between shots). Base 6, halved to 3 by RAPID
+// pickup, then the RAPID FIRE mutation (÷1.7), fastFingers perk (×0.75), and
+// OVERLOAD synergy (×0.6) stack multiplicatively — each fl'd and floored at 2 so
+// it can never reach 0 (infinite shots/frame). Pure + tested so the stacking and
+// the min-2 floor can't drift.
+function computeFireCooldown(rapidActive, rapidFireMut, fastFingers, overload) {
+  let cd = rapidActive ? 3 : 6;
+  if (rapidFireMut) cd = Math.max(2, Math.floor(cd / 1.7));
+  if (fastFingers)  cd = Math.max(2, Math.floor(cd * 0.75));
+  if (overload)     cd = Math.max(2, Math.floor(cd * 0.6));
+  return cd;
+}
+
 function updatePlayer() {
   if (!game.playerAlive) return;
   const ship = game.ship || shipAttrs();
@@ -8409,13 +8422,12 @@ function updatePlayer() {
     // RAPID — halved cooldown while active (6 → 3 frames = ~20 shots/sec)
     // Base cooldown: 6 frames; RAPID halves it; RAPID FIRE mutation 1.7× shaves a frame
     // from each tier. Min 2 frames so we don't end up at 0 (infinite shots/frame).
-    let cd = (game.rapidTimer || 0) > 0 ? 3 : 6;
-    if (game.stageMutation && game.stageMutation.id === 'rapidFire') cd = Math.max(2, Math.floor(cd / 1.7));
-    // PERK 'fastFingers' — additional 25% reduction. Stacks multiplicatively with rapid/mutation.
-    if (game.activePerk === 'fastFingers') cd = Math.max(2, Math.floor(cd * 0.75));
-    // SYNERGY 'OVERLOAD' (S5+N3+P3) — fire cd ×0.6. Min 2 floor preserved.
-    if (synergy === 'OVERLOAD') cd = Math.max(2, Math.floor(cd * 0.6));
-    game.fireCooldown = cd;
+    game.fireCooldown = computeFireCooldown(
+      (game.rapidTimer || 0) > 0,
+      !!(game.stageMutation && game.stageMutation.id === 'rapidFire'),
+      game.activePerk === 'fastFingers',
+      synergy === 'OVERLOAD'
+    );
     const wave = (game.waveTimer || 0) > 0;
     const homing = (game.homingTimer || 0) > 0;
     const laser = (game.laserTimer || 0) > 0;

@@ -2439,6 +2439,21 @@ if (typeof G.computeSynergy === 'function') {
 } else { console.log('  (skipped — computeSynergy not exposed)'); }
 
 // ============================================================
+section('computeFireCooldown — RAPID/mutation/perk/synergy stacking + min-2 floor');
+if (typeof G.computeFireCooldown === 'function') {
+  eq(G.computeFireCooldown(false, false, false, false), 6, 'base = 6 frames');
+  eq(G.computeFireCooldown(true,  false, false, false), 3, 'RAPID pickup halves to 3');
+  eq(G.computeFireCooldown(false, true,  false, false), 3, 'RAPID FIRE mutation: floor(6/1.7)=3');
+  eq(G.computeFireCooldown(true,  true,  false, false), 2, 'RAPID+mutation: floor(3/1.7)=1 → floored to 2');
+  eq(G.computeFireCooldown(false, false, true,  false), 4, 'fastFingers perk: floor(6*0.75)=4');
+  eq(G.computeFireCooldown(false, false, false, true),  3, 'OVERLOAD synergy: floor(6*0.6)=3');
+  eq(G.computeFireCooldown(false, false, true,  true),  2, 'fastFingers+OVERLOAD: 6→4→floor(4*0.6)=2');
+  // The min-2 floor is the safety invariant — no stack can drive cd to 0/1.
+  eq(G.computeFireCooldown(true,  true,  true,  true),  2, 'all modifiers stacked still floors at 2');
+  ok(G.computeFireCooldown(true, true, true, true) >= 2, 'cd never below 2 (no infinite-fire)');
+} else { console.log('  (skipped — computeFireCooldown not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
