@@ -1894,11 +1894,10 @@ if (typeof G.pickEpitaph === 'function') {
 } else { console.log('  (skipped — pickEpitaph not exposed)'); }
 
 // ============================================================
-section('tauntFor: graceful fallback for every archetype × situation (incl. phantom/rune)');
+section('tauntFor: every archetype has its own voice; unknown still falls back safely');
 if (typeof G.tauntFor === 'function') {
-  // All 6 archetypes (phantom/rune lack their own BOSS_TAUNTS entry → fall back to
-  // standard). All situations the code triggers. Must never throw; returns a
-  // string (a line) or null (no line for that situation) — both are valid.
+  // All situations the code triggers, across the 6 real archetypes plus an unknown
+  // one. Must never throw; returns a string (a line) or null (no line) — both valid.
   const archs = ['standard', 'horned', 'tendril', 'crystal', 'phantom', 'rune', 'unknownArch'];
   const sits  = ['intro', 'phase2', 'lowHp', 'dash', 'death', 'finalStand', 'bogusSit'];
   let allOk = true, bad = '';
@@ -1911,9 +1910,23 @@ if (typeof G.tauntFor === 'function') {
     }
   }
   ok(allOk, 'tauntFor returns string|null and never throws for any archetype×situation' + (bad ? ' (bad: ' + bad + ')' : ''));
-  // phantom/rune specifically resolve via the standard fallback for a known situation
-  ok(G.tauntFor('phantom', 'intro') === G.tauntFor('standard', 'intro'), 'phantom intro falls back to standard');
-  ok(G.tauntFor('rune', 'intro') === G.tauntFor('standard', 'intro'), 'rune intro falls back to standard');
+  // Every real archetype now has its OWN complete, distinct voice — phantom/rune no
+  // longer fall back to standard (gap closed). Lock it: all 6 situations present,
+  // non-empty, and at least one line differs from the standard set's line.
+  const realArchs = ['standard', 'horned', 'tendril', 'crystal', 'phantom', 'rune'];
+  const realSits  = ['intro', 'phase2', 'lowHp', 'dash', 'death', 'finalStand'];
+  for (const a of realArchs) {
+    let complete = true, differs = (a === 'standard');
+    for (const s of realSits) {
+      const line = G.tauntFor(a, s);
+      if (typeof line !== 'string' || line.length === 0) complete = false;
+      if (a !== 'standard' && line !== G.tauntFor('standard', s)) differs = true;
+    }
+    ok(complete, a + ' has a non-empty line for all 6 situations');
+    ok(differs, a + ' has its own voice (differs from standard)');
+  }
+  // The fallback path is still intact for a genuinely unknown archetype.
+  ok(G.tauntFor('unknownArch', 'intro') === G.tauntFor('standard', 'intro'), 'unknown archetype still falls back to standard');
 } else { console.log('  (skipped — tauntFor not exposed)'); }
 
 // ============================================================
