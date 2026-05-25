@@ -301,6 +301,14 @@ function aabbHit(dx, dy, halfW, halfH) {
 function clamp01(x) {
   return Math.max(0, Math.min(1, x));
 }
+// Symmetric random offset in [-range/2, range/2) — the `(Math.random()-0.5)*N`
+// jitter idiom at 29 sites (sprite shimmer, shake offsets, particle/spark
+// spread). `range` is the full peak-to-peak width and is the only thing that
+// varies per site, so the single arg keeps every call uniform. Wrapping is safe:
+// each call is its own independent random draw, identical to the inline form.
+function jitter(range) {
+  return (Math.random() - 0.5) * range;
+}
 // Short human-readable summary of what a difficulty actually changes — surfaced
 // as toggle feedback so the speed/fire/elite/loot trade-offs (diffSpeedMul,
 // diffFireMul, eliteRateForStage, powerUpDropRate) are legible at the moment of
@@ -3543,7 +3551,7 @@ function initNebulae() {
     nebulae.push({
       x: Math.random() * BASE_W,
       y: Math.random() * BASE_H,
-      vx: (Math.random() - 0.5) * 0.04,
+      vx: jitter(0.04),
       vy: 0.06 + Math.random() * 0.06,
       size: 28 + Math.random() * 30,
       color: NEBULA_PALETTE[i % NEBULA_PALETTE.length],
@@ -3765,7 +3773,7 @@ function updateStageWeather() {
         vy: 0.7 + Math.random() * 0.5,
         size: 3 + Math.floor(Math.random() * 2),
         rot: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.12,
+        rotSpeed: jitter(0.12),
         hp: 1
       });
     }
@@ -3851,9 +3859,9 @@ function updateStageWeather() {
           x: Math.random() * BASE_W,
           y: Math.random() * BASE_H,
           vy: 0.10 + Math.random() * 0.22,
-          vx: (Math.random() - 0.5) * 0.06,
+          vx: jitter(0.06),
           rot: Math.random() * Math.PI * 2,
-          rotSpeed: (Math.random() - 0.5) * 0.05,
+          rotSpeed: jitter(0.05),
           size: 1 + Math.floor(Math.random() * 2)
         });
       }
@@ -4773,7 +4781,7 @@ function ensureAsteroids() {
       vy: 0.15 + Math.random() * 0.25,
       size: 4 + Math.floor(Math.random() * 5),
       rot: Math.random() * Math.PI * 2,
-      rotSpeed: (Math.random() - 0.5) * 0.02
+      rotSpeed: jitter(0.02)
     });
   }
 }
@@ -6656,7 +6664,7 @@ function updateOneMegaBoss(mb) {
           game.debris.push({
             x: 12 + Math.random() * (BASE_W - 24),
             y: -4 - Math.random() * 30,
-            vx: (Math.random() - 0.5) * 0.6,
+            vx: jitter(0.6),
             vy: 0.4 + Math.random() * 1.2,
             life: -Math.floor(Math.random() * 30),
             maxLife: 90 + Math.floor(Math.random() * 60),
@@ -9979,7 +9987,7 @@ function updatePowerUps() {
     if ((game.animFrame & 7) === 0) {
       const trailCol = POWERUP_COL[p.type] || '#fff';
       game.itemBursts.push({
-        x: p.x + (Math.random() - 0.5) * 2,
+        x: p.x + jitter(2),
         y: p.y - 3,
         life: 0, color: trailCol
       });
@@ -11061,8 +11069,8 @@ function updateFormationBreathing() {
       e.y = e.homeY + offY + (e.panicOffY || 0);
       // Brief flinch — small jitter when a neighbor was just killed
       if (e.flinch && e.flinch > 0) {
-        e.x += (Math.random() - 0.5) * 2;
-        e.y += (Math.random() - 0.5) * 2;
+        e.x += jitter(2);
+        e.y += jitter(2);
         e.flinch--;
       }
       // Pre-dive telegraph countdown — flips to 'diving' when timer hits 0.
@@ -11295,8 +11303,8 @@ function updateEnemies() {
       if (e.diveTimer % 4 === 0 && Math.random() < 0.4) {
         const tCol = e.type === 'kamikaze' ? '#f80' : e.type === 'boss' ? '#f8a' : '#cef';
         game.itemBursts.push({
-          x: e.x + (Math.random() - 0.5) * 2,
-          y: e.y + (Math.random() - 0.5) * 2,
+          x: e.x + jitter(2),
+          y: e.y + jitter(2),
           life: 12, color: tCol
         });
       }
@@ -12240,8 +12248,8 @@ function updateCollisions() {
               // Assign scatter targets to all alive formation enemies
               for (const _fe of game.enemies) {
                 if (!_fe.alive || _fe.state !== 'formation') continue;
-                _fe.panicTargetX = (Math.random() - 0.5) * 38;
-                _fe.panicTargetY = (Math.random() - 0.5) * 18;
+                _fe.panicTargetX = jitter(38);
+                _fe.panicTargetY = jitter(18);
                 _fe.panicOffX = 0;
                 _fe.panicOffY = 0;
               }
@@ -12280,8 +12288,8 @@ function updateCollisions() {
             }
             for (let s = 0; s < 4; s++) {
               game.hitSparks.push({
-                x: e.x + (Math.random() - 0.5) * 8,
-                y: e.y + (Math.random() - 0.5) * 8,
+                x: e.x + jitter(8),
+                y: e.y + jitter(8),
                 life: -s
               });
             }
@@ -12466,7 +12474,7 @@ function updateCollisions() {
             unlockAchievement('goldenTouch');
             // Meteor shower — 12 streaks radiating outward, with shooting-star tails
             for (let k = 0; k < 12; k++) {
-              const a = (k / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
+              const a = (k / 12) * Math.PI * 2 + jitter(0.2);
               const sp = 1.6 + Math.random() * 1.4;
               game.shootingStars.push({
                 x: e.x, y: e.y,
@@ -12479,7 +12487,7 @@ function updateCollisions() {
           }
           // Tiny "+1" near kill point — only while in an active combo, so it reinforces the streak
           if (game.combo >= 3) {
-            const offX = (Math.random() - 0.5) * 6;
+            const offX = jitter(6);
             game.floatTexts.push({
               x: e.x + offX, y: e.y - 8, text: '+1',
               color: '#fff', life: 22, maxLife: 22, size: 5
@@ -12735,7 +12743,7 @@ function updateCollisions() {
             const beamCols = ['#ff4', '#0ff', '#fff', '#f6f'];
             for (let k = 0; k < beamSteps; k++) {
               const t = k / (beamSteps - 1);
-              const bx = e.x + (game.playerX - e.x) * t + (Math.random() - 0.5) * 3;
+              const bx = e.x + (game.playerX - e.x) * t + jitter(3);
               const by = e.y + (game.playerY - e.y) * t;
               game.itemBursts.push({
                 x: bx, y: by,
@@ -12871,7 +12879,7 @@ function updateCollisions() {
           // Extra cyan upward burst at deflect site for visual feedback
           for (let _ek = 0; _ek < 3; _ek++) {
             game.itemBursts.push({
-              x: b.x + (Math.random() - 0.5) * 2,
+              x: b.x + jitter(2),
               y: b.y - _ek * 3,
               life: -_ek * 2, color: '#0ff'
             });
@@ -13044,8 +13052,8 @@ function updateCollisions() {
         if (game.itemBursts) {
           for (let _r = 0; _r < 3; _r++) {
             game.itemBursts.push({
-              x: b.x + (Math.random() - 0.5) * 1.5,
-              y: b.y + (Math.random() - 0.5) * 1.5,
+              x: b.x + jitter(1.5),
+              y: b.y + jitter(1.5),
               life: -_r, color: '#fff'
             });
           }
@@ -13235,8 +13243,8 @@ function killPlayer(srcX, srcY, cause, srcType) {
   game.hitStopFrames = Math.max(game.hitStopFrames || 0, 12);
   // Multi-stage debris burst centered on the ship
   for (let i = 0; i < 5; i++) {
-    const ox = (Math.random() - 0.5) * 14;
-    const oy = (Math.random() - 0.5) * 10;
+    const ox = jitter(14);
+    const oy = jitter(10);
     game.explosions.push({
       x: game.playerX + ox, y: game.playerY + oy,
       timer: -i * 4, maxTime: 36
@@ -13245,8 +13253,8 @@ function killPlayer(srcX, srcY, cause, srcType) {
   // Spark shower around the wreck
   for (let i = 0; i < 4; i++) {
     game.hitSparks.push({
-      x: game.playerX + (Math.random() - 0.5) * 12,
-      y: game.playerY + (Math.random() - 0.5) * 8,
+      x: game.playerX + jitter(12),
+      y: game.playerY + jitter(8),
       life: -i * 2
     });
   }
@@ -13568,8 +13576,8 @@ function updateShake() {
     const mul = shakeMul();
     // Ease-out: shake amplitude scales with remaining time so it tapers smoothly
     const amp = 4 * Math.min(1, game.shakeTimer / 8);
-    game.shakeX = (Math.random() - 0.5) * amp * mul;
-    game.shakeY = (Math.random() - 0.5) * amp * mul;
+    game.shakeX = jitter(amp) * mul;
+    game.shakeY = jitter(amp) * mul;
   } else {
     game.shakeX = 0; game.shakeY = 0;
   }
@@ -21370,8 +21378,8 @@ function drawGameOverScreen() {
   ctx.shadowBlur = 12 * glow;
   // Shake: strong in first 30 entry frames, decays with elapsedGo
   const goShake = Math.max(0, 1 - elapsedGo / 30) * 4;
-  const goSx = (Math.random() - 0.5) * goShake;
-  const goSy = (Math.random() - 0.5) * goShake;
+  const goSx = jitter(goShake);
+  const goSy = jitter(goShake);
   drawRetroText('GAME OVER', BASE_W/2 + goSx, cy - 35 + goSy, 16, COL.red);
   ctx.restore();
   // PILOT TITLE LABEL — '[CSN] TITLE' below GAME OVER. Color picks up the

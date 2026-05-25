@@ -2566,6 +2566,30 @@ if (typeof G.clamp01 === 'function') {
 } else { console.log('  (skipped — clamp01 not exposed)'); }
 
 // ============================================================
+section('jitter — symmetric random offset in [-range/2, range/2) (29 sites)');
+if (typeof G.jitter === 'function') {
+  eq(G.jitter(0), 0, 'zero range → 0');
+  // Range invariant + sign coverage across many draws.
+  let lo = Infinity, hi = -Infinity, sawNeg = false, sawPos = false, outOfRange = 0;
+  for (let i = 0; i < 5000; i++) {
+    const j = G.jitter(10);
+    if (j < lo) lo = j;
+    if (j > hi) hi = j;
+    if (j < 0) sawNeg = true;
+    if (j > 0) sawPos = true;
+    if (j < -5 || j >= 5) outOfRange++; // [-5, 5)
+  }
+  eq(outOfRange, 0, 'jitter(10) always within [-5, 5) over 5000 draws');
+  ok(sawNeg && sawPos, 'jitter produces both signs');
+  ok(lo < -3 && hi > 3, 'jitter(10) spans most of its range (not stuck near 0)');
+  // Scales linearly with range: jitter(n) = (rand-0.5)*n, so dividing by n is
+  // range-independent — confirm a small range stays tightly bounded.
+  let small = 0;
+  for (let i = 0; i < 1000; i++) if (Math.abs(G.jitter(0.04)) >= 0.02) small++;
+  eq(small, 0, 'jitter(0.04) always within [-0.02, 0.02)');
+} else { console.log('  (skipped — jitter not exposed)'); }
+
+// ============================================================
 section('rampedInterval — enemy cadence shrinks with stage, floored');
 if (typeof G.rampedInterval === 'function') {
   eq(G.rampedInterval(120, 240, 4, 0),  240, 'stage 0 → base interval (240)');
