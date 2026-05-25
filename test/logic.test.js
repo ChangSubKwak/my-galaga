@@ -2590,6 +2590,39 @@ if (typeof G.jitter === 'function') {
 } else { console.log('  (skipped — jitter not exposed)'); }
 
 // ============================================================
+section('randInt — integer in [0, n) (54 Math.floor(Math.random()*n) sites)');
+if (typeof G.randInt === 'function') {
+  // Always an integer.
+  let nonInt = 0, outOfRange = 0;
+  const seen = new Set();
+  for (let i = 0; i < 5000; i++) {
+    const r = G.randInt(5);
+    if (!Number.isInteger(r)) nonInt++;
+    if (r < 0 || r >= 5) outOfRange++;
+    seen.add(r);
+  }
+  eq(nonInt, 0, 'randInt always returns an integer');
+  eq(outOfRange, 0, 'randInt(5) always in [0, 5) over 5000 draws');
+  ok([0,1,2,3,4].every(v => seen.has(v)), 'randInt(5) eventually hits all of 0..4');
+  ok(!seen.has(5), 'randInt(5) never returns 5 (upper bound exclusive)');
+  // randInt(1) is degenerate-but-valid: always 0 (single index).
+  let allZero = true;
+  for (let i = 0; i < 200; i++) if (G.randInt(1) !== 0) allZero = false;
+  ok(allZero, 'randInt(1) always 0 (single-element index)');
+  // Identity vs the inlined form: drive the sandbox's Math.random with fixed
+  // values and confirm randInt(n) === Math.floor(value * n) for each.
+  const realRand = G.Math.random;
+  const cases = [[0, 10, 0], [0.49, 10, 4], [0.5, 10, 5], [0.999, 10, 9], [0.25, 8, 2]];
+  let drift = 0;
+  for (const [v, n, expected] of cases) {
+    G.Math.random = () => v;
+    if (G.randInt(n) !== expected) drift++;
+  }
+  G.Math.random = realRand;
+  eq(drift, 0, 'randInt(n) === Math.floor(value*n) across fixed random values');
+} else { console.log('  (skipped — randInt not exposed)'); }
+
+// ============================================================
 section('rampedInterval — enemy cadence shrinks with stage, floored');
 if (typeof G.rampedInterval === 'function') {
   eq(G.rampedInterval(120, 240, 4, 0),  240, 'stage 0 → base interval (240)');

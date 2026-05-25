@@ -309,6 +309,14 @@ function clamp01(x) {
 function jitter(range) {
   return (Math.random() - 0.5) * range;
 }
+// Random integer in [0, n) — the `Math.floor(Math.random() * n)` idiom that was
+// at 54 call sites (random array index `arr[randInt(arr.length)]`, random
+// count/variant pick). `n` is the only thing that varies and is atomic at every
+// site, so the single arg keeps the call uniform and the floor/draw stay
+// identical to the inline form.
+function randInt(n) {
+  return Math.floor(Math.random() * n);
+}
 // Short human-readable summary of what a difficulty actually changes — surfaced
 // as toggle feedback so the speed/fire/elite/loot trade-offs (diffSpeedMul,
 // diffFireMul, eliteRateForStage, powerUpDropRate) are legible at the moment of
@@ -3435,10 +3443,10 @@ function maybeSpawnConstellation() {
   // Pick two near-layer stars
   const nears = stars.filter(s => s.layer === 'near');
   if (nears.length < 2) return;
-  const a = nears[Math.floor(Math.random() * nears.length)];
+  const a = nears[randInt(nears.length)];
   let b = a;
   for (let tries = 0; tries < 8 && b === a; tries++) {
-    b = nears[Math.floor(Math.random() * nears.length)];
+    b = nears[randInt(nears.length)];
   }
   if (b === a) return;
   // Skip if too far apart (avoid edge-to-edge)
@@ -3526,7 +3534,7 @@ function initStars() {
         y: Math.random() * BASE_H,
         speed,
         brightness: brightMin + Math.random() * (brightMax - brightMin),
-        color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
+        color: STAR_COLORS[randInt(STAR_COLORS.length)],
         twinklePhase: Math.random() * Math.PI * 2,
         twinkleRate: 0.02 + Math.random() * 0.04,
         big: layer === 'near' && Math.random() < 0.30,
@@ -3744,7 +3752,7 @@ function pickStageWeather() {
   if (Math.random() > 0.50) return null;
   const matches = Object.entries(WEATHER_TABLE).filter(([_id, w]) => w.biome === biome);
   if (matches.length === 0) return null;
-  const [id, info] = matches[Math.floor(Math.random() * matches.length)];
+  const [id, info] = matches[randInt(matches.length)];
   return {
     id, label: info.label, col: info.col, whisper: info.whisper,
     frames: 0, banner: 180,
@@ -3766,12 +3774,12 @@ function updateStageWeather() {
     // Spawn rocks periodically, capped at ~6 simultaneously to avoid screen clutter
     w.rockTimer--;
     if (w.rockTimer <= 0 && w.rocks.length < 6) {
-      w.rockTimer = 60 + Math.floor(Math.random() * 90);
+      w.rockTimer = 60 + randInt(90);
       w.rocks.push({
         x: 14 + Math.random() * (BASE_W - 28),
         y: -8,
         vy: 0.7 + Math.random() * 0.5,
-        size: 3 + Math.floor(Math.random() * 2),
+        size: 3 + randInt(2),
         rot: Math.random() * Math.PI * 2,
         rotSpeed: jitter(0.12),
         hp: 1
@@ -3818,7 +3826,7 @@ function updateStageWeather() {
     // new stars forming in the nebula. Each ignition: 40-frame life, 0→60 radius.
     w.starTimer = (w.starTimer || 0) - 1;
     if (w.starTimer <= 0) {
-      w.starTimer = 180 + Math.floor(Math.random() * 60);
+      w.starTimer = 180 + randInt(60);
       w.starIgnitions = w.starIgnitions || [];
       w.starIgnitions.push({
         x: 20 + Math.random() * (BASE_W - 40),
@@ -3862,7 +3870,7 @@ function updateStageWeather() {
           vx: jitter(0.06),
           rot: Math.random() * Math.PI * 2,
           rotSpeed: jitter(0.05),
-          size: 1 + Math.floor(Math.random() * 2)
+          size: 1 + randInt(2)
         });
       }
     }
@@ -3884,15 +3892,15 @@ function updateStageWeather() {
     // vertical streak from top down with a flash frame. Up to 3 concurrent.
     w.stormTimer = (w.stormTimer || 0) - 1;
     if (w.stormTimer <= 0) {
-      w.stormTimer = 90 + Math.floor(Math.random() * 60);
+      w.stormTimer = 90 + randInt(60);
       w.strikes = w.strikes || [];
       if (w.strikes.length < 3) {
         w.strikes.push({
           x: 12 + Math.random() * (BASE_W - 24),
           y: -5,
-          height: 60 + Math.floor(Math.random() * 80),
+          height: 60 + randInt(80),
           life: 0,
-          maxLife: 10 + Math.floor(Math.random() * 8)
+          maxLife: 10 + randInt(8)
         });
       }
     }
@@ -3920,7 +3928,7 @@ function updateStageWeather() {
     // METEOR SHOWER — spawn streaks periodically. Visual only, no collision.
     w.meteorTimer = (w.meteorTimer || 0) - 1;
     if (w.meteorTimer <= 0) {
-      w.meteorTimer = 30 + Math.floor(Math.random() * 60);
+      w.meteorTimer = 30 + randInt(60);
       w.meteors = w.meteors || [];
       if (w.meteors.length < 5) {
         const fromLeft = Math.random() < 0.5;
@@ -3930,7 +3938,7 @@ function updateStageWeather() {
           vx: (fromLeft ? 1 : -1) * (1.8 + Math.random() * 1.4),
           vy: 0.4 + Math.random() * 0.6,
           life: 0,
-          maxLife: 90 + Math.floor(Math.random() * 60)
+          maxLife: 90 + randInt(60)
         });
       }
     }
@@ -4354,7 +4362,7 @@ function pushIntercept(type) {
   if ((now - last) < INTERCEPT_COOLDOWN_FRAMES) return;
   game._interceptLastT[type] = now;
   const variants = INTERCEPT_MSG[type];
-  const text = variants[Math.floor(Math.random() * variants.length)];
+  const text = variants[randInt(variants.length)];
   game.interceptQueue = game.interceptQueue || [];
   game.interceptQueue.unshift({ text, life: INTERCEPT_LIFE, maxLife: INTERCEPT_LIFE });
   if (game.interceptQueue.length > 3) game.interceptQueue.length = 3;
@@ -4697,7 +4705,7 @@ function updateSupplyCrate() {
         // BREAK — spawn random timed power-up. Permanent S/N/P excluded to keep
         // mid-stage event from inflating long-term progression.
         const typesT = ['T', 'R', 'W', 'H'];
-        const type = typesT[Math.floor(Math.random() * typesT.length)];
+        const type = typesT[randInt(typesT.length)];
         game.powerUps.push({ x: c.x, y: c.y, vy: 0.6, type });
         // GUARDIAN VARIANT — 15% chance to also drop a blue RAPID-fire drone
         if (Math.random() < 0.15 && typeof spawnGuardian === 'function') {
@@ -4779,7 +4787,7 @@ function ensureAsteroids() {
       x: Math.random() * BASE_W,
       y: Math.random() * BASE_H,
       vy: 0.15 + Math.random() * 0.25,
-      size: 4 + Math.floor(Math.random() * 5),
+      size: 4 + randInt(5),
       rot: Math.random() * Math.PI * 2,
       rotSpeed: jitter(0.02)
     });
@@ -4839,7 +4847,7 @@ function drawBiome() {
       if (a.y - a.size > BASE_H) {
         a.y = -a.size;
         a.x = Math.random() * BASE_W;
-        a.size = 4 + Math.floor(Math.random() * 5);
+        a.size = 4 + randInt(5);
       }
       // Rotated chunky pixel cluster — 4 cardinal pieces + center
       ctx.save();
@@ -5296,7 +5304,7 @@ function pickAmbientEvent() {
   if (game.stage <= 3) return null;            // pure-space tutorial
   if (Math.random() >= 0.35) return null;      // 35% spawn rate
   const types = ['cargoShip', 'supernova', 'satellite', 'comet', 'pulsar', 'meteorShower'];
-  return types[Math.floor(Math.random() * types.length)];
+  return types[randInt(types.length)];
 }
 function startAmbientEvent(type) {
   if (!type) { game.ambientEvent = null; return; }
@@ -5328,7 +5336,7 @@ function startAmbientEvent(type) {
       lightPhase: 0
     };
   } else if (type === 'supernova') {
-    const corner = Math.floor(Math.random() * 4);
+    const corner = randInt(4);
     game.ambientEvent = {
       type, life: 0,
       maxLife: 180,                  // ~3s flash + fade
@@ -5372,7 +5380,7 @@ function startAmbientEvent(type) {
     // METEOR SHOWER — spawns 6-9 staggered comet-style streaks all from same edge.
     // Stored as an array of sub-streaks in `streaks`. Rendered with same comet logic.
     const fromLeft = Math.random() < 0.5;
-    const count = 6 + Math.floor(Math.random() * 4);
+    const count = 6 + randInt(4);
     const streaks = [];
     for (let k = 0; k < count; k++) {
       streaks.push({
@@ -6666,9 +6674,9 @@ function updateOneMegaBoss(mb) {
             y: -4 - Math.random() * 30,
             vx: jitter(0.6),
             vy: 0.4 + Math.random() * 1.2,
-            life: -Math.floor(Math.random() * 30),
-            maxLife: 90 + Math.floor(Math.random() * 60),
-            color: goldCols[Math.floor(Math.random() * goldCols.length)],
+            life: -randInt(30),
+            maxLife: 90 + randInt(60),
+            color: goldCols[randInt(goldCols.length)],
             size: Math.random() < 0.4 ? 2 : 1
           });
         }
@@ -6693,10 +6701,10 @@ function updateOneMegaBoss(mb) {
               y: mb.y + Math.sin(_ang) * 4,
               vx: Math.cos(_ang) * _sp,
               vy: Math.sin(_ang) * _sp - 0.2,
-              life: -Math.floor(Math.random() * 12),
-              maxLife: 90 + Math.floor(Math.random() * 40),
+              life: -randInt(12),
+              maxLife: 90 + randInt(40),
               color: _archCol,
-              size: 3 + Math.floor(Math.random() * 2)
+              size: 3 + randInt(2)
             });
           }
         }
@@ -6709,7 +6717,7 @@ function updateOneMegaBoss(mb) {
         // bonus. Floats text "BONUS DROP!" at the spawn site for clarity.
         if (Math.random() < 0.25) {
           const BONUS_TYPES = ['T', 'R', 'W', 'H', 'L'];
-          const bt = BONUS_TYPES[Math.floor(Math.random() * BONUS_TYPES.length)];
+          const bt = BONUS_TYPES[randInt(BONUS_TYPES.length)];
           game.powerUps.push({ x: mb.x, y: mb.y - 12, vy: 0.55, type: bt });
           game.floatTexts.push({
             x: mb.x, y: mb.y - 28, text: 'BONUS DROP!',
@@ -6750,7 +6758,7 @@ function updateOneMegaBoss(mb) {
           rune:     ['THE GLYPHS DIM', 'WORDS LOSE MEANING']
         };
         const _far = _BOSS_FAREWELLS[mb.archetype] || _BOSS_FAREWELLS.standard;
-        const _fLine = _far[Math.floor(Math.random() * _far.length)];
+        const _fLine = _far[randInt(_far.length)];
         game.floatTexts.push({
           x: mb.x, y: mb.y + 18,
           text: _fLine, color: '#fc8',
@@ -7043,7 +7051,7 @@ function pickStageMutation() {
   // Daily mode: deterministic, always-on. Same modifier every stage today.
   if (game.dailyMode) return dailyMutation();
   if (Math.random() >= 0.30) return null;                      // 30% trigger rate
-  return STAGE_MUTATIONS[Math.floor(Math.random() * STAGE_MUTATIONS.length)];
+  return STAGE_MUTATIONS[randInt(STAGE_MUTATIONS.length)];
 }
 
 function startStage() {
@@ -7376,7 +7384,7 @@ function startStage() {
   // PILOT QUOTE — 30% chance on normal stages (no boss, no challenge) to display
   // a pilot maxim during STAGE_INTRO. Pure narrative texture, no gameplay effect.
   if (!isBoss && !isChallenge && Math.random() < 0.30 && typeof PILOT_QUOTES !== 'undefined') {
-    game.stageQuote = PILOT_QUOTES[Math.floor(Math.random() * PILOT_QUOTES.length)];
+    game.stageQuote = PILOT_QUOTES[randInt(PILOT_QUOTES.length)];
   } else {
     game.stageQuote = null;
   }
@@ -8968,7 +8976,7 @@ function pickStageObjective(stage) {
   if (stage <= 4) return null;
   if (game.challengeMode) return null; // challenge mode is its own structure
   if (Math.random() >= 0.40) return null;
-  const pick = STAGE_OBJECTIVES[Math.floor(Math.random() * STAGE_OBJECTIVES.length)];
+  const pick = STAGE_OBJECTIVES[randInt(STAGE_OBJECTIVES.length)];
   // Snapshot run-cumulative counters so the objective measures delta-during-stage,
   // not lifetime totals (parries / eliteKills accumulate across runs).
   game._objStartParries = game.parryCount || 0;
@@ -8994,7 +9002,7 @@ function pickPerkOffer() {
   const pool = PERK_IDS.slice();
   const out = [];
   for (let i = 0; i < 3 && pool.length > 0; i++) {
-    const idx = Math.floor(Math.random() * pool.length);
+    const idx = randInt(pool.length);
     out.push(pool.splice(idx, 1)[0]);
   }
   return out;
@@ -9252,7 +9260,7 @@ function unlockAchievement(id) {
         game.shootingStars.push({
           x: sx, y: sy,
           vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-          life: 0, maxLife: 28 + Math.floor(Math.random() * 14)
+          life: 0, maxLife: 28 + randInt(14)
         });
       }
     }
@@ -9326,7 +9334,7 @@ function startBonusGame() {
     elapsed: 0,
     reels:    [0, 0, 0],
     stopAt:   [60, 90, 120],
-    finalIdx: [Math.floor(Math.random() * 5), Math.floor(Math.random() * 5), Math.floor(Math.random() * 5)],
+    finalIdx: [randInt(5), randInt(5), randInt(5)],
     locked:   [false, false, false],
     resultShown: false,
     bonus: 0,
@@ -10732,7 +10740,7 @@ function bumpCombo() {
       const ex = 16 + Math.random() * (BASE_W - 32);
       const ey = 30 + Math.random() * (BASE_H - 80);
       game.explosions.push({
-        x: ex, y: ey, timer: -Math.floor(Math.random() * 24), maxTime: 28
+        x: ex, y: ey, timer: -randInt(24), maxTime: 28
       });
     }
     spawnConfetti(megaTier * 14);
@@ -10962,7 +10970,7 @@ function updatePlayerTrail() {
         x: game.playerX + (Math.random() * 4 - 2),
         y: game.playerY + 4,
         vy: 0.45 + Math.random() * 0.3,
-        life: 0, maxLife: 28 + Math.floor(Math.random() * 10)
+        life: 0, maxLife: 28 + randInt(10)
       });
       if (game.exhaustDust.length > 24) game.exhaustDust.shift();
     }
@@ -11261,7 +11269,7 @@ function updateEnemies() {
       // (±20-50px) every ~120 frames during dive. warpFade ramps 0→1→0 over
       // 24 frames: fade out for 12, swap position at midpoint, fade in 12.
       if (e.type === 'warper') {
-        if (!e.warpTimer) e.warpTimer = 60 + Math.floor(Math.random() * 60);
+        if (!e.warpTimer) e.warpTimer = 60 + randInt(60);
         e.warpTimer--;
         if (e.warpTimer === 12) {
           // Mid-warp: spawn purple flash + 6 spark, swap x position
@@ -11292,7 +11300,7 @@ function updateEnemies() {
           e.warpFade = e.warpTimer / 12;
         } else {
           e.warpFade = 0;
-          e.warpTimer = 90 + Math.floor(Math.random() * 60);
+          e.warpTimer = 90 + randInt(60);
         }
         // Pre-warp fade (last 12 of timer before swap)
         if (e.warpTimer <= 24 && e.warpTimer > 12) {
@@ -11484,7 +11492,7 @@ function updateEnemies() {
         en.type !== 'minibee' && en.type !== 'hoverer' && !en.elite
       );
       if (_cmdCandidates.length > 0) {
-        const _cmd = _cmdCandidates[Math.floor(Math.random() * _cmdCandidates.length)];
+        const _cmd = _cmdCandidates[randInt(_cmdCandidates.length)];
         _cmd.isCommander = true;
         _cmd.commanderPulse = 0;
       }
@@ -11503,7 +11511,7 @@ function updateEnemies() {
       // Pick a random formation enemy to dive
       const candidates = game.enemies.filter(e => e.alive && e.state === 'formation');
       if (candidates.length > 0) {
-        const e = candidates[Math.floor(Math.random() * candidates.length)];
+        const e = candidates[randInt(candidates.length)];
         // Boss might try to capture
         if (e.type === 'boss' && !e.capturedShip && !game.dualFighter && Math.random() < 0.2 && game.capturedShipEnemy === null) {
           e.state = 'capturing';
@@ -12315,7 +12323,7 @@ function updateCollisions() {
                 x: e.x, y: e.y,
                 vx: Math.cos(a) * sp,
                 vy: Math.sin(a) * sp,
-                life: 0, maxLife: 18 + Math.floor(Math.random() * 8)
+                life: 0, maxLife: 18 + randInt(8)
               });
             }
             game.flashTimer = Math.max(game.flashTimer, 4);
@@ -12479,7 +12487,7 @@ function updateCollisions() {
               game.shootingStars.push({
                 x: e.x, y: e.y,
                 vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-                life: 0, maxLife: 28 + Math.floor(Math.random() * 14)
+                life: 0, maxLife: 28 + randInt(14)
               });
             }
             // Extra confetti for the celebration
@@ -13271,10 +13279,10 @@ function killPlayer(srcX, srcY, cause, srcType) {
         y: game.playerY + Math.sin(_sang) * 3,
         vx: Math.cos(_sang) * _ssp,
         vy: Math.sin(_sang) * _ssp - 0.3,
-        life: -Math.floor(Math.random() * 8),
-        maxLife: 70 + Math.floor(Math.random() * 30),
+        life: -randInt(8),
+        maxLife: 70 + randInt(30),
         color: s < 2 ? '#fff' : s < 4 ? '#f84' : _shipCol,
-        size: 1 + Math.floor(Math.random() * 2)
+        size: 1 + randInt(2)
       });
     }
     // Red shock ring at death position — distinct from white flash
@@ -13631,8 +13639,8 @@ function spawnDebris(x, y, type) {
       vx: Math.cos(a) * sp,
       vy: Math.sin(a) * sp - 0.3, // slight upward bias for arcade feel
       life: 0,
-      maxLife: 32 + Math.floor(Math.random() * 18),
-      color: prof.cols[Math.floor(Math.random() * prof.cols.length)],
+      maxLife: 32 + randInt(18),
+      color: prof.cols[randInt(prof.cols.length)],
       size: Math.random() < 0.25 ? 2 : 1
     });
   }
@@ -15041,7 +15049,7 @@ function update() {
         const _voiceWords = ['STATIC', 'WHO?', 'WAKE.', 'WRONG', 'ECHO', 'HOLLOW',
                              'TURN BACK', 'REMEMBER', '01010', 'INSIDE', 'NULL',
                              'COLD', 'WATCHING', 'EMPTY'];
-        const _w = _voiceWords[Math.floor(Math.random() * _voiceWords.length)];
+        const _w = _voiceWords[randInt(_voiceWords.length)];
         const _vx = 30 + Math.random() * (BASE_W - 60);
         const _vy = 40 + Math.random() * (BASE_H - 80);
         const _vc = Math.random() < 0.5 ? '#f48' : '#0cf';
@@ -15114,8 +15122,8 @@ function update() {
         game.titleAmbientCooldown = (game.titleAmbientCooldown || 240) - 1;
         if (game.titleAmbientCooldown <= 0 && !game.ambientEvent) {
           const titleTypes = ['cargoShip', 'satellite', 'comet', 'supernova'];
-          startAmbientEvent(titleTypes[Math.floor(Math.random() * titleTypes.length)]);
-          game.titleAmbientCooldown = 600 + Math.floor(Math.random() * 600); // 10-20s next
+          startAmbientEvent(titleTypes[randInt(titleTypes.length)]);
+          game.titleAmbientCooldown = 600 + randInt(600); // 10-20s next
         }
       }
       break;
@@ -15345,7 +15353,7 @@ function update() {
             ? game._deathCausePending : 'unknown';
           const _wList = RESPAWN_WHISPERS[_cKey] || [];
           if (_wList.length > 0) {
-            const _wh = _wList[Math.floor(Math.random() * _wList.length)];
+            const _wh = _wList[randInt(_wList.length)];
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 + 40, text: _wh,
               color: '#888', life: 60, maxLife: 60, size: 5
@@ -16895,7 +16903,7 @@ function pickEpitaph(stage, acc) {
   else if (stage >= 5)  bucket = 'scout';
   else                  bucket = 'rookie';
   const arr = EPITAPHS[bucket];
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[randInt(arr.length)];
 }
 
 // RUN HIGHLIGHTS — produce up to 3 "best moments" lines summarizing the run.
