@@ -2454,6 +2454,36 @@ if (typeof G.computeFireCooldown === 'function') {
 } else { console.log('  (skipped — computeFireCooldown not exposed)'); }
 
 // ============================================================
+section('computeBulletDamage — additive P/ship/perk/synergy sources');
+if (typeof G.computeBulletDamage === 'function') {
+  eq(G.computeBulletDamage(1, 0, false, null, false), 1, 'P1 base = 1');
+  eq(G.computeBulletDamage(3, 0, false, null, false), 3, 'P3 = 3');
+  eq(G.computeBulletDamage(1, 1, false, null, false), 2, 'ship dmgBonus +1');
+  eq(G.computeBulletDamage(1, 0, true,  null, false), 2, 'heavyRound perk +1');
+  eq(G.computeBulletDamage(1, 0, false, 'OVERLOAD', false), 2, 'OVERLOAD synergy +1');
+  eq(G.computeBulletDamage(1, 0, false, 'HEAVY', false), 3, 'HEAVY synergy +2');
+  eq(G.computeBulletDamage(1, 0, false, 'BLINK', false), 1, 'BLINK gives no damage bonus');
+  eq(G.computeBulletDamage(1, 0, false, null, true), 3, 'lastStand (1 life) +2');
+  // OVERLOAD/HEAVY mutually exclusive (else-if): OVERLOAD wins, +1 not +3.
+  eq(G.computeBulletDamage(1, 0, false, 'OVERLOAD', false), 2, 'OVERLOAD only +1, not OVERLOAD+HEAVY');
+  // Full stack: P3 + ship1 + heavyRound1 + HEAVY2 + lastStand2 = 9.
+  eq(G.computeBulletDamage(3, 1, true, 'HEAVY', true), 9, 'all additive sources stack');
+} else { console.log('  (skipped — computeBulletDamage not exposed)'); }
+
+// ============================================================
+section('computeBulletSpeed — S scaling × BLINK/firebrand multipliers');
+if (typeof G.computeBulletSpeed === 'function') {
+  // S-level scaling uses 0.25 steps (exact in binary) — safe for ===.
+  eq(G.computeBulletSpeed(4, 1, false, false), 4, 'S1 = base (no scaling)');
+  eq(G.computeBulletSpeed(4, 3, false, false), 6, 'S3 = base × 1.5');
+  eq(G.computeBulletSpeed(4, 5, false, false), 8, 'S5 = base × 2.0 (max)');
+  // ×1.3 multipliers — float-tolerant compare.
+  ok(Math.abs(G.computeBulletSpeed(4, 1, true, false) - 5.2) < 1e-9, 'BLINK ×1.3');
+  ok(Math.abs(G.computeBulletSpeed(4, 1, false, true) - 5.2) < 1e-9, 'firebrand ×1.3');
+  ok(Math.abs(G.computeBulletSpeed(4, 1, true, true) - 6.76) < 1e-9, 'BLINK+firebrand stack ×1.69');
+} else { console.log('  (skipped — computeBulletSpeed not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {
