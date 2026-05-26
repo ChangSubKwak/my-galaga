@@ -5825,7 +5825,6 @@ function resetGame() {
     strikeFx: [],
     hitStopFrames: 0,
     cinematicBars: 0,
-    zoomPulse: 0,
     autoRestartTimer: -1,
     grazeCount: 0,
     camNudgeX: 0, camNudgeY: 0,
@@ -12600,14 +12599,14 @@ function updateCollisions() {
           else if (e.type === 'ufo' || e.type === 'mirror') stopFrames = 4;
           else if (e.type === 'boss' || e.type === 'shielded') stopFrames = 2;
           if (stopFrames > game.hitStopFrames) game.hitStopFrames = stopFrames;
-          // Zoom pulse on visually heavy kills — brief 1.04× swell + ease back
-          let zoomPF = 0;
-          if (e.type === 'goldenBee') zoomPF = 14;
-          else if (e.type === 'ufo' || e.type === 'mirror') zoomPF = 10;
-          else if (e.type === 'boss' || e.type === 'shielded') zoomPF = 7;
-          if (zoomPF > (game.zoomPulse || 0)) game.zoomPulse = zoomPF;
+          // Flag visually heavy kills (golden bee / ufo / mirror / boss / shielded)
+          // so the camera gives them a brief directional nudge toward the kill site.
+          let heavyKill = 0;
+          if (e.type === 'goldenBee') heavyKill = 14;
+          else if (e.type === 'ufo' || e.type === 'mirror') heavyKill = 10;
+          else if (e.type === 'boss' || e.type === 'shielded') heavyKill = 7;
           // Camera nudge — pull view briefly toward the kill site for big targets
-          if (zoomPF > 0) {
+          if (heavyKill > 0) {
             const nudge = e.type === 'goldenBee' ? 4 : e.type === 'ufo' || e.type === 'mirror' ? 3 : 2;
             const dx = e.x - BASE_W/2, dy = e.y - BASE_H/2;
             const len = magnitude(dx, dy) || 1;
@@ -15067,9 +15066,8 @@ function update() {
       }
     }
     // Camera FX timers — moved out of draw() so they tick at simulation rate (60Hz)
-    // instead of render rate (varies by monitor: 60/120/144Hz). On a 144Hz display the
-    // 14-frame zoom pulse was burning out in ~95ms instead of 233ms.
-    if ((game.zoomPulse || 0) > 0) game.zoomPulse--;
+    // instead of render rate (varies by monitor: 60/120/144Hz), keeping their
+    // durations refresh-rate independent.
     if ((game.cinematicBars || 0) > 0) game.cinematicBars--;
     if ((game.lifeGainPulseTimer || 0) > 0) game.lifeGainPulseTimer--;
     // RUN TIME MILESTONE BANNERS — 5/10/20/30 minute marks, one-shot per run.
@@ -15488,16 +15486,11 @@ function drawLastStandOverlay() {
 
 function draw() {
   ctx.save();
-  // Camera zoom pulse on big kills — eases up and back over its lifetime.
-  // Timer ticks in update() so it stays correct across refresh rates and PAUSED.
-  // Camera zoom/rotation are gated by reduceMotion (OS reduce-motion preference):
-  // zoom-punch and screen rotation are vestibular/motion-sickness triggers, so a
-  // reduce-motion player gets a still camera.
-  let camZoom = 1;
-  if (game && game.zoomPulse > 0 && !reduceMotion) {
-    const tt = game.zoomPulse / 14;
-    camZoom = 1 + 0.05 * Math.sin(tt * Math.PI);
-  }
+  // camZoom is kept as a transform factor (always 1 now — the big-kill zoom-punch
+  // was removed: it swelled the whole view incl. the background but didn't land as
+  // feedback). Screen rotation below is still gated by reduceMotion (OS preference):
+  // it's a vestibular/motion-sickness trigger, so reduce-motion gets a still camera.
+  const camZoom = 1;
   // Subtle screen rotation while spiral entry is in progress
   let camRot = 0;
   if (game && !reduceMotion && game.entrySpiral && game.enemies && game.enemies.some(e => e.alive && e.state === 'entering' && e.spiralEntry)) {
