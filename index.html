@@ -15498,10 +15498,6 @@ function draw() {
     const tt = game.zoomPulse / 14;
     camZoom = 1 + 0.05 * Math.sin(tt * Math.PI);
   }
-  // High-combo sustained zoom — combo 60+ holds a subtle 1.02× zoom for tension
-  if (game && game.combo >= 60 && !reduceMotion) {
-    camZoom *= 1.02 + 0.005 * Math.sin(game.animFrame * 0.12);
-  }
   // Subtle screen rotation while spiral entry is in progress
   let camRot = 0;
   if (game && !reduceMotion && game.entrySpiral && game.enemies && game.enemies.some(e => e.alive && e.state === 'entering' && e.spiralEntry)) {
