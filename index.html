@@ -4311,7 +4311,6 @@ const INTERCEPT_MSG = {
   clusterParry:  ['THEY DANCED THROUGH THE VOLLEY!', 'OUR BARRAGE — TURNED ASIDE!', 'IMPOSSIBLE DEFLECTION!'],
   grazeChain:    ['THEY WEAVE THROUGH IT ALL!', 'OUR FIRE FINDS NOTHING!', 'A GHOST IN THE BARRAGE!'],
   flawlessKill:  ['THE CHAMPION FELL UNTOUCHED!', 'NOT A SCRATCH ON THEM!', 'FLAWLESS — HOW?!'],
-  revengeKill:   ['THEY HUNT US BACK!', 'THE PILOT REMEMBERS!', 'VENGEANCE INBOUND!'],
   firstExtra:    ['ENEMY GAINS STRENGTH!', 'IT GROWS RESILIENT!', 'WE LOST GROUND!'],
   firstElite:    ['PILOT KILLED AN ACE!', 'WING COMMANDER DOWN!', 'OUR BEST IS DEAD!'],
   guardianMaster:['TARGET COMMANDS DRONES!', 'FOUR ALLIES!', 'UNSTOPPABLE FORMATION!'],
@@ -12014,29 +12013,17 @@ function updateCollisions() {
           }
           bumpCombo();
           // REVENGE KILL — if a prior collision death captured this enemy type,
-          // surface a "REVENGE!" beat at the kill spot. One-shot per capture
-          // (clears immediately). Paired with DEATH RECAP WHISPER for a
-          // narrative loop: collision-death → coaching whisper at respawn →
-          // payback when the same type falls. red #f44 + glow 5 + graze ping.
+          // killing that type back counts as payback. The in-play "REVENGE!" banner
+          // + sfx + enemy-comms intercept were removed (CEO subtraction: in-play
+          // screen noise) — payback is now a quiet tracked stat that still feeds the
+          // pilot rank ladder (THE AVENGER), run highlights, and lifetime stats.
           if (game._revengeType && e.type === game._revengeType) {
             game._revengeType = null;
-            game.floatTexts.push({
-              x: e.x, y: e.y - 18, text: 'REVENGE!',
-              color: '#f44', life: 50, maxLife: 50, size: 11, glow: 5
-            });
-            if (typeof playSound === 'function') playSound('graze', e.x);
-            // REVENGE COUNT — track per-run revenges + persist lifetime total.
-            // Mirrors parryCount / nearMissCount / witchSaves pattern. Surfaced
-            // in runHighlights and stats overlay with tier labels.
             game.revengeCount = (game.revengeCount || 0) + 1;
             try {
               const _rT = parseInt(localStorage.getItem('galagaRevengeTotal') || '0', 10) || 0;
               localStorage.setItem('galagaRevengeTotal', String(_rT + 1));
             } catch (_eR) {}
-            // NARRATIVE FUSION — enemy comms note the pilot hunting back (first/run).
-            if (game.revengeCount === 1 && typeof pushIntercept === 'function') {
-              pushIntercept('revengeKill');
-            }
           }
           const inForm = e.state === 'formation';
           // EARLY INTERCEPT — kill while enemy is still in entering path.
