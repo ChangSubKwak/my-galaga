@@ -165,9 +165,6 @@ const shim = `
 ;try { globalThis.__getUnlockedAch = function () { return (typeof unlockedAchievements !== 'undefined') ? unlockedAchievements : null; }; } catch (e) {}
 ;try { globalThis.__getBossNames = function () { return (typeof BOSS_NAMES !== 'undefined') ? BOSS_NAMES : null; }; } catch (e) {}
 ;try { globalThis.__getInterceptMsg = function () { return (typeof INTERCEPT_MSG !== 'undefined') ? INTERCEPT_MSG : null; }; } catch (e) {}
-;try { globalThis.__getMoraleTrig = function () { return (typeof _MORALE_TRIG !== 'undefined') ? _MORALE_TRIG : null; }; } catch (e) {}
-;try { globalThis.__getMoraleStates = function () { return (typeof MORALE_STATES !== 'undefined') ? MORALE_STATES : null; }; } catch (e) {}
-;try { globalThis.__getPilotMomentum = function () { return (typeof PILOT_MOMENTUM !== 'undefined') ? PILOT_MOMENTUM : null; }; } catch (e) {}
 ;try { globalThis.__getStageMutations = function () { return (typeof STAGE_MUTATIONS !== 'undefined') ? STAGE_MUTATIONS : null; }; } catch (e) {}
 ;try { globalThis.__getActTitles = function () { return (typeof ACT_TITLES !== 'undefined') ? ACT_TITLES : null; }; } catch (e) {}
 ;try { globalThis.__getEnduranceTiers = function () { return (typeof ENDURANCE_TIERS !== 'undefined') ? ENDURANCE_TIERS : null; }; } catch (e) {}
@@ -206,46 +203,6 @@ function fresh() {
   return G.__getGame();
 }
 function stagePBs() { return G.__getStagePBs(); }
-
-// ============================================================
-section('computePilotMomentum');
-ok(typeof G.computePilotMomentum === 'function', 'computePilotMomentum exists');
-{
-  const g = fresh();
-  g.lives = 3; g.combo = 0; g.cleanStreak = 0; g.stageDied = false;
-  eq(G.computePilotMomentum(), 'STEADY', 'default = STEADY');
-
-  g.lives = 1;
-  eq(G.computePilotMomentum(), 'CORNERED', 'lives 1 = CORNERED');
-
-  g.lives = 3; g.combo = 20; g.cleanStreak = 3;
-  eq(G.computePilotMomentum(), 'ASCENDING', 'combo20 + clean3 = ASCENDING');
-
-  g.combo = 19; g.cleanStreak = 3;
-  eq(G.computePilotMomentum(), 'STEADY', 'combo19 below threshold = STEADY');
-
-  g.combo = 20; g.cleanStreak = 2;
-  eq(G.computePilotMomentum(), 'STEADY', 'cleanStreak2 below threshold = STEADY');
-
-  g.combo = 0; g.cleanStreak = 0; g.stageDied = true;
-  eq(G.computePilotMomentum(), 'STRAINED', 'died + low combo = STRAINED');
-
-  g.stageDied = true; g.combo = 5;
-  eq(G.computePilotMomentum(), 'STEADY', 'died but combo>=5 = STEADY (recovered)');
-
-  // CORNERED takes priority over ASCENDING
-  g.lives = 1; g.combo = 30; g.cleanStreak = 5; g.stageDied = false;
-  eq(G.computePilotMomentum(), 'CORNERED', 'CORNERED priority over ASCENDING');
-}
-
-// ============================================================
-section('moraleStateFor (enemy morale thresholds)');
-if (typeof G.moraleStateFor === 'function') {
-  eq(G.moraleStateFor(-100), 'CONFIDENT', '<= -50 = CONFIDENT');
-  eq(G.moraleStateFor(0), 'NORMAL', '0 = NORMAL');
-  eq(G.moraleStateFor(100), 'SHAKEN', '100 = SHAKEN');
-  eq(G.moraleStateFor(200), 'ROUTED', '>=150 = ROUTED');
-} else { console.log('  (skipped — moraleStateFor not exposed)'); }
 
 // ============================================================
 section('comboMultiplier tiers');
@@ -822,29 +779,6 @@ if (typeof G.fmtMS === 'function') {
   eq(G.fmtMS(null), '--:--', 'null → placeholder');
 } else { console.log('  (skipped — fmtMS not exposed)'); }
 
-// ============================================================
-section('computeMoraleScore — enemy-confidence weighted inputs');
-{
-  const mg = G.__getGame && G.__getGame();
-  if (mg && typeof G.computeMoraleScore === 'function') {
-    const save = { stats: mg.stats, lives: mg.lives, witchSaves: mg.witchSaves,
-                   bossesKilledThisRun: mg.bossesKilledThisRun, parryCount: mg.parryCount,
-                   eliteKills: mg.eliteKills };
-    const near = (a, b, m) => ok(Math.abs(a - b) < 1e-9, m);
-    const reset = () => { mg.stats = { kills: 0, maxStage: 1 }; mg.lives = 3; mg.witchSaves = 0;
-                          mg.bossesKilledThisRun = 0; mg.parryCount = 0; mg.eliteKills = 0; };
-    reset(); near(G.computeMoraleScore(), 0, 'baseline = 0');
-    reset(); mg.stats = { kills: 10, maxStage: 1 }; near(G.computeMoraleScore(), 5, 'kills ×0.5');
-    reset(); mg.lives = 1; near(G.computeMoraleScore(), -24, 'lost 2 lives → -24 (enemies confident)');
-    reset(); mg.bossesKilledThisRun = 1; near(G.computeMoraleScore(), 30, 'boss kill → +30');
-    reset(); mg.parryCount = 10; near(G.computeMoraleScore(), 15, 'parries ×1.5');
-    reset(); mg.eliteKills = 5; near(G.computeMoraleScore(), 15, 'elite kills ×3');
-    reset(); mg.stats = { kills: 0, maxStage: 11 }; near(G.computeMoraleScore(), 50, 'depth (maxStage-1)×5');
-    reset(); mg.stats = { kills: 0, maxStage: 11 }; mg.witchSaves = 4;
-    near(G.computeMoraleScore(), 70, 'witch saves ×5 stack on depth');
-    Object.assign(mg, save);
-  } else { console.log('  (skipped — computeMoraleScore / game not exposed)'); }
-}
 
 // ============================================================
 section('computePilotTitle / computePilotNextRank — rank ladder');
@@ -1044,32 +978,9 @@ section('ACT_TITLES — contiguous stage ranges, well-formed');
 }
 
 // ============================================================
-section('MORALE_STATES / PILOT_MOMENTUM — compute outputs all have render entries');
-{
-  // moraleStateFor can only return these; each must have a label+color or the HUD
-  // morale chip / banner would render undefined.
-  const ms = G.__getMoraleStates && G.__getMoraleStates();
-  if (ms) {
-    ['CONFIDENT', 'NORMAL', 'SHAKEN', 'ROUTED'].forEach(s => {
-      ok(ms[s] && typeof ms[s].label === 'string' && ms[s].label.length, 'MORALE_STATES.' + s + ' has a label');
-      ok(ms[s] && typeof ms[s].col === 'string', 'MORALE_STATES.' + s + ' has a color');
-    });
-  } else { console.log('  (skipped — MORALE_STATES not exposed)'); }
-  // computePilotMomentum can only return these; same requirement for its 6 channels.
-  const pm = G.__getPilotMomentum && G.__getPilotMomentum();
-  if (pm) {
-    ['ASCENDING', 'STEADY', 'STRAINED', 'CORNERED'].forEach(s => {
-      ok(pm[s] && typeof pm[s].label === 'string' && pm[s].label.length, 'PILOT_MOMENTUM.' + s + ' has a label');
-      ok(pm[s] && typeof pm[s].col === 'string', 'PILOT_MOMENTUM.' + s + ' has a color');
-    });
-  } else { console.log('  (skipped — PILOT_MOMENTUM not exposed)'); }
-}
-
-// ============================================================
 section('INTERCEPT_MSG registry — every message reachable & well-formed');
 {
   const msg = G.__getInterceptMsg && G.__getInterceptMsg();
-  const trig = G.__getMoraleTrig && G.__getMoraleTrig();
   if (msg) {
     // every entry must be a non-empty array of non-empty strings (pushIntercept
     // picks a random variant — an empty entry would silently show nothing)
@@ -1080,16 +991,6 @@ section('INTERCEPT_MSG registry — every message reachable & well-formed');
     }
     ok(allOk, 'every INTERCEPT_MSG entry is a non-empty string[]');
   } else { console.log('  (skipped — INTERCEPT_MSG not exposed)'); }
-  if (msg && trig) {
-    // every morale state maps to a real message key — a renamed message would
-    // otherwise silently drop the morale-shift broadcast
-    let allResolve = true;
-    for (const state of Object.keys(trig)) {
-      if (!msg[trig[state]]) allResolve = false;
-    }
-    ok(allResolve, '_MORALE_TRIG → every state resolves to an INTERCEPT_MSG key');
-    eq(Object.keys(trig).length, 4, 'four morale states mapped (CONFIDENT/NORMAL/SHAKEN/ROUTED)');
-  } else { console.log('  (skipped — _MORALE_TRIG not exposed)'); }
 }
 
 // ============================================================
@@ -1477,18 +1378,6 @@ if (typeof G.comboKillDetune === 'function') {
   ok(G.comboKillDetune(20) > G.comboKillDetune(5), 'monotonic: higher combo → higher pitch');
 } else { console.log('  (skipped — comboKillDetune not exposed)'); }
 
-// ============================================================
-section('moraleDiveDetune — MORALE TONE dive-pitch by enemy morale (cents)');
-if (typeof G.moraleDiveDetune === 'function') {
-  eq(G.moraleDiveDetune('NORMAL'),    0,    'NORMAL → base pitch');
-  eq(G.moraleDiveDetune('CONFIDENT'), -120, 'CONFIDENT → lower/menacing');
-  eq(G.moraleDiveDetune('SHAKEN'),    80,   'SHAKEN → slightly higher');
-  eq(G.moraleDiveDetune('ROUTED'),    160,  'ROUTED → higher/frantic');
-  eq(G.moraleDiveDetune(undefined),   0,    'undefined → 0 (no NaN)');
-  eq(G.moraleDiveDetune('GARBAGE'),   0,    'unknown state → 0');
-  ok(G.moraleDiveDetune('CONFIDENT') < G.moraleDiveDetune('ROUTED'),
-     'morale axis: confident lower-pitched than routed');
-} else { console.log('  (skipped — moraleDiveDetune not exposed)'); }
 
 // ============================================================
 section('stageModeFor — boss / challenge / normal dispatch');
@@ -2034,7 +1923,7 @@ section('INTERCEPT_MSG: every literal pushIntercept(id) is a defined message');
   // One-directional guard (referenced ⊆ defined): a pushIntercept('typo') silently
   // no-ops (pushIntercept returns early on an unknown key), so a misspelled trigger
   // is an invisible dead beat. We don't assert the reverse — some keys are pushed
-  // via dynamic refs (morale state map, endurance tiers) the literal scan can't see.
+  // via dynamic refs (endurance tiers) the literal scan can't see.
   const lines = scriptSrc.split('\n');
   const start = lines.findIndex(l => /const INTERCEPT_MSG = \{/.test(l));
   const defined = new Set();

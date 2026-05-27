@@ -31,18 +31,18 @@ framework or dependencies). It extracts the inline `<script>`, runs it inside a
 `vm` sandbox with hand-rolled browser-API stubs (canvas/2d ctx, `localStorage`,
 `document`, `window`, `AudioContext` — including `createStereoPanner` / node
 `detune`, RAF), and asserts pure-ish logic plus registry-consistency invariants:
-`computePilotMomentum`, `evalBonusResult`, `bonusSkillStop`, `checkPbHalfMark`,
+`evalBonusResult`, `bonusSkillStop`, `checkPbHalfMark`,
 `killPlayer` revenge-seeding, `addScore` extra-life/cap, `comboMultiplier`/
 `bumpCombo`, `bezierPoint` + `createEntryPath`/`createLoopPath`, `eliteRateForStage`/
 `powerUpDropRate`, `fmtScore`/`fmtFrameTime`/`fmtMS`, `computeAccuracy`,
 `computeRunGradeScore`/`runGradeLetter`, `comboTierName`, `stageModeFor`,
 `isCombatState`, `computeBgmIntensity`/`computeBgmPitch`/`bgmForGameState`,
-`computeMoraleScore`, `computeDailyStreak`, the pilot rank ladder + composite
+`computeDailyStreak`, the pilot rank ladder + composite
 completion, daily-mode determinism, `panForX`/`SFX_VARY` (spatial-audio curve +
 pitch-wobble set), the stats-overlay page model (`statsAchGridPages`/
 `statsTotalPages`), corrupt-storage robustness, and **data-registry guards** that
-each entry stays wired on both sides — INTERCEPT_MSG, MORALE_STATES,
-PILOT_MOMENTUM, STAGE_MUTATIONS (id↔read-site), ACT_TITLES (contiguous ranges),
+each entry stays wired on both sides — INTERCEPT_MSG,
+STAGE_MUTATIONS (id↔read-site), ACT_TITLES (contiguous ranges),
 ENDURANCE_TIERS (ascending), COMBO_ARSENAL (buff↔timer), ACHIEVEMENTS
 (every definition has an `unlockAchievement()` call and vice-versa — scanned from
 source text so an unreachable or dead achievement can't slip in), plus STATE / PERK /
@@ -52,7 +52,7 @@ can't silently half-break). Also covers the **four persistence paths**
 corrupt-JSON graceful, `commitGameToCumStats` demo-guard + accumulation + last-run,
 `recordStagePB` strictly-faster-only, `unlockDex` valid-only/idempotent), the
 shared `tryStartDash` gating (cooldown/i-frames/combat), the `comboTierColor` /
-`comboKillDetune` / `moraleDiveDetune` / `flashAlpha` / `effectiveShakeMul` /
+`comboKillDetune` / `flashAlpha` / `effectiveShakeMul` /
 `blinkPhase` / `computeStageAccuracy` helpers, and `POWERUP_COL` / `GRADE_COL`
 completeness guards. Also covers the pure math/random utility helpers
 (`aabbHit` symmetric-box overlap, `clamp01` saturate-to-[0,1], `jitter` symmetric
@@ -168,7 +168,6 @@ DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are
 - **`BOSS_TAUNTS`** — dialogue dictionary keyed by archetype × situation (intro/phase2/lowHp/dash/death/finalStand). All 6 archetypes have their own complete voice (phantom = spectral/unseen, rune = ancient/inscribed); `tauntFor(archetype, situation)` still falls back to `standard` for a genuinely unknown archetype and returns `null` for an absent situation (never throws). The logic tests lock each archetype's voice as complete + distinct-from-standard. Speech bubble above boss, fades over 90 frames.
 - **`EPITAPHS`** — 7 stage-tier buckets (rookie/scout/veteran/deepDive/apex/voidwalker/legend) × 3 variants. `pickEpitaph(stage, acc)` runs once at game over, stored on `game.runEpitaph`.
 - **`pickRunHighlights()`** — top 3 stats (max combo / parries / graze chain / cluster parry / revenge / flawless boss / stages / bosses / accuracy / dual fighter / elites …) sorted by priority, displayed below epitaph.
-- **Faction MORALE vs PILOT MOMENTUM** — two mirrored psychological gauges. `updateEnemyMorale()` swings enemy state (CONFIDENT/NORMAL/SHAKEN/ROUTED) off player performance — surfaced via the HUD morale chip + shift banner and, audibly, **MORALE TONE** (`moraleDiveDetune`, tested): formation/kamikaze dive SFX detune by morale (CONFIDENT lower/menacing → ROUTED higher/frantic; boss attacks omit it); `computePilotMomentum()` reads the player's own composure (ASCENDING = combo ≥ 20 + clean streak ≥ 3 / CORNERED = last life / STRAINED = post-death low combo / STEADY). PILOT MOMENTUM expresses across **6 channels**: STAGE_INTRO chip, HUD chip, ASCENDING ship spark-aura, ASCENDING BGM intensity lift (`computeBgmIntensity`), CORNERED nebula red-tint, and a transition banner (`updatePilotMomentum`, mirrors the MORALE shift banner).
 
 ### Player identity
 
@@ -245,7 +244,7 @@ When the user requests "의미있는 작업 진행" / "기조로 작업" / "다�
 
 ## Working in this codebase
 
-- **Shared single-source helpers — use these, don't re-inline the formula** (each is logic-tested): `stageModeFor(stage)` (boss/challenge/normal dispatch), `isCombatState()` (the `PLAYING || CHALLENGING || BOSS_STAGE` gate, used by per-frame timers/morale/BGM), `computeAccuracy(stats)` (hit %, zero-shot-safe) + `computeStageAccuracy()` (same on the current stage's tallies — used by per-stage grade/bonus/HUD), `computeRunGradeScore` + `runGradeLetter` (GAME_OVER grade letter and its audio cue), `comboTierName(combo)` (combo medal label for HUD + carry banner), `comboTierColor(mult)` (combo multiplier tier color — HUD readout / score-pop / carry banner share it), `panForX(x)` (spatial-SFX stereo pan), and the `EXTRA_LIFE_SCORE` constant. Player-shot + enemy-scaling formula helpers (also logic-tested) live just above `updatePlayer` / near `diffSpeedMul`: `computeSynergy(s,n,p)` (S/N/P → OVERLOAD/BLINK/HEAVY build mode), `computeFireCooldown(rapid, mut, fastFingers, overload)` (stacking, min-2 floor), `computeBulletDamage(...)` / `computeBulletSpeed(...)` (player shot), `nonFireBulletCount(bullets)` (guardian/parry-echo excluded from the fire cap), `cappedStageSpeed(cap, base, perStage, stage, diffMul)` (enemy bullet speed — increasing, capped), `rampedInterval(floor, base, perStage, stage)` + `rampedFireInterval(floor, base, perStage, stage, diffMul)` (spawn/fire cadence — decreasing, floored), `aimVelocity(fromX, fromY, toX, toY, speed)` (unit-aim × speed, with a zero-distance NaN guard), and `aabbHit(dx, dy, halfW, halfH)` (symmetric box overlap — the 9 `Math.abs(dx) < hw && Math.abs(dy) < hh` collision sites: player vs bullet/dive/ram, bullet vs mega-boss/satellite/cargo; strict `<`, args are pure arithmetic so eager eval matches the original short-circuit). These were extracted from 2–35 duplicated inline sites; re-inlining reintroduces drift.
+- **Shared single-source helpers — use these, don't re-inline the formula** (each is logic-tested): `stageModeFor(stage)` (boss/challenge/normal dispatch), `isCombatState()` (the `PLAYING || CHALLENGING || BOSS_STAGE` gate, used by per-frame timers/BGM), `computeAccuracy(stats)` (hit %, zero-shot-safe) + `computeStageAccuracy()` (same on the current stage's tallies — used by per-stage grade/bonus/HUD), `computeRunGradeScore` + `runGradeLetter` (GAME_OVER grade letter and its audio cue), `comboTierName(combo)` (combo medal label for HUD + carry banner), `comboTierColor(mult)` (combo multiplier tier color — HUD readout / score-pop / carry banner share it), `panForX(x)` (spatial-SFX stereo pan), and the `EXTRA_LIFE_SCORE` constant. Player-shot + enemy-scaling formula helpers (also logic-tested) live just above `updatePlayer` / near `diffSpeedMul`: `computeSynergy(s,n,p)` (S/N/P → OVERLOAD/BLINK/HEAVY build mode), `computeFireCooldown(rapid, mut, fastFingers, overload)` (stacking, min-2 floor), `computeBulletDamage(...)` / `computeBulletSpeed(...)` (player shot), `nonFireBulletCount(bullets)` (guardian/parry-echo excluded from the fire cap), `cappedStageSpeed(cap, base, perStage, stage, diffMul)` (enemy bullet speed — increasing, capped), `rampedInterval(floor, base, perStage, stage)` + `rampedFireInterval(floor, base, perStage, stage, diffMul)` (spawn/fire cadence — decreasing, floored), `aimVelocity(fromX, fromY, toX, toY, speed)` (unit-aim × speed, with a zero-distance NaN guard), and `aabbHit(dx, dy, halfW, halfH)` (symmetric box overlap — the 9 `Math.abs(dx) < hw && Math.abs(dy) < hh` collision sites: player vs bullet/dive/ram, bullet vs mega-boss/satellite/cargo; strict `<`, args are pure arithmetic so eager eval matches the original short-circuit). These were extracted from 2–35 duplicated inline sites; re-inlining reintroduces drift.
 - Game tuning constants are mostly at the top of the script (`PLAYER_SPEED`, `BULLET_SPEED`, `BOSS_STAGE_INTERVAL`, `EXTRA_LIFE_SCORE`, `STAR_COUNT`, `MILESTONE_STAGES`) or grouped near the relevant function (`SHIELD_MAX`, `SLOW/RAPID/WAVE/HOMING/LASER_DURATION`, `WITCH_WINDOW=30`, `WITCH_COOLDOWN=720`, `COMBO_DECAY=90`, `COMBO_MILESTONE=40`). Per-ship caps live on `SHIPS[*].bulletCap` and difficulty scales speed/fire-rate via `diffSpeedMul()` / `diffFireMul()`. Difficulty scaling typically multiplies by `game.stage`.
 - Sprite art is drawn procedurally via `ctx.fillRect` calls in `drawPlayer` / `drawBee` / `drawButterfly` / `drawBoss` / `drawMegaBoss` / `drawPlayerBullet` / etc. There are no image assets.
 - Hit detection is AABB with hardcoded half-extents (commonly `8 × 8` for bullets-vs-enemies, `7` or `16` for the player depending on `dualFighter`). When changing sprite size, update the corresponding collision constants too.

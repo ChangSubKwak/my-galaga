@@ -162,7 +162,7 @@ function stageModeFor(stage) {
   return 'normal';
 }
 // True during the three active-combat states (formation / challenge wave / boss
-// fight) — the gate used by per-frame timers, morale, BGM, last-life cues, etc.
+// fight) — the gate used by per-frame timers, BGM, last-life cues, etc.
 // Excludes TITLE / INTRO / GAME_OVER / PAUSED / CAPTURED / RESPAWN / BONUS.
 function isCombatState() {
   if (!game) return false;
@@ -1084,12 +1084,6 @@ function computeBgmIntensity() {
   // Last life — urgency cue
   if (game.lives === 1 && (isCombatState())) {
     m += 0.20;
-  }
-  // PILOT MOMENTUM — ASCENDING (combo ≥ 20 AND clean streak ≥ 3, the in-zone peak
-  // flow state) earns a brighter mix beyond raw combo. Makes the BGM the 4th
-  // expression channel for momentum (after STAGE_INTRO chip, HUD chip, ship aura).
-  if (typeof computePilotMomentum === 'function' && computePilotMomentum() === 'ASCENDING') {
-    m += 0.10;
   }
   return Math.min(1.55, m);
 }
@@ -3595,28 +3589,12 @@ function drawNebulae() {
   let reactTint = null, reactAlpha = 0;
   if (game) {
     const bossPhase2 = (game.megaBosses || []).some(mb => mb.alive && mb.phase2);
-    const _cornered = game.lives === 1
-      && (isCombatState());
     if (bossPhase2) {
       reactTint = '#911';
       reactAlpha = 0.22 + 0.10 * Math.sin(game.animFrame * 0.08);
-    } else if (_cornered) {
-      // CORNERED — PILOT MOMENTUM last-life state. Persistent low red unease across
-      // the nebula field. Atmospheric counterpart to ASCENDING's bright ship aura —
-      // completes the momentum expression's two poles (triumph vs. tension).
-      reactTint = '#811';
-      reactAlpha = 0.13 + 0.06 * Math.sin(game.animFrame * 0.10);
     } else if ((game.comboLostVignette || 0) > 0) {
       reactTint = '#722';
       reactAlpha = (game.comboLostVignette / 60) * 0.20;
-    } else if (game.stageDied && (game.combo || 0) < 5
-        && (isCombatState())) {
-      // STRAINED — PILOT MOMENTUM regrouping state (post-death, combo not yet rebuilt).
-      // A faint desaturated blue-grey haze reads as "shaken focus" — the quiet third
-      // pole between ASCENDING (bright aura) and CORNERED (red unease). Dissolves
-      // naturally once the player rebuilds combo to 5 (the STRAINED exit condition).
-      reactTint = '#446';
-      reactAlpha = 0.08 + 0.04 * Math.sin(game.animFrame * 0.06);
     } else if ((game.combo || 0) >= 30) {
       reactTint = '#a82';
       reactAlpha = 0.10 + 0.06 * Math.sin(game.animFrame * 0.05);
@@ -4352,11 +4330,7 @@ const INTERCEPT_MSG = {
   forkSpread:    ['SPREAD FIRE!', 'THREE PATHS — DODGE WHERE?', 'FORMATION VULNERABLE!'],
   waveActive:    ['ERRATIC FIRE!', 'BULLETS DANCE!', 'PATTERN UNPREDICTABLE!'],
   rapidFire:     ['FIRE RATE SURGE!', 'CONTINUOUS SHOOTING!', 'BARRAGE INCOMING!'],
-  homingTrack:   ['BULLETS HUNT US!', 'NO ESCAPE — THEY TURN!', 'TRACKING ROUNDS!'],
-  moraleConfident: ['WE WILL CRUSH THEM!', 'TARGET WEAKENS!', 'PRESS THE ADVANTAGE!'],
-  moraleNormal:    ['HOLD THE LINE.', 'STANDARD ENGAGEMENT.', 'CONTINUE OPERATIONS.'],
-  moraleShaken:    ['THIS ONE IS DANGEROUS!', 'TAKING HEAVY LOSSES!', 'REQUEST ORDERS!'],
-  moraleRouted:    ['WE CANNOT WIN!', 'RETREAT IMPOSSIBLE!', 'IT KILLS US ALL!']
+  homingTrack:   ['BULLETS HUNT US!', 'NO ESCAPE — THEY TURN!', 'TRACKING ROUNDS!']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
 const INTERCEPT_LIFE = 180;
@@ -5805,8 +5779,6 @@ function resetGame() {
     _comboGuardianFired: false,
     perfectStagesRun: 0,
     _enduranceFired: {},
-    enemyMorale: 'NORMAL',
-    _moraleCheckTimer: 0,
     prevBiome: null,
     _pickupTypes: new Set(),
     _biomesSeen: new Set(),
@@ -10603,14 +10575,6 @@ function comboKillDetune(combo) {
   return Math.min(Math.max(combo || 0, 0), 30) * 10;
 }
 
-// MORALE TONE — formation-dive SFX detune (cents) by enemy morale, so the swarm's
-// confidence is audible: CONFIDENT dives lower/menacing, ROUTED higher/frantic.
-// Pure; passed only by formation/kamikaze dives (boss attacks omit it — morale is a
-// formation concept). Bounded [-120, +160], composes with the SFX_VARY wobble.
-function moraleDiveDetune(state) {
-  return state === 'CONFIDENT' ? -120 : state === 'SHAKEN' ? 80 : state === 'ROUTED' ? 160 : 0;
-}
-
 const COMBO_MILESTONE = 40; // every N kills in a combo grants a milestone reward (was 20 — life inflation curbed)
 
 // COMBO ARSENAL ladder — each combo threshold auto-grants a temporary weapon for 3 seconds.
@@ -11531,7 +11495,7 @@ function updateEnemies() {
           // Telegraph the dive: 30-frame preview where the path is visible but the enemy stays put.
           e.previewTimer = 30;
           e.previewPath = createLoopPath(e.x, e.y, e.x < BASE_W/2 ? 1 : -1);
-          playSound('enemyDive', e.x, moraleDiveDetune(game.enemyMorale));
+          playSound('enemyDive', e.x);
           // If boss, escorts get a slightly-delayed preview. Selected by POSITION
           // proximity (2 nearest formation butterflies within 30px), not col/row —
           // variant formations (v/circle/diamond/wave) tag every enemy row=0, so the
@@ -11575,7 +11539,7 @@ function updateEnemies() {
         frame: 0, frameTimer: 0
       };
       game.enemies.push(k);
-      playSound('enemyDive', k.x, moraleDiveDetune(game.enemyMorale));
+      playSound('enemyDive', k.x);
     }
   }
 
@@ -13673,84 +13637,6 @@ function spawnConfetti(count) {
   }
 }
 
-// ENEMY MORALE STATE — dynamic enemy-side narrative gauge tracked from player
-// performance stats. 4 states (CONFIDENT / NORMAL / SHAKEN / ROUTED). State changes
-// fire matching intercept broadcasts and update a small HUD chip. Pure narrative
-// reactivity — no gameplay balance changes.
-const MORALE_STATES = {
-  CONFIDENT: { col: '#f44', label: 'CONFIDENT' },
-  NORMAL:    { col: '#cfc', label: 'NORMAL'    },
-  SHAKEN:    { col: '#fc8', label: 'SHAKEN'    },
-  ROUTED:    { col: '#0ff', label: 'ROUTED'    }
-};
-const _MORALE_TRIG = {
-  CONFIDENT: 'moraleConfident',
-  NORMAL:    'moraleNormal',
-  SHAKEN:    'moraleShaken',
-  ROUTED:    'moraleRouted'
-};
-function computeMoraleScore() {
-  if (!game) return 0;
-  let s = 0;
-  s += ((game.stats && game.stats.kills) || 0) * 0.5;
-  // Death penalty — each life lost makes enemies more confident
-  const livesLost = Math.max(0, 3 - (game.lives || 3));
-  s -= livesLost * 12;
-  s += (game.witchSaves || 0) * 5;
-  s += (game.bossesKilledThisRun || 0) * 30;
-  s += (game.parryCount || 0) * 1.5;
-  s += (game.eliteKills || 0) * 3;
-  s += Math.max(0, ((game.stats && game.stats.maxStage) || 1) - 1) * 5;
-  return s;
-}
-function moraleStateFor(score) {
-  if (score <= -50) return 'CONFIDENT';
-  if (score < 30)   return 'NORMAL';
-  if (score < 150)  return 'SHAKEN';
-  return 'ROUTED';
-}
-function updateEnemyMorale() {
-  if (!game) return;
-  if (game.state !== STATE.PLAYING && game.state !== STATE.CHALLENGING
-      && game.state !== STATE.BOSS_STAGE) return;
-  // Throttle to once per second (60 frames) — morale shifts are tonal, not jittery
-  game._moraleCheckTimer = (game._moraleCheckTimer || 0) + 1;
-  if (game._moraleCheckTimer < 60) return;
-  game._moraleCheckTimer = 0;
-  const score = computeMoraleScore();
-  const newState = moraleStateFor(score);
-  const oldState = game.enemyMorale || 'NORMAL';
-  if (newState !== oldState) {
-    game.enemyMorale = newState;
-    const trig = _MORALE_TRIG[newState];
-    if (trig && typeof pushIntercept === 'function') pushIntercept(trig);
-    // MORALE SHIFT BANNER — short floattext announcing the enemy morale change.
-    // Pairs with the INTERCEPT narrative for paired text+visual recognition.
-    // Suppressed on first NORMAL set at run start (oldState was 'NORMAL' too).
-    if (typeof MORALE_STATES !== 'undefined' && MORALE_STATES[newState] && game.floatTexts) {
-      const _ms = MORALE_STATES[newState];
-      game.floatTexts.push({
-        x: BASE_W/2, y: 50,
-        text: 'MORALE: ' + newState,
-        color: _ms.col, life: 60, maxLife: 60, size: 6
-      });
-    }
-    // ROUTED CINEMATIC — peak demoralized state. Large cyan shockwave centered
-    // on the playfield + brief flash so the rare achievement of fully breaking
-    // enemy morale registers as the encounter beat it is. Banner + INTERCEPT
-    // still fire; this layers the visual climax on top.
-    if (newState === 'ROUTED') {
-      if (game.shockwaves) {
-        game.shockwaves.push({
-          x: BASE_W/2, y: BASE_H/2, life: 0, maxLife: 28, maxR: 80, color: '#0ff'
-        });
-      }
-      game.flashTimer = Math.max(game.flashTimer || 0, 6);
-      game.flashColor = '#0ff';
-    }
-  }
-}
-
 // DEATH RECAP WHISPERS — cause-specific coaching lines surfaced at respawn.
 // Mapped from game._deathCausePending captured in killPlayer ('bullet' /
 // 'collision' / fallback 'unknown'). 3 variants per cause keep repeats fresh.
@@ -13781,52 +13667,6 @@ function checkPbHalfMark() {
   }
 }
 
-// PILOT MOMENTUM — player-side composure narrative. Complements enemy MORALE
-// (their reaction to player) with the player's own state. Pure narrative chip:
-// no gameplay impact, no score change. Surfaced only when non-default so HUD
-// stays clean for typical play.
-//   ASCENDING — combo ≥ 20 AND cleanStreak ≥ 3 (player in peak flow)
-//   CORNERED  — lives ≤ 1 (last-life pressure)
-//   STRAINED  — recent stageDied + low combo (regrouping)
-//   STEADY    — default (not displayed)
-const PILOT_MOMENTUM = {
-  ASCENDING: { col: '#0ff', label: 'ASCENDING' },
-  STEADY:    { col: '#cfc', label: 'STEADY'    },
-  STRAINED:  { col: '#fc8', label: 'STRAINED'  },
-  CORNERED:  { col: '#f44', label: 'CORNERED'  }
-};
-function computePilotMomentum() {
-  if (!game) return 'STEADY';
-  if ((game.lives || 3) <= 1) return 'CORNERED';
-  if ((game.combo || 0) >= 20 && (game.cleanStreak || 0) >= 3) return 'ASCENDING';
-  if (game.stageDied && (game.combo || 0) < 5) return 'STRAINED';
-  return 'STEADY';
-}
-// PILOT MOMENTUM transition banner — fires a brief banner when the pilot's
-// composure shifts into a non-STEADY state. Mirrors the enemy MORALE shift
-// banner so both sides of the psychological battle surface their state changes.
-// 90-frame cooldown + STEADY-returns-quiet prevents flip-flop spam near thresholds.
-function updatePilotMomentum() {
-  if (!game) return;
-  if (game.state !== STATE.PLAYING && game.state !== STATE.CHALLENGING
-      && game.state !== STATE.BOSS_STAGE) return;
-  if ((game._pilotMomentumBannerCd || 0) > 0) game._pilotMomentumBannerCd--;
-  const cur = computePilotMomentum();
-  const prev = game._lastPilotMomentum || 'STEADY';
-  if (cur !== prev) {
-    game._lastPilotMomentum = cur;
-    if (cur !== 'STEADY' && (game._pilotMomentumBannerCd || 0) <= 0
-        && typeof PILOT_MOMENTUM !== 'undefined' && PILOT_MOMENTUM[cur] && game.floatTexts) {
-      game._pilotMomentumBannerCd = 90;
-      const pm = PILOT_MOMENTUM[cur];
-      game.floatTexts.push({
-        x: BASE_W/2, y: 58, text: 'PILOT ' + pm.label,
-        color: pm.col, life: 50, maxLife: 50, size: 6,
-        glow: cur === 'CORNERED' ? 4 : 3
-      });
-    }
-  }
-}
 
 // ENDURANCE TIERS — wall-clock survival milestones tracked across the whole run.
 // Each crossing fires a banner + score bonus + intercept + flash. Per-run one-shot
@@ -15034,10 +14874,6 @@ function update() {
     updateGuardian();
     // ENDURANCE TIERS — check run-frame thresholds, fire ceremony at crossings.
     updateEnduranceTiers();
-    // ENEMY MORALE — compute state from stats, fire intercept on state transition.
-    updateEnemyMorale();
-    // PILOT MOMENTUM — mirror: fire a banner when the pilot's composure shifts.
-    updatePilotMomentum();
     // RAPID STORM synergy — RAPID + FORK simultaneously active triggers a one-shot
     // intercept per run. Detects mid-frame so concurrent timer activity is required.
     if ((game.rapidTimer || 0) > 0 && (game.forkTimer || 0) > 0
@@ -17374,9 +17210,9 @@ function drawStageIntro() {
       drawRetroText('N' + game.lvl.N, 15, _plY, 4, '#0ff', 'left');
       drawRetroText('P' + game.lvl.P, 26, _plY, 4, '#f6f', 'left');
       if (typeof isPowerMaxed === 'function' && isPowerMaxed()) {
-        // MAX power tier — gold glow matching the 8-peak-threshold GLOW pattern
+        // MAX power tier — gold glow matching the peak-threshold GLOW pattern
         // (HIGH SCORE / ACC / COMBO MAX / PARRY ULTRA / SHIELD MAX / PB ALARM /
-        // MORALE ROUTED / MAX POWER).
+        // MAX POWER).
         ctx.save();
         ctx.shadowColor = '#fc4';
         ctx.shadowBlur = 4;
@@ -17432,23 +17268,6 @@ function drawStageIntro() {
       }
       drawRetroText('CLEAN x' + game.cleanStreak, 4, BASE_H/2 + 34, 4, '#0f8', 'left');
       ctx.restore();
-    }
-    // PILOT MOMENTUM chip — player-side composure narrative. Surfaced only
-    // when non-STEADY so the typical-play HUD stays clean. Complements the
-    // enemy MORALE chip (which exists in-stage HUD); this one is pre-stage
-    // self-reflection. CORNERED picks up a small red halo for urgency.
-    if (typeof computePilotMomentum === 'function' && typeof PILOT_MOMENTUM !== 'undefined') {
-      const _pmS = computePilotMomentum();
-      if (_pmS && _pmS !== 'STEADY' && PILOT_MOMENTUM[_pmS]) {
-        const _pm = PILOT_MOMENTUM[_pmS];
-        ctx.save();
-        if (_pmS === 'CORNERED') {
-          ctx.shadowColor = _pm.col;
-          ctx.shadowBlur = 4;
-        }
-        drawRetroText(_pm.label, 4, BASE_H/2 + 41, 4, _pm.col, 'left');
-        ctx.restore();
-      }
     }
 
     // ---- RIGHT COLUMN ----
@@ -18509,30 +18328,6 @@ function drawGameplay() {
         ctx.fillRect(e.x, e.y, 1, 1);
         ctx.restore();
       }
-      // MORALE TINT — faint colored overlay reflecting faction morale state.
-      // Only applied to standard formation types; special spawns (UFO / goldenBee /
-      // minibee) keep signature colors. NORMAL state = no tint. ROUTED adds a faint
-      // horizontal jitter to convey breakdown.
-      if (game.enemyMorale && game.enemyMorale !== 'NORMAL'
-          && typeof MORALE_STATES !== 'undefined' && MORALE_STATES[game.enemyMorale]
-          && e.type !== 'ufo' && e.type !== 'goldenBee' && e.type !== 'minibee') {
-        const _ms = MORALE_STATES[game.enemyMorale];
-        let _mAlpha = 0.16;
-        let _mShake = 0;
-        if (game.enemyMorale === 'CONFIDENT') {
-          _mAlpha = 0.18 + 0.08 * Math.sin(game.animFrame * 0.12 + e.x * 0.05);
-        } else if (game.enemyMorale === 'SHAKEN') {
-          _mAlpha = 0.14;
-        } else if (game.enemyMorale === 'ROUTED') {
-          _mAlpha = 0.22;
-          _mShake = Math.sin(game.animFrame * 0.45 + e.x * 0.1) * 0.6;
-        }
-        ctx.save();
-        ctx.globalAlpha = _mAlpha;
-        ctx.fillStyle = _ms.col;
-        ctx.fillRect(Math.round(e.x - 8 + _mShake), Math.round(e.y - 8), 16, 16);
-        ctx.restore();
-      }
       // ENEMY MINI HP BAR — 1px bar above damaged multi-HP enemies. Shows
       // remaining HP fraction. Only when maxHp > 1 AND hp < maxHp. Hidden for
       // single-HP enemies and unhit multi-HP enemies (clean view).
@@ -18803,26 +18598,6 @@ function drawGameplay() {
         const py = game.playerY + Math.sin(a) * ringR;
         const bright = k < game.shieldCharges * 3;
         ctx.globalAlpha = bright ? 0.9 : 0.25;
-        ctx.fillRect(Math.round(px - 1), Math.round(py - 1), 2, 2);
-      }
-      ctx.restore();
-    }
-    // ASCENDING FLOW AURA — when PILOT MOMENTUM reads ASCENDING (combo ≥ 20 +
-    // clean streak ≥ 3, the peak-flow state), 3 cyan/white sparks orbit the ship
-    // as a subtle reward. Fuses the PILOT MOMENTUM narrative layer with ship
-    // rendering. Pure visual; distinct radius (11) and spark form from the shield
-    // (green 8-seg), cheat (gold frame), and dash (cyan frame) rings so they
-    // never read as the same thing. computePilotMomentum only reads state.
-    if (typeof computePilotMomentum === 'function' && computePilotMomentum() === 'ASCENDING') {
-      const t = game.animFrame;
-      ctx.save();
-      for (let k = 0; k < 3; k++) {
-        const a = (k / 3) * Math.PI * 2 + t * 0.08;
-        const r = 11 + Math.sin(t * 0.18 + k) * 1.5;
-        const px = game.playerX + Math.cos(a) * r;
-        const py = game.playerY + Math.sin(a) * r;
-        ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 0.2 + k * 2);
-        ctx.fillStyle = k === 0 ? '#fff' : '#0ff';
         ctx.fillRect(Math.round(px - 1), Math.round(py - 1), 2, 2);
       }
       ctx.restore();
@@ -20694,53 +20469,6 @@ function drawHUD() {
     const met = obj.met(game);
     drawRetroText(obj.label, BASE_W - 5, baseY, 5, met ? '#0f8' : '#cfc', 'right');
     drawRetroText(String(obj.progress(game)), BASE_W - 5, baseY + 6, 5, met ? '#0f8' : COL.gray, 'right');
-  }
-  // ENEMY MORALE chip — bottom-left, above lives row, tiny pulse on state changes.
-  // Only shown in active combat states. State color signals enemy mindset at a glance.
-  if (!minimalHud && game.enemyMorale && typeof MORALE_STATES !== 'undefined'
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING
-          || game.state === STATE.BOSS_STAGE)) {
-    const ms = MORALE_STATES[game.enemyMorale];
-    if (ms) {
-      ctx.save();
-      // Subtle pulse — stronger when state isn't NORMAL
-      const intensity = game.enemyMorale === 'NORMAL' ? 0.55 : 0.85;
-      ctx.globalAlpha = intensity;
-      // ROUTED peak — chip glows cyan so the rare peak morale state reads as a
-      // visual reward beyond the arrow + label. Matches the peak-threshold
-      // GLOW pattern (HIGH SCORE / ACC / COMBO MAX / PARRY ULTRA / SHIELD MAX
-      // / PB ALARM / MORALE ROUTED).
-      if (game.enemyMorale === 'ROUTED') {
-        ctx.shadowColor = ms.col;
-        ctx.shadowBlur = 4;
-      }
-      // Tier arrow — ▲ enemy advantage / - balanced / ▼ player advantage / ▽ rout
-      const _arrow = game.enemyMorale === 'CONFIDENT' ? '▲'
-                   : game.enemyMorale === 'SHAKEN'    ? '▼'
-                   : game.enemyMorale === 'ROUTED'    ? '▽'
-                                                       : '-';
-      drawRetroText(_arrow + ' MORALE: ' + ms.label, 4, BASE_H - 44, 4, ms.col, 'left');
-      ctx.restore();
-    }
-  }
-  // PILOT MOMENTUM chip — player composure, stacked just above the enemy MORALE
-  // chip to form a paired faction-vs-pilot readout. Only shown when non-STEADY
-  // so typical play keeps a clean HUD. Mirrors the STAGE_INTRO pilot chip.
-  if (!minimalHud && typeof computePilotMomentum === 'function' && typeof PILOT_MOMENTUM !== 'undefined'
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING
-          || game.state === STATE.BOSS_STAGE)) {
-    const _pmHs = computePilotMomentum();
-    if (_pmHs && _pmHs !== 'STEADY' && PILOT_MOMENTUM[_pmHs]) {
-      const _pmH = PILOT_MOMENTUM[_pmHs];
-      ctx.save();
-      ctx.globalAlpha = 0.85;
-      if (_pmHs === 'CORNERED') {
-        ctx.shadowColor = _pmH.col;
-        ctx.shadowBlur = 4;
-      }
-      drawRetroText('PILOT: ' + _pmH.label, 4, BASE_H - 50, 4, _pmH.col, 'left');
-      ctx.restore();
-    }
   }
 
   // Run timer (mm:ss) — color shifts after 5/15 min
