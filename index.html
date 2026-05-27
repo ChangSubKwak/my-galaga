@@ -9,15 +9,15 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
   width: 100%; height: 100%; overflow: hidden;
-  background: radial-gradient(ellipse at center, #001428 0%, #000408 55%, #000 100%);
+  background: radial-gradient(ellipse at center, #140a0c 0%, #070508 55%, #000 100%);
 }
 canvas {
   display: block; margin: 0 auto;
   image-rendering: pixelated;
   box-shadow:
-    0 0 24px rgba(0, 180, 255, 0.30),
-    0 0 60px rgba(0, 180, 255, 0.12),
-    inset 0 0 0 1px rgba(0, 180, 255, 0.18);
+    0 0 24px rgba(255, 59, 59, 0.22),
+    0 0 60px rgba(255, 59, 59, 0.08),
+    inset 0 0 0 1px rgba(240, 240, 240, 0.14);
   border-radius: 2px;
 }
 /* Subtle scanline overlay across the whole viewport for CRT vibe */
@@ -3431,7 +3431,7 @@ function createEntryPath(startX, startY, endX, endY, curveDir) {
 // --- Game data ---
 let game, keys, stars;
 
-const STAR_COLORS = ['#fff', '#fff', '#fff', '#cef', '#fce', '#ffe', '#cff'];
+const STAR_COLORS = ['#fff', '#fff', '#fff', '#ddd', '#bbb', '#eee', '#ccc'];
 
 // Star layers — far is dim/slow, near is bright/fast; gives the field a sense of depth.
 // CONSTELLATION LINES — at stage 50+, occasional faint dashed line between
@@ -3553,7 +3553,7 @@ function initStars() {
 // Background nebula puffs — sit BEHIND the star layers, scroll very slowly downward
 // for a sense of depth without dominating the playfield. Pure cosmetic.
 let nebulae = [];
-const NEBULA_PALETTE = ['#317', '#136', '#244', '#306', '#125'];
+const NEBULA_PALETTE = ['#1a1416', '#141214', '#181315', '#161217', '#121214'];
 function initNebulae() {
   nebulae = [];
   const COUNT = 5;

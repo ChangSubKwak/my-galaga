@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Visual design
+Read **`DESIGN.md`** before any visual/color change. The aesthetic direction is
+**Ink Minimal Noir** (near-black void + white + a single crimson accent; the anti-
+"cool-blue-neon-arcade" look). Atmosphere/chrome layers go noir; gameplay-functional
+color-coding (enemy types, power-ups, grades, elite/ghost, shield/dash/witch-time
+semantics) is PRESERVED for legibility — don't monochrome those. See DESIGN.md for the
+palette and the staged plan (ambient field done; UI accent + biome backdrops pending).
+
 ## Running the game
 
 The entire game is a single static file. To play:
