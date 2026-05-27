@@ -4306,9 +4306,7 @@ const INTERCEPT_MSG = {
   sustainedSkill:['RHYTHM UNBROKEN!', 'TARGET MAINTAINS PRESSURE!', 'WE CANNOT BREATHE!'],
   parryMaster:   ['DEFLECTION SPECIALIST!', 'ALL OUR SHOTS RETURN!', 'WEAPONS FAIL US!'],
   nearMissAce:   ['EVASION SPECIALIST!', 'NO HIT REGISTERED!', 'TARGET DEFIES FIRE!'],
-  perfectParry:  ['IT TIMED THE DEFLECT!', 'IMPOSSIBLE READ!', 'PILOT MASTERS THE DASH!'],
   firstParry:    ['PILOT GRAZES OUR FIRE!', 'DEFLECTION DETECTED!', 'NEW THREAT VECTOR!'],
-  clusterParry:  ['THEY DANCED THROUGH THE VOLLEY!', 'OUR BARRAGE — TURNED ASIDE!', 'IMPOSSIBLE DEFLECTION!'],
   grazeChain:    ['THEY WEAVE THROUGH IT ALL!', 'OUR FIRE FINDS NOTHING!', 'A GHOST IN THE BARRAGE!'],
   flawlessKill:  ['THE CHAMPION FELL UNTOUCHED!', 'NOT A SCRATCH ON THEM!', 'FLAWLESS — HOW?!'],
   firstExtra:    ['ENEMY GAINS STRENGTH!', 'IT GROWS RESILIENT!', 'WE LOST GROUND!'],
@@ -12785,30 +12783,19 @@ function updateCollisions() {
         game.parryStreakTimer = 90;
         if ((game.parryStreak || 0) > (game.parryStreakBest || 0)) game.parryStreakBest = game.parryStreak;
         if ((game.parryStreak || 0) >= 5) unlockAchievement('parryChain');
-        // PARRY STREAK 10+ unlocks ULTRA tier (white-gold, 250 score). Below 10
-        // the original 4-tier ramp applies. One-time ULTRA fanfare at streak===10.
+        // Streak tier ramps the BASE SCORE 50 → 75 → 100 → 150 → 250 (cap at 10+).
+        // CEO subtraction: the escalating tier COLORS and the center "ULTRA PARRY"
+        // fanfare banner were removed — the scoring stays, the feedback is now the
+        // single per-parry cue below (one cyan color). The +500 streak-10 bonus is
+        // kept as score (no banner).
         const tier = (game.parryStreak >= 10) ? 4
                     : Math.min(3, Math.floor((game.parryStreak - 1) / 2));
         const baseScore = [50, 75, 100, 150, 250][tier];
-        const tierCol = ['#0ff', '#a8f', '#f6f', '#fc4', '#fff'][tier];
+        const tierCol = '#0ff';
         const tierLabel = game.parryStreak >= 2 ? ('PARRY x' + game.parryStreak) : 'PARRY';
-        // ULTRA PARRY fanfare — fires exactly once when streak crosses 10
         if (game.parryStreak === 10 && !game._ultraParryFired) {
           game._ultraParryFired = true;
           addScore(500);
-          game.floatTexts.push({
-            x: BASE_W/2, y: BASE_H/2 - 24, text: 'ULTRA PARRY',
-            color: '#fff', life: 80, maxLife: 80, size: 12, glow: 8
-          });
-          game.floatTexts.push({
-            x: BASE_W/2, y: BASE_H/2 - 12, text: 'CHAIN x10  +500',
-            color: '#fc4', life: 70, maxLife: 70, size: 6
-          });
-          game.flashTimer = Math.max(game.flashTimer || 0, 8);
-          game.flashColor = '#fff';
-          if (typeof spawnConfetti === 'function') spawnConfetti(14);
-          if (typeof playSound === 'function') playSound('milestone');
-          rumble(280, 0.9, 0.5);
         }
         // PERK 'parryDividend' — parry score → 3×
         addScore(game.activePerk === 'parryDividend' ? baseScore * 3 : baseScore);
@@ -12817,18 +12804,11 @@ function updateCollisions() {
         // bullet's deflect spot. Encourages tight timing reads.
         if ((game.dashTimer || 0) >= 10) {
           addScore(50);
-          game.floatTexts.push({
-            x: b.x, y: b.y - 14,
-            text: 'PERFECT', color: '#fc4', life: 35, maxLife: 35, size: 6
-          });
+          // CEO subtraction: the gold "PERFECT" callout banner + enemy-comms
+          // intercept were removed. The +50 bonus, the perfect-parry count/stat, and
+          // the PARRY ECHO return-bullet all remain — perfect timing still pays off,
+          // just without the extra banner.
           game.perfectParries = (game.perfectParries || 0) + 1;
-          // RUN MILESTONE — first perfect parry triggers a narrative INTERCEPT.
-          // Perfect parry requires the bullet to land within the first 3 frames
-          // of dash (precise timing), so the first one of a run is a clear skill
-          // signature worth announcing alongside the existing visual.
-          if (game.perfectParries === 1 && typeof pushIntercept === 'function') {
-            pushIntercept('perfectParry');
-          }
           try {
             const _pp = parseInt(localStorage.getItem('galagaPerfectParries') || '0', 10) || 0;
             localStorage.setItem('galagaPerfectParries', String(_pp + 1));
@@ -12880,44 +12860,28 @@ function updateCollisions() {
             life: -k, color: tierCol
           });
         }
+        // Single consolidated parry cue — "PARRY x{n} +{score}" at the deflect spot.
         game.floatTexts.push({
           x: b.x, y: b.y - 6, text: tierLabel + ' +' + baseScore,
           color: tierCol, life: 30 + tier * 6, maxLife: 30 + tier * 6, size: 5 + tier
         });
-        if (tier >= 2 && game.parryStreak % 2 === 1) {
-          // Higher tier — small rumble + flash for emphasis
-          game.flashTimer = Math.max(game.flashTimer || 0, 4);
-          game.flashColor = tierCol;
-          rumble(110, 0.5, 0.25);
-        }
         playSound('graze', b.x); // metallic ping reused — short, bright, fits parry feel (panned to deflect spot)
       }
     }
     // CLUSTER PARRY — deflecting 3+ bullets in a single dash frame is a high-skill
-    // dive-into-fire read. Recognized with a gold banner + bonus + per-run count.
-    // Distinct from PARRY STREAK (chains across frames); this is same-frame density.
+    // dive-into-fire read. CEO subtraction: the gold center banner + confetti +
+    // fanfare sfx + enemy-comms intercept were removed. The +100 bonus, the
+    // per-run count + clusterParryBest stat (feeds rank/highlights), and the
+    // size-scaled HIT-STOP all remain — the brief freeze is now the cue, a quiet
+    // tactile weight instead of a banner.
     if (_parriedThisFrame >= 3) {
       game.clusterParries = (game.clusterParries || 0) + 1;
       if (_parriedThisFrame > (game.clusterParryBest || 0)) game.clusterParryBest = _parriedThisFrame;
       addScore(100);
-      game.floatTexts.push({
-        x: BASE_W/2, y: BASE_H/2 - 30, text: 'CLUSTER PARRY x' + _parriedThisFrame,
-        color: '#fc4', life: 50, maxLife: 50, size: 9, glow: 6
-      });
-      game.flashTimer = Math.max(game.flashTimer || 0, 5);
-      game.flashColor = '#0ff';
       // HITSTOP — brief freeze scales with cluster size (4f base, +1 per extra
       // bullet, capped 8). Gives the high-skill multi-deflect tactile weight,
       // smaller than the boss-kill hitstop (14) so it punctuates without dragging.
       game.hitStopFrames = Math.max(game.hitStopFrames || 0, Math.min(8, 4 + (_parriedThisFrame - 3)));
-      if (typeof spawnConfetti === 'function') spawnConfetti(8);
-      if (typeof playSound === 'function') playSound('milestone');
-      rumble(180, 0.6, 0.35);
-      // NARRATIVE FUSION — enemy comms register the impossible deflection (once/run).
-      if (!game._clusterInterceptFired && typeof pushIntercept === 'function') {
-        game._clusterInterceptFired = true;
-        pushIntercept('clusterParry');
-      }
     }
   }
   // Enemy bullets vs player (skip while invincible)
@@ -17198,8 +17162,7 @@ function drawStageIntro() {
       drawRetroText('P' + game.lvl.P, 26, _plY, 4, '#f6f', 'left');
       if (typeof isPowerMaxed === 'function' && isPowerMaxed()) {
         // MAX power tier — gold glow matching the peak-threshold GLOW pattern
-        // (HIGH SCORE / ACC / COMBO MAX / PARRY ULTRA / SHIELD MAX / PB ALARM /
-        // MAX POWER).
+        // (HIGH SCORE / ACC / COMBO MAX / SHIELD MAX / PB ALARM / MAX POWER).
         ctx.save();
         ctx.shadowColor = '#fc4';
         ctx.shadowBlur = 4;
@@ -19896,22 +19859,16 @@ function drawHUD() {
   let _weatherChipShown = false;
   if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING
       || game.state === STATE.BOSS_STAGE) {
-    // PARRY STREAK CHIP — current parry streak count with tier color escalation.
-    // Cyan (2-3) → purple (4-5) → gold (6-9) → white-gold (10+). Disappears on streak
-    // break (parryStreakTimer === 0). Hidden when streak < 2 to keep HUD clean.
+    // PARRY STREAK CHIP — current parry streak count (the one consolidated streak
+    // cue). CEO subtraction: the tier color escalation + ULTRA glow were flattened
+    // to a single cyan. Disappears on streak break (parryStreakTimer === 0). Hidden
+    // when streak < 2 to keep HUD clean.
     if ((game.parryStreak || 0) >= 2 && (game.parryStreakTimer || 0) > 0) {
       const _ps = game.parryStreak;
-      const _psCol = _ps >= 10 ? '#fff' : _ps >= 6 ? '#fc4' : _ps >= 4 ? '#a8f' : '#0ff';
       const _psFade = Math.min(1, game.parryStreakTimer / 30);
       ctx.save();
       ctx.globalAlpha = 0.85 * _psFade;
-      // ULTRA tier (10+) gets a glow so the peak streak reads as a reward
-      // beyond the white-gold color change.
-      if (_ps >= 10) {
-        ctx.shadowColor = _psCol;
-        ctx.shadowBlur = 4;
-      }
-      drawRetroText('P×' + _ps, BASE_W - 30, 32, 5, _psCol, 'right');
+      drawRetroText('P×' + _ps, BASE_W - 30, 32, 5, '#0ff', 'right');
       ctx.restore();
     }
     // STAGE WEATHER LIVE CHIP — active weather label always visible in HUD so the
@@ -20595,7 +20552,7 @@ function drawHUD() {
     const sy = BASE_H - 11;
     // SHIELD MAX glow — when fully stacked, chevrons get a green shadow so
     // the cap reads as a peak threshold reward (matches HIGH SCORE / ACC /
-    // COMBO MAX / PARRY ULTRA peak-threshold GLOW pattern).
+    // COMBO MAX peak-threshold GLOW pattern).
     const _shMax = game.shieldCharges >= SHIELD_MAX;
     ctx.save();
     if (_shMax) {
