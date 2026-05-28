@@ -37,6 +37,24 @@ layers; **gameplay-functional colors stay** (optionally muted later).
 - `STAR_COLORS` → monochrome white/gray (dropped cyan/pink/yellow tints).
 - `NEBULA_PALETTE` → desaturated ink grays.
 
+## Applied — pass 2 (per-screen chrome audit, 2026-05-28)
+Screen-by-screen audit. Most cyan/magenta sites turned out to be gameplay-semantic
+(S/N/P power-letter coding, challenge-stage identity, BLINK synergy, accuracy tiers,
+ship/biome color) and were KEPT. Only purely-decorative chrome was changed.
+
+- **STAGE_INTRO 2A:** time-of-day micro-tint rainbow → noir cycle (dim gray /
+  warm soft / white / soft crimson, gold for noon stays); 6-loop cyan decoration
+  → white; PB-time chrome cyan → gold; TIP chrome cyan → muted gray; stage-
+  progress-map "current-normal-stage" marker cyan → white (boss=red and
+  challenge=magenta stay as semantic tier identity).
+- **TITLE 2B:** time-of-day greeting rainbow (6 pastels) → same noir cycle as
+  STAGE_INTRO; top dashed marquee `#0af` → white; trophy badges flattened to
+  gold (top tier) / white (mid) / dim gray (low) instead of cyan/green/gold mix;
+  completion-percent tier `#0ff`/`#0f8` chrome → white/dim.
+- **GAME_OVER / PAUSED 2C:** boss-stage aurora streaks (3 blues `#48f`/`#8af`/`#a8f`)
+  → noir crimson aurora `#933`/`#a55`/`#864`, matching the crimson frame glow.
+  Witch-time tint `#5cf` is gameplay-semantic — KEPT.
+
 ## Staged / pending (verify-by-play, user decision)
 - **UI chrome accent:** the pervasive cyan `#0ff` in HUD/title/menu *chrome* → white +
   crimson. Risky to flip globally (COL.cyan is also gameplay-semantic: dash, witch

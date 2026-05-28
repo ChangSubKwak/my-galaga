@@ -15334,7 +15334,9 @@ function draw() {
   // Three horizontal sine-bands of color, each phase-offset, slowly drifting.
   if (game.state === STATE.BOSS_STAGE) {
     const t = game.animFrame;
-    const auroraCols = ['#48f', '#8af', '#a8f'];
+    // Noir crimson aurora — boss-stage ominous heat in the Ink Noir palette
+    // (was three blues #48f/#8af/#a8f, replaced to match the crimson frame glow).
+    const auroraCols = ['#933', '#a55', '#864'];
     ctx.save();
     for (let band = 0; band < 3; band++) {
       ctx.globalAlpha = 0.08 + 0.04 * Math.sin(t * 0.025 + band * 1.7);
@@ -15993,17 +15995,17 @@ function drawTitleScreen() {
   if (!callsignInput.active && playerCallsign && playerCallsign !== '???') {
     const _hr = new Date().getHours();
     let _phase, _phCol;
-    if (_hr < 5)       { _phase = 'LATE NIGHT'; _phCol = '#a8f'; }
+    if (_hr < 5)       { _phase = 'LATE NIGHT'; _phCol = '#888'; }
     else if (_hr < 9)  { _phase = 'GOOD MORNING'; _phCol = '#fc8'; }
     else if (_hr < 12) { _phase = 'GOOD MORNING'; _phCol = '#fc4'; }
-    else if (_hr < 17) { _phase = 'GOOD AFTERNOON'; _phCol = '#0cf'; }
-    else if (_hr < 21) { _phase = 'GOOD EVENING'; _phCol = '#f6c'; }
-    else               { _phase = 'GOOD NIGHT'; _phCol = '#48f'; }
+    else if (_hr < 17) { _phase = 'GOOD AFTERNOON'; _phCol = '#fff'; }
+    else if (_hr < 21) { _phase = 'GOOD EVENING'; _phCol = '#f88'; }
+    else               { _phase = 'GOOD NIGHT'; _phCol = '#888'; }
     drawRetroText(_phase + ', [' + playerCallsign + ']', BASE_W/2, 12, 5, _phCol);
   }
 
   // Top decorative dashed border (animated marquee)
-  ctx.fillStyle = '#0af';
+  ctx.fillStyle = '#fff';
   for (let i = 0; i < BASE_W; i += 8) {
     if ((i + (t * 2)) % 16 < 4) {
       ctx.fillRect(i, 30, 4, 1);
@@ -16033,10 +16035,10 @@ function drawTitleScreen() {
     if (_achAll) {
       _trophies.push({ text: '100%', col: '#fc4' });
     }
-    if (_psPm >= 10) _trophies.push({ text: 'PM', col: '#0cf' });
-    if (_cbEver >= 50) _trophies.push({ text: _cbEver >= 100 ? 'CG' : 'CL', col: _cbEver >= 100 ? '#fc4' : '#0ff' });
+    if (_psPm >= 10) _trophies.push({ text: 'PM', col: '#fff' });
+    if (_cbEver >= 50) _trophies.push({ text: _cbEver >= 100 ? 'CG' : 'CL', col: _cbEver >= 100 ? '#fc4' : '#fff' });
     if (_lr >= 54000) _trophies.push({ text: _lr >= 216000 ? 'IP' : _lr >= 108000 ? 'MR' : 'LR',
-                                        col: _lr >= 216000 ? '#fc4' : _lr >= 108000 ? '#0ff' : '#0f8' });
+                                        col: _lr >= 216000 ? '#fc4' : _lr >= 108000 ? '#fff' : '#aaa' });
     if (_trophies.length > 0) {
       const _gap = 8;
       const _slotW = 16;  // fixed slot width keeps spacing uniform
@@ -16055,7 +16057,7 @@ function drawTitleScreen() {
   if (typeof computeCompositeCompletion === 'function') {
     const _comp = computeCompositeCompletion();
     if (_comp >= 5) {
-      const _cmpCol = _comp >= 80 ? '#fc4' : _comp >= 50 ? '#0ff' : _comp >= 20 ? '#0f8' : '#888';
+      const _cmpCol = _comp >= 80 ? '#fc4' : _comp >= 50 ? '#fff' : _comp >= 20 ? '#aaa' : '#888';
       drawRetroText('CMPL ' + _comp + '%', BASE_W/2, 94, 4, _cmpCol, 'center');
       // Mini bar under text
       ctx.save();
@@ -16834,11 +16836,11 @@ function drawStageIntro() {
   {
     const _hr = new Date().getHours();
     let _todCol = null;
-    if (_hr < 5)       _todCol = '#48f';       // late night
-    else if (_hr < 9)  _todCol = '#fc8';       // morning
-    else if (_hr < 17) _todCol = '#0cf';       // afternoon
-    else if (_hr < 21) _todCol = '#f6c';       // evening
-    else               _todCol = '#48f';       // night
+    if (_hr < 5)       _todCol = '#666';       // late night (noir dim)
+    else if (_hr < 9)  _todCol = '#fc8';       // morning (warm soft, noir-ok)
+    else if (_hr < 17) _todCol = '#fff';       // afternoon (white)
+    else if (_hr < 21) _todCol = '#f88';       // evening (soft crimson)
+    else               _todCol = '#666';       // night (noir dim)
     if (_todCol) {
       ctx.save();
       ctx.globalAlpha = 0.08;
@@ -16913,7 +16915,7 @@ function drawStageIntro() {
   if (introElapsed < 30) {
     const psSeed = (game.stage * 73) % 8;
     ctx.save();
-    ctx.fillStyle = '#0cf';
+    ctx.fillStyle = '#fff';
     for (let k = 0; k < 6; k++) {
       const ang = ((k + psSeed) / 6) * Math.PI * 2 + introElapsed * 0.03;
       const ringR = 80 - introElapsed * 2.4;
@@ -17299,7 +17301,7 @@ function drawStageIntro() {
         && typeof stagePBs !== 'undefined' && stagePBs) {
       const _pbF2 = stagePBs[String(game.stage)];
       if (typeof _pbF2 === 'number' && _pbF2 > 0 && typeof fmtFrameTime === 'function') {
-        drawRetroText('PB ' + fmtFrameTime(_pbF2), BASE_W - 4, BASE_H/2 + 25, 4, '#0cf', 'right');
+        drawRetroText('PB ' + fmtFrameTime(_pbF2), BASE_W - 4, BASE_H/2 + 25, 4, '#fc4', 'right');
       } else {
         drawRetroText('NO PB YET', BASE_W - 4, BASE_H/2 + 25, 4, '#888', 'right');
       }
@@ -17410,7 +17412,7 @@ function drawStageIntro() {
     if (_tip) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, (introElapsed - 60) / 18) * 0.85;
-      drawRetroText(_tip, BASE_W/2 + offX, BASE_H/2 + 22, 4, '#0cf');
+      drawRetroText(_tip, BASE_W/2 + offX, BASE_H/2 + 22, 4, '#aaa');
       ctx.restore();
     }
   }
@@ -17812,7 +17814,7 @@ function drawStageIntro() {
       const _isPast = i < _cycPos;
       const _isCur = i === _cycPos;
       let _col = '#444';
-      if (_isCur) _col = _isBoss ? '#f44' : _isChall ? '#f6f' : '#0cf';
+      if (_isCur) _col = _isBoss ? '#f44' : _isChall ? '#f6f' : '#fff';
       else if (_isPast) _col = '#666';
       else if (_isBoss) _col = '#823';
       else if (_isChall) _col = '#525';
