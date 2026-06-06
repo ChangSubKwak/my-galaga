@@ -148,6 +148,9 @@ const ctx = canvas.getContext('2d');
 // --- Constants ---
 const BASE_W = 224, BASE_H = 288;
 let SCALE = 1;
+// NEON VECTOR BLOOM — full-frame post-process glow (see draw() tail). Persisted
+// off-switch for low-end devices / preference; on by default (it's the headline look).
+let bloomEnabled = (() => { try { return localStorage.getItem('galagaBloomOff') !== '1'; } catch(e) { return true; } })();
 const FPS = 60;
 const PLAYER_SPEED = 2.5;
 const BULLET_SPEED = 5;
@@ -15943,6 +15946,31 @@ function draw() {
   }
 
   ctx.restore();
+
+  // ===== NEON VECTOR BLOOM — full-frame post-process =====
+  // Composite the finished frame back onto itself, blurred + additively ('lighter'),
+  // so every bright element (neon bullets, explosions, engine glow, HUD text) sheds a
+  // glow halo. Two passes: a wide soft bloom + a tight bright halo. Runs in device
+  // pixels after the transform restore. Internal res is tiny (224×288) so the two
+  // drawImage passes are cheap. Black areas add ~0 under 'lighter', so the deep void
+  // stays deep while lights bloom — the electric-arcade look.
+  if (bloomEnabled && (typeof ctx.filter === 'string')) {
+    const cw = canvas.width, ch = canvas.height;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.imageSmoothingEnabled = true;
+    // Wide soft glow
+    ctx.filter = 'blur(' + Math.max(3, Math.round(SCALE * 2.4)) + 'px)';
+    ctx.globalAlpha = 0.40;
+    ctx.drawImage(canvas, 0, 0, cw, ch);
+    // Tight bright halo (crisper, hugs the source)
+    ctx.filter = 'blur(' + Math.max(1, Math.round(SCALE * 0.9)) + 'px)';
+    ctx.globalAlpha = 0.28;
+    ctx.drawImage(canvas, 0, 0, cw, ch);
+    ctx.filter = 'none';
+    ctx.restore();
+  }
 }
 
 // First-launch cinematic — three short story cards over a warp-star backdrop.
