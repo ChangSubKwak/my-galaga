@@ -74,9 +74,11 @@ body::before {
 #btnPause {
   display: none; position: fixed; top: 12px; right: 12px;
   width: 44px; height: 44px; border-radius: 50%;
-  background: rgba(0,180,255,0.14);
-  border: 2px solid rgba(0,200,255,0.45);
-  box-shadow: 0 0 10px rgba(0,180,255,0.28), inset 0 0 6px rgba(0,200,255,0.18);
+  /* Noir: pause is pure navigation chrome (not a gameplay action) — neutral
+     white ink + a whisper of crimson frame, matching the canvas glow. */
+  background: rgba(240,240,240,0.10);
+  border: 2px solid rgba(240,240,240,0.35);
+  box-shadow: 0 0 10px rgba(255,255,255,0.16), inset 0 0 6px rgba(255,59,59,0.14);
   align-items: center; justify-content: center;
   color: rgba(255,255,255,0.80); font-size: 18px; font-family: sans-serif;
   user-select: none; -webkit-user-select: none; z-index: 11;
@@ -93,9 +95,11 @@ body::before {
   width: 132px; height: 132px;
   left: 24px; bottom: 16px;
   border-radius: 50%;
-  background: rgba(0, 180, 255, 0.10);
-  border: 2px solid rgba(0, 200, 255, 0.40);
-  box-shadow: 0 0 14px rgba(0, 180, 255, 0.30), inset 0 0 14px rgba(0, 200, 255, 0.18);
+  /* Noir: the move pad is navigation chrome (movement isn't color-coded in-game)
+     — neutral white ring; the knob carries the crimson identity accent. */
+  background: rgba(240, 240, 240, 0.05);
+  border: 2px solid rgba(240, 240, 240, 0.28);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.14), inset 0 0 14px rgba(255, 255, 255, 0.10);
   touch-action: none;
 }
 #joyKnob {
@@ -104,14 +108,14 @@ body::before {
   left: 50%; top: 50%;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: rgba(0, 200, 255, 0.45);
-  border: 2px solid rgba(255, 255, 255, 0.80);
-  box-shadow: 0 0 16px rgba(0, 220, 255, 0.65), inset 0 0 8px rgba(255, 255, 255, 0.30);
+  background: rgba(255, 59, 59, 0.42);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 16px rgba(255, 59, 59, 0.55), inset 0 0 8px rgba(255, 255, 255, 0.30);
   pointer-events: none;
   transition: background 0.1s ease-out;
 }
 #joyPad.active #joyKnob {
-  background: rgba(255, 255, 68, 0.55);
+  background: rgba(255, 90, 90, 0.7);
 }
 /* Narrow screens (<350px, e.g. iPhone SE / small Androids): the full-size
    joystick (left:24 + 132 = right edge x=156) would overlap the dash button
@@ -22155,9 +22159,12 @@ function drawStatsOverlay() {
   const px = (BASE_W - panelW) / 2;
   const py = (BASE_H - panelH) / 2;
 
-  ctx.fillStyle = 'rgba(0,30,60,0.92)';
+  // Noir panel: near-black crimson-warm fill + white ink frame with a crimson
+  // glow (matching the canvas frame). The old blue fill + green neon frame were
+  // pure chrome — gameplay-functional tier colors inside the panel are preserved.
+  ctx.fillStyle = 'rgba(16,9,11,0.93)';
   ctx.fillRect(px, py, panelW, panelH);
-  ctx.fillStyle = COL.green;
+  ctx.fillStyle = COL.white;
   ctx.fillRect(px, py, panelW, 1);
   ctx.fillRect(px, py + panelH - 1, panelW, 1);
   ctx.fillRect(px, py, 1, panelH);
@@ -22165,11 +22172,11 @@ function drawStatsOverlay() {
 
   ctx.save();
   const glow = 0.6 + 0.4 * Math.sin(game.animFrame * 0.1);
-  ctx.shadowColor = COL.green;
+  ctx.shadowColor = '#ff3b3b';
   ctx.shadowBlur = 8 * glow;
   drawRetroText('LIFETIME STATS', BASE_W/2, py + 12, 10, COL.yellow);
   // Decorative dashed border below title
-  ctx.fillStyle = COL.green;
+  ctx.fillStyle = COL.white;
   for (let i = 0; i < panelW - 16; i += 6) {
     if ((i + game.animFrame) % 12 < 4) ctx.fillRect(px + 8 + i, py + 20, 3, 1);
   }
@@ -22492,7 +22499,7 @@ function drawStatsOverlay() {
         const _bMs = [10, 20, 30, 40, 50, 60, 70, 80];
         const _bDf = _bMs.filter(m => _bD[String(m)]).length;
         _pDiv();
-        drawRetroText('BOSSES  ' + _bDf + ' / 8', px + 8, y, 6, COL.cyan, 'left');
+        drawRetroText('BOSSES  ' + _bDf + ' / 8', px + 8, y, 6, COL.white, 'left');
         y += 8;
         for (let i = 0; i < _bMs.length; i++) {
           const _g = !!_bD[String(_bMs[i])];
@@ -22529,7 +22536,7 @@ function drawStatsOverlay() {
   // block, which used to push the 12-row enemy codex ~46px past the panel footer.
   {
     if (game.statsAchPage === statsAchGridPages() + 1) {
-      drawRetroText('BESTIARY', px + 8, y, 7, COL.cyan, 'left');
+      drawRetroText('BESTIARY', px + 8, y, 7, COL.white, 'left');
       drawRetroText((game.statsAchPage + 1) + '/' + statsTotalPages() + '  TAB',
                     px + panelW - 8, y, 5, COL.gray, 'right');
       y += 9;
@@ -22574,7 +22581,7 @@ function drawStatsOverlay() {
       const ids = Object.keys(ACHIEVEMENTS);
       const cellW = (panelW - 16) / 3;
       const cellH = 8;
-      drawRetroText('ACHIEVEMENTS', px + 8, y, 7, COL.cyan, 'left');
+      drawRetroText('ACHIEVEMENTS', px + 8, y, 7, COL.white, 'left');
       drawRetroText((game.statsAchPage + 1) + '/' + statsTotalPages() + '  TAB',
                     px + panelW - 8, y, 5, COL.gray, 'right');
       y += 9;

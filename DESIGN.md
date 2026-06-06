@@ -54,6 +54,17 @@ ship/biome color) and were KEPT. Only purely-decorative chrome was changed.
 - **GAME_OVER / PAUSED 2C:** boss-stage aurora streaks (3 blues `#48f`/`#8af`/`#a8f`)
   → noir crimson aurora `#933`/`#a55`/`#864`, matching the crimson frame glow.
   Witch-time tint `#5cf` is gameplay-semantic — KEPT.
+- **TOUCH CONTROLS 2F (CSS):** pause button + move-pad/knob chrome (blue) → neutral
+  white ring; the joystick knob carries the crimson identity accent. DASH button
+  (`.touch-btn` base, cyan) and FIRE button (red) KEPT — they mirror the in-game
+  dash=cyan / danger=red semantics, so the touch palette now reads as
+  cyan=dash / red=fire / white=navigation.
+- **STATS OVERLAY 2G (TAB):** panel chrome only — blue fill → near-black crimson-warm
+  `rgba(16,9,11,.93)`; green neon frame + glow → white ink + crimson glow (matches
+  canvas frame); page-title headers (BESTIARY / ACHIEVEMENTS / BOSSES) cyan → white.
+  All per-stat tier colors (`#0ff`/`#0f8`/`#fc4` progress ramps), the BESTIARY
+  unlocked-row + CODEX-bar green (completion-state encoding), and enemy `info.col`
+  were KEPT as gameplay-functional.
 
 ## Staged / pending (verify-by-play, user decision)
 - **UI chrome accent:** the pervasive cyan `#0ff` in HUD/title/menu *chrome* → white +
