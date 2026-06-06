@@ -2906,14 +2906,19 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
   // Drawn as a 3-layer stack: outer halo (cyan), mid (white-blue), core (white).
   if (kind === 'laser') {
     ctx.save();
+    // NEON: additive beam stack — the elongated beam reads as its own trail.
+    ctx.globalCompositeOperation = 'lighter';
     const pulse = 0.7 + 0.3 * Math.sin(game.animFrame * 0.6);
-    ctx.globalAlpha = 0.35 * pulse;
-    ctx.fillStyle = '#0ff';
+    ctx.shadowColor = '#1ffbff';
+    ctx.shadowBlur = 6;
+    ctx.globalAlpha = 0.25 * pulse;
+    ctx.fillStyle = '#1ffbff';
     ctx.fillRect(x - 3, y - 8, 6, 16);
-    ctx.globalAlpha = 0.7 * pulse;
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.5 * pulse;
     ctx.fillStyle = '#9ef';
     ctx.fillRect(x - 2, y - 9, 4, 18);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.85;
     ctx.fillStyle = '#fff';
     ctx.fillRect(x - 1, y - 10, 2, 20);
     ctx.restore();
@@ -2922,13 +2927,18 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
   // HOMING bullets — cyan diamond with rotating spark ring; piercing-style look.
   if (kind === 'homing') {
     ctx.save();
-    ctx.globalAlpha = 0.55 + 0.25 * Math.sin(game.animFrame * 0.5);
-    ctx.fillStyle = '#0ef';
+    // NEON: additive cyan block + seeking up-trail (cyan = dash/witch family, kept).
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.20; ctx.fillStyle = '#0ef';
+    ctx.fillRect(x - 1, y + 3, 2, 2);
+    ctx.globalAlpha = 0.10; ctx.fillRect(x - 1, y + 6, 2, 2);
+    ctx.globalAlpha = (0.40 + 0.18 * Math.sin(game.animFrame * 0.5));
+    ctx.fillStyle = '#1ffbff';
     ctx.fillRect(x - 3, y - 3, 6, 6);
     ctx.restore();
     ctx.fillStyle = '#fff';
     ctx.fillRect(x - 1, y - 2, 2, 4);
-    ctx.fillStyle = '#0ff';
+    ctx.fillStyle = '#1ffbff';
     ctx.fillRect(x, y - 3, 1, 1);
     ctx.fillRect(x - 2, y, 1, 1);
     ctx.fillRect(x + 1, y, 1, 1);
@@ -2938,13 +2948,18 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
   // WAVE bullets get a pink/magenta halo regardless of P-tier so the buff is obvious.
   if (kind === 'wave') {
     ctx.save();
-    ctx.globalAlpha = 0.55 + 0.25 * Math.sin(game.animFrame * 0.4);
-    ctx.fillStyle = '#f8a';
+    // NEON: additive magenta halo + up-trail (magenta = wave-buff identity, kept).
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.20; ctx.fillStyle = '#f8a';
+    ctx.fillRect(x - 1, y + 3, 2, 2);
+    ctx.globalAlpha = 0.10; ctx.fillRect(x - 1, y + 6, 2, 2);
+    ctx.globalAlpha = (0.38 + 0.16 * Math.sin(game.animFrame * 0.4));
+    ctx.fillStyle = '#ff5ce0';
     ctx.fillRect(x - 3, y - 4, 6, 8);
     ctx.restore();
     ctx.fillStyle = '#fff';
     ctx.fillRect(x - 1, y - 3, 2, 6);
-    ctx.fillStyle = '#f6f';
+    ctx.fillStyle = '#ff7bff';
     ctx.fillRect(x, y - 4, 1, 1);
     ctx.fillRect(x - 1, y - 2, 1, 1);
     ctx.fillRect(x + 1, y, 1, 1);
@@ -2952,18 +2967,21 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
     return;
   }
   if (lvl >= 3) {
-    // Lv3 Shard trail — green crystal echoes behind
+    // Lv3 Shard trail — green crystal echoes behind (NEON additive streak)
     ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
     for (let i = 1; i <= 3; i++) {
-      ctx.globalAlpha = 0.32 - i * 0.08;
-      ctx.fillStyle = '#0f8';
+      ctx.globalAlpha = 0.26 - i * 0.07;
+      ctx.fillStyle = '#1fff7a';
       ctx.fillRect(x - 2, y + 4 + i * 3, 4, 2);
       ctx.fillStyle = '#aff';
       ctx.fillRect(x - 1, y + 4 + i * 3, 2, 1);
     }
     ctx.restore();
-    // Lv3 Shard — emerald polyhedron diamond
-    ctx.fillStyle = '#0f8';
+    // Lv3 Shard — emerald polyhedron diamond (neon rim glow, hue kept = tier 3)
+    ctx.save();
+    ctx.shadowColor = '#1fff7a'; ctx.shadowBlur = 5;
+    ctx.fillStyle = '#1fff7a';
     ctx.beginPath();
     ctx.moveTo(x,     y - 7); // top apex
     ctx.lineTo(x + 3, y - 2); // upper-right
@@ -2981,43 +2999,60 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
     ctx.lineTo(x,     y - 1);
     ctx.closePath();
     ctx.fill();
+    ctx.restore(); // end Lv3 diamond glow before the crisp core glint
     // core glint
     ctx.fillStyle = '#fff';
     ctx.fillRect(x - 1, y - 4, 1, 2);
   } else if (lvl >= 2) {
-    // Lv2 Nova trail — gold streak behind
+    // Lv2 Nova trail — gold streak behind (NEON additive)
     ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
     for (let i = 1; i <= 3; i++) {
-      ctx.globalAlpha = 0.30 - i * 0.07;
-      ctx.fillStyle = '#fb0';
+      ctx.globalAlpha = 0.24 - i * 0.06;
+      ctx.fillStyle = '#ffb01f';
       ctx.fillRect(x - 2, y + 4 + i * 3, 4, 2);
       ctx.fillStyle = '#ffd';
       ctx.fillRect(x - 1, y + 4 + i * 3, 2, 1);
     }
     ctx.restore();
-    // Lv2 Nova — gold/white cylinder
-    ctx.fillStyle = '#fb0';
+    // Lv2 Nova — gold/white cylinder (neon rim, hue kept = tier 2)
+    ctx.save();
+    ctx.shadowColor = '#ffb01f'; ctx.shadowBlur = 5;
+    ctx.fillStyle = '#ffb01f';
     ctx.fillRect(x - 2, y - 5, 4, 9); // gold body
     ctx.fillStyle = '#ffd';
     ctx.fillRect(x - 1, y - 5, 2, 3); // white highlight stripe
+    ctx.shadowBlur = 0;
     ctx.fillStyle = '#fff';
     ctx.fillRect(x - 2, y - 6, 4, 2); // bright white cap
     ctx.fillStyle = '#a60';
-    ctx.fillRect(x - 2, y + 4, 4, 1); // dark base shadow
+    ctx.fillRect(x - 2, y + 4, 4, 1); // dark base shadow (kept — intentional shading)
+    ctx.restore();
   } else {
-    // Lv1 Sleek — blue/white slim beam (no trail to keep clean)
-    ctx.fillStyle = '#6af';
+    // Lv1 Sleek — blue/white slim beam. NEON: vivid body + a SHORT additive up-trail
+    // (most common shot — alphas kept low so constant fire doesn't bloom-saturate).
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.22; ctx.fillStyle = '#6af';
+    ctx.fillRect(x - 1, y + 3, 2, 2);
+    ctx.globalAlpha = 0.12; ctx.fillRect(x - 1, y + 5, 2, 2);
+    ctx.globalAlpha = 0.06; ctx.fillRect(x - 1, y + 7, 2, 2);
+    ctx.restore();
+    ctx.fillStyle = '#5cc0ff';
     ctx.fillRect(x - 1, y - 1, 2, 5); // blue body
+    ctx.save();
+    ctx.shadowColor = '#5cc0ff'; ctx.shadowBlur = 4;
     ctx.fillStyle = '#fff';
     ctx.fillRect(x - 1, y - 3, 2, 3); // white leading tip
+    ctx.restore();
   }
   // FORK SIDE BULLET TINT — amber accent on side spread bullets so the FORK
-  // power-up reads as a distinct effect (vs primary vertical shot which keeps
-  // its weapon-kind look). Color matches the F label / forkTimer chip.
+  // power-up reads as a distinct effect. Color matches the F label / forkTimer chip.
   if (fork) {
     ctx.save();
-    ctx.globalAlpha = 0.65;
-    ctx.fillStyle = '#fa0';
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#ffaa1f';
     ctx.fillRect(x - 2, y - 1, 4, 2);
     ctx.restore();
   }
@@ -3306,11 +3341,13 @@ function drawPowerUp(p) {
 //   default (dive enemies)  → orange/yellow
 //   kind 'mega'  (megaboss aimed)   → bright red
 //   kind 'spiral'(megaboss spiral)  → magenta
+// NEON VECTOR BLOOM — threat-coded hues pushed to vivid neon (hue preserved so the
+// gameplay tell survives): amber=dive, red=aimed/elite, magenta=spiral/sweep/ring.
 const BULLET_COLORS = {
-  dive:       { trail: '#f80', halo: '#ff4', core: '#f80', inner: '#ff4' },
-  mega:       { trail: '#f44', halo: '#f88', core: '#f44', inner: '#faa' },
-  spiral:     { trail: '#c2c', halo: '#f8f', core: '#c2c', inner: '#fcf' },
-  eliteBurst: { trail: '#f44', halo: '#fc4', core: '#f44', inner: '#fc8' }
+  dive:       { trail: '#ff7a00', halo: '#ffd633', core: '#ff8c00', inner: '#ffe34d' },
+  mega:       { trail: '#ff1a1a', halo: '#ff5555', core: '#ff2a2a', inner: '#ff8080' },
+  spiral:     { trail: '#ff1aff', halo: '#ff66ff', core: '#ff2bff', inner: '#ffb3ff' },
+  eliteBurst: { trail: '#ff2a2a', halo: '#ffcc33', core: '#ff3a3a', inner: '#ffd699' }
 };
 function drawEnemyBullet(b) {
   const t = game.animFrame;
@@ -3340,9 +3377,13 @@ function drawEnemyBullet(b) {
     if (_bid && BIOME_NAMES && BIOME_NAMES[_bid]) _biomeTrailCol = BIOME_NAMES[_bid].col;
   }
   ctx.save();
+  // NEON: trail + halo composite ADDITIVELY ('lighter') so they read as a motion
+  // light-streak + glow. Alphas cut vs the old source-over values because the
+  // full-frame bloom already amplifies — full alpha here would white-out.
+  ctx.globalCompositeOperation = 'lighter';
   // Trail (1 or 3 fading echoes behind the bullet, depending on density)
   for (let i = 1; i <= trailLen; i++) {
-    ctx.globalAlpha = (0.32 - i * 0.08) * _fadeIn;
+    ctx.globalAlpha = (0.20 - i * 0.05) * _fadeIn;
     // Last echo (farthest) uses biome color when active, otherwise default
     ctx.fillStyle = (_biomeTrailCol && i === trailLen) ? _biomeTrailCol : C.trail;
     const tx = b.x + ux * i * 2.2;
@@ -3351,14 +3392,15 @@ function drawEnemyBullet(b) {
     ctx.fillRect(tx - sz / 2, ty - sz / 2, sz, sz);
   }
 
-  // Pulsing outer halo
+  // Pulsing outer halo (additive glow ring)
   const pulse = 0.5 + 0.4 * Math.sin(t * 0.4);
-  ctx.globalAlpha = pulse * 0.55 * _fadeIn;
+  ctx.globalAlpha = pulse * 0.30 * _fadeIn;
   ctx.fillStyle = C.halo;
   ctx.fillRect(b.x - 3, b.y - 3, 6, 6);
   ctx.restore();
 
-  // Core (fade applied via globalAlpha during spawn ramp)
+  // Core — KEEP source-over so the saturated hostile hue reads as a solid object
+  // against the void (additive would dissolve it into the halo). fade via ramp.
   ctx.save();
   ctx.globalAlpha = _fadeIn;
   ctx.fillStyle = C.core;
@@ -3366,7 +3408,9 @@ function drawEnemyBullet(b) {
   // Inner
   ctx.fillStyle = C.inner;
   ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
-  // White-hot center
+  // White-hot center — slightly under full so the bloom doesn't flatten the colored
+  // core to a featureless white dot (the gameplay tell is the colored core).
+  ctx.globalAlpha = _fadeIn * 0.82;
   ctx.fillStyle = '#fff';
   ctx.fillRect(b.x, b.y, 1, 1);
   ctx.restore();
