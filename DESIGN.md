@@ -42,9 +42,20 @@ The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
 - **Design implication:** anything you want to glow just needs to be BRIGHT and ideally
   drawn with additive/`shadowBlur`. Don't fight the bloom with heavy outlines on bright
   shapes — let the bloom be the outline. Keep the background dark so neon reads.
-- **Staged neon passes (pending):** intensify the combat palette (player/enemy bullets,
-  explosions → vivid additive neon), vector-emissive enemy bodies (core + neon rim),
-  bullet motion trails, an options toggle for bloom. Each is verify-by-play.
+- **Neon passes shipped (verify-by-play, mapped by a read-only Explore workflow):**
+  1. Full-frame bloom (headline).
+  2. Projectiles — `BULLET_COLORS` vivid neon + `drawEnemyBullet` additive trail/halo;
+     `drawPlayerBullet` neon bodies + additive trails (lvl1 up-trail, lvl2/3 flipped,
+     laser/homing/wave halos), hues kept (cyan/magenta/tier semantics).
+  3. Player ship — additive engine flame glow, hull neon rim (from `body` hue),
+     P-ring additive magenta, dualFighter tether additive.
+  4. Explosions/particles — `drawExplosion`/`drawHitSpark`/`drawShockwaves`/
+     `drawItemBurst` additive light-bursts (alphas capped for bloom).
+- **Still pending (lower priority — enemies already glow via the bloom):** per-sprite
+  vector rims on enemy bodies (`drawBee`/`drawButterfly`/`drawMegaBoss`… — shadowBlur
+  rims, hot-path cost, preserve elite-outline/ghost-stealth/hit-flash at the
+  dispatcher), optional shared `COL` palette neon-lift (touches all UI — do carefully),
+  and a bloom on/off options-menu toggle (`galagaBloomOff` already persists).
 
 ## Core principle — atmosphere noir, gameplay color preserved
 A pure monochrome would break gameplay legibility and the colorblind redundancy the
