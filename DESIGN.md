@@ -5,14 +5,46 @@ rendered HTML5 canvas arcade shooter — no fonts, no CSS framework, no componen
 The "design system" here is the **visual atmosphere**: palette, background, and the
 chrome/ambient treatment. Read this before any visual/color change.
 
-## Aesthetic Direction
-- **Direction:** Ink Minimal Noir
+## Aesthetic Direction — NEON VECTOR BLOOM (current, 2026-06-06)
+A second `/design-consultation` (2026-06-06) flipped the direction: the restrained
+flat Ink Noir read as "too flat / drab / cheap" — the minimalism became lifelessness.
+The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
+
+- **Direction:** Neon Vector Bloom on a deep void.
+- **Mood:** Electric. The deep-black void STAYS (it is what makes the glow read), but
+  everything bright sheds light — a full-frame bloom post-process composites the frame
+  onto itself blurred + additively, so neon bullets, explosions, engine glow, and HUD
+  text all bloom halos. Vivid saturated neon, vector-emissive sprites, particle juice.
+- **Relationship to noir:** This is not "make it bright." It KEEPS noir's dark canvas
+  (the void, the crimson accent, the daylight ground biomes) — and adds the electric
+  bloom + neon energy that flat noir was missing. Noir gave the stage; neon turns the
+  lights on. The earlier per-screen noir chrome work (below) still stands as the
+  baseline the bloom amplifies.
+- **Why:** Directly answers the "too flat" critique. Bloom + neon is the biggest, most
+  technically cheap lever (internal res is 224×288; the bloom is two `drawImage` passes)
+  that turns crude `fillRect` pixels into glowing vector-light. The game already had 47
+  `shadowBlur` glow sites — the look was latent; bloom unifies it.
+
+### Earlier direction (history) — Ink Minimal Noir (2026-05-27)
 - **Mood:** A near-black void with restrained, deliberate color. White does the work;
-  a single crimson accent carries danger/identity. The opposite of the generic
-  "cool-blue neon arcade" look most shmup clones converge on.
-- **Why:** Reinforces the sharpened product identity (*"a tight skill Galaga"*, see
-  the CEO-review subtraction) and the user's standing "clean UI" (깔끔) north star.
-  Less chromatic noise → gameplay-functional color reads louder.
+  a single crimson accent carries danger/identity. Kept as the dark foundation the
+  bloom builds on, but the *restraint* is no longer the goal — energy is.
+- **Why (then):** Reinforced the sharpened "tight skill Galaga" identity + the "clean
+  UI" (깔끔) north star. Still valid for chrome legibility; superseded for atmosphere.
+
+## Bloom / glow (the headline system)
+- **Full-frame bloom** lives at the tail of `draw()` (after the transform restore, in
+  device pixels): `globalCompositeOperation='lighter'` + `ctx.filter='blur(Npx)'`, two
+  passes — wide soft glow (`blur ≈ SCALE×2.4`, α 0.40) + tight halo (`blur ≈ SCALE×0.9`,
+  α 0.28) — `drawImage(canvas, …)` onto itself. Black adds ~0 under `lighter`, so the
+  void stays deep while lights bloom. Gated on `bloomEnabled` (`galagaBloomOff` persist)
+  and a `ctx.filter` support check; the logic-test stub ctx has no `filter` so tests skip it.
+- **Design implication:** anything you want to glow just needs to be BRIGHT and ideally
+  drawn with additive/`shadowBlur`. Don't fight the bloom with heavy outlines on bright
+  shapes — let the bloom be the outline. Keep the background dark so neon reads.
+- **Staged neon passes (pending):** intensify the combat palette (player/enemy bullets,
+  explosions → vivid additive neon), vector-emissive enemy bodies (core + neon rim),
+  bullet motion trails, an options toggle for bloom. Each is verify-by-play.
 
 ## Core principle — atmosphere noir, gameplay color preserved
 A pure monochrome would break gameplay legibility and the colorblind redundancy the
@@ -102,3 +134,4 @@ space(dark)↔ground(bright) environmental contrast that reuses the existing bio
 |------|----------|-----------|
 | 2026-05-27 | Ink Minimal Noir direction chosen; ambient field converted (pass 1) | User picked it via /design-consultation; serves the "clean" identity. Gameplay color-coding preserved for legibility. |
 | 2026-06-06 | Bright daylight ground biomes (planet/dawn/desert/canyon) | User asked to consider a bright Earth-land backdrop; chose per-biome brightness over a global pivot. Noir keeps space + chrome; daylight gets the ground stages → space↔ground contrast, reusing the biome cycle. |
+| 2026-06-06 | **Direction pivot → Neon Vector Bloom** (full-frame bloom pass 1 shipped) | User: flat Ink Noir read as "too flat/drab/cheap." 2nd /design-consultation chose Neon Vector Bloom. Keeps the dark void (glow needs black) but adds an electric full-frame bloom + neon energy. Noir = foundation, neon = the lights. Remaining sprite/palette neon passes staged. |

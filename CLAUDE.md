@@ -3,12 +3,19 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Visual design
-Read **`DESIGN.md`** before any visual/color change. The aesthetic direction is
-**Ink Minimal Noir** (near-black void + white + a single crimson accent; the anti-
-"cool-blue-neon-arcade" look). Atmosphere/chrome layers go noir; gameplay-functional
-color-coding (enemy types, power-ups, grades, elite/ghost, shield/dash/witch-time
-semantics) is PRESERVED for legibility — don't monochrome those. See DESIGN.md for the
-palette and the staged plan (ambient field done; UI accent + biome backdrops pending).
+Read **`DESIGN.md`** before any visual/color change. The current aesthetic direction is
+**NEON VECTOR BLOOM** (Geometry Wars / Rez lineage): a deep-black void with an electric
+full-frame **bloom** post-process (tail of `draw()`, device-pixel `'lighter'` +
+`ctx.filter` blur, gated on `bloomEnabled`/`galagaBloomOff`) so every bright element
+sheds a glow halo, plus vivid neon emissives. This *evolved from* the earlier **Ink
+Minimal Noir** (near-black void + white + crimson) — the dark void, crimson accent,
+noir chrome, and daylight ground biomes all STAY as the foundation; the pivot adds
+energy (bloom + neon), because flat noir read as "too flat/drab." Keep the background
+dark (glow needs black) and let the bloom be the outline — don't fight it with heavy
+strokes on bright shapes. Gameplay-functional color-coding (enemy types, power-ups,
+grades, elite/ghost, shield/dash/witch-time semantics) is PRESERVED for legibility.
+See DESIGN.md for the palette, the bloom system, and the staged neon passes (bloom
+shipped; combat-palette/sprite-emissive/trail passes pending).
 
 ## Running the game
 
