@@ -2424,13 +2424,18 @@ function drawExplosion(x, y, t, maxT) {
   // EXPLOSION BIOME TINT — splice biome color into the palette at stage 8+.
   // Subtle: replaces ONE of the 4 base hues per biome so identity shifts but
   // the white/yellow/orange core still reads as 'fire'.
-  let colors = ['#fff', '#ff0', '#f80', '#f00'];
+  // NEON: vivid fire ramp (white→neon yellow→neon orange→neon red), kept as 'fire'.
+  let colors = ['#fff', '#ffee33', '#ff7a00', '#ff2233'];
   if (game && typeof biomeForStage === 'function') {
     const _bid = biomeForStage(game.stage);
     if (_bid && BIOME_NAMES[_bid]) {
-      colors = ['#fff', '#ff0', BIOME_NAMES[_bid].col, '#f00'];
+      colors = ['#fff', '#ffee33', BIOME_NAMES[_bid].col, '#ff2233'];
     }
   }
+  // NEON: composite the burst ADDITIVELY so it reads as a light-burst. Alpha capped
+  // at ~0.55*(1-progress) (not full) because the full-frame bloom already amplifies —
+  // full additive at t=0 would blow to a featureless white disc.
+  ctx.globalCompositeOperation = 'lighter';
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + progress * 2;
     const d = r * (0.5 + Math.random() * 0.5);
@@ -2438,8 +2443,16 @@ function drawExplosion(x, y, t, maxT) {
     const py = Math.sin(a) * d;
     const s = 2 * (1 - progress);
     ctx.fillStyle = colors[i % colors.length];
-    ctx.globalAlpha = 1 - progress;
+    ctx.globalAlpha = 0.55 * (1 - progress);
     ctx.fillRect(px - s/2, py - s/2, s, s);
+  }
+  // Hot core flash at the start of the burst (bloom seed)
+  if (progress < 0.25) {
+    ctx.globalAlpha = 0.5 * (1 - progress * 4);
+    ctx.shadowColor = '#ffcc33'; ctx.shadowBlur = 6;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(-1.5, -1.5, 3, 3);
+    ctx.shadowBlur = 0;
   }
   ctx.restore();
 }
@@ -2770,15 +2783,17 @@ function drawItemBurst(b) {
   const p = b.life / max;
   const r = 2 + p * 14;
   ctx.save();
-  ctx.globalAlpha = 1 - p;
+  // NEON: additive light-shatter ring (used by mirror/shielded/ufo death + pickups).
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = (1 - p) * 0.8;
   // Outer ring
   ctx.fillStyle = b.color;
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
     ctx.fillRect(b.x + Math.cos(a) * r - 1, b.y + Math.sin(a) * r - 1, 2, 2);
   }
-  // Inner ring (offset, white)
-  ctx.globalAlpha = (1 - p) * 0.7;
+  // Inner ring (offset, white) — dropped to 0.5 additive so it doesn't blow out
+  ctx.globalAlpha = (1 - p) * 0.5;
   ctx.fillStyle = '#fff';
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
@@ -2829,7 +2844,6 @@ function drawHitSpark(s) {
   const p = s.life / max;
   const r = p * 8;
   ctx.save();
-  ctx.globalAlpha = 1 - p;
   // BIOME SPARK GLOW — when a biome is active, replace one of the 6 ray colors
   // (every 3rd) with biome col so each spark carries environment hint without
   // losing the yellow/white core identity.
@@ -2838,17 +2852,23 @@ function drawHitSpark(s) {
     const _bid = biomeForStage(game.stage || 1);
     if (_bid && BIOME_NAMES && BIOME_NAMES[_bid]) _bsCol = BIOME_NAMES[_bid].col;
   }
+  // NEON: rays composite additively (light-spark). These fire constantly (pool 50),
+  // so no per-spark shadowBlur — the global bloom carries the glow. Alpha halved
+  // since 'lighter' + bloom on overlapping sparks would make a glowing wall.
+  ctx.globalCompositeOperation = 'lighter';
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + s.life * 0.05;
     const px = Math.cos(a) * r;
     const py = Math.sin(a) * r;
-    ctx.fillStyle = (_bsCol && i % 3 === 0) ? _bsCol : (i % 2 === 0 ? '#ff4' : '#fff');
+    ctx.globalAlpha = (1 - p) * 0.5;
+    ctx.fillStyle = (_bsCol && i % 3 === 0) ? _bsCol : (i % 2 === 0 ? '#ffee33' : '#fff');
     const sz = 2 - p * 1.5;
     ctx.fillRect(s.x + px - sz / 2, s.y + py - sz / 2, sz, sz);
   }
-  // Bright center flash (first 4 frames)
+  // Bright center flash (first 4 frames) — the punch; back to source-over, capped.
   if (s.life < 4) {
-    ctx.globalAlpha = 1 - s.life / 4;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = (1 - s.life / 4) * 0.7;
     ctx.fillStyle = '#fff';
     ctx.fillRect(s.x - 2, s.y - 2, 4, 4);
   }
@@ -13561,7 +13581,11 @@ function drawShockwaves() {
     const t = s.life / s.maxLife;
     const r = s.maxR * t;
     ctx.save();
-    ctx.globalAlpha = (1 - t) * 0.7;
+    // NEON: additive glowing ring (count capped at 30 so the shadowBlur is safe).
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowColor = s.color;
+    ctx.shadowBlur = 4;
+    ctx.globalAlpha = (1 - t) * 0.6;
     ctx.strokeStyle = s.color;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -13569,7 +13593,7 @@ function drawShockwaves() {
     ctx.stroke();
     // Inner thinner ring trailing slightly
     if (t > 0.3) {
-      ctx.globalAlpha = (1 - t) * 0.35;
+      ctx.globalAlpha = (1 - t) * 0.3;
       ctx.beginPath();
       ctx.arc(s.x, s.y, r * 0.7, 0, Math.PI * 2);
       ctx.stroke();
