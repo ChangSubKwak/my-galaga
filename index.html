@@ -1672,16 +1672,20 @@ function drawPlayer(x, y, color, levels) {
   // P TIER — cockpit glow ring around the dome (lvl 2+)
   if (pLvl >= 2) {
     ctx.save();
-    const gAlpha = pLvl >= 3 ? 0.55 : 0.30;
+    // NEON: additive magenta energy halo (P/POWER axis hue kept). Base alpha cut
+    // since 'lighter' + bloom over the white dome behind would otherwise wash out.
+    ctx.globalCompositeOperation = 'lighter';
+    const gAlpha = pLvl >= 3 ? 0.40 : 0.22;
     ctx.globalAlpha = gAlpha + 0.15 * Math.sin((game && game.animFrame || 0) * 0.18);
-    ctx.fillStyle = '#f6f';
+    ctx.fillStyle = '#ff3df0';
     // Halo outline around the white cockpit
     ctx.fillRect(-3, -6, 7, 1);
     ctx.fillRect(-3, -1, 7, 1);
     ctx.fillRect(-3, -5, 1, 4);
     ctx.fillRect(3, -5, 1, 4);
     if (pLvl >= 3) {
-      // Lvl 3 — bright magenta glints at corners
+      // Lvl 3 — bright magenta glints at corners (tiny → bloom stars them)
+      ctx.globalAlpha = 1;
       ctx.fillStyle = '#fff';
       ctx.fillRect(-3, -6, 1, 1);
       ctx.fillRect(3, -6, 1, 1);
@@ -1715,6 +1719,16 @@ function drawPlayer(x, y, color, levels) {
   // Lower hull
   ctx.fillStyle = body;
   ctx.fillRect(-3, 2, 7, 2);
+  // NEON: thin additive rim along the top edges so the hull reads as a glowing vector
+  // craft while the solid body stays readable. Derived from `body` (additive lifts it
+  // toward its lit edge), so per-ship color selection is respected.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = body;
+  ctx.fillRect(-6, 0, 13, 1); // wing leading edge
+  ctx.fillRect(-4, -2, 9, 1); // upper-body leading edge
+  ctx.restore();
   // Engine flames — base 2-tier, with S TIER scaling exhaust width/intensity
   const t = (game && game.animFrame) || 0;
   const flicker = (t & 1) === 0;
@@ -1722,17 +1736,24 @@ function drawPlayer(x, y, color, levels) {
   // level 5 = 11 wide). Cap so it doesn't exceed wing span.
   const flameW = Math.min(11, 7 + (sLvl - 1));
   const flameXOff = -flameW / 2 + 0.5;
+  // NEON: the whole flame composites ADDITIVELY so cyan rim → amber mid → yellow core
+  // sum into a hot white-yellow center (natural rocket-flame falloff). Alphas cut vs
+  // the old source-over values since the full-frame bloom already amplifies.
   ctx.save();
-  ctx.globalAlpha = 0.5 + 0.2 * Math.sin(t * 0.4);
-  ctx.fillStyle = '#0cf';
+  ctx.globalCompositeOperation = 'lighter';
+  // Outer wide flame (neon cyan halo) + soft penumbra independent of the global bloom
+  ctx.save();
+  ctx.shadowColor = '#15f6ff'; ctx.shadowBlur = 4;
+  ctx.globalAlpha = 0.35 + 0.15 * Math.sin(t * 0.4);
+  ctx.fillStyle = '#15f6ff';
   ctx.fillRect(flameXOff, 4, flameW, flicker ? 3 : 2);
   ctx.restore();
-  // Mid flame (orange)
-  ctx.fillStyle = '#f80';
+  // Mid flame (neon amber)
+  ctx.fillStyle = '#ff7a00';
   ctx.fillRect(-2, 4, 2, 1);
   ctx.fillRect(1, 4, 2, 1);
-  // Bright inner core (yellow + flicker tail)
-  ctx.fillStyle = '#ff4';
+  // Bright inner core (neon yellow + white flicker tail — under 'lighter' the center auto-whitens)
+  ctx.fillStyle = '#ffee55';
   ctx.fillRect(-1, 4, 1, 1);
   ctx.fillRect(2, 4, 1, 1);
   if (flicker) {
@@ -1743,8 +1764,8 @@ function drawPlayer(x, y, color, levels) {
   // S TIER — extended trail at lvl 3+ (longer streamer below the engine)
   if (sLvl >= 3) {
     ctx.save();
-    ctx.globalAlpha = 0.35 + 0.20 * Math.sin(t * 0.5);
-    ctx.fillStyle = '#0cf';
+    ctx.globalAlpha = 0.30 + 0.18 * Math.sin(t * 0.5);
+    ctx.fillStyle = '#15f6ff';
     const trailH = sLvl >= 5 ? 4 : sLvl >= 4 ? 3 : 2;
     ctx.fillRect(-1, 7, 1, trailH);
     ctx.fillRect(1, 7, 1, trailH);
@@ -1754,6 +1775,7 @@ function drawPlayer(x, y, color, levels) {
     }
     ctx.restore();
   }
+  ctx.restore(); // end engine 'lighter' wrapper
 
   // BATTLE DAMAGE — scorch marks / flickering engine / cockpit crack
   // Driven by game.battleScars (increments on shield absorb or witch save).
@@ -21788,15 +21810,17 @@ function drawBossStage() {
       drawShipTraitAura(game.playerX + 8, _drawPY, selectedShip);
       drawPlayer(game.playerX - 8, _drawPY, pcol, game.lvl);
       drawPlayer(game.playerX + 8, _drawPY, pcol, game.lvl);
-      // DUAL FIGHTER LINK BEAM — faint cyan tether between the two ships, visually
-      // selling "paired" identity. Subtle pulse so it reads as energy, not static.
+      // DUAL FIGHTER LINK BEAM — neon cyan energy tether between the two ships.
+      // NEON: additive so it reads as a glowing energy link; alpha cut since
+      // 'lighter' + bloom over a long 14px bar blows out fast.
       ctx.save();
-      const _dfP = 0.32 + 0.18 * Math.sin(game.animFrame * 0.22);
+      ctx.globalCompositeOperation = 'lighter';
+      const _dfP = 0.22 + 0.16 * Math.sin(game.animFrame * 0.22);
       ctx.globalAlpha = _dfP;
-      ctx.fillStyle = '#0ff';
+      ctx.fillStyle = '#15f6ff';
       ctx.fillRect(Math.round(game.playerX - 7), Math.round(_drawPY), 14, 1);
-      // Small bright midpoint dot
-      ctx.globalAlpha = _dfP * 1.5;
+      // Small bright midpoint dot (bloom stars it)
+      ctx.globalAlpha = _dfP * 1.2;
       ctx.fillStyle = '#fff';
       ctx.fillRect(Math.round(game.playerX), Math.round(_drawPY), 1, 1);
       ctx.restore();
