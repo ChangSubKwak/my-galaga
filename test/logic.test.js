@@ -222,6 +222,27 @@ if (typeof G.biomeForStage === 'function') {
 } else { console.log('  (skipped — biomeForStage not exposed)'); }
 
 // ============================================================
+section('biomeIsBright — DAYLIGHT GROUND BIOMES predicate');
+if (typeof G.biomeIsBright === 'function') {
+  // The four terrestrial/sky biomes render as a bright daytime scene.
+  ['planet', 'dawn', 'desert', 'canyon'].forEach(b =>
+    ok(G.biomeIsBright(b) === true, b + ' is a bright (daylight) biome'));
+  // Every other biome stays on the noir void.
+  ['ruins', 'asteroid', 'ice', 'gasGiant', 'corona', 'blackhole', 'nebula', 'starfield'].forEach(b =>
+    ok(G.biomeIsBright(b) === false, b + ' stays dark (space void)'));
+  // Robust to junk / null (drawBiome early-returns before calling it, but guard anyway).
+  ok(G.biomeIsBright(null) === false, 'null biome is not bright');
+  ok(G.biomeIsBright('nope') === false, 'unknown biome is not bright');
+  // Consistency: every bright biome is a real biome that biomeForStage can yield.
+  if (typeof G.biomeForStage === 'function') {
+    const yielded = new Set();
+    for (let s = 8; s < 8 + 48; s++) yielded.add(G.biomeForStage(s));
+    ['planet', 'dawn', 'desert', 'canyon'].forEach(b =>
+      ok(yielded.has(b), 'bright biome ' + b + ' is reachable from biomeForStage'));
+  }
+} else { console.log('  (skipped — biomeIsBright not exposed)'); }
+
+// ============================================================
 section('evalBonusResult uses LOCKED reels (skill-stop), not finalIdx');
 if (typeof G.evalBonusResult === 'function') {
   const g = fresh();

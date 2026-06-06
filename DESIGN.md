@@ -66,6 +66,27 @@ ship/biome color) and were KEPT. Only purely-decorative chrome was changed.
   unlocked-row + CODEX-bar green (completion-state encoding), and enemy `info.col`
   were KEPT as gameplay-functional.
 
+## Applied — DAYLIGHT GROUND BIOMES (2026-06-06)
+User asked to consider a **bright (non-dark) background with Earth's land**. Chosen
+direction (via question): introduce brightness **per-biome**, not globally — keep the
+noir void for space, but render the four terrestrial/sky biomes as a genuinely BRIGHT
+daytime scene. This is a deliberate, scoped exception to the global noir void: noir
+still governs space + chrome; daylight governs the ground stages, creating a
+space(dark)↔ground(bright) environmental contrast that reuses the existing biome cycle.
+
+- **Bright set:** `planet` (blue world horizon), `dawn` (warm sunrise), `desert` (hazy
+  bright dunes), `canyon` (bright sky framed by red walls). `ruins` (somber bombed city)
+  and the 7 space biomes stay on the noir void.
+- **Render:** shared `drawBrightSky(pal)` paints a lit sky gradient (medium-tone zenith
+  → luminous horizon, so combat up top stays legible), a horizon glow, a lit ground
+  fill, and a forward-scrolling parallax speckle. Each biome keeps its signature detail.
+- **Legibility (the bright-bg cost, handled):** `game._brightBiome` gates three fixes —
+  starfield hidden (no stars in daylight), a dark gradient HUD backing (top score row +
+  bottom lives/level), and a thin dark backing behind player bullets. Gameplay-functional
+  colors (enemy types, power-ups, bullets) are unchanged.
+- Verified by play (browser screenshots): planet stage 8/10 render bright sky + green
+  ground with legible HUD/enemies/bullets; non-bright stages keep the dark void.
+
 ## Staged / pending (verify-by-play, user decision)
 - **UI chrome accent:** the pervasive cyan `#0ff` in HUD/title/menu *chrome* → white +
   crimson. Risky to flip globally (COL.cyan is also gameplay-semantic: dash, witch
@@ -80,3 +101,4 @@ ship/biome color) and were KEPT. Only purely-decorative chrome was changed.
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-05-27 | Ink Minimal Noir direction chosen; ambient field converted (pass 1) | User picked it via /design-consultation; serves the "clean" identity. Gameplay color-coding preserved for legibility. |
+| 2026-06-06 | Bright daylight ground biomes (planet/dawn/desert/canyon) | User asked to consider a bright Earth-land backdrop; chose per-biome brightness over a global pivot. Noir keeps space + chrome; daylight gets the ground stages → space↔ground contrast, reusing the biome cycle. |

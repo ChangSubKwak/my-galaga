@@ -11,3 +11,4 @@
 # Node / dev artifacts (none currently, but defensive)
 node_modules/
 *.log
+.gstack/

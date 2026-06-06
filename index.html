@@ -2420,6 +2420,8 @@ function drawExplosion(x, y, t, maxT) {
 }
 
 function drawStar(s) {
+  // DAYLIGHT GROUND BIOMES wash out the starfield — no stars in a bright sky.
+  if (game && game._brightBiome) return;
   // Far stars twinkle less, near stars more
   const twinkleAmp = s.layer === 'far' ? 0.15 : s.layer === 'mid' ? 0.25 : 0.35;
   const flick = (1 - twinkleAmp) + twinkleAmp * Math.sin(s.twinklePhase);
@@ -2830,6 +2832,16 @@ function drawHitSpark(s) {
 
 // GAM-42: Bullet transformation — 3 visual tiers keyed to P (Power) level
 function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
+  // DAYLIGHT GROUND BIOMES — white/bright player bullets can wash out over the lit
+  // sky + horizon glow. Lay a thin dark backing (bright biomes only) so the shot
+  // stays readable; drawn first so the bullet body covers it.
+  if (game && game._brightBiome) {
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#0a0608';
+    ctx.fillRect(x - 2, y - 5, 4, 11);
+    ctx.restore();
+  }
   // CRIT bullet halo — gold pulse around the bullet during flight. Crits are 4%
   // chance so this visual feedback is rare and rewarding. Drawn FIRST so body
   // layers cover halo edges.
@@ -3710,6 +3722,15 @@ function biomeForStage(stage) {
   // colorful breather after the void.
   return ['planet', 'ruins', 'dawn', 'asteroid', 'desert', 'ice', 'gasGiant', 'corona', 'canyon', 'blackhole', 'nebula', 'starfield'][idx % 12];
 }
+
+// DAYLIGHT GROUND BIOMES — the four terrestrial/sky biomes render as a genuinely
+// BRIGHT daytime scene (lit sky gradient + scrolling ground) instead of the dark
+// space void, creating a space(dark)↔ground(bright) environmental contrast. Pure
+// predicate (logic-tested); read by drawBiome (sky repaint), drawStar (hide stars
+// in daylight), the HUD (dark backing strip), and bullet draws (dark backing for
+// legibility on bright sky). The other 8 biomes stay on the noir void.
+const BRIGHT_BIOMES = new Set(['planet', 'dawn', 'desert', 'canyon']);
+function biomeIsBright(id) { return BRIGHT_BIOMES.has(id); }
 
 // BIOME WEATHER — environmental phenomena tied to specific biomes.
 // 50% chance to trigger on a normal stage (8+) when the biome matches.
@@ -4777,48 +4798,88 @@ function ensureAsteroids() {
   }
 }
 
+// drawBrightSky — shared daylight backdrop for the four DAYLIGHT GROUND BIOMES.
+// Paints over the noir void: a lit sky gradient (medium-tone zenith so white
+// bullets/enemies stay legible up top, brightening to a luminous horizon), a
+// horizon glow band, a lit ground fill, and a forward-scrolling parallax speckle
+// so flight reads as motion over terrain. Each biome layers its signature detail
+// (sun / dunes / canyon walls / city lights) on top.
+function drawBrightSky(pal) {
+  const horizonY = pal.horizonY != null ? pal.horizonY : BASE_H - 46;
+  const t = game ? game.animFrame : 0;
+  const sky = ctx.createLinearGradient(0, 0, 0, horizonY);
+  sky.addColorStop(0, pal.zenith);
+  sky.addColorStop(0.6, pal.mid);
+  sky.addColorStop(1, pal.horizon);
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, BASE_W, horizonY);
+  // Horizon glow band — bright haze where sky meets ground
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = pal.glow;
+  ctx.fillRect(0, horizonY - 8, BASE_W, 10);
+  // Ground — lit surface from horizon to the bottom
+  ctx.globalAlpha = 1;
+  const grd = ctx.createLinearGradient(0, horizonY, 0, BASE_H);
+  grd.addColorStop(0, pal.ground);
+  grd.addColorStop(1, pal.ground2);
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, horizonY, BASE_W, BASE_H - horizonY);
+  // Scrolling ground streaks — receding rows scroll faster near the player
+  // (parallax), conveying forward flight over the surface.
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = pal.streak;
+  for (let i = 0; i < 22; i++) {
+    const depth = i / 22;                       // 0 = horizon .. ~1 = near
+    const gy = horizonY + depth * depth * (BASE_H - horizonY);
+    const speed = 0.3 + depth * 1.8;
+    const len = 6 + depth * 26;
+    const gx = ((i * 53 + t * speed) % (BASE_W + 40)) - 20;
+    ctx.fillRect(Math.round(gx), Math.round(gy), Math.round(len), 1);
+  }
+  ctx.restore();
+}
+
 function drawBiome() {
   if (!game) return;
+  game._brightBiome = false;
   const id = biomeForStage(game.stage || 1);
   if (!id) return;
   const t = game.animFrame;
 
   if (id === 'planet') {
-    // PLANET HORIZON — lower band of curved planet surface w/ atmospheric glow.
-    // Color palette tied loosely to TIER_PALETTES so it harmonizes, not clashes.
+    // PLANET HORIZON — daylight over a blue world: lit sky + curved green land.
+    game._brightBiome = true;
+    drawBrightSky({ zenith: '#2f5c96', mid: '#4f86c6', horizon: '#bcdcf4',
+                    glow: '#dff0ff', ground: '#2d5a3e', ground2: '#1c3f2c',
+                    streak: '#6fae7e', horizonY: BASE_H - 50 });
     ctx.save();
-    // Atmospheric glow band just above the surface
-    ctx.globalAlpha = 0.18;
-    ctx.fillStyle = '#48f';
-    ctx.fillRect(0, BASE_H - 60, BASE_W, 6);
-    ctx.globalAlpha = 0.10;
-    ctx.fillRect(0, BASE_H - 66, BASE_W, 8);
-    ctx.restore();
-    // Planet curve — chunky pixel arc made from horizontal rects of varying width
-    ctx.fillStyle = '#236';
+    // Curved planet limb — chunky arc just below the horizon (darker land mass)
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#1c3f2c';
     for (let py = 0; py < 50; py++) {
       const y = BASE_H - 50 + py;
-      // Crude curve: width based on parabola from y
       const k = py / 50;
-      const w = BASE_W * (1 - k * 0.05); // very gentle curve at top, more at bottom
+      const w = BASE_W * (1 - k * 0.05);
       const x = (BASE_W - w) / 2;
       ctx.fillRect(x, y, w, 1);
     }
-    // Surface highlights — moving lights (cities)
+    // City lights glinting on the land below
+    ctx.globalAlpha = 0.9;
     ctx.fillStyle = '#fc4';
     for (let i = 0; i < 6; i++) {
       const cx = ((i * 47 + (t * 0.05)) % BASE_W);
       const cy = BASE_H - 30 + (i % 3) * 6;
       if ((t + i * 7) % 60 < 30) ctx.fillRect(Math.round(cx), cy, 1, 1);
     }
-    // Atmospheric dust — slow drift upward (atmospheric scatter)
-    ctx.save();
-    ctx.globalAlpha = 0.35;
-    ctx.fillStyle = '#a86';
-    for (let i = 0; i < 10; i++) {
-      const px = ((i * 23 + t * 0.15) % BASE_W);
-      const py = ((BASE_H - 50) - ((i * 37 + t * 0.08) % (BASE_H - 60)));
-      ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+    // High clouds drifting across the bright sky
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#eaf4ff';
+    for (let i = 0; i < 5; i++) {
+      const cx = ((i * 61 + t * 0.12) % (BASE_W + 40)) - 20;
+      const cy = 24 + (i % 3) * 16;
+      ctx.fillRect(Math.round(cx), cy, 14, 2);
+      ctx.fillRect(Math.round(cx) + 3, cy - 1, 8, 1);
     }
     ctx.restore();
   } else if (id === 'asteroid') {
@@ -4919,38 +4980,27 @@ function drawBiome() {
     }
     ctx.restore();
   } else if (id === 'dawn') {
-    // DAWN SKY — orange/pink gradient covering bottom half of screen for a "rising
-    // over a planet" feel. Bright lift to contrast the deep-space biomes around it.
-    // Alpha kept ≤0.30 so player/enemy sprites remain clearly readable.
+    // DAWN SKY — warm sunrise over land, the sun cresting the horizon.
+    game._brightBiome = true;
+    drawBrightSky({ zenith: '#3a3170', mid: '#b66a6a', horizon: '#ffcf8a',
+                    glow: '#ffe6b8', ground: '#5a3f4a', ground2: '#33222e',
+                    streak: '#caa074', horizonY: BASE_H - 44 });
     ctx.save();
-    const bands = [
-      { y0: BASE_H - 90, h: 16, col: '#824', alpha: 0.10 },
-      { y0: BASE_H - 74, h: 14, col: '#a36', alpha: 0.16 },
-      { y0: BASE_H - 60, h: 18, col: '#d66', alpha: 0.22 },
-      { y0: BASE_H - 42, h: 18, col: '#f86', alpha: 0.26 },
-      { y0: BASE_H - 24, h: 20, col: '#fc8', alpha: 0.30 },
-      { y0: BASE_H - 4,  h: 14, col: '#fec', alpha: 0.32 }
-    ];
-    for (const b of bands) {
-      ctx.globalAlpha = b.alpha;
-      ctx.fillStyle = b.col;
-      ctx.fillRect(0, b.y0, BASE_W, b.h);
-    }
-    // Sun rising at right horizon — partial disc + glow
-    const sunCx = BASE_W - 28, sunCy = BASE_H - 28;
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = '#fec';
-    for (let by = -10; by <= 4; by++) {
-      const w = Math.floor(Math.sqrt(Math.max(0, 100 - by * by)) * 2);
+    // Rising sun at right horizon — partial disc + halo
+    const sunCx = BASE_W - 28, sunCy = BASE_H - 44;
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = '#fff2cc';
+    for (let by = -12; by <= 2; by++) {
+      const w = Math.floor(Math.sqrt(Math.max(0, 144 - by * by)) * 2);
       ctx.fillRect(sunCx - w / 2, sunCy + by, w, 1);
     }
-    ctx.globalAlpha = 0.35;
-    ctx.fillStyle = '#fec';
-    ctx.fillRect(sunCx - 16, sunCy - 16, 32, 2); // halo
-    ctx.fillRect(sunCx - 18, sunCy - 14, 36, 1);
-    // Golden motes — bright particles drifting up (dawn light filtering)
-    ctx.globalAlpha = 0.55;
-    ctx.fillStyle = '#fc8';
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#ffe6b8';
+    ctx.fillRect(sunCx - 20, sunCy - 18, 40, 2); // halo
+    ctx.fillRect(sunCx - 22, sunCy - 15, 44, 1);
+    // Golden motes — bright particles drifting up in the dawn light
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#ffd98a';
     for (let i = 0; i < 12; i++) {
       const px = ((i * 31 + t * 0.18) % BASE_W);
       const py = ((BASE_H - 30) - ((i * 41 + t * 0.10) % (BASE_H - 40)));
@@ -5160,23 +5210,14 @@ function drawBiome() {
     }
     ctx.restore();
   } else if (id === 'desert') {
-    // DESERT WASTES — orange sand dunes, heat shimmer, dust haze.
+    // DESERT WASTES — bright hazy sky over rolling sunlit dunes.
+    game._brightBiome = true;
+    drawBrightSky({ zenith: '#7a8fb0', mid: '#c8a878', horizon: '#f0d8a0',
+                    glow: '#fff0c8', ground: '#c87830', ground2: '#8a4f1c',
+                    streak: '#e0a85a', horizonY: BASE_H - 30 });
     ctx.save();
-    // Hot sky gradient — orange-brown at bottom fading upward
-    const desertBands = [
-      { y: BASE_H - 90, h: 18, col: '#62300a', a: 0.10 },
-      { y: BASE_H - 72, h: 18, col: '#8b450e', a: 0.14 },
-      { y: BASE_H - 54, h: 20, col: '#b05a14', a: 0.18 },
-      { y: BASE_H - 34, h: 20, col: '#c87028', a: 0.22 },
-      { y: BASE_H - 14, h: 14, col: '#d4843a', a: 0.28 },
-    ];
-    for (const b of desertBands) {
-      ctx.globalAlpha = b.a;
-      ctx.fillStyle = b.col;
-      ctx.fillRect(0, b.y, BASE_W, b.h);
-    }
-    // Dune silhouette — sin-based wavy horizon
-    ctx.globalAlpha = 0.70;
+    // Dune silhouette — sin-based wavy ridge along the horizon
+    ctx.globalAlpha = 0.8;
     ctx.fillStyle = '#9a5a1a';
     for (let x = 0; x < BASE_W; x++) {
       const dune = Math.floor(
@@ -5187,9 +5228,9 @@ function drawBiome() {
       const yTop = BASE_H - 28 + dune;
       ctx.fillRect(x, yTop, 1, BASE_H - yTop);
     }
-    // Dune highlights — lighter crest along the ridge
-    ctx.globalAlpha = 0.45;
-    ctx.fillStyle = '#d49050';
+    // Dune crest highlights — sunlit ridge line
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = '#f0c070';
     for (let x = 0; x < BASE_W; x++) {
       const dune = Math.floor(
         Math.sin(x * 0.04 + t * 0.003) * 10 +
@@ -5199,43 +5240,33 @@ function drawBiome() {
       const yTop = BASE_H - 28 + dune;
       ctx.fillRect(x, yTop, 1, 1);
     }
-    // Heat shimmer — thin transparent bands that oscillate vertically
-    ctx.globalAlpha = 0.08;
-    ctx.fillStyle = '#ffa840';
+    // Heat shimmer — faint oscillating bands above the sand
+    ctx.globalAlpha = 0.10;
+    ctx.fillStyle = '#fff';
     for (let i = 0; i < 5; i++) {
-      const hy = BASE_H - 80 + i * 12 + Math.sin(t * 0.06 + i * 0.8) * 3;
+      const hy = BASE_H - 50 + i * 8 + Math.sin(t * 0.06 + i * 0.8) * 3;
       ctx.fillRect(0, Math.round(hy), BASE_W, 1);
-    }
-    // Dust particles — brown motes drifting diagonally
-    ctx.globalAlpha = 0.40;
-    ctx.fillStyle = '#a06030';
-    for (let i = 0; i < 16; i++) {
-      const px = ((i * 43 + t * 0.22) % BASE_W);
-      const py = ((BASE_H - 80) - ((i * 31 + t * 0.15) % (BASE_H - 95)));
-      ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
     }
     ctx.restore();
   } else if (id === 'canyon') {
-    // CRIMSON CANYON — red rock walls flanking both sides, strata bands, rocky floor.
+    // CRIMSON CANYON — a bright desert sky framed by towering red rock walls.
+    game._brightBiome = true;
+    drawBrightSky({ zenith: '#6a3a3a', mid: '#b5654a', horizon: '#e9b07a',
+                    glow: '#ffd0a0', ground: '#7a3018', ground2: '#451808',
+                    streak: '#b5604a', horizonY: BASE_H - 18 });
     ctx.save();
-    // Deep red-brown tint wash (ambient canyon light)
-    ctx.globalAlpha = 0.10;
-    ctx.fillStyle = '#7a2010';
-    ctx.fillRect(0, 0, BASE_W, BASE_H);
-    // Left rock wall — tapers inward going up
+    // Left rock wall — full-height, tapers inward going up, framing the sky strip
     const wallColor = '#5a2010';
     const wallHighlight = '#7a3818';
     const wallDepth = 40; // max wall width at bottom
-    ctx.globalAlpha = 0.70;
+    ctx.globalAlpha = 0.92;
     for (let y = 0; y < BASE_H; y++) {
       const wallW = Math.floor(wallDepth * (1 - y / BASE_H) * 0.9 + 4);
       ctx.fillStyle = wallColor;
       ctx.fillRect(0, y, wallW, 1);
-      // Strata highlight bands every 8px
       if (y % 8 < 2) {
         ctx.fillStyle = wallHighlight;
         ctx.fillRect(0, y, wallW - 1, 1);
-        ctx.fillStyle = wallColor;
       }
     }
     // Right rock wall — mirror
@@ -5246,23 +5277,10 @@ function drawBiome() {
       if (y % 8 < 2) {
         ctx.fillStyle = wallHighlight;
         ctx.fillRect(BASE_W - wallW + 1, y, wallW - 1, 1);
-        ctx.fillStyle = wallColor;
       }
     }
-    // Rocky ground — solid dark band at very bottom
-    ctx.globalAlpha = 0.80;
-    ctx.fillStyle = '#3d1808';
-    ctx.fillRect(0, BASE_H - 18, BASE_W, 18);
-    // Ground surface highlights — scattered lighter pebbles
-    ctx.globalAlpha = 0.45;
-    ctx.fillStyle = '#7a3818';
-    for (let i = 0; i < 20; i++) {
-      const seed = i * 97;
-      const px = seed * 11 % BASE_W;
-      ctx.fillRect(px, BASE_H - 16 + (seed % 8), 2 + (seed % 3), 1);
-    }
     // Falling rock dust — sparse downward motes from the walls
-    ctx.globalAlpha = 0.30;
+    ctx.globalAlpha = 0.35;
     ctx.fillStyle = '#8b4020';
     for (let i = 0; i < 10; i++) {
       const side = i % 2 === 0 ? (i * 7 % 35) : (BASE_W - 5 - (i * 11 % 30));
@@ -15292,6 +15310,9 @@ function draw() {
   if (game) {
     nudgeX = game.camNudgeX || 0;
     nudgeY = game.camNudgeY || 0;
+    // Default to noir void each frame; drawBiome() flips this true on the four
+    // DAYLIGHT GROUND BIOMES so non-combat states (title/game-over) stay dark.
+    game._brightBiome = false;
   }
   if (camZoom !== 1 || camRot !== 0 || nudgeX || nudgeY) {
     const cx = BASE_W * SCALE / 2, cy = BASE_H * SCALE / 2;
@@ -19436,6 +19457,23 @@ function drawCrown(x, y, color) {
 }
 
 function drawHUD() {
+  // DAYLIGHT GROUND BIOMES — the bright sky washes out the white HUD text. Lay a
+  // soft dark gradient behind the top score row (and a thin bottom strip behind
+  // the lives/level readout) so the HUD stays legible. Combat states only.
+  if (game._brightBiome && isCombatState()) {
+    ctx.save();
+    const topG = ctx.createLinearGradient(0, 0, 0, 24);
+    topG.addColorStop(0, 'rgba(8,6,8,0.60)');
+    topG.addColorStop(1, 'rgba(8,6,8,0)');
+    ctx.fillStyle = topG;
+    ctx.fillRect(0, 0, BASE_W, 24);
+    const botG = ctx.createLinearGradient(0, BASE_H - 16, 0, BASE_H);
+    botG.addColorStop(0, 'rgba(8,6,8,0)');
+    botG.addColorStop(1, 'rgba(8,6,8,0.55)');
+    ctx.fillStyle = botG;
+    ctx.fillRect(0, BASE_H - 16, BASE_W, 16);
+    ctx.restore();
+  }
   // (BULLET HELL EDGE WARNING removed — the pulsing red bands were a major
   // contributor to perceived blinking. Bullet pressure now reads naturally
   // through the sheer bullet count on screen.)
