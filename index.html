@@ -4959,9 +4959,9 @@ function ensureVectorGrid() { if (!vgrid) buildVectorGrid(); }
 // Radial impulse — shoves nearby nodes outward from (cx,cy). Strength scales the
 // kick; falloff is linear to VGRID_RIPPLE_R. Called from the explosion-scan hook.
 const VGRID_RIPPLE_R = 66;
-function gridRipple(cx, cy, strength) {
+function gridRipple(cx, cy, strength, radius) {
   ensureVectorGrid();
-  const pts = vgrid.pts, R = VGRID_RIPPLE_R, R2 = R * R;
+  const pts = vgrid.pts, R = radius || VGRID_RIPPLE_R, R2 = R * R;
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
     const ddx = p.ax - cx, ddy = p.ay - cy;
@@ -4998,6 +4998,23 @@ function updateVectorGrid() {
       const mt = e.maxTime || 20;
       gridRipple(e.x, e.y, 2.6 + mt * 0.10); // bigger booms = bigger shove
     }
+  }
+  // DIVE WAKES — diving / kamikaze enemies drag a soft tight wake through the grid so
+  // an incoming threat visibly disturbs the floor (weighty dives), not just kills.
+  // Weak continuous push + a small radius = a trailing dent that recovers behind them.
+  if (game && game.enemies && (game.animFrame & 1) === 0) {
+    for (let i = 0; i < game.enemies.length; i++) {
+      const e = game.enemies[i];
+      if (!e.alive) continue;
+      if (e.state === 'diving' || e.state === 'kamikaze') gridRipple(e.x, e.y, 0.55, 26);
+    }
+  }
+  // DASH SHOCKWAVE — the player's dash (core defensive mechanic) punches the grid on
+  // its rising edge, so a well-timed evade leaves a visible blast under the ship.
+  if (game) {
+    const _dt = game.dashTimer || 0;
+    if (_dt > (game._gridPrevDash || 0)) gridRipple(game.playerX, game.playerY, 3.4, 52);
+    game._gridPrevDash = _dt;
   }
 }
 function drawVectorGrid() {

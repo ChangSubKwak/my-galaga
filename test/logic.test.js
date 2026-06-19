@@ -2636,6 +2636,24 @@ if (typeof G.buildVectorGrid === 'function'
   for (let i = 0; i < 5; i++) G.updateVectorGrid();
   ok(Math.abs(tgt.dx) <= 26 && Math.abs(tgt.dy) <= 26, 'displacement clamped to ±MAXD (26)');
 
+  // Custom radius (dive wakes + dash shockwave use a tighter radius): a node ~40px
+  // away is reached by the default 66 radius but NOT by a tight 26 radius.
+  G.buildVectorGrid();
+  const vgR = G.__getVgrid();
+  const ctr = vgR.pts.find(p => p.ax >= 40 && p.ax < 80 && p.ay >= 40 && p.ay < 80);
+  const midNode = ctr && vgR.pts.find(p => {
+    const d = Math.hypot(p.ax - ctr.ax, p.ay - ctr.ay);
+    return d > 30 && d < 60;
+  });
+  if (midNode) {
+    G.gridRipple(ctr.ax, ctr.ay, 6, 26); // tight radius — midNode is outside it
+    const tightHit = Math.abs(midNode.vx) + Math.abs(midNode.vy);
+    G.gridRipple(ctr.ax, ctr.ay, 6);     // default radius — midNode is inside it
+    const wideHit = Math.abs(midNode.vx) + Math.abs(midNode.vy);
+    ok(tightHit === 0, 'tight-radius ripple spares a node beyond its radius');
+    ok(wideHit > 0, 'default-radius ripple reaches the same node');
+  }
+
   // Explosion-scan hook: each explosion ripples the grid exactly once (sets _rippled).
   const bg = G.__getGame && G.__getGame();
   if (bg) {
