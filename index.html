@@ -6472,6 +6472,9 @@ function updateOneMegaBoss(mb) {
     mb.archetype = morphMap[oldArc] || 'horned';
     mb.sigTimer = 0; // reset signature timer so the NEW signature lands soon
     mb.telegraphFrames = 24; // brief metamorphosis freeze
+    // FLOOR-WIDE GRID HEAVE — the metamorphosis shoves the entire vector grid outward
+    // from the boss (huge radius), so the climactic morph physically rocks the world.
+    if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 9, 220);
     startBGM('bossEnrage');
     game.flashTimer = 12;
     game.flashColor = '#fff';
@@ -6518,6 +6521,8 @@ function updateOneMegaBoss(mb) {
     mb.vx *= 1.2;
     mb.shootInterval = Math.max(14, Math.floor(mb.shootInterval * 0.8));
     mb.telegraphFrames = 18; // brief pause before rage attacks land
+    // FINAL-STAND grid heave — second floor-wide shock as the boss enters rage.
+    if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 7, 180);
     game.flashTimer = Math.max(game.flashTimer || 0, 10);
     game.flashColor = '#f44';
     game.shakeTimer = Math.max(game.shakeTimer || 0, 12);
@@ -6654,6 +6659,9 @@ function updateOneMegaBoss(mb) {
     }
     if (!frozen && mb.sigTimer >= sigInterval) {
       mb.sigTimer = 0;
+      // SIGNATURE HEAVE — the floor pulses under the boss each time it unleashes a
+      // signature attack, so the grid telegraphs the climax beats (medium radius).
+      if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 3.2, 78);
       if (mb.archetype === 'horned') {
         // SPLIT SHOT — single fast bullet that splits into 3 fan after 28 frames
         const sp = cappedStageSpeed(2.4, 1.4, 0.025, game.stage, diffSpeedMul());
