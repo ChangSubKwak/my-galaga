@@ -3180,14 +3180,18 @@ function drawPowerUp(p) {
   };
   const c = palette[p.type] || palette.S;
 
-  // Pulsing halo (additive feel via globalAlpha)
+  // Pulsing halo — TRUE additive (Neon Bloom) so the pickup emits light and blooms
+  // like every other entity, instead of a flat alpha blend. The iconic cross-beam
+  // shape + semantic glow color (POWERUP_COL) are preserved; 'lighter' over the dark
+  // void turns the cross into a neon emissive that the full-frame bloom spreads.
   ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
   const pulse = 0.35 + 0.25 * Math.sin(t * 0.18);
   ctx.globalAlpha = pulse;
   ctx.fillStyle = c.glow;
   ctx.fillRect(x - 8, y - 1, 17, 3);  // horizontal beam
   ctx.fillRect(x - 1, y - 8, 3, 17);  // vertical beam
-  ctx.globalAlpha = pulse * 0.55;
+  ctx.globalAlpha = pulse * 0.45;
   ctx.fillRect(x - 6, y - 6, 13, 13); // diffuse square glow
   ctx.restore();
 
