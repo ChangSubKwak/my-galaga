@@ -51,6 +51,19 @@ The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
      P-ring additive magenta, dualFighter tether additive.
   4. Explosions/particles — `drawExplosion`/`drawHitSpark`/`drawShockwaves`/
      `drawItemBurst` additive light-bursts (alphas capped for bloom).
+  5. **REACTIVE VECTOR GRID (headline layer)** — a spring-mounted neon lattice
+     (`buildVectorGrid`/`updateVectorGrid`/`drawVectorGrid`/`gridRipple`, `vgrid`)
+     drawn as additive lines just after `drawBiome()` (above void/nebula, below
+     stars + sprites). Explosions shove it outward then it springs back, so the
+     dead void becomes a living Geometry-Wars floor. Physics ticks in `update()`
+     (next to `updateStars`); draw only reads displacement + a stateless idle
+     wave. Ripples are fanned from a SINGLE hook that scans `game.explosions`
+     (`_rippled` flag), covering every explosion source without touching push-sites.
+     Self-gates OFF on the bright daylight biomes (`game._brightBiome`); mood
+     shifts indigo→crimson on boss phase-2 / last-life (mirrors the starfield mood).
+     Base pass is one path/one stroke; only ripple-energized segments overdraw
+     brighter. Logic-tested (lattice coverage, ripple impulse, spring settle, MAXD
+     clamp, explosion-scan hook).
 - **Still pending (lower priority — enemies already glow via the bloom):** per-sprite
   vector rims on enemy bodies (`drawBee`/`drawButterfly`/`drawMegaBoss`… — shadowBlur
   rims, hot-path cost, preserve elite-outline/ghost-stealth/hit-flash at the

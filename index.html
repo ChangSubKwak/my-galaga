@@ -4929,6 +4929,135 @@ function drawBrightSky(pal) {
   ctx.restore();
 }
 
+// ============================================================================
+// REACTIVE VECTOR GRID — Geometry Wars / Rez lineage.
+// A lattice of spring-mounted points drawn as additive neon lines that bloom for
+// free. Explosions/dives shove the grid outward (ripple), then it springs back —
+// turning the dead noir void into a living vector space. Self-gates OFF on the
+// bright daylight ground biomes (they have their own sky); space biomes get it.
+//   * Physics (per-point displacement) ticks in updateVectorGrid() — NOT draw().
+//   * drawVectorGrid() only READS displacement + computes a stateless idle wave.
+//   * gridRipple() is fanned out from a single hook that scans game.explosions,
+//     so every explosion source feeds the grid without touching 8 push-sites.
+// ============================================================================
+let vgrid = null;
+const VGRID_SPACING = 24;
+function buildVectorGrid() {
+  const sp = VGRID_SPACING;
+  const cols = Math.ceil((BASE_W + sp * 2) / sp) + 1;
+  const rows = Math.ceil((BASE_H + sp * 2) / sp) + 1;
+  const pts = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      // Anchor lattice spans -sp..BASE_W+sp so edge nodes sit off-screen.
+      pts.push({ ax: -sp + c * sp, ay: -sp + r * sp, dx: 0, dy: 0, vx: 0, vy: 0 });
+    }
+  }
+  vgrid = { cols, rows, pts };
+}
+function ensureVectorGrid() { if (!vgrid) buildVectorGrid(); }
+// Radial impulse — shoves nearby nodes outward from (cx,cy). Strength scales the
+// kick; falloff is linear to VGRID_RIPPLE_R. Called from the explosion-scan hook.
+const VGRID_RIPPLE_R = 66;
+function gridRipple(cx, cy, strength) {
+  ensureVectorGrid();
+  const pts = vgrid.pts, R = VGRID_RIPPLE_R, R2 = R * R;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const ddx = p.ax - cx, ddy = p.ay - cy;
+    const d2 = ddx * ddx + ddy * ddy;
+    if (d2 > R2) continue;
+    const dist = Math.sqrt(d2) || 0.001;
+    const falloff = 1 - dist / R;
+    const push = strength * falloff * falloff; // soft inner punch
+    p.vx += (ddx / dist) * push;
+    p.vy += (ddy / dist) * push;
+  }
+}
+function updateVectorGrid() {
+  ensureVectorGrid();
+  const SPRING = 0.085, DAMP = 0.90, MAXD = 26;
+  const pts = vgrid.pts;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    p.vx += -SPRING * p.dx;
+    p.vy += -SPRING * p.dy;
+    p.vx *= DAMP; p.vy *= DAMP;
+    p.dx += p.vx; p.dy += p.vy;
+    // clamp so a chained-explosion stack can't fling a node across the screen
+    if (p.dx > MAXD) p.dx = MAXD; else if (p.dx < -MAXD) p.dx = -MAXD;
+    if (p.dy > MAXD) p.dy = MAXD; else if (p.dy < -MAXD) p.dy = -MAXD;
+  }
+  // Single hook: feed every NEW explosion into the grid as a ripple, then flag it.
+  // Covers all 8+ explosions.push() sites for free (enemy/boss/bomb/player death).
+  if (game && game.explosions) {
+    for (let i = 0; i < game.explosions.length; i++) {
+      const e = game.explosions[i];
+      if (e._rippled) continue;
+      e._rippled = true;
+      const mt = e.maxTime || 20;
+      gridRipple(e.x, e.y, 2.6 + mt * 0.10); // bigger booms = bigger shove
+    }
+  }
+}
+function drawVectorGrid() {
+  if (!game || game._brightBiome) return;
+  ensureVectorGrid();
+  const t = game.animFrame || 0;
+  const cols = vgrid.cols, rows = vgrid.rows, pts = vgrid.pts;
+  // Mood: dim indigo normally; crimson when the stakes spike (mirrors starfield mood).
+  const _phase2 = game.state === STATE.BOSS_STAGE
+    && game.megaBosses && game.megaBosses.some && game.megaBosses.some(b => b && b.phase2);
+  const danger = _phase2 || (game.lives === 1 && isCombatState());
+  const baseRGB = danger ? '190,64,84' : '60,104,196';
+  const hotR = danger ? 255 : 150, hotG = danger ? 150 : 224, hotB = danger ? 170 : 255;
+  const BASE_A = 0.30;
+  // Displayed positions = anchor + ripple displacement + stateless idle breathing.
+  const px = new Array(pts.length), py = new Array(pts.length), en = new Array(pts.length);
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const bx = Math.sin(p.ay * 0.05 + t * 0.020) * 1.2;
+    const by = Math.cos(p.ax * 0.05 + t * 0.018) * 1.0;
+    px[i] = p.ax + p.dx + bx;
+    py[i] = p.ay + p.dy + by;
+    en[i] = Math.abs(p.dx) + Math.abs(p.dy); // ripple energy at this node
+  }
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = 1;
+  // Pass 1 — all calm segments in ONE path / ONE stroke (cheap).
+  ctx.beginPath();
+  const HOT = 2.0; // energy threshold: above this, segment is overdrawn brighter
+  const hotSegs = [];
+  function consider(a, b) {
+    const e = en[a] > en[b] ? en[a] : en[b];
+    if (e > HOT) { hotSegs.push(a, b, e); }
+    else { ctx.moveTo(px[a], py[a]); ctx.lineTo(px[b], py[b]); }
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      if (c + 1 < cols) consider(idx, idx + 1);
+      if (r + 1 < rows) consider(idx, idx + cols);
+    }
+  }
+  ctx.strokeStyle = 'rgba(' + baseRGB + ',' + BASE_A + ')';
+  ctx.stroke();
+  // Pass 2 — energized segments overdrawn, brightness lerps toward the hot color.
+  for (let i = 0; i < hotSegs.length; i += 3) {
+    const a = hotSegs[i], b = hotSegs[i + 1], e = hotSegs[i + 2];
+    const k = Math.min(1, e / 12);
+    const cr = Math.round(60 + (hotR - 60) * k);
+    const cg = Math.round(104 + (hotG - 104) * k);
+    const cb = Math.round(196 + (hotB - 196) * k);
+    ctx.strokeStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + (BASE_A + 0.42 * k) + ')';
+    ctx.beginPath();
+    ctx.moveTo(px[a], py[a]); ctx.lineTo(px[b], py[b]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawBiome() {
   if (!game) return;
   game._brightBiome = false;
@@ -14761,6 +14890,7 @@ function update() {
   game._dmgNumThisFrame = 0;
   pollGamepad();
   updateStars();
+  updateVectorGrid();
   updateDustMotes();
   maybeSpawnConstellation();
   updateConstellation();
@@ -15429,6 +15559,10 @@ function draw() {
   // black hole). Layered ABOVE nebula so it reads as foreground geography, BELOW stars
   // so the starfield still twinkles through. Stage-tier driven, see biomeForStage.
   drawBiome();
+  // REACTIVE VECTOR GRID — neon lattice floor that ripples on explosions/dives.
+  // Drawn after drawBiome() so it reads game._brightBiome (off on daylight biomes)
+  // and sits above the void/nebula but below stars + all sprites. Blooms for free.
+  drawVectorGrid();
   // DRIFT EMBERS — at stage 50+, slow upward red/orange particles drift across
   // screen to amplify the deep-territory pressure. Deterministic positions
   // derived from animFrame so they self-reset cleanly on state change.

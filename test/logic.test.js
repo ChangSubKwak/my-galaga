@@ -172,6 +172,7 @@ const shim = `
 ;try { globalThis.__getAchievements = function () { return (typeof ACHIEVEMENTS !== 'undefined') ? ACHIEVEMENTS : null; }; } catch (e) {}
 ;try { globalThis.__getPowerupCol = function () { return (typeof POWERUP_COL !== 'undefined') ? POWERUP_COL : null; }; } catch (e) {}
 ;try { globalThis.__getGradeCol = function () { return (typeof GRADE_COL !== 'undefined') ? GRADE_COL : null; }; } catch (e) {}
+;try { globalThis.__getVgrid = function () { return (typeof vgrid !== 'undefined') ? vgrid : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -2588,6 +2589,65 @@ if (typeof G.rampedFireInterval === 'function') {
   eq(G.rampedFireInterval(40, 100, 1.2, 1000, 1), 40, 'deep stage clamps to floor (40)');
   ok(G.rampedFireInterval(40, 100, 1.2, 1000, 1.15) >= 40, 'fire interval never below floor');
 } else { console.log('  (skipped — rampedFireInterval not exposed)'); }
+
+// ============================================================
+section('reactive vector grid — lattice build, ripple impulse, spring settle');
+if (typeof G.buildVectorGrid === 'function'
+    && typeof G.gridRipple === 'function'
+    && typeof G.updateVectorGrid === 'function'
+    && G.__getVgrid) {
+  // Build the lattice and assert it fully covers the screen with off-screen edges.
+  G.buildVectorGrid();
+  const vg = G.__getVgrid();
+  ok(vg && vg.pts && vg.pts.length > 0, 'buildVectorGrid populates a point lattice');
+  ok(vg.cols > 0 && vg.rows > 0, 'lattice has positive cols/rows');
+  eq(vg.pts.length, vg.cols * vg.rows, 'point count = cols × rows');
+  // Edge anchors sit off-screen (negative top-left, past BASE_W/H bottom-right) so
+  // no dangling node is visible at the play border.
+  const first = vg.pts[0], last = vg.pts[vg.pts.length - 1];
+  ok(first.ax < 0 && first.ay < 0, 'top-left anchor is off-screen (negative)');
+  ok(last.ax >= 224 && last.ay >= 288, 'bottom-right anchor spans past the screen');
+  // All displacements start at rest.
+  ok(vg.pts.every(p => p.dx === 0 && p.dy === 0 && p.vx === 0 && p.vy === 0),
+     'fresh lattice is fully at rest');
+
+  // Pick a node and a ripple centered on its anchor's neighbor so it gets a kick,
+  // plus a far node that must stay untouched (outside VGRID_RIPPLE_R).
+  const near = vg.pts.find(p => p.ax >= 0 && p.ax < 224 && p.ay >= 0 && p.ay < 288);
+  const nIdx = vg.pts.indexOf(near);
+  // A node far from the ripple center (opposite corner) — well beyond radius 66.
+  const far = vg.pts[vg.pts.length - 1];
+  G.gridRipple(near.ax + 4, near.ay + 4, 6); // center just off the near node
+  ok((Math.abs(near.vx) + Math.abs(near.vy)) > 0, 'ripple imparts velocity to a near node');
+  ok(far.vx === 0 && far.vy === 0, 'ripple leaves far nodes (outside radius) untouched');
+
+  // One physics tick moves the displaced node; many ticks settle it back toward rest
+  // (spring + damping), and the MAXD clamp keeps a huge ripple bounded.
+  G.updateVectorGrid();
+  ok((Math.abs(near.dx) + Math.abs(near.dy)) > 0, 'tick converts velocity into displacement');
+  for (let i = 0; i < 400; i++) G.updateVectorGrid();
+  ok((Math.abs(near.dx) + Math.abs(near.dy)) < 0.5, 'node springs back toward rest over time');
+
+  // MAXD clamp: a violent ripple cannot fling a node across the screen.
+  G.buildVectorGrid();
+  const vg2 = G.__getVgrid();
+  const tgt = vg2.pts.find(p => p.ax >= 0 && p.ax < 224 && p.ay >= 0 && p.ay < 288);
+  G.gridRipple(tgt.ax + 1, tgt.ay + 1, 9999);
+  for (let i = 0; i < 5; i++) G.updateVectorGrid();
+  ok(Math.abs(tgt.dx) <= 26 && Math.abs(tgt.dy) <= 26, 'displacement clamped to ±MAXD (26)');
+
+  // Explosion-scan hook: each explosion ripples the grid exactly once (sets _rippled).
+  const bg = G.__getGame && G.__getGame();
+  if (bg) {
+    G.buildVectorGrid();
+    const before = G.__getVgrid().pts.find(p => p.ax >= 0 && p.ax < 224 && p.ay >= 0 && p.ay < 288);
+    const savedExpl = bg.explosions;
+    bg.explosions = [{ x: before.ax, y: before.ay, maxTime: 22 }];
+    G.updateVectorGrid();
+    ok(bg.explosions[0]._rippled === true, 'explosion-scan hook flags the explosion _rippled');
+    bg.explosions = savedExpl;
+  }
+} else { console.log('  (skipped — vector grid not exposed)'); }
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
