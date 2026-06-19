@@ -18520,6 +18520,26 @@ function drawGameplay() {
       }
       // GHOST stealth wrap — only sprite is dimmed; pips/flash stay readable
       const _ghostStealth = e.ghost && !e.ghostRevealed;
+      // NEON EMISSIVE HALO (Neon Bloom) — a soft additive glow BEHIND the sprite in
+      // the enemy's own semantic type color (ENEMY_INFO.col), so each enemy emits its
+      // gameplay color as light and blooms for free. Color-coding is PRESERVED (the hue
+      // is the type's own). Skipped while ghost-stealthed (must not reveal a hidden
+      // ghost) and softened when the deep-stage threat aura already owns the glow.
+      if (!_ghostStealth) {
+        const _ei = ENEMY_INFO[e.type];
+        if (_ei && _ei.col) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          const _pulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.12 + e.x * 0.04);
+          const _base = (auraStage ? 0.07 : 0.13) + 0.04 * _pulse;
+          ctx.fillStyle = _ei.col;
+          ctx.globalAlpha = _base;
+          ctx.fillRect(e.x - 8, e.y - 8, 16, 16);
+          ctx.globalAlpha = _base * 0.7;
+          ctx.fillRect(e.x - 6, e.y - 6, 12, 12);
+          ctx.restore();
+        }
+      }
       if (_ghostStealth) { ctx.save(); ctx.globalAlpha = 0.15; }
       switch(e.type) {
         case 'bee': drawBee(e.x, e.y, e.frame); break;
