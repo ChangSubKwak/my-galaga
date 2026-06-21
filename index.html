@@ -4994,11 +4994,20 @@ function updateVectorGrid() {
   }
   // Single hook: feed every NEW explosion into the grid as a ripple, then flag it.
   // Covers all 8+ explosions.push() sites for free (enemy/boss/bomb/player death).
+  // RIPPLE CAP — a bomb / boss-death / splitter cascade pushes DOZENS of explosions in
+  // ONE frame; rippling every one energizes the whole screen-wide grid into a bright
+  // additive sheet that the bloom blows out to white (+ a hot-stroke cost spike that
+  // persists ~1s while it settles). Cap to a few ripples per frame; flag the rest so
+  // they never re-queue. A handful of shoves reads identically to dozens.
   if (game && game.explosions) {
+    const RIP_CAP = 3;
+    let _rip = 0;
     for (let i = 0; i < game.explosions.length; i++) {
       const e = game.explosions[i];
       if (e._rippled) continue;
       e._rippled = true;
+      if (_rip >= RIP_CAP) continue;
+      _rip++;
       const mt = e.maxTime || 20;
       gridRipple(e.x, e.y, 2.6 + mt * 0.10); // bigger booms = bigger shove
     }
@@ -5032,7 +5041,9 @@ function drawVectorGrid() {
   const danger = _phase2 || (game.lives === 1 && isCombatState());
   const baseRGB = danger ? '190,64,84' : '60,104,196';
   const hotR = danger ? 255 : 150, hotG = danger ? 150 : 224, hotB = danger ? 170 : 255;
-  const BASE_A = 0.30;
+  // BASE_A kept low: the grid spans the WHOLE screen and is additive, so it sets the
+  // bloom's brightness FLOOR — too high and combat brightness tips the frame to white.
+  const BASE_A = 0.17;
   // Displayed positions = anchor + ripple displacement + stateless idle breathing.
   const px = new Array(pts.length), py = new Array(pts.length), en = new Array(pts.length);
   for (let i = 0; i < pts.length; i++) {
@@ -5071,7 +5082,7 @@ function drawVectorGrid() {
     const cr = Math.round(60 + (hotR - 60) * k);
     const cg = Math.round(104 + (hotG - 104) * k);
     const cb = Math.round(196 + (hotB - 196) * k);
-    ctx.strokeStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + (BASE_A + 0.42 * k) + ')';
+    ctx.strokeStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + (BASE_A + 0.30 * k) + ')';
     ctx.beginPath();
     ctx.moveTo(px[a], py[a]); ctx.lineTo(px[b], py[b]);
     ctx.stroke();
@@ -6476,9 +6487,11 @@ function updateOneMegaBoss(mb) {
     mb.archetype = morphMap[oldArc] || 'horned';
     mb.sigTimer = 0; // reset signature timer so the NEW signature lands soon
     mb.telegraphFrames = 24; // brief metamorphosis freeze
-    // FLOOR-WIDE GRID HEAVE — the metamorphosis shoves the entire vector grid outward
-    // from the boss (huge radius), so the climactic morph physically rocks the world.
-    if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 9, 220);
+    // FLOOR-WIDE GRID HEAVE — the metamorphosis shoves a wide patch of the vector grid
+    // outward from the boss, so the climactic morph physically rocks the world. Radius
+    // kept short of full-screen so it heaves dramatically without energizing EVERY node
+    // into a white additive sheet (the bloom would blow out a whole-grid energize).
+    if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 6, 130);
     startBGM('bossEnrage');
     game.flashTimer = 12;
     game.flashColor = '#fff';
@@ -6525,8 +6538,9 @@ function updateOneMegaBoss(mb) {
     mb.vx *= 1.2;
     mb.shootInterval = Math.max(14, Math.floor(mb.shootInterval * 0.8));
     mb.telegraphFrames = 18; // brief pause before rage attacks land
-    // FINAL-STAND grid heave — second floor-wide shock as the boss enters rage.
-    if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 7, 180);
+    // FINAL-STAND grid heave — second shock as the boss enters rage (kept sub-full-screen
+    // so it doesn't energize the whole grid into a bloom-whiteout).
+    if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 5, 120);
     game.flashTimer = Math.max(game.flashTimer || 0, 10);
     game.flashColor = '#f44';
     game.shakeTimer = Math.max(game.shakeTimer || 0, 12);

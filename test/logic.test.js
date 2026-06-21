@@ -2663,6 +2663,23 @@ if (typeof G.buildVectorGrid === 'function'
     bg.explosions = [{ x: before.ax, y: before.ay, maxTime: 22 }];
     G.updateVectorGrid();
     ok(bg.explosions[0]._rippled === true, 'explosion-scan hook flags the explosion _rippled');
+
+    // RIPPLE CAP — a bomb / boss-death pushes DOZENS of explosions in one frame. The
+    // cap must stop them all energizing the screen-wide grid (bloom whiteout + cost
+    // spike). Push 40 fresh explosions spread across the grid; after one tick, only a
+    // few nodes should have nonzero velocity, but ALL 40 must be flagged _rippled.
+    G.buildVectorGrid();
+    const vgC = G.__getVgrid();
+    const blast = [];
+    for (let i = 0; i < 40; i++) blast.push({ x: 10 + (i * 5) % 200, y: 10 + (i * 7) % 260, maxTime: 22 });
+    bg.explosions = blast;
+    G.updateVectorGrid();
+    ok(blast.every(e => e._rippled === true), 'cap still flags every explosion (no re-queue next frame)');
+    const movedNodes = vgC.pts.filter(p => (Math.abs(p.vx) + Math.abs(p.vy)) > 0).length;
+    // 3 ripples × radius 66 can touch at most a few dozen of the ~150 nodes — the whole
+    // grid (every node) must NOT be energized. Assert well under half the lattice moved.
+    ok(movedNodes > 0, 'capped ripples still disturb the grid (a few shoves land)');
+    ok(movedNodes < vgC.pts.length * 0.5, 'ripple cap prevents whole-grid energize (< half nodes moved)');
     bg.explosions = savedExpl;
   }
 } else { console.log('  (skipped — vector grid not exposed)'); }
