@@ -2685,6 +2685,41 @@ if (typeof G.buildVectorGrid === 'function'
 } else { console.log('  (skipped — vector grid not exposed)'); }
 
 // ============================================================
+section('nextBloomPerfState — adaptive bloom valve (drop on low FPS, restore on high)');
+if (typeof G.nextBloomPerfState === 'function') {
+  // Healthy FPS: never drops, no streaks accumulate.
+  let s = { off: false, low: 0, high: 0 };
+  for (let i = 0; i < 20; i++) s = G.nextBloomPerfState(s.off, 60, s.low, s.high);
+  ok(s.off === false, '60fps sustained → bloom stays ON');
+
+  // Sustained low FPS (<30) for 5 samples → drops bloom.
+  s = { off: false, low: 0, high: 0 };
+  for (let i = 0; i < 4; i++) s = G.nextBloomPerfState(s.off, 22, s.low, s.high);
+  ok(s.off === false, '4 low samples not yet enough to drop (hysteresis)');
+  s = G.nextBloomPerfState(s.off, 22, s.low, s.high); // 5th
+  ok(s.off === true, '5th sustained sub-30 sample → bloom auto-suspended');
+
+  // A single low sample then recovery must NOT drop bloom (no transient-hitch trip).
+  s = { off: false, low: 0, high: 0 };
+  s = G.nextBloomPerfState(s.off, 18, s.low, s.high); // one bad frame
+  s = G.nextBloomPerfState(s.off, 60, s.low, s.high); // recovered — resets low streak
+  for (let i = 0; i < 4; i++) s = G.nextBloomPerfState(s.off, 22, s.low, s.high);
+  ok(s.off === false, 'a transient hitch then recovery does not drop bloom');
+
+  // Once off, sustained high FPS (>=52) for 8 samples restores it.
+  s = { off: true, low: 0, high: 0 };
+  for (let i = 0; i < 7; i++) s = G.nextBloomPerfState(s.off, 58, s.low, s.high);
+  ok(s.off === true, '7 high samples not yet enough to restore (hysteresis)');
+  s = G.nextBloomPerfState(s.off, 58, s.low, s.high); // 8th
+  ok(s.off === false, '8th sustained high sample → bloom restored');
+
+  // fps==0 (uninitialised / first frame) must not count as "low" and trip the valve.
+  s = { off: false, low: 0, high: 0 };
+  for (let i = 0; i < 10; i++) s = G.nextBloomPerfState(s.off, 0, s.low, s.high);
+  ok(s.off === false, 'fps==0 sentinel never trips the valve');
+} else { console.log('  (skipped — nextBloomPerfState not exposed)'); }
+
+// ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
 if (failed) {

@@ -151,6 +151,20 @@ let SCALE = 1;
 // NEON VECTOR BLOOM — full-frame post-process glow (see draw() tail). Persisted
 // off-switch for low-end devices / preference; on by default (it's the headline look).
 let bloomEnabled = (() => { try { return localStorage.getItem('galagaBloomOff') !== '1'; } catch(e) { return true; } })();
+// ADAPTIVE PERF VALVE — the full-frame bloom (two device-canvas blur passes) is the
+// single heaviest render cost. On a weak machine, sustained heavy combat can drop FPS
+// to "unplayable"; rather than let it spiral, auto-suspend the bloom when FPS stays
+// genuinely low, and restore it once FPS recovers comfortably. Hysteresis (5 low
+// samples to drop, 8 high to restore; samples are ~500ms) prevents fast flapping.
+// Pure + logic-tested via nextBloomPerfState.
+let _perfBloomOff = false, _perfLowStreak = 0, _perfHighStreak = 0;
+function nextBloomPerfState(off, fps, low, high) {
+  low  = (fps > 0 && fps < 30) ? low + 1 : 0;
+  high = (fps >= 52)           ? high + 1 : 0;
+  if (!off && low >= 5)  { off = true;  low = 0; }
+  else if (off && high >= 8) { off = false; high = 0; }
+  return { off, low, high };
+}
 const FPS = 60;
 const PLAYER_SPEED = 2.5;
 const BULLET_SPEED = 5;
@@ -2951,12 +2965,14 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
     // NEON: additive beam stack — the elongated beam reads as its own trail.
     ctx.globalCompositeOperation = 'lighter';
     const pulse = 0.7 + 0.3 * Math.sin(game.animFrame * 0.6);
-    ctx.shadowColor = '#1ffbff';
-    ctx.shadowBlur = 6;
-    ctx.globalAlpha = 0.25 * pulse;
+    // PERF: no per-bullet shadowBlur — the full-frame bloom carries the beam glow
+    // (shadowBlur is ~10-100x a fillRect and scales with bullet count → FPS cliff
+    // under rapid-fire + combo-arsenal laser). A wider additive halo replaces it.
+    ctx.globalAlpha = 0.22 * pulse;
     ctx.fillStyle = '#1ffbff';
+    ctx.fillRect(x - 4, y - 9, 8, 18); // wide soft halo (bloom spreads it)
+    ctx.globalAlpha = 0.28 * pulse;
     ctx.fillRect(x - 3, y - 8, 6, 16);
-    ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.5 * pulse;
     ctx.fillStyle = '#9ef';
     ctx.fillRect(x - 2, y - 9, 4, 18);
@@ -3020,9 +3036,8 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
       ctx.fillRect(x - 1, y + 4 + i * 3, 2, 1);
     }
     ctx.restore();
-    // Lv3 Shard — emerald polyhedron diamond (neon rim glow, hue kept = tier 3)
+    // Lv3 Shard — emerald polyhedron diamond (glow via bloom, no per-bullet shadowBlur)
     ctx.save();
-    ctx.shadowColor = '#1fff7a'; ctx.shadowBlur = 5;
     ctx.fillStyle = '#1fff7a';
     ctx.beginPath();
     ctx.moveTo(x,     y - 7); // top apex
@@ -3057,14 +3072,12 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
       ctx.fillRect(x - 1, y + 4 + i * 3, 2, 1);
     }
     ctx.restore();
-    // Lv2 Nova — gold/white cylinder (neon rim, hue kept = tier 2)
+    // Lv2 Nova — gold/white cylinder (glow via bloom, no per-bullet shadowBlur)
     ctx.save();
-    ctx.shadowColor = '#ffb01f'; ctx.shadowBlur = 5;
     ctx.fillStyle = '#ffb01f';
     ctx.fillRect(x - 2, y - 5, 4, 9); // gold body
     ctx.fillStyle = '#ffd';
     ctx.fillRect(x - 1, y - 5, 2, 3); // white highlight stripe
-    ctx.shadowBlur = 0;
     ctx.fillStyle = '#fff';
     ctx.fillRect(x - 2, y - 6, 4, 2); // bright white cap
     ctx.fillStyle = '#a60';
@@ -3082,11 +3095,9 @@ function drawPlayerBullet(x, y, lvl, kind, parryEcho, guardianCol, crit, fork) {
     ctx.restore();
     ctx.fillStyle = '#5cc0ff';
     ctx.fillRect(x - 1, y - 1, 2, 5); // blue body
-    ctx.save();
-    ctx.shadowColor = '#5cc0ff'; ctx.shadowBlur = 4;
+    // white leading tip — glow via bloom, no per-bullet shadowBlur (perf)
     ctx.fillStyle = '#fff';
-    ctx.fillRect(x - 1, y - 3, 2, 3); // white leading tip
-    ctx.restore();
+    ctx.fillRect(x - 1, y - 3, 2, 3);
   }
   // FORK SIDE BULLET TINT — amber accent on side spread bullets so the FORK
   // power-up reads as a distinct effect. Color matches the F label / forkTimer chip.
@@ -16221,7 +16232,7 @@ function draw() {
   // pixels after the transform restore. Internal res is tiny (224×288) so the two
   // drawImage passes are cheap. Black areas add ~0 under 'lighter', so the deep void
   // stays deep while lights bloom — the electric-arcade look.
-  if (bloomEnabled && (typeof ctx.filter === 'string')) {
+  if (bloomEnabled && !_perfBloomOff && (typeof ctx.filter === 'string')) {
     const cw = canvas.width, ch = canvas.height;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -16229,11 +16240,11 @@ function draw() {
     ctx.imageSmoothingEnabled = true;
     // Wide soft glow
     ctx.filter = 'blur(' + Math.max(3, Math.round(SCALE * 2.4)) + 'px)';
-    ctx.globalAlpha = 0.40;
+    ctx.globalAlpha = 0.36;
     ctx.drawImage(canvas, 0, 0, cw, ch);
     // Tight bright halo (crisper, hugs the source)
     ctx.filter = 'blur(' + Math.max(1, Math.round(SCALE * 0.9)) + 'px)';
-    ctx.globalAlpha = 0.28;
+    ctx.globalAlpha = 0.24;
     ctx.drawImage(canvas, 0, 0, cw, ch);
     ctx.filter = 'none';
     ctx.restore();
@@ -23128,6 +23139,9 @@ function gameLoop(timestamp) {
       _fpsValue = Math.round((1000 * _fpsCount) / Math.max(1, _fpsAcc));
       _fpsAcc = 0; _fpsCount = 0;
       _fpsLastSample = timestamp;
+      // Adaptive perf valve: suspend/restore the bloom based on sustained FPS.
+      const _ps = nextBloomPerfState(_perfBloomOff, _fpsValue, _perfLowStreak, _perfHighStreak);
+      _perfBloomOff = _ps.off; _perfLowStreak = _ps.low; _perfHighStreak = _ps.high;
     }
 
     accumulator += dt;
