@@ -165,6 +165,35 @@ function nextBloomPerfState(off, fps, low, high) {
   else if (off && high >= 8) { off = false; high = 0; }
   return { off, low, high };
 }
+// ===== SPECTRAL LENS GRADE — pure post-process drivers (logic-tested) =====
+// One "combat heat" scalar (0..1) drives the chromatic-aberration split + grade so
+// the whole frame intensifies under pressure. Inputs are the same signals the grid /
+// starfield mood already read (combo / last-life / boss phase2) — shared, not a new island.
+function bloomHeat(combo, lastLife, phase2) {
+  let h = (combo || 0) / 18;
+  if (lastLife) h = h > 0.55 ? h : 0.55;
+  if (phase2)   h = h > 0.78 ? h : 0.78;
+  return h < 0 ? 0 : h > 1 ? 1 : h;
+}
+// Chromatic split distance in INTERNAL px (×SCALE at draw time): calm 0.6 → hot 2.4.
+function chromaSplitForHeat(heat) {
+  heat = heat < 0 ? 0 : heat > 1 ? 1 : heat;
+  return 0.6 + heat * 1.8;
+}
+// Spectral ghost alpha: subtle at rest, prismatic when hot. Stays low so the additive
+// ghosts add COLOR, not white (guards the whiteout fix).
+function chromaAlphaForHeat(heat) {
+  heat = heat < 0 ? 0 : heat > 1 ? 1 : heat;
+  return 0.05 + heat * 0.12;
+}
+// Vignette grade alpha: focuses the eye + deepens mood; heavily reduced on the bright
+// daylight biomes so daytime sky stays bright.
+function vignetteAlphaForHeat(heat, bright) {
+  heat = heat < 0 ? 0 : heat > 1 ? 1 : heat;
+  let a = 0.18 + heat * 0.22;
+  if (bright) a *= 0.25;
+  return a;
+}
 const FPS = 60;
 const PLAYER_SPEED = 2.5;
 const BULLET_SPEED = 5;
@@ -16234,19 +16263,48 @@ function draw() {
   // stays deep while lights bloom — the electric-arcade look.
   if (bloomEnabled && !_perfBloomOff && (typeof ctx.filter === 'string')) {
     const cw = canvas.width, ch = canvas.height;
+    // SPECTRAL LENS GRADE — combat heat widens the chromatic split + deepens the grade.
+    const _phase2b = game && game.state === STATE.BOSS_STAGE
+      && game.megaBosses && game.megaBosses.some && game.megaBosses.some(b => b && b.phase2);
+    const _lastLifeB = game && game.lives === 1 && isCombatState();
+    const _heat = bloomHeat(game ? game.combo : 0, _lastLifeB, _phase2b);
+    const _bright = game && game._brightBiome;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
     ctx.imageSmoothingEnabled = true;
-    // Wide soft glow
+    // Wide soft glow (true neon hues preserved — the main halo).
     ctx.filter = 'blur(' + Math.max(3, Math.round(SCALE * 2.4)) + 'px)';
-    ctx.globalAlpha = 0.36;
+    ctx.globalAlpha = 0.34;
     ctx.drawImage(canvas, 0, 0, cw, ch);
-    // Tight bright halo (crisper, hugs the source)
+    // Tight bright halo (crisper, hugs the source).
     ctx.filter = 'blur(' + Math.max(1, Math.round(SCALE * 0.9)) + 'px)';
-    ctx.globalAlpha = 0.24;
+    ctx.globalAlpha = 0.22;
     ctx.drawImage(canvas, 0, 0, cw, ch);
+    // Spectral chromatic-aberration ghosts — a warm ghost shifted one way + a cool ghost
+    // the other, recolored via sepia+hue-rotate so bright edges split into prismatic
+    // fringe (the Rez/Tetris-Effect lens look). Skipped under reduceMotion (reads as motion).
+    if (!reduceMotion) {
+      const _sp = Math.round(chromaSplitForHeat(_heat) * SCALE);
+      const _caBlur = 'blur(' + Math.max(2, Math.round(SCALE * 1.6)) + 'px) sepia(1) saturate(6) ';
+      ctx.globalAlpha = chromaAlphaForHeat(_heat);
+      ctx.filter = _caBlur + 'hue-rotate(-58deg)';   // warm (red/orange) ghost
+      ctx.drawImage(canvas, -_sp, 0, cw, ch);
+      ctx.filter = _caBlur + 'hue-rotate(150deg)';   // cool (cyan/blue) ghost
+      ctx.drawImage(canvas, _sp, 0, cw, ch);
+    }
     ctx.filter = 'none';
+    // Dynamic vignette grade — mood mirrors the grid/starfield (indigo calm → crimson
+    // danger); focuses the eye + deepens atmosphere. source-over (a darkening, not additive).
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    const _va = vignetteAlphaForHeat(_heat, _bright).toFixed(3);
+    const _danger = _phase2b || _lastLifeB;
+    const _vg = ctx.createRadialGradient(cw / 2, ch / 2, ch * 0.30, cw / 2, ch / 2, ch * 0.74);
+    _vg.addColorStop(0, 'rgba(0,0,0,0)');
+    _vg.addColorStop(1, _danger ? 'rgba(40,4,12,' + _va + ')' : 'rgba(6,10,30,' + _va + ')');
+    ctx.fillStyle = _vg;
+    ctx.fillRect(0, 0, cw, ch);
     ctx.restore();
   }
 }

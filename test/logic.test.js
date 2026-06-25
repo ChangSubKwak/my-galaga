@@ -2719,6 +2719,35 @@ if (typeof G.nextBloomPerfState === 'function') {
   ok(s.off === false, 'fps==0 sentinel never trips the valve');
 } else { console.log('  (skipped — nextBloomPerfState not exposed)'); }
 
+section('SPECTRAL LENS GRADE — post-process heat → chromatic split / vignette');
+if (typeof G.bloomHeat === 'function') {
+  // bloomHeat — combo ramps 0..1, last-life & boss phase2 floor it.
+  ok(G.bloomHeat(0, false, false) === 0, 'no combo, no pressure → heat 0');
+  ok(Math.abs(G.bloomHeat(18, false, false) - 1) < 1e-9, 'combo 18 → heat saturates at 1');
+  ok(G.bloomHeat(9, false, false) > 0.49 && G.bloomHeat(9, false, false) < 0.51, 'combo 9 → ~0.5');
+  ok(G.bloomHeat(100, false, false) === 1, 'combo over cap clamps to 1');
+  ok(G.bloomHeat(0, true, false) >= 0.55, 'last-life floors heat to 0.55 even at 0 combo');
+  ok(G.bloomHeat(0, false, true) >= 0.78, 'boss phase2 floors heat to 0.78');
+  ok(G.bloomHeat(20, true, true) === 1, 'high combo + pressure still clamps to 1 (no overflow)');
+  ok(G.bloomHeat(-5, false, false) === 0, 'negative combo guarded to 0');
+
+  // chromaSplitForHeat — monotonic, bounded 0.6..2.4 internal px.
+  ok(Math.abs(G.chromaSplitForHeat(0) - 0.6) < 1e-9, 'calm split = 0.6px');
+  ok(Math.abs(G.chromaSplitForHeat(1) - 2.4) < 1e-9, 'hot split = 2.4px');
+  ok(G.chromaSplitForHeat(0.5) > G.chromaSplitForHeat(0.1), 'split grows with heat');
+  ok(G.chromaSplitForHeat(2) === G.chromaSplitForHeat(1), 'split clamps above heat 1');
+
+  // chromaAlphaForHeat — stays low so additive ghosts add colour, not white.
+  ok(Math.abs(G.chromaAlphaForHeat(0) - 0.05) < 1e-9, 'calm ghost alpha = 0.05');
+  ok(G.chromaAlphaForHeat(1) <= 0.18, 'hot ghost alpha capped low (guards whiteout)');
+  ok(G.chromaAlphaForHeat(1) > G.chromaAlphaForHeat(0), 'ghost alpha grows with heat');
+
+  // vignetteAlphaForHeat — deepens with heat; bright daylight biomes keep it faint.
+  ok(G.vignetteAlphaForHeat(0, false) > 0.17, 'baseline vignette present even at calm');
+  ok(G.vignetteAlphaForHeat(1, false) > G.vignetteAlphaForHeat(0, false), 'vignette deepens with heat');
+  ok(G.vignetteAlphaForHeat(1, true) < G.vignetteAlphaForHeat(1, false) * 0.5, 'bright biome cuts vignette hard (stays bright)');
+} else { console.log('  (skipped — bloomHeat not exposed)'); }
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);

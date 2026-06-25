@@ -64,6 +64,20 @@ The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
      Base pass is one path/one stroke; only ripple-energized segments overdraw
      brighter. Logic-tested (lattice coverage, ripple impulse, spring settle, MAXD
      clamp, explosion-scan hook).
+  6. **SPECTRAL LENS GRADE (headline post pass)** — the whole composited frame now
+     passes through one cinematic lens at the bloom tail. A pure **combat-heat** scalar
+     (`bloomHeat`, from combo / last-life / boss phase2 — the same signals the grid &
+     starfield mood read) drives two effects: (a) **chromatic-aberration spectral bloom**
+     — a warm ghost shifted one way + a cool ghost the other (`chromaSplitForHeat` /
+     `chromaAlphaForHeat`, recolored via `sepia+hue-rotate` so bright edges split into
+     prismatic fringe — the Rez/Tetris-Effect look; ghosts stay low-alpha + colored so
+     they add hue not white, guarding the whiteout fix; skipped under `reduceMotion`),
+     and (b) a **dynamic vignette grade** (`vignetteAlphaForHeat`) tinting the edges in
+     the indigo-calm→crimson-danger mood, focusing the eye + deepening atmosphere
+     (hard-reduced on bright daylight biomes so daytime stays bright). Rides the SAME
+     `bloomEnabled`/`_perfBloomOff` perf valve — full lens stack shuts off under load.
+     The two base bloom passes were trimmed (0.36/0.24 → 0.34/0.22) to offset the added
+     additive ghosts. Four pure drivers logic-tested.
 - **Still pending (lower priority — enemies already glow via the bloom):** per-sprite
   vector rims on enemy bodies (`drawBee`/`drawButterfly`/`drawMegaBoss`… — shadowBlur
   rims, hot-path cost, preserve elite-outline/ghost-stealth/hit-flash at the
