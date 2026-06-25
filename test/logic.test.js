@@ -2748,6 +2748,33 @@ if (typeof G.bloomHeat === 'function') {
   ok(G.vignetteAlphaForHeat(1, true) < G.vignetteAlphaForHeat(1, false) * 0.5, 'bright biome cuts vignette hard (stays bright)');
 } else { console.log('  (skipped — bloomHeat not exposed)'); }
 
+if (typeof G.biomeGrade === 'function' && typeof G.biomeForStage === 'function') {
+  // Every biome the cycle can produce must map to a distinct, valid dark-rgb grade.
+  const ids = ['planet','ruins','dawn','asteroid','desert','ice','gasGiant','corona','canyon','blackhole','nebula','starfield'];
+  const seen = new Set();
+  let allValid = true, allDark = true;
+  for (const id of ids) {
+    const g = G.biomeGrade(id);
+    if (!Array.isArray(g) || g.length !== 3) { allValid = false; break; }
+    if (g.some(c => c < 0 || c > 64)) allDark = false;       // grades are DARK (vignette darkens)
+    seen.add(g.join(','));
+  }
+  ok(allValid, 'every biome grade is a valid [r,g,b] triple');
+  ok(allDark, 'every biome grade stays dark (rides the shadow, never washes gameplay)');
+  ok(seen.size === ids.length, 'all 12 biome grades are distinct (per-biome identity)');
+  // Unknown / null biome → neutral indigo fallback, never undefined.
+  const fb = G.biomeGrade(null);
+  ok(Array.isArray(fb) && fb.length === 3, 'null biome → indigo fallback triple (no crash)');
+  ok(G.biomeGrade('not-a-biome').join(',') === fb.join(','), 'unknown biome id → same fallback');
+  // The cycle every biomeForStage can return must be covered (no orphan id).
+  let covered = true;
+  for (let st = 8; st <= 8 + 12 * 4; st += 4) {
+    const id = G.biomeForStage(st);
+    if (id && G.biomeGrade(id) === G.biomeGrade('not-a-biome') && !ids.includes(id)) covered = false;
+  }
+  ok(covered, 'every biomeForStage output has its own grade (registry wired both sides)');
+} else { console.log('  (skipped — biomeGrade not exposed)'); }
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);

@@ -78,6 +78,17 @@ The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
      `bloomEnabled`/`_perfBloomOff` perf valve — full lens stack shuts off under load.
      The two base bloom passes were trimmed (0.36/0.24 → 0.34/0.22) to offset the added
      additive ghosts. Four pure drivers logic-tested.
+  7. **BIOME ATMOSPHERIC GRADE (per-biome lens identity)** — the SPECTRAL LENS
+     vignette is no longer one fixed mood: a pure `biomeGrade(id)` (BIOME_GRADE map
+     + neutral-indigo fallback) tints the whole frame's edge-darkening in each
+     biome's mood — molten corona burns red-orange, the ice field chills cyan, the
+     star nursery glows violet, the black hole goes cold void-violet. A whisper of
+     the hue also rides the vignette centre (skipped on bright daylight biomes so
+     daytime stays bright). Danger (boss phase2 / last-life) still overrides the
+     whole grade to crimson — survival mood trumps scenery. So the 12 biomes now
+     differ in full-frame colour identity, not just background art. Logic-tested
+     (12 distinct dark grades, registry wired both sides via biomeForStage, null
+     fallback).
 - **Still pending (lower priority — enemies already glow via the bloom):** per-sprite
   vector rims on enemy bodies (`drawBee`/`drawButterfly`/`drawMegaBoss`… — shadowBlur
   rims, hot-path cost, preserve elite-outline/ghost-stealth/hit-flash at the

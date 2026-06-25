@@ -3865,6 +3865,30 @@ function biomeForStage(stage) {
 const BRIGHT_BIOMES = new Set(['planet', 'dawn', 'desert', 'canyon']);
 function biomeIsBright(id) { return BRIGHT_BIOMES.has(id); }
 
+// BIOME ATMOSPHERIC GRADE — each biome tints the whole frame's vignette a DARK
+// hue of its mood, so the lens (SPECTRAL LENS GRADE) reads differently per biome:
+// molten corona burns red-orange at the edges, the ice field chills cyan, the star
+// nursery glows violet. Returns a DARK rgb (a vignette darkens — the hue rides the
+// shadow, never washing the gameplay-coloured centre). Pure + logic-tested; danger
+// (boss phase2 / last-life) still overrides to crimson at the draw site, and a null /
+// unknown biome (stages < 8) falls back to the neutral indigo the lens shipped with.
+const BIOME_GRADE = {
+  planet:    [8, 16, 34],   // cool world-blue
+  ruins:     [20, 15, 11],  // smoky amber-gray
+  dawn:      [30, 18, 8],   // warm sunrise
+  asteroid:  [14, 15, 20],  // neutral steel
+  desert:    [28, 22, 12],  // hazy sand
+  ice:       [8, 20, 32],   // frozen cyan
+  gasGiant:  [28, 16, 6],   // storm amber
+  corona:    [40, 14, 4],   // molten orange-red
+  canyon:    [30, 10, 7],   // red-clay walls
+  blackhole: [10, 8, 18],   // cold void-violet
+  nebula:    [24, 8, 36],   // birth-nursery violet
+  starfield: [10, 14, 30]   // open indigo
+};
+const BIOME_GRADE_FALLBACK = [6, 10, 30]; // neutral indigo (no biome yet)
+function biomeGrade(id) { return BIOME_GRADE[id] || BIOME_GRADE_FALLBACK; }
+
 // BIOME WEATHER — environmental phenomena tied to specific biomes.
 // 50% chance to trigger on a normal stage (8+) when the biome matches.
 // Skipped on boss/challenge stages so cinematic flow isn't disturbed.
@@ -16294,15 +16318,22 @@ function draw() {
       ctx.drawImage(canvas, _sp, 0, cw, ch);
     }
     ctx.filter = 'none';
-    // Dynamic vignette grade — mood mirrors the grid/starfield (indigo calm → crimson
-    // danger); focuses the eye + deepens atmosphere. source-over (a darkening, not additive).
+    // Dynamic vignette grade — BIOME ATMOSPHERIC GRADE drives the hue: each biome
+    // darkens the edges in its own mood (corona red, ice cyan, nebula violet…), so the
+    // whole frame's colour identity shifts per biome. Danger (boss phase2 / last-life)
+    // overrides to crimson — survival mood trumps scenery. source-over (a darkening).
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    const _va = vignetteAlphaForHeat(_heat, _bright).toFixed(3);
+    const _edgeA = vignetteAlphaForHeat(_heat, _bright).toFixed(3);
     const _danger = _phase2b || _lastLifeB;
+    const _grd = _danger ? [40, 4, 12] : biomeGrade(game && typeof biomeForStage === 'function' ? biomeForStage(game.stage) : null);
+    const _gp = _grd[0] + ',' + _grd[1] + ',' + _grd[2];
+    // A whisper of the biome hue in the centre too (skipped on bright daylight biomes so
+    // daytime stays bright) ties the whole frame to the mood without washing gameplay.
+    const _innerA = _bright ? 0 : (0.04 + _heat * 0.03).toFixed(3);
     const _vg = ctx.createRadialGradient(cw / 2, ch / 2, ch * 0.30, cw / 2, ch / 2, ch * 0.74);
-    _vg.addColorStop(0, 'rgba(0,0,0,0)');
-    _vg.addColorStop(1, _danger ? 'rgba(40,4,12,' + _va + ')' : 'rgba(6,10,30,' + _va + ')');
+    _vg.addColorStop(0, 'rgba(' + _gp + ',' + _innerA + ')');
+    _vg.addColorStop(1, 'rgba(' + _gp + ',' + _edgeA + ')');
     ctx.fillStyle = _vg;
     ctx.fillRect(0, 0, cw, ch);
     ctx.restore();
