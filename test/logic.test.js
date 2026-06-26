@@ -2775,6 +2775,34 @@ if (typeof G.biomeGrade === 'function' && typeof G.biomeForStage === 'function')
   ok(covered, 'every biomeForStage output has its own grade (registry wired both sides)');
 } else { console.log('  (skipped — biomeGrade not exposed)'); }
 
+section('BIOME SONIC IDENTITY — per-biome BGM key transpose');
+if (typeof G.biomeBgmPitch === 'function' && typeof G.biomeForStage === 'function') {
+  const ids = ['planet','ruins','dawn','asteroid','desert','ice','gasGiant','corona','canyon','blackhole','nebula','starfield'];
+  // Null / unknown biome → no shift (ratio exactly 1.0).
+  ok(G.biomeBgmPitch(null) === 1.0, 'null biome → ratio 1.0 (no transpose, e.g. stages < 8)');
+  ok(G.biomeBgmPitch('not-a-biome') === 1.0, 'unknown biome → ratio 1.0');
+  ok(G.biomeBgmPitch('planet') === 1.0, 'planet is the neutral home key (0 semitones)');
+  // Every real biome maps to a sane ratio (2^(semi/12), within a ~±5 semitone band).
+  let allSane = true;
+  for (const id of ids) {
+    const r = G.biomeBgmPitch(id);
+    if (typeof r !== 'number' || r < 0.7 || r > 1.5) { allSane = false; break; }
+  }
+  ok(allSane, 'every biome ratio stays inside the ±5-semitone musical band (0.7..1.5)');
+  // Ratio must equal 2^(semi/12) — anchor a couple of known offsets.
+  ok(Math.abs(G.biomeBgmPitch('dawn')  - Math.pow(2,  2/12)) < 1e-9, 'dawn = +2 semitones (warm lift)');
+  ok(Math.abs(G.biomeBgmPitch('gasGiant') - Math.pow(2, -5/12)) < 1e-9, 'gas giant = -5 semitones (deep storm)');
+  ok(G.biomeBgmPitch('nebula') > 1 && G.biomeBgmPitch('blackhole') < 1, 'nebula lifts, black hole sinks (opposed moods)');
+  // Coverage: every biome the cycle can produce has a transpose entry (no orphan id
+  // silently falling back to 1.0). planet legitimately maps to 1.0, so exclude it.
+  let wired = true;
+  for (let st = 8; st <= 8 + 12 * 4; st += 4) {
+    const id = G.biomeForStage(st);
+    if (id && id !== 'planet' && G.biomeBgmPitch(id) === 1.0) wired = false;
+  }
+  ok(wired, 'every non-planet biomeForStage output has a real transpose (registry wired)');
+} else { console.log('  (skipped — biomeBgmPitch not exposed)'); }
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);

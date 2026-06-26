@@ -201,6 +201,8 @@ BGM tracks have 5 voices: `lead` (square/saw, detuned chorus) + `bass` (triangle
 
 `bgmForGameState(state)` selects track: `normal | boss | bossEnrage | bossSuper | title`.
 
+**BIOME SONIC IDENTITY** (`biomeBgmPitch(biomeId)`) — on the normal-play tracks only (`normal`/`normalMid`), the whole BGM (lead + bass + pad, uniformly) is transposed to the current biome's key centre via a pure semitone→ratio map (`BIOME_SEMITONES`, `2^(semi/12)`), so each biome SOUNDS like itself — the audio twin of the visual BIOME ATMOSPHERIC GRADE (the per-biome vignette/lens hue). Boss tracks keep `biomePitch = 1.0` so the archetype lead-detune (`computeBgmPitch`) stays the tension cue; a null/unknown biome (stages < 8) → 1.0. Snapshotted once per scheduler tick (phrase-coherent). Pure + logic-tested (ratio band, fallback, registry-wired against `biomeForStage`).
+
 ### Persistence
 
 `localStorage` holds 60+ keys, all prefixed `galaga*`:

@@ -1121,6 +1121,26 @@ function computeBgmPitch() {
   return 1.0;
 }
 
+// BIOME SONIC IDENTITY — each biome transposes the WHOLE normal-play BGM (lead +
+// bass + pad, uniformly) to its own key centre, so a region SOUNDS like itself. This
+// is the audio twin of BIOME ATMOSPHERIC GRADE (which gives each biome its own colour):
+// molten corona lifts, the gas-giant storm sinks deep, the star nursery shimmers high,
+// the black hole goes deepest. A uniform semitone transpose is a clean key change —
+// in tune with itself, only the centre shifts. Returns a frequency ratio = 2^(semi/12).
+// Boss tracks ignore it (they keep the archetype lead-detune tension instead); a null /
+// unknown biome (stages < 8) → 1.0 (no shift). Pure + logic-tested. Biomes change only
+// every 4 stages, so the key change reads as "new region", not per-stage churn.
+const BIOME_SEMITONES = {
+  planet: 0,   dawn: 2,     desert: -2,  canyon: -3,
+  ruins: -4,   asteroid: -1, ice: 4,     gasGiant: -5,
+  corona: 3,   blackhole: -5, nebula: 5, starfield: 1
+};
+function biomeBgmPitch(biomeId) {
+  const s = BIOME_SEMITONES[biomeId];
+  if (typeof s !== 'number') return 1.0;
+  return Math.pow(2, s / 12);
+}
+
 function computeBgmIntensity() {
   if (!game) return 1.0;
   let m = 1.0;
@@ -1152,6 +1172,12 @@ function scheduleBGMNotes() {
   const intensity = computeBgmIntensity();
   // Snapshot pitch ratio once per tick — applied to lead voice freq below.
   const pitch = computeBgmPitch();
+  // BIOME SONIC IDENTITY — on the normal-play tracks only, transpose the whole track
+  // to the current biome's key centre. Boss tracks keep biomePitch = 1.0 so the
+  // archetype lead-detune stays the tension cue. Snapshotted once per tick (phrase-coherent).
+  const _onBiomeTrack = (bgmTrack === 'normal' || bgmTrack === 'normalMid');
+  const biomePitch = (_onBiomeTrack && game && typeof biomeForStage === 'function')
+    ? biomeBgmPitch(biomeForStage(game.stage)) : 1.0;
 
   // --- Lead voice (main + detuned chorus partner for shimmer/width) ---
   while (bgmNextTime < horizon) {
@@ -1161,8 +1187,8 @@ function scheduleBGMNotes() {
       const noteDur = dur * 0.75;
       // Lead voice pitch shifted by archetype (×1.0 default, ±semitones for horned/tendril/crystal)
       const voices = [
-        { freq: freq * pitch,           vol: t.vol * 0.65 * intensity },
-        { freq: freq * pitch * 1.005,   vol: t.vol * 0.35 * intensity }
+        { freq: freq * pitch * biomePitch,         vol: t.vol * 0.65 * intensity },
+        { freq: freq * pitch * biomePitch * 1.005, vol: t.vol * 0.35 * intensity }
       ];
       for (const v of voices) {
         const g = audioCtx.createGain();
@@ -1196,7 +1222,7 @@ function scheduleBGMNotes() {
         g.connect(dest);
         const o = audioCtx.createOscillator();
         o.type = 'triangle';
-        o.frequency.setValueAtTime(bfreq, bgmBassNextTime);
+        o.frequency.setValueAtTime(bfreq * biomePitch, bgmBassNextTime);
         g.gain.setValueAtTime(0, bgmBassNextTime);
         g.gain.linearRampToValueAtTime(bvol, bgmBassNextTime + 0.015);
         g.gain.setValueAtTime(bvol, bgmBassNextTime + bnoteDur - 0.03);
@@ -1223,9 +1249,9 @@ function scheduleBGMNotes() {
         const attack = Math.min(0.18, pnoteDur * 0.25);
         const release = Math.min(0.22, pnoteDur * 0.30);
         const padVoices = [
-          { freq: pfreq,        vol: t.vol * 0.32 },  // root
-          { freq: pfreq * 1.5,  vol: t.vol * 0.16 },  // perfect fifth (softer, hangs above root)
-          { freq: pfreq * 2.0,  vol: t.vol * 0.10 }   // octave (quietest, just adds shimmer)
+          { freq: pfreq * biomePitch,        vol: t.vol * 0.32 },  // root
+          { freq: pfreq * biomePitch * 1.5,  vol: t.vol * 0.16 },  // perfect fifth (softer, hangs above root)
+          { freq: pfreq * biomePitch * 2.0,  vol: t.vol * 0.10 }   // octave (quietest, just adds shimmer)
         ];
         for (const v of padVoices) {
           const g = audioCtx.createGain();
