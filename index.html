@@ -14169,17 +14169,9 @@ function spawnStageClear(label, sub) {
     if (_bid && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_bid]) {
       game.flashTimer = Math.max(game.flashTimer || 0, 8);
       game.flashColor = BIOME_NAMES[_bid].col;
-      // BIOME PARTICLE BURST — 12 particles in biome color radially from center.
-      if (game.itemBursts) {
-        for (let _k = 0; _k < 12; _k++) {
-          const _a = (_k / 12) * Math.PI * 2;
-          game.itemBursts.push({
-            x: BASE_W/2 + Math.cos(_a) * 12,
-            y: BASE_H/2 + Math.sin(_a) * 12,
-            life: -_k, color: BIOME_NAMES[_bid].col
-          });
-        }
-      }
+      // DECLUTTER: the 12-particle biome burst at screen-center was removed — it
+      // stacked on top of the player-celebration sparks + confetti at the clear
+      // moment; the biome-colored flash alone keeps the environmental continuity.
     }
   }
   if (sub) {
@@ -14194,12 +14186,8 @@ function spawnStageClear(label, sub) {
   if ((game.stageHitTaken || 0) === 0 && (game.stageShotsFired || 0) >= 5) {
     addScore(300);
     game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H/2 + 50, text: 'UNTOUCHED',
+      x: BASE_W/2, y: BASE_H/2 + 50, text: 'UNTOUCHED +300',
       color: '#0ff', life: 100, maxLife: 100, size: 11
-    });
-    game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H/2 + 62, text: '+300',
-      color: '#fff', life: 90, maxLife: 90, size: 6
     });
     if (game.shockwaves) {
       game.shockwaves.push({
@@ -14239,12 +14227,8 @@ function spawnStageClear(label, sub) {
   if ((game.lives || 0) === 1 && !game.stageDied) {
     addScore(200);
     game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H/2 + 24, text: 'LAST STAND',
+      x: BASE_W/2, y: BASE_H/2 + 24, text: 'LAST STAND +200',
       color: '#f44', life: 100, maxLife: 100, size: 11
-    });
-    game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H/2 + 36, text: '+200',
-      color: '#fff', life: 90, maxLife: 90, size: 6
     });
     game.flashTimer = Math.max(game.flashTimer || 0, 6);
     game.flashColor = '#f44';
@@ -17250,25 +17234,10 @@ function drawStageIntro() {
   // from screen center outward. Reads as cinematic transition between stages.
   // Color picked from biome for cohesion (or default cyan).
   const introElapsed = 120 - game.stageTimer;
-  // TIME-OF-DAY ACCENT — top thin band tinted by real-world hour phase, so
-  // each intro carries the day's mood. Subtle so it stays under stage-type
-  // tint and warp.
-  {
-    const _hr = new Date().getHours();
-    let _todCol = null;
-    if (_hr < 5)       _todCol = '#666';       // late night (noir dim)
-    else if (_hr < 9)  _todCol = '#fc8';       // morning (warm soft, noir-ok)
-    else if (_hr < 17) _todCol = '#fff';       // afternoon (white)
-    else if (_hr < 21) _todCol = '#f88';       // evening (soft crimson)
-    else               _todCol = '#666';       // night (noir dim)
-    if (_todCol) {
-      ctx.save();
-      ctx.globalAlpha = 0.08;
-      ctx.fillStyle = _todCol;
-      ctx.fillRect(0, 0, BASE_W, 2);
-      ctx.restore();
-    }
-  }
+  // DECLUTTER (2026-06-26): the time-of-day top band, biome edge pulse, intro
+  // particle stream, and dashed banner marquee were removed — they piled four
+  // competing transient layers over the warp/flash in the first 30 frames and
+  // read as "messy". The warp + biome entry flash + biome name carry the intro.
   // DAILY/CHALLENGE INTRO BORDER — single-pixel full frame around intro when
   // these modes are active. Daily green, Challenge red. Reinforces mode at
   // every stage entry. Daily takes priority over challenge if both somehow set.
@@ -17300,19 +17269,6 @@ function drawStageIntro() {
     ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
     ctx.restore();
   }
-  // BIOME EDGE PULSE — first 30 frames of intro paint biome-colored 1px
-  // left/right edges to extend the warp identity into the intro proper.
-  if (introElapsed < 30 && typeof biomeForStage === 'function') {
-    const _bidE = biomeForStage(game.stage || 1);
-    if (_bidE && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_bidE]) {
-      ctx.save();
-      ctx.globalAlpha = (1 - introElapsed / 30) * 0.4;
-      ctx.fillStyle = BIOME_NAMES[_bidE].col;
-      ctx.fillRect(0, 0, 1, BASE_H);
-      ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
-      ctx.restore();
-    }
-  }
   // STAGE TYPE BG TINT — faint 4-frame edge band by stage type so the player
   // instantly reads what kind of stage is starting. Boss/challenge get the
   // tint; normal stages stay clean (no distraction).
@@ -17329,24 +17285,6 @@ function drawStageIntro() {
       ctx.restore();
     }
   }
-  // STAGE INTRO PARTICLE STREAM — first 30 frames, small dots flow from screen
-  // edges toward the center stage label. Subtle motion that draws attention to
-  // the title sequence without competing with warp streaks.
-  if (introElapsed < 30) {
-    const psSeed = (game.stage * 73) % 8;
-    ctx.save();
-    ctx.fillStyle = '#fff';
-    for (let k = 0; k < 6; k++) {
-      const ang = ((k + psSeed) / 6) * Math.PI * 2 + introElapsed * 0.03;
-      const ringR = 80 - introElapsed * 2.4;
-      const px = BASE_W/2 + Math.cos(ang) * ringR;
-      const py = BASE_H/2 + Math.sin(ang) * ringR;
-      ctx.globalAlpha = Math.max(0, ringR / 80) * 0.6;
-      ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
-    }
-    ctx.restore();
-  }
-
   // BIOME ENTRY FLASH — 12-frame screen-wide tint matching the upcoming biome.
   // Fades from 0.25 alpha to 0 over the window. Reads as "we just arrived here".
   // BIOME TRANSITION FANFARE — if biome id changed from last stage, boost flash
@@ -17470,14 +17408,6 @@ function drawStageIntro() {
 
   // Standard banner elements — suppressed on boss stages (cinematic handles them)
   if (!isBoss) {
-    // Top + bottom dashed banners marquee
-    ctx.fillStyle = labelColor;
-    for (let i = 0; i < BASE_W; i += 8) {
-      if ((i + game.animFrame * 2) % 16 < 4) {
-        ctx.fillRect(i, BASE_H/2 - 28, 4, 1);
-        ctx.fillRect(i, BASE_H/2 + 4, 4, 1);
-      }
-    }
     // Banner panel
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -17526,23 +17456,8 @@ function drawStageIntro() {
     if (_biomeId && BIOME_NAMES[_biomeId]) {
       const bInfo = BIOME_NAMES[_biomeId];
       drawRetroText('— ' + bInfo.label + ' —', BASE_W/2 + offX, BASE_H/2 + 2, 5, bInfo.col);
-      // BIOME CYCLE INDEX — 1-based position within the 8-biome cycle.
-      // BIOME FAMILIARITY — append lifetime visit count for this biome (read
-      // from galagaBiomeVisits, written on every stage entry). Tier color ramp:
-      // 1-2 gray (new), 3-9 cyan (familiar), 10-24 green (known), 25+ gold
-      // (homeland). Inline keeps STAGE_INTRO compact.
-      const _bIdx = Math.floor((game.stage - 8) / 4) % 8;
-      let _cycTxt = '(' + (_bIdx + 1) + ' / 8)';
-      let _cycCol = '#555';
-      try {
-        const _bvMap = JSON.parse(localStorage.getItem('galagaBiomeVisits') || '{}');
-        const _vc = _bvMap[_biomeId] || 0;
-        if (_vc >= 1) {
-          _cycTxt += ' · x' + _vc;
-          _cycCol = _vc >= 25 ? '#fc4' : _vc >= 10 ? '#0f8' : _vc >= 3 ? '#0cf' : '#888';
-        }
-      } catch (_eBV) {}
-      drawRetroText(_cycTxt, BASE_W/2 + offX, BASE_H/2 - 4, 3, _cycCol);
+      // DECLUTTER: the biome cycle-index "(N/8) · xVISITS" line was removed — it
+      // was stat noise stacked under the biome name; the name + whisper suffice.
       // BIOME WHISPER — atmospheric one-liner under biome label, last 75 frames of
       // intro only (after the warp settles). Color softened from biome col.
       if (typeof BIOME_WHISPERS !== 'undefined' && BIOME_WHISPERS[_biomeId] && introElapsed > 45) {
@@ -17615,20 +17530,8 @@ function drawStageIntro() {
       const _ap = PERKS[game.activePerk];
       drawRetroText('PERK ' + _ap.name.split(' ')[0], 4, BASE_H/2 + 20, 4, _ap.col, 'left');
     }
-    // Recent grades trend — last 3 stage grades 'D-B-A' (oldest → newest).
-    // Color picks up the avg rank tier: gold (≥A avg), cyan (≥B), cream (≥C),
-    // gray default. Quick read of "how the last 3 stages went on average".
-    if (Array.isArray(game.recentGrades) && game.recentGrades.length > 0) {
-      const _gradeRank = { D: 0, C: 1, B: 2, A: 3, S: 4, SS: 5 };
-      let _gSum = 0;
-      for (const _g of game.recentGrades) _gSum += (_gradeRank[_g] || 0);
-      const _gAvg = _gSum / game.recentGrades.length;
-      const _gtCol = _gAvg >= 3.5 ? '#fc4'
-                    : _gAvg >= 2.5 ? '#0ff'
-                    : _gAvg >= 1.5 ? '#cfc'
-                    : '#888';
-      drawRetroText(game.recentGrades.join('-'), 4, BASE_H/2 + 27, 4, _gtCol, 'left');
-    }
+    // DECLUTTER: the "recent grades trend" (last-3 D-B-A) chip was removed from the
+    // intro — historical reflection, not next-stage planning; lives in the stats overlay.
     // CLEAN STREAK chip — consecutive no-death stages. Green at ≥ 2, picks up
     // a small glow at ≥ 5 (high-tier mastery threshold). Sits below recent
     // grades on the LEFT column.
@@ -17714,31 +17617,10 @@ function drawStageIntro() {
                     game.lastStageGradeCol || '#fff', 'right');
       ctx.restore();
     }
-    // Stage PB status — only on normal stages (boss/challenge use other timing)
-    if ((game.stage || 0) >= 1
-        && (game.stage % BOSS_STAGE_INTERVAL !== 0)
-        && (game.stage % 4 !== 0)
-        && typeof stagePBs !== 'undefined' && stagePBs) {
-      const _pbF2 = stagePBs[String(game.stage)];
-      if (typeof _pbF2 === 'number' && _pbF2 > 0 && typeof fmtFrameTime === 'function') {
-        drawRetroText('PB ' + fmtFrameTime(_pbF2), BASE_W - 4, BASE_H/2 + 25, 4, '#fc4', 'right');
-      } else {
-        drawRetroText('NO PB YET', BASE_W - 4, BASE_H/2 + 25, 4, '#888', 'right');
-      }
-    }
-    // Previous stage clear time — reflection point. Surfaced under PB row.
-    // Green when the prior clear beat its PB, gray otherwise; matches the
-    // STAGE TIME CLOCK ahead/behind color convention. Appends '(-N.Ns)' delta
-    // on PB-beat clears so the player sees the improvement margin.
-    if ((game.lastStageFrames || 0) > 0 && typeof fmtFrameTime === 'function') {
-      const _prvCol = game.lastStagePBBeat ? '#0f8' : '#888';
-      const _prvTxt = 'PRV ' + fmtFrameTime(game.lastStageFrames);
-      const _prvSfx = game.lastStagePBBeat && (game.lastStagePBDelta || 0) > 0
-        ? ' (-' + (game.lastStagePBDelta / 60).toFixed(1) + 's)'
-        : '';
-      drawRetroText(_prvTxt + _prvSfx,
-                    BASE_W - 4, BASE_H/2 + 32, 4, _prvCol, 'right');
-    }
+    // DECLUTTER: the stage-PB row ("PB 12.3" / "NO PB YET") and the previous-clear-
+    // time row ("PRV …") were removed from the intro — speed-reflection stats that
+    // crowded the right column; the per-stage clear time still shows on the
+    // after-action report at stage end.
   }
   // CHALLENGING STAGE MISSION BRIEF — for challenge intros, replace generic
   // stat columns with a tactical briefing panel: wave count, unit total,
@@ -17809,20 +17691,9 @@ function drawStageIntro() {
     ctx.globalAlpha = 1;
     ctx.restore();
   }
-  // RUN QUICK STATS — single-line summary of in-progress run shown at stage 2+.
-  // Combo / Score / Accuracy. Score-neutral context for player decisions.
-  if (slide >= 1 && game.stage >= 2 && !isBoss && !isChallenge) {
-    const _sc = game.score || 0;
-    const _cb = game.comboBest || 0;
-    const _accNum = (game.stats && game.stats.shotsFired)
-      ? Math.round((game.stats.shotsHit / game.stats.shotsFired) * 100) : 0;
-    const _scStr = _sc >= 1000 ? Math.round(_sc / 1000) + 'K' : String(_sc);
-    const _runLine = 'RUN  C×' + _cb + '  ' + _scStr + 'PT  ' + _accNum + '%';
-    ctx.save();
-    ctx.globalAlpha = 0.7;
-    drawRetroText(_runLine, BASE_W/2, BASE_H/2 + 32, 4, '#aaa');
-    ctx.restore();
-  }
+  // DECLUTTER: the centered "RUN C×N  NK PT  N%" quick-stats line was removed — it
+  // duplicated the HI SCORE / ACC already in the right column and the combo readout,
+  // and overlapped the biome whisper + adaptive tip at the same y. One less line.
   // ADAPTIVE TIP — surface skill hint based on first matching weakness check
   if (slide >= 1 && !isBoss && !isChallenge && typeof STAGE_TIPS !== 'undefined' && introElapsed > 60) {
     let _tip = null;
