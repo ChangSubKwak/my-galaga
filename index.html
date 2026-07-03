@@ -10239,8 +10239,14 @@ function blinkPhase(shift) { return (game.animFrame >> shift) % 2 === 0; }
 
 // Full-screen impact-flash alpha. Dampened to 30% when reduce-motion is on, so the
 // strobe is gentle for photosensitive players without losing the hit-feedback cue.
+// FLASH ALPHA CAP (the "screen whitens" root cause, found via instrumented repro):
+// this helper was UNCLAMPED — any flashTimer ≥ 12 rendered a FULLY OPAQUE full-screen
+// fill (alpha 24/8*0.7 = 2.1 on boss beats), and in dense combat the 55 Math.max
+// setters re-armed the timer faster than it decayed, holding the whole screen at
+// 0.5–1.0 alpha for SECONDS — a sustained whiteout, not a flash. Capped at 0.45:
+// a flash is an accent, never a blindfold; the decay curve below the cap is unchanged.
 function flashAlpha(timer, reduce) {
-  const a = (timer || 0) / 8 * 0.7;
+  const a = Math.min(0.45, (timer || 0) / 8 * 0.7);
   return reduce ? a * 0.3 : a;
 }
 
@@ -13959,6 +13965,13 @@ function drawStrikeFx() {
 function drawShockwaves() {
   if (!game.shockwaves) return;
   for (const s of game.shockwaves) {
+    // DELAY GUARD (whiteout root cause): staggered shockwaves spawn with life < 0
+    // (e.g. the shield cinematic pushes life 0/-6/-12). A negative life produced a
+    // NEGATIVE arc radius → IndexSizeError thrown MID-'lighter' → ctx.restore()
+    // skipped → gameLoop swallowed it → every subsequent frame rendered additive at
+    // the leaked alpha = the progressive screen-whitening + console-spam slowdown
+    // the user reported four times. Not yet born → simply don't draw it.
+    if (s.life < 0) continue;
     const t = s.life / s.maxLife;
     const r = s.maxR * t;
     ctx.save();
@@ -22739,7 +22752,22 @@ function gameLoop(timestamp) {
       maxIters--;
     }
     if (maxIters === 0) accumulator = 0; // drain remainder if we hit the cap
-    try { draw(); } catch (dErr) { console.error('draw() error:', dErr); }
+    try { draw(); } catch (dErr) {
+      console.error('draw() error:', dErr);
+      // STATE-POISON GUARD (defense in depth for the whiteout class): an exception
+      // thrown between a ctx.save() and its restore() leaves the canvas in whatever
+      // composite/alpha/transform the throwing function was using — a leaked
+      // 'lighter' turns every subsequent frame additive and the screen whitens
+      // progressively while the errors spam (= slowdown). Any caught draw error
+      // now hard-resets the shared ctx state so one bad frame can never cascade.
+      try {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowBlur = 0;
+        if (typeof ctx.filter === 'string') ctx.filter = 'none';
+      } catch (rErr) {}
+    }
   } finally {
     requestAnimationFrame(gameLoop);
   }

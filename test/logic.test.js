@@ -1147,11 +1147,16 @@ if (typeof G.blinkPhase === 'function') {
 } else { console.log('  (skipped — blinkPhase not exposed)'); }
 
 // ============================================================
-section('flashAlpha — impact-flash alpha, dampened under reduce-motion');
+section('flashAlpha — impact-flash alpha, CAPPED (whiteout root cause) + reduce-motion');
 if (typeof G.flashAlpha === 'function') {
-  eq(G.flashAlpha(8, false), 0.7, 'full timer, normal → 0.7');
+  // THE WHITEOUT GUARD: the uncapped form hit alpha 2.1 at timer 24 (boss beats) —
+  // a fully opaque screen — and chained combat events held it there for seconds.
+  eq(G.flashAlpha(8, false), 0.45, 'timer 8 → capped at 0.45 (was 0.7)');
+  eq(G.flashAlpha(24, false), 0.45, 'timer 24 (max setter) → still 0.45, NEVER opaque');
+  eq(G.flashAlpha(1000, false), 0.45, 'absurd timer → still 0.45 (hard ceiling)');
+  ok(Math.abs(G.flashAlpha(4, false) - 0.35) < 1e-9, 'below the cap the decay curve is unchanged (4 → 0.35)');
   eq(G.flashAlpha(0, false), 0,   'no flash → 0');
-  ok(Math.abs(G.flashAlpha(8, true) - 0.21) < 1e-9, 'full timer, reduce-motion → 30% (0.21)');
+  ok(Math.abs(G.flashAlpha(8, true) - 0.135) < 1e-9, 'reduce-motion → 30% of capped (0.135)');
   ok(G.flashAlpha(8, true) < G.flashAlpha(8, false), 'reduce-motion always dimmer than normal');
   eq(G.flashAlpha(undefined, false), 0, 'undefined timer → 0 (no NaN)');
   ok(G.flashAlpha(4, false) > G.flashAlpha(4, true), 'dampening holds at partial timer too');
