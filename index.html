@@ -55,7 +55,7 @@ body::before {
   border-color: rgba(255,100,100,0.6);
   box-shadow: 0 0 14px rgba(255,80,80,0.45), inset 0 0 10px rgba(255,100,100,0.25);
   color: #fff;
-  animation: firePulse 1.6s ease-in-out infinite;
+  /* (GUI-simplify DELETE: firePulse — perpetual idle motion on a control the thumb rests on) */
 }
 @keyframes firePulse {
   0%, 100% { box-shadow: 0 0 14px rgba(255,80,80,0.45), inset 0 0 10px rgba(255,100,100,0.25); }
@@ -15267,7 +15267,7 @@ function update() {
     // CORRUPTION VOICE — late stage (corruption > 0.4) randomly spawn distorted
     // 1-word whispers at random screen position. Adds narrative voice layer to
     // the existing purely-visual worldCorruption system. Score-neutral.
-    if (game.stage >= 50 && game.playerAlive
+    if (!minimalHud && game.stage >= 50 && game.playerAlive
         && (isCombatState())) {
       // Spawn chance ramps from 0.0008 at stage 50 to 0.004 at stage 80 (~once per 4-15s)
       const _voiceChance = Math.min(0.006, 0.0008 + (game.stage - 50) * 0.00013);
@@ -15666,58 +15666,9 @@ function drawRetroText(text, x, y, size, color, align) {
 
 // LAST STAND OVERLAY — red emergency vignette drawn over gameplay when on final life.
 // Pulsing edge border + corner warning pips. Suppressed during RESPAWN / PAUSED / GAME_OVER.
-function drawLastStandOverlay() {
-  if (!game || game.lives !== 1) return;
-  const _activePlay = game.state === STATE.PLAYING
-                   || game.state === STATE.CHALLENGING
-                   || game.state === STATE.BOSS_STAGE;
-  if (!_activePlay) return;
-  if ((game.respawnTimer || 0) > 0) return;
-  if ((game.invincibleTimer || 0) > 50) return; // suppress during post-respawn grace
-
-  const t = game.animFrame;
-  const pulse = 0.45 + 0.35 * Math.sin(t * 0.11);   // slow heartbeat ~0.1–0.8
-  const fastP  = 0.5  + 0.5  * Math.sin(t * 0.28);  // faster for corner pips
-
-  ctx.save();
-
-  // Edge vignette — 4 thin gradient bars along each screen edge
-  const edgeW = 5;
-  const edgeAlpha = 0.55 * pulse;
-  ctx.globalAlpha = edgeAlpha;
-  ctx.fillStyle = '#f22';
-  ctx.fillRect(0, 0, edgeW, BASE_H);              // left
-  ctx.fillRect(BASE_W - edgeW, 0, edgeW, BASE_H); // right
-  ctx.fillRect(0, 0, BASE_W, edgeW);              // top
-  ctx.fillRect(0, BASE_H - edgeW, BASE_W, edgeW); // bottom
-
-  // Corner pips — 3×3 red squares at all 4 corners, flash on fastP
-  ctx.globalAlpha = (fastP > 0.6 ? 0.85 : 0.25);
-  const pip = 3;
-  ctx.fillStyle = '#f44';
-  ctx.fillRect(0, 0, pip, pip);
-  ctx.fillRect(BASE_W - pip, 0, pip, pip);
-  ctx.fillRect(0, BASE_H - pip, pip, pip);
-  ctx.fillRect(BASE_W - pip, BASE_H - pip, pip, pip);
-
-  // "LAST STAND" text — upper-right corner, small, urgent
-  ctx.globalAlpha = pulse * 0.90;
-  ctx.shadowColor = '#f00';
-  ctx.shadowBlur = 6;
-  drawRetroText('LAST STAND', BASE_W - 4, 6, 5, '#f44', 'right');
-  ctx.shadowBlur = 0;
-
-  // Low HP crosshatch — subtle dark red scanlines over play area, very faint
-  if ((game.battleScars || 0) >= 3) {
-    ctx.globalAlpha = 0.06 * pulse;
-    ctx.fillStyle = '#f00';
-    for (let gy = 0; gy < BASE_H; gy += 4) {
-      ctx.fillRect(0, gy, BASE_W, 1);
-    }
-  }
-
-  ctx.restore();
-}
+// (GUI-simplify DELETE: drawLastStandOverlay — the permanent screen-wide red
+// edge + corner pips on last life = alarm fatigue; the LAST LIFE banner + lives
+// pulse + bloom crimson grade are the consolidated last-life language.)
 
 function draw() {
   ctx.save();
@@ -15769,7 +15720,7 @@ function draw() {
   // DRIFT EMBERS — at stage 50+, slow upward red/orange particles drift across
   // screen to amplify the deep-territory pressure. Deterministic positions
   // derived from animFrame so they self-reset cleanly on state change.
-  if ((game.stage || 0) >= 50
+  if (!minimalHud && (game.stage || 0) >= 50
       && game.state !== STATE.PAUSED && game.state !== STATE.TITLE && game.state !== STATE.GAME_OVER) {
     const _emT = game.animFrame;
     ctx.save();
@@ -15785,9 +15736,9 @@ function draw() {
   // AMBIENT EVENTS — narrative one-shots (cargo ship traversal, supernova flash).
   // Drawn after biome but before aurora/stars so engine glow / silhouette read clearly.
   drawAmbientEvent();
-  // Aurora streaks — only during BOSS_STAGE for added drama.
-  // Three horizontal sine-bands of color, each phase-offset, slowly drifting.
-  if (game.state === STATE.BOSS_STAGE) {
+  // Aurora streaks — only during BOSS_STAGE for added drama. Detail view only
+  // (GUI-simplify: ambient chrome; the boss arena reads cleaner without it).
+  if (!minimalHud && game.state === STATE.BOSS_STAGE) {
     const t = game.animFrame;
     // Noir crimson aurora — boss-stage ominous heat in the Ink Noir palette
     // (was three blues #48f/#8af/#a8f, replaced to match the crimson frame glow).
@@ -15821,9 +15772,10 @@ function draw() {
         const _phase2 = game.state === STATE.BOSS_STAGE
                       && game.megaBosses
                       && game.megaBosses.some(mb => mb.alive && mb.phase2);
-        const _lastLife = _active && game.lives === 1;
+        // (GUI-simplify: the lives==1 star tint was the FOURTH last-life layer —
+        // the LAST LIFE banner + lives-row pulse + bloom crimson grade carry it.)
         const _maxCombo = (game.combo || 0) >= 20;
-        if (_phase2 || _lastLife) _mood = '#f88';
+        if (_phase2) _mood = '#f88';
         else if (_maxCombo) _mood = '#fc8';
       }
     }
@@ -15937,20 +15889,11 @@ function draw() {
     ctx.fillRect(BASE_W - 16, BASE_H - 16, 16, 16);
     ctx.restore();
   }
-  // Stage 50+ — golden persistent edge pulse (legendary territory)
-  if (game.stage >= 50 && (isCombatState())) {
-    ctx.save();
-    const p = 0.6 + 0.4 * Math.sin(game.animFrame * 0.1);
-    ctx.globalAlpha = 0.15 * p;
-    ctx.fillStyle = '#fc4';
-    ctx.fillRect(-10, -10, BASE_W + 20, 3);
-    ctx.fillRect(-10, BASE_H - 3, BASE_W + 20, 13);
-    ctx.fillRect(-10, -10, 3, BASE_H + 20);
-    ctx.fillRect(BASE_W - 3, -10, 13, BASE_H + 20);
-    ctx.restore();
-  }
-  // High-combo edge glow — frames border with combo-tier color when combo >= 30
-  if (game.combo >= 30 && (isCombatState())) {
+  // (GUI-simplify DELETE: the stage-50+ golden edge pulse — a PERMANENT decorative
+  // border diluted the semantics of transient danger borders; the stage label's
+  // tier colour already encodes depth.)
+  // High-combo edge glow — detail view only (edges mean DANGER in the simple view)
+  if (!minimalHud && game.combo >= 30 && (isCombatState())) {
     const tierCol = game.combo >= 60 ? '#f6f' : game.combo >= 45 ? '#f80' : '#ff4';
     ctx.save();
     const pulse = 0.55 + 0.35 * Math.sin(game.animFrame * 0.22);
@@ -16025,38 +15968,11 @@ function draw() {
     if (corr > 0) {
       ctx.save();
       const t = game.animFrame;
-      // LAST LIFE HEARTBEAT — when lives === 1 in active gameplay, paint thin red
-  // top/bottom band synced to ~80bpm pulse. Reinforces existing dangerLives cue.
-  if (game.lives === 1
-      && (isCombatState())) {
-    // 80bpm = 1.33 beats/sec at 60fps = 45 frames/beat; double-beat pattern
-    const _hbT = (game.animFrame % 45) / 45;
-    const _hbA = Math.max(0, 0.18 * (1 - Math.abs(_hbT - 0.15)) - 0.04
-                       + Math.max(0, 0.12 * (1 - Math.abs(_hbT - 0.35))));
-    if (_hbA > 0) {
-      ctx.save();
-      ctx.globalAlpha = _hbA;
-      ctx.fillStyle = '#f44';
-      ctx.fillRect(0, 0, BASE_W, 2);
-      ctx.fillRect(0, BASE_H - 2, BASE_W, 2);
-      ctx.restore();
-    }
-  }
-  // BOSS LOW HP SCREEN PULSE — when any alive boss is under 25% HP, paint
-  // pulsing red edge bars to amplify decisive-blow tension.
-  if (game.state === STATE.BOSS_STAGE && game.megaBosses
-      && game.megaBosses.some(mb => mb.alive && mb.maxHp && mb.hp / mb.maxHp < 0.25)) {
-    const _bpA = 0.18 + 0.18 * Math.sin(game.animFrame * 0.22);
-    ctx.save();
-    ctx.globalAlpha = _bpA;
-    ctx.fillStyle = '#f44';
-    ctx.fillRect(0, 0, BASE_W, 3);
-    ctx.fillRect(0, BASE_H - 3, BASE_W, 3);
-    ctx.fillRect(0, 0, 3, BASE_H);
-    ctx.fillRect(BASE_W - 3, 0, 3, BASE_H);
-    ctx.restore();
-  }
-  // STAGE TIER DARK VIGNETTE — soft black edge gradient. Strength scales
+      // (GUI-simplify DELETE: the LAST-LIFE heartbeat band [4th last-life layer]
+      // and the BOSS LOW-HP screen pulse [HP bar already pulses red < 25%] — both
+      // were also nest-bugged inside this corr>0 block, so they never fired below
+      // stage 30 anyway: proof they were not load-bearing.)
+      // STAGE TIER DARK VIGNETTE — soft black edge gradient. Strength scales
       // with corruption. Adds oppression beyond colored noise.
       ctx.globalAlpha = corr * 0.30;
       ctx.fillStyle = '#000';
@@ -16065,6 +15981,10 @@ function draw() {
       ctx.globalAlpha = corr * 0.18;
       ctx.fillRect(0, 0, BASE_W, 6);
       ctx.fillRect(0, BASE_H - 6, BASE_W, 6);
+      // Corruption SUB-LAYERS (edge noise / RGB bleed / glitch bars / violet pulse /
+      // overscan) — detail view only; the base dark vignette above IS the corruption
+      // identity in the simple view.
+      if (!minimalHud) {
       // Edge noise — random corrupted pixels at screen edges. Density scales with corr.
       const noiseCount = Math.floor(corr * 30);
       ctx.globalAlpha = 0.45;
@@ -16138,13 +16058,14 @@ function draw() {
           ctx.fillRect(0, yLine + 1, BASE_W, 1);
         }
       }
+      }
       ctx.restore();
     }
   }
   // BIG COMBO LOST vignette — gray screen-edge fade when a 10+ combo breaks. Reads
   // as visual weight to the loss. Falls under scanline overlay so it doesn't
   // permanently darken the playfield.
-  if ((game.comboLostVignette || 0) > 0) {
+  if (!minimalHud && (game.comboLostVignette || 0) > 0) {
     const v = game.comboLostVignette;
     const vRatio = v / 60;
     ctx.save();
@@ -16182,17 +16103,8 @@ function draw() {
     ctx.fillRect(BASE_W - 10, 0, 4, BASE_H);
     ctx.restore();
   }
-  // CRT scanline overlay — very subtle horizontal bands at alpha 0.06 sit on top of the
-  // playfield for a retro arcade vibe. Skip during PAUSED so paused menu reads cleanly.
-  if (game.state !== STATE.PAUSED && game.state !== STATE.TITLE) {
-    ctx.save();
-    ctx.globalAlpha = 0.06;
-    ctx.fillStyle = '#000';
-    for (let y = 0; y < BASE_H; y += 2) {
-      ctx.fillRect(0, y, BASE_W, 1);
-    }
-    ctx.restore();
-  }
+  // (GUI-simplify DELETE: the canvas CRT scanline pass — the free CSS body::before
+  // scanline overlay carries the identical identity; ~144 fewer fillRects/frame.)
 
   // Cinematic letterbox bars on boss kill (expand → hold → retract over 60 frames).
   // Timer ticks in update() so the bars don't shrink 2× faster on 144Hz monitors.
@@ -16320,31 +16232,12 @@ function draw() {
     ctx.restore();
   }
 
-  // CRT scanline overlay (subtle, drawn last)
-  ctx.save();
-  ctx.globalAlpha = 0.12;
-  ctx.fillStyle = '#000';
-  for (let yy = 0; yy < BASE_H; yy += 2) {
-    ctx.fillRect(0, yy, BASE_W, 1);
-  }
-  ctx.restore();
-
-  // Vignette — subtle dark gradient at the four corners (4-pass darkening)
-  ctx.save();
-  ctx.globalAlpha = 0.08;
-  ctx.fillStyle = '#000';
-  // Top + bottom strips, fading out toward the center
-  for (let i = 0; i < 12; i++) {
-    ctx.globalAlpha = 0.07 * (1 - i / 12);
-    ctx.fillRect(0, i, BASE_W, 1);
-    ctx.fillRect(0, BASE_H - 1 - i, BASE_W, 1);
-    ctx.fillRect(i, 0, 1, BASE_H);
-    ctx.fillRect(BASE_W - 1 - i, 0, 1, BASE_H);
-  }
-  ctx.restore();
+  // (GUI-simplify DELETE: the second canvas scanline pass [CSS body::before is the
+  // one surviving scanline] and the static 12-step corner vignette — the bloom's
+  // biome/danger grade IS the vignette now; this was a third vignette system.)
   // DEEP STAGE FOG — additional subtle fog gradient at stage 60+. Pure visual
   // atmosphere on top of standard vignette. Animated alpha for slight breathing.
-  if (game && game.stage >= 60
+  if (!minimalHud && game && game.stage >= 60
       && (isCombatState())) {
     ctx.save();
     const fogPulse = 0.6 + 0.4 * Math.sin(game.animFrame * 0.04);
@@ -19332,7 +19225,6 @@ function drawGameplay() {
     }
   }
 
-  drawLastStandOverlay();
   drawDivePreviewPaths();
   drawThreatIndicators();
   drawLastEnemyAlert();
@@ -22035,28 +21927,8 @@ function drawBossStage() {
       drawShipTraitAura(game.playerX, _drawPY, selectedShip);
       drawPlayer(game.playerX, _drawPY, pcol, game.lvl);
     }
-    // FIRE READY DOT — small pulse above ship nose when fire cooldown is 0.
-    // Tactile cue that the next shot will fire immediately. Hidden during dash.
-    // Color matches active weapon kind (laser/homing/wave/fork) so the player
-    // reads next-shot type at a glance — gold fallback for the unmodded shot.
-    if (game.playerAlive && (game.fireCooldown || 0) <= 0 && (game.dashTimer || 0) === 0) {
-      const _frP = 0.55 + 0.30 * Math.sin(game.animFrame * 0.30);
-      let _frCol = '#fc4';
-      if      ((game.laserTimer  || 0) > 0) _frCol = '#f6c';
-      else if ((game.homingTimer || 0) > 0) _frCol = '#0f8';
-      else if ((game.waveTimer   || 0) > 0) _frCol = '#6cf';
-      else if ((game.forkTimer   || 0) > 0) _frCol = '#fa0';
-      ctx.save();
-      ctx.globalAlpha = _frP;
-      ctx.fillStyle = _frCol;
-      if (game.dualFighter) {
-        ctx.fillRect(Math.round(game.playerX - 8), Math.round(_drawPY - 6), 1, 1);
-        ctx.fillRect(Math.round(game.playerX + 8), Math.round(_drawPY - 6), 1, 1);
-      } else {
-        ctx.fillRect(Math.round(game.playerX), Math.round(_drawPY - 6), 1, 1);
-      }
-      ctx.restore();
-    }
+    // (GUI-simplify DELETE: the FIRE READY dot — pulsed near-constantly at the
+    // 6f cooldown and existed inconsistently only on boss stages.)
     // (DASH and WITCH cooldown bars under the ship removed — they sat in the
     // player's line of sight and contributed to visual noise. The dash icon
     // glow on the ship body still signals dash-ready state.)
@@ -22074,7 +21946,6 @@ function drawBossStage() {
   for (const s of game.hitSparks) drawHitSpark(s);
   for (const ft of game.floatTexts) drawFloatText(ft);
 
-  drawLastStandOverlay();
   drawComboEdgeFlame();
   drawHUD();
 }
