@@ -19597,19 +19597,17 @@ function drawHUD() {
   // 1UP + PILOT callsign small line below (pilot identity persistent across runs).
   // Daily mode swaps red → green so the mode reads at a glance (challenge mode
   // already uses red elsewhere and keeps the standard 1UP red).
-  if (game.animFrame % 60 < 40) {
-    const _1upCol = game.dailyMode ? COL.green : COL.red;
-    drawRetroText('1UP', 28, 8, 7, _1upCol, 'center');
-  }
-  drawRetroText('[' + playerCallsign + ']', 28, 15, 5, callsignColor(), 'center');
-  // PILOT TITLE under callsign — cache maintained in update() (updatePilotTitleCache);
-  // the promotion detection + banner moved there too (draw must not mutate state).
-  {
+  // SIMPLE VIEW: the identity stack (blinking 1UP + [callsign] + pilot title —
+  // three text items) hides; the score alone owns the top-left. Detail (M) keeps it.
+  if (!minimalHud) {
+    if (game.animFrame % 60 < 40) {
+      const _1upCol = game.dailyMode ? COL.green : COL.red;
+      drawRetroText('1UP', 28, 8, 7, _1upCol, 'center');
+    }
+    drawRetroText('[' + playerCallsign + ']', 28, 15, 5, callsignColor(), 'center');
+    // PILOT TITLE under callsign — cache maintained in update() (updatePilotTitleCache).
     const _hudTitleCol = typeof pilotTitleColor === 'function'
       ? pilotTitleColor(game._titleCache) : COL.gray;
-    // ACE PILOT (peak tier) — HUD title glows so the apex rank reads at every
-    // frame, completing the 3-location ACE PILOT cohesion (STAGE_INTRO / HUD
-    // / GAME_OVER).
     ctx.save();
     if (game._titleCache === 'ACE PILOT') {
       ctx.shadowColor = _hudTitleCol;
@@ -19973,13 +19971,15 @@ function drawHUD() {
     ctx.globalAlpha = Math.sin(game.animFrame * 0.08) * 0.4 + 0.6;
     drawRetroText(_btTxt, BASE_W/2, 12, _btSize, COL.red);
     ctx.restore();
+  } else if (minimalHud) {
+    // SIMPLE VIEW (user: "even simpler — too many texts/icons confuse"): the two-line
+    // 'HIGH SCORE' header collapses to one compact 'HI <value>' line.
+    drawRetroText('HI ' + fmtScore(game.highScore), BASE_W/2, 10, 5, COL.gray, 'center');
   } else {
     drawRetroText('HIGH SCORE', BASE_W/2, 8, 7, COL.red, 'center');
     drawRetroText(fmtScore(game.highScore), BASE_W/2 + 25, 17, 7, COL.white, 'right');
     // HIGH SCORE CALLSIGN — show holder of the top score for the active mode.
-    // Looks up live top-1 from the leaderboard (loadTopScores) so it reflects all
-    // entries, including ones higher than the running game.highScore.
-    if (!minimalHud && typeof loadTopScores === 'function') {
+    if (typeof loadTopScores === 'function') {
       const mode = game.dailyMode ? 'daily' : game.challengeMode ? 'challenge' : 'normal';
       const top1 = (loadTopScores(mode)[0]) || null;
       if (top1 && top1.callsign && top1.callsign !== '???' && top1.score > 0) {
@@ -20425,7 +20425,7 @@ function drawHUD() {
   else if (totalSec >= 300)    tCol = '#0cf';
   else if (totalSec >= 180)    tCol = '#cef';
   else                          tCol = COL.gray;
-  drawRetroText(mm + ':' + ss, BASE_W - 5, 16, 6, tCol, 'right');
+  if (!minimalHud) drawRetroText(mm + ':' + ss, BASE_W - 5, 16, 6, tCol, 'right'); // detail view (simple: one less top-row number)
   // STAGE PB GHOST — show personal best for current stage during play, color-tinted
   // by current pace. Gold if ahead of PB, gray if behind. Only when PB exists.
   if (!minimalHud && typeof stagePBs !== 'undefined' && stagePBs
