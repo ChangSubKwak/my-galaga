@@ -2720,38 +2720,9 @@ if (typeof G.nextBloomPerfState === 'function') {
   ok(s.off === false, 'fps==0 sentinel never trips the valve');
 } else { console.log('  (skipped — nextBloomPerfState not exposed)'); }
 
-section('nextLensLiteState — mid-tier valve (shed spectral ghosts in the 30..50fps band)');
-if (typeof G.nextLensLiteState === 'function') {
-  // The whole point: fps in the 30..48 band trips THIS valve even though the binary
-  // bloom valve (fps<30) never would — the previously-unshed "slow" band.
-  let s = { lite: false, low: 0, high: 0 };
-  for (let i = 0; i < 3; i++) s = G.nextLensLiteState(s.lite, 40, s.low, s.high);
-  ok(s.lite === false, '3 samples at 40fps not yet enough (hysteresis)');
-  s = G.nextLensLiteState(s.lite, 40, s.low, s.high); // 4th
-  ok(s.lite === true, '4th sustained sub-48 sample → ghosts shed (mid band now sheds load)');
-  // Cross-check with the binary valve: 40fps NEVER trips full-bloom-off.
-  let b = { off: false, low: 0, high: 0 };
-  for (let i = 0; i < 20; i++) b = G.nextBloomPerfState(b.off, 40, b.low, b.high);
-  ok(b.off === false, '40fps never trips the binary valve — the lite valve is what catches it');
-  // Healthy fps: never trips.
-  s = { lite: false, low: 0, high: 0 };
-  for (let i = 0; i < 20; i++) s = G.nextLensLiteState(s.lite, 60, s.low, s.high);
-  ok(s.lite === false, '60fps sustained → ghosts stay on');
-  // Restore path: sustained ≥56 for 8 samples.
-  s = { lite: true, low: 0, high: 0 };
-  for (let i = 0; i < 7; i++) s = G.nextLensLiteState(s.lite, 58, s.low, s.high);
-  ok(s.lite === true, '7 high samples not yet enough to restore');
-  s = G.nextLensLiteState(s.lite, 58, s.low, s.high);
-  ok(s.lite === false, '8th sustained high sample → ghosts restored');
-  // 50fps sits between the shed (48) and restore (56) thresholds → no flapping either way.
-  s = { lite: true, low: 0, high: 0 };
-  for (let i = 0; i < 20; i++) s = G.nextLensLiteState(s.lite, 50, s.low, s.high);
-  ok(s.lite === true, '50fps while lite → stays lite (no flap in the dead band)');
-  // fps==0 sentinel ignored.
-  s = { lite: false, low: 0, high: 0 };
-  for (let i = 0; i < 10; i++) s = G.nextLensLiteState(s.lite, 0, s.low, s.high);
-  ok(s.lite === false, 'fps==0 sentinel never trips the lite valve');
-} else { console.log('  (skipped — nextLensLiteState not exposed)'); }
+// (nextLensLiteState section retired — the mid-tier valve was removed with the
+// filter-free downsampled bloom rewrite; the binary valve remains tested above.)
+
 
 section('SPECTRAL LENS GRADE — post-process heat → chromatic split / vignette');
 if (typeof G.bloomHeat === 'function') {
@@ -2765,18 +2736,8 @@ if (typeof G.bloomHeat === 'function') {
   ok(G.bloomHeat(20, true, true) === 1, 'high combo + pressure still clamps to 1 (no overflow)');
   ok(G.bloomHeat(-5, false, false) === 0, 'negative combo guarded to 0');
 
-  // chromaSplitForHeat — monotonic, bounded 0.6..2.4 internal px.
-  ok(Math.abs(G.chromaSplitForHeat(0) - 0.6) < 1e-9, 'calm split = 0.6px');
-  ok(Math.abs(G.chromaSplitForHeat(1) - 2.4) < 1e-9, 'hot split = 2.4px');
-  ok(G.chromaSplitForHeat(0.5) > G.chromaSplitForHeat(0.1), 'split grows with heat');
-  ok(G.chromaSplitForHeat(2) === G.chromaSplitForHeat(1), 'split clamps above heat 1');
-
-  // chromaAlphaForHeat — stays low so additive ghosts add colour, not white. The cap is
-  // load-bearing: peak stack (bloom 0.34+0.22 + 2 ghosts) must stay well under ~0.8.
-  ok(Math.abs(G.chromaAlphaForHeat(0) - 0.04) < 1e-9, 'calm ghost alpha = 0.04');
-  ok(G.chromaAlphaForHeat(1) <= 0.12, 'hot ghost alpha capped ≤ 0.12 (whiteout guard: 0.56 + 2×0.11 < 0.8)');
-  ok(G.chromaAlphaForHeat(1) > G.chromaAlphaForHeat(0), 'ghost alpha grows with heat');
-
+  // (chromaSplitForHeat / chromaAlphaForHeat tests retired with the chromatic
+  // ghosts — the 4th whiteout-report rewrite removed those layers.)
   // vignetteAlphaForHeat — deepens with heat; bright daylight biomes keep it faint.
   ok(G.vignetteAlphaForHeat(0, false) > 0.17, 'baseline vignette present even at calm');
   ok(G.vignetteAlphaForHeat(1, false) > G.vignetteAlphaForHeat(0, false), 'vignette deepens with heat');
