@@ -95,6 +95,20 @@ The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
   dispatcher), optional shared `COL` palette neon-lift (touches all UI — do carefully),
   and a bloom on/off options-menu toggle (`galagaBloomOff` already persists).
 
+## SIMPLE-BY-DEFAULT GUI (2026-07-03)
+User directive: "make the overall GUI VERY simple." The default view now shows only
+VITAL elements (score/lives/stage, buff strip, combo box, boss HP, danger telegraphs,
+shield/dash/witch cues, one line per event); ~120 INFO elements (chips, stat banners,
+speedrun cluster, radar, meta counters, score chatter) live behind the **M toggle**
+(`minimalHud`, default ON — "HUD: SIMPLE/DETAILED"). DECOR was deleted outright
+(duplicate chips, marquees, stacked red layers, extra vignettes/scanlines, subtitle
+lines, celebration bursts). Principles: **edges mean danger** (no permanent decorative
+borders), **one text per event**, **one rendering per fact** (the AAR panel is the
+sole stage summary), **absence needs no label**. Never-cut list honored: gameplay
+color coding, danger telegraphs, colorblind markers, reduceMotion, boss HP, buff
+timers. Shipped as 8 commits (45cc9c7..4db0dcd); the per-screen keep/gate/delete
+spec came from a 6-auditor + judge workflow.
+
 ## Core principle — atmosphere noir, gameplay color preserved
 A pure monochrome would break gameplay legibility and the colorblind redundancy the
 game carefully built (power-up letters, enemy types, grades, elite/ghost markers all
