@@ -14223,15 +14223,8 @@ function spawnStageClear(label, sub) {
     // — without this gate a normal clear showed TWO grades and double-counted the
     // galagaStageGrades tally (often into different letter buckets).
     if (_sf >= 5 && game.state !== STATE.PLAYING) {  // skip near-zero-shot (boss insta-clear) + normal (System B owns it)
-      game.floatTexts.push({
-        x: BASE_W/2 + 56, y: BASE_H/2 - 10, text: _grade,
-        color: _gCol, life: 90, maxLife: 90, size: 16,
-        glow: _grade === 'S' ? 8 : 0  // apex S-grade picks up a gold halo
-      });
-      game.floatTexts.push({
-        x: BASE_W/2 + 56, y: BASE_H/2 + 2, text: Math.round(_accPct) + '%',
-        color: '#888', life: 80, maxLife: 80, size: 5
-      });
+      // (GUI-simplify DELETE: the floating grade letter + acc% — the AFTER-ACTION
+      // REPORT panel is the sole grade display on every clear now.)
       // STAGE GRADE LIFETIME TALLY — accumulate per-grade counts to localStorage
       // so PROFILE can surface medal totals (esp. S count = mastery signal).
       try {
@@ -14257,25 +14250,12 @@ function spawnStageClear(label, sub) {
   // payoff at the moment of clearing (not just in next STAGE_INTRO). Reuses
   // lastStagePBBeat/Delta already computed at the top of this function. Skipped
   // when delta = 0 (defensive guard against odd timing edge).
-  if (game.lastStagePBBeat && (game.lastStagePBDelta || 0) > 0) {
-    const _pbSec = (game.lastStagePBDelta / 60).toFixed(1);
-    game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H/2 + 14, text: 'PB -' + _pbSec + 's',
-      color: '#0f8', life: 90, maxLife: 90, size: 8, glow: 5
-    });
-  }
+  // (GUI-simplify DELETE: the 'PB -X.Xs' floattext — third PB rendering; the AAR
+  // panel's PB star is the one clear-time cue.)
   // STAGE CLEAR BIOME FLASH — brief biome-colored screen flash for environmental
   // continuity. Falls back to green default when no biome (stage 1-7).
-  if (typeof biomeForStage === 'function') {
-    const _bid = biomeForStage(game.stage || 1);
-    if (_bid && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_bid]) {
-      game.flashTimer = Math.max(game.flashTimer || 0, 8);
-      game.flashColor = BIOME_NAMES[_bid].col;
-      // DECLUTTER: the 12-particle biome burst at screen-center was removed — it
-      // stacked on top of the player-celebration sparks + confetti at the clear
-      // moment; the biome-colored flash alone keeps the environmental continuity.
-    }
-  }
+  // (GUI-simplify DELETE: the stage-clear biome flash — flash pileup with the
+  // player-celebration green flash at the same moment; one flash per clear.)
   if (sub) {
     game.floatTexts.push({
       x: BASE_W/2, y: BASE_H/2 + 6, text: sub,
@@ -14287,7 +14267,7 @@ function spawnStageClear(label, sub) {
   // (e.g., instant boss-down doesn't deserve trophy).
   if ((game.stageHitTaken || 0) === 0 && (game.stageShotsFired || 0) >= 5) {
     addScore(300);
-    game.floatTexts.push({
+    pushInfoText({
       x: BASE_W/2, y: BASE_H/2 + 50, text: 'UNTOUCHED +300',
       color: '#0ff', life: 100, maxLife: 100, size: 11
     });
@@ -14328,7 +14308,7 @@ function spawnStageClear(label, sub) {
   // Adds drama to the win + small score bonus + lifetime counter.
   if ((game.lives || 0) === 1 && !game.stageDied) {
     addScore(200);
-    game.floatTexts.push({
+    pushInfoText({
       x: BASE_W/2, y: BASE_H/2 + 24, text: 'LAST STAND +200',
       color: '#f44', life: 100, maxLife: 100, size: 11
     });
@@ -14360,9 +14340,8 @@ function spawnStageClear(label, sub) {
     // Brief green flash for celebration tinted toward player
     game.flashTimer = Math.max(game.flashTimer, 8);
     game.flashColor = '#0f8';
-    // STAGE CLEAR SPOTLIGHT — 60-frame cinematic vignette centered on the player.
-    // Read by drawHUD overlay below to dim screen edges + leave player area lit.
-    game.stageClearSpotlightFrames = 60;
+    // (GUI-simplify DELETE: the stage-clear spotlight vignette — it dimmed the
+    // screen exactly while the player reads the after-action report.)
   }
   playSound('extraLife');
 }
@@ -14391,14 +14370,14 @@ function checkStageComplete() {
         if (game.stageObjective) {
           if (game.stageObjective.met(game)) {
             game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
-            game.floatTexts.push({
+            pushInfoText({
               x: BASE_W/2, y: BASE_H/2 + 32,
               text: 'OBJECTIVE COMPLETE!',
               color: '#0f8', life: 100, maxLife: 100, size: 10
             });
             spawnConfetti(8);
           } else {
-            game.floatTexts.push({
+            pushInfoText({
               x: BASE_W/2, y: BASE_H/2 + 32,
               text: 'MISSED: ' + game.stageObjective.label,
               color: '#fa8', life: 80, maxLife: 80, size: 6
@@ -14428,7 +14407,7 @@ function checkStageComplete() {
           const txt = sPbR.prev != null
             ? 'SCORE PB! +' + fmtScore(sGained) + ' (+' + fmtScore(sGained - sPbR.prev) + ')'
             : 'SCORE PB! +' + fmtScore(sGained);
-          game.floatTexts.push({
+          pushInfoText({
             x: BASE_W/2, y: BASE_H/2 + 24, text: txt,
             color: '#ff4', life: 90, maxLife: 90, size: 7
           });
@@ -14464,14 +14443,14 @@ function checkStageComplete() {
       if (game.stageObjective) {
         if (game.stageObjective.met(game)) {
           game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
-          game.floatTexts.push({
+          pushInfoText({
             x: BASE_W/2, y: BASE_H/2 + 40,
             text: 'OBJECTIVE COMPLETE!',
             color: '#0f8', life: 100, maxLife: 100, size: 10
           });
           spawnConfetti(8);
         } else {
-          game.floatTexts.push({
+          pushInfoText({
             x: BASE_W/2, y: BASE_H/2 + 40,
             text: 'MISSED: ' + game.stageObjective.label,
             color: '#fa8', life: 80, maxLife: 80, size: 6
@@ -14503,7 +14482,7 @@ function checkStageComplete() {
           const txt = sPbR.prev != null
             ? 'SCORE PB! +' + fmtScore(sGained) + ' (+' + fmtScore(sGained - sPbR.prev) + ')'
             : 'SCORE PB! +' + fmtScore(sGained);
-          game.floatTexts.push({
+          pushInfoText({
             x: BASE_W/2, y: BASE_H/2 + 32, text: txt,
             color: '#ff4', life: 90, maxLife: 90, size: 7
           });
@@ -14546,7 +14525,7 @@ function checkStageComplete() {
           // SECONDARY OBJECTIVE check (visual reward when met, miss hint when not)
           if (game.stageObjective && game.stageObjective.met(game)) {
             game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
-            game.floatTexts.push({
+            pushInfoText({
               x: BASE_W/2, y: BASE_H/2 + 32,
               text: 'OBJECTIVE COMPLETE!',
               color: '#0f8', life: 100, maxLife: 100, size: 10
@@ -14580,10 +14559,8 @@ function checkStageComplete() {
             });
             // BLAZE BANNER — 5+ second cut over prior PB
             if (pbResult.prev != null && (pbResult.prev - game.stageFrames) >= 300) {
-              game.floatTexts.push({
-                x: BASE_W/2, y: BASE_H/2 + 8, text: 'BLAZE!',
-                color: '#fc4', life: 100, maxLife: 100, size: 10
-              });
+              // (GUI-simplify DELETE: the 'BLAZE!' banner — the NEW PB ceremony covers it.)
+            
               if (typeof spawnConfetti === 'function') spawnConfetti(8);
             }
             playSound('extraLife');
@@ -14623,7 +14600,7 @@ function checkStageComplete() {
             if (game.lives === 1) unlockAchievement('comeback');
             // MARATHON BANNER — gold banner at no-death streak milestones
             if (game.zenStreak === 5 || game.zenStreak === 10 || game.zenStreak === 20) {
-              game.floatTexts.push({
+              pushInfoText({
                 x: BASE_W/2, y: BASE_H/2 - 6, text: 'MARATHON x' + game.zenStreak,
                 color: '#fc4', life: 110, maxLife: 110, size: 12
               });
@@ -14686,19 +14663,19 @@ function checkStageComplete() {
           if (total >= 50000) unlockAchievement('highRoller');
           const cy = BASE_H / 2 + 22;
           // Each bonus animates from 0 → final over 30 frames so they feel like a tally rolling up
-          if (timeBonus > 0) game.floatTexts.push({
+          if (timeBonus > 0) pushInfoText({
             x: BASE_W/2, y: cy, text: '', countTo: timeBonus, prefix: 'TIME +', countDuration: 30,
             color: '#0ff', life: 80, maxLife: 80, size: 7
           });
-          if (noDeathBonus > 0) game.floatTexts.push({
+          if (noDeathBonus > 0) pushInfoText({
             x: BASE_W/2, y: cy + 9, text: '', countTo: noDeathBonus, prefix: 'NO HIT +', countDuration: 30,
             color: '#0f8', life: 80, maxLife: 80, size: 7
           });
-          if (accBonus > 0) game.floatTexts.push({
+          if (accBonus > 0) pushInfoText({
             x: BASE_W/2, y: cy + 18, text: '', countTo: accBonus, prefix: 'ACCURACY +', countDuration: 30,
             color: '#f6f', life: 80, maxLife: 80, size: 7
           });
-          if (challengeBonus > 0) game.floatTexts.push({
+          if (challengeBonus > 0) pushInfoText({
             x: BASE_W/2, y: cy + 27, text: '', countTo: challengeBonus, prefix: 'CHALLENGE +', countDuration: 30,
             color: '#f44', life: 80, maxLife: 80, size: 7
           });
@@ -14706,26 +14683,8 @@ function checkStageComplete() {
             x: BASE_W/2, y: cy + 39, text: '', countTo: total, prefix: 'TOTAL +', countDuration: 50,
             color: '#ff4', life: 80, maxLife: 80, size: 9
           });
-          // STAGE KILLS COUNT — small label showing kills this stage
-          if ((game.stageKills || 0) >= 5) {
-            game.floatTexts.push({
-              x: BASE_W/2, y: cy + 60,
-              text: 'KILLS: ' + game.stageKills,
-              color: '#fc8', life: 100, maxLife: 100, size: 6
-            });
-          }
-          // STAGE TOTAL TIER LABEL — big-windfall recognition tier
-          if (total >= 10000) {
-            const _tierTxt = total >= 50000 ? 'JACKPOT!'
-                           : total >= 25000 ? 'WINDFALL!'
-                           : 'BIG HAUL';
-            const _tierCol = total >= 50000 ? '#fc4' : total >= 25000 ? '#ff8' : '#0f8';
-            game.floatTexts.push({
-              x: BASE_W/2, y: cy + 50, text: _tierTxt,
-              color: _tierCol, life: 100, maxLife: 100, size: 8
-            });
-            if (typeof spawnConfetti === 'function') spawnConfetti(8);
-          }
+          // (GUI-simplify DELETE: the 'KILLS: N' label and the JACKPOT/WINDFALL/
+          // BIG HAUL tier label — the TOTAL count-up carries the payout.)
           // STAGE GRADE — letter grade based on accuracy + no-death + time bonus tier.
           // Pure recognition layer; no extra score (the underlying bonuses already
           // reward the same axes). Counters per grade persisted to localStorage for
@@ -14753,7 +14712,7 @@ function checkStageComplete() {
               game.aceStreak = (game.aceStreak || 0) + 1;
               if (game.aceStreak > (game.aceStreakBest || 0)) game.aceStreakBest = game.aceStreak;
               if (game.aceStreak === 3 || game.aceStreak === 5 || game.aceStreak === 10 || game.aceStreak === 15) {
-                game.floatTexts.push({
+                pushInfoText({
                   x: BASE_W/2, y: BASE_H/2 + 40,
                   text: 'ACE STREAK x' + game.aceStreak,
                   color: '#fc4', life: 100, maxLife: 100, size: 10
@@ -14768,15 +14727,16 @@ function checkStageComplete() {
             } else {
               game.aceStreak = 0;
             }
-            // Top-center large letter with bracket frame
-            game.floatTexts.push({
-              x: BASE_W/2, y: 56, text: '[ ' + grade + ' ]',
-              color: gradeCol, life: 120, maxLife: 120, size: 14
-            });
-            game.floatTexts.push({
-              x: BASE_W/2, y: 72, text: 'STAGE GRADE',
-              color: '#888', life: 120, maxLife: 120, size: 4
-            });
+            // (GUI-simplify DELETE: the [ G ] bracket + 'STAGE GRADE' floats — the
+            // AFTER-ACTION REPORT panel is the sole grade display.)
+            // AAR STALE-GRADE FIX: normal stages never wrote lastStageGrade (only the
+            // boss/challenge path did), so the AAR showed a stale grade on normal
+            // clears. System B is the normal-stage authority — record it here.
+            game.lastStageGrade = grade;
+            game.lastStageGradeCol = gradeCol;
+            if (!Array.isArray(game.recentGrades)) game.recentGrades = [];
+            game.recentGrades.push(grade);
+            if (game.recentGrades.length > 3) game.recentGrades.shift();
             // GRADE SFX — distinct audio per tier. S/A get triumphant cues, B/C
             // get neutral acknowledgements, D gets a low thud (signaling room for
             // improvement). Reuses existing SFX palette — no new oscillator code.
@@ -14791,23 +14751,25 @@ function checkStageComplete() {
               game.flashTimer = Math.max(game.flashTimer || 0, 8);
               game.flashColor = '#fc4';
               rumble(220, 0.85, 0.5);
-              // S GRADE CINEMATIC — gold shockwave + 16 confetti + 'PERFECT!'
-              // bonus banner. Triggered only on S so it stays rare and earned.
-              if (game.shockwaves) {
-                game.shockwaves.push({
-                  x: BASE_W/2, y: 60,
-                  life: 0, maxLife: 28, maxR: 70, color: '#fc4'
-                });
-                game.shockwaves.push({
-                  x: BASE_W/2, y: 60,
-                  life: -8, maxLife: 22, maxR: 50, color: '#ff4'
+              // S GRADE CINEMATIC — detail view only (the glowing S letter on the
+              // AAR panel is the reward in the simple view).
+              if (!minimalHud) {
+                if (game.shockwaves) {
+                  game.shockwaves.push({
+                    x: BASE_W/2, y: 60,
+                    life: 0, maxLife: 28, maxR: 70, color: '#fc4'
+                  });
+                  game.shockwaves.push({
+                    x: BASE_W/2, y: 60,
+                    life: -8, maxLife: 22, maxR: 50, color: '#ff4'
+                  });
+                }
+                if (typeof spawnConfetti === 'function') spawnConfetti(16);
+                pushInfoText({
+                  x: BASE_W/2, y: 84, text: 'PERFECT!',
+                  color: '#fff', life: 100, maxLife: 100, size: 6
                 });
               }
-              if (typeof spawnConfetti === 'function') spawnConfetti(16);
-              game.floatTexts.push({
-                x: BASE_W/2, y: 84, text: 'PERFECT!',
-                color: '#fff', life: 100, maxLife: 100, size: 6
-              });
             }
             // Persist grade-tier counters for PROFILE page display
             try {
@@ -14824,7 +14786,7 @@ function checkStageComplete() {
           {
             const accStage = computeStageAccuracy();
             if (!game.stageDied && accStage >= 85 && game.stageShotsFired >= 10) {
-              game.floatTexts.push({
+              pushInfoText({
                 x: BASE_W/2, y: cy - 12, text: 'PERFECT CLEAR!',
                 color: '#ff4', life: 120, maxLife: 120, size: 11
               });
@@ -14843,7 +14805,7 @@ function checkStageComplete() {
                   x: BASE_W/2, y: cy - 32, text: '★ GOLDEN CLEAR ★',
                   color: '#fc4', life: 140, maxLife: 140, size: 13
                 });
-                game.floatTexts.push({
+                pushInfoText({
                   x: BASE_W/2, y: cy - 20, text: 'PERFECT + PB! +1500',
                   color: '#fff', life: 140, maxLife: 140, size: 7
                 });
@@ -14862,12 +14824,8 @@ function checkStageComplete() {
               // Resets when a stage fails the perfect condition. Milestone celebrations
               // at ×3 / ×5 / ×10 give escalating recognition + persistent best record.
               game.perfectStreak = (game.perfectStreak || 0) + 1;
-              if (game.perfectStreak >= 2) {
-                game.floatTexts.push({
-                  x: BASE_W/2, y: cy - 22, text: 'STREAK x' + game.perfectStreak,
-                  color: '#fc4', life: 100, maxLife: 100, size: 8
-                });
-              }
+              // (GUI-simplify DELETE: the 'STREAK xN' perfect-streak float — stat
+              // chatter; the streak still tracks for achievements/records.)
               if (game.perfectStreak === 3 || game.perfectStreak === 5 || game.perfectStreak === 10) {
                 spawnConfetti(12);
                 playSound('milestone');
@@ -15121,7 +15079,7 @@ function update() {
     // DEATH GHOST TRAIL tick
     if ((game.deathGhostLife || 0) > 0) game.deathGhostLife--;
     // STAGE CLEAR SPOTLIGHT tick
-    if ((game.stageClearSpotlightFrames || 0) > 0) game.stageClearSpotlightFrames--;
+    // (stageClearSpotlightFrames retired with the spotlight vignette — GUI-simplify)
     // PARRY STREAK timer — expires the chain if no new parry within 90 frames
     if ((game.parryStreakTimer || 0) > 0) {
       game.parryStreakTimer--;
@@ -20164,33 +20122,8 @@ function drawHUD() {
     ctx.restore();
   }
 
-  // STAGE CLEAR SPOTLIGHT — radial vignette centered on player ship during stage
-  // clear cinematic. Inner circle ~30px stays bright; outside fades to dark.
-  // Drawn here (HUD pre-text layer) so it darkens the playfield but not text.
-  if ((game.stageClearSpotlightFrames || 0) > 0 && game.playerAlive) {
-    const sfp = game.stageClearSpotlightFrames;
-    const fade = sfp > 30 ? 1 : sfp / 30; // hold 30 frames, fade out over last 30
-    ctx.save();
-    ctx.globalAlpha = 0.55 * fade;
-    ctx.fillStyle = '#000';
-    // 4-ring concentric vignette around player position
-    const cx = game.playerX, cy = game.playerY;
-    for (let r = 0; r < 6; r++) {
-      const rin = 30 + r * 8;
-      const rout = rin + 8;
-      ctx.globalAlpha = 0.10 * fade * (r + 1);
-      // Top strip
-      ctx.fillRect(0, 0, BASE_W, Math.max(0, cy - rout));
-      // Bottom strip
-      ctx.fillRect(0, cy + rout, BASE_W, Math.max(0, BASE_H - (cy + rout)));
-      // Left strip
-      ctx.fillRect(0, Math.max(0, cy - rout), Math.max(0, cx - rout), Math.min(BASE_H, 2 * rout));
-      // Right strip
-      ctx.fillRect(cx + rout, Math.max(0, cy - rout), Math.max(0, BASE_W - (cx + rout)), Math.min(BASE_H, 2 * rout));
-      break; // single iteration — outer dim only
-    }
-    ctx.restore();
-  }
+  // (GUI-simplify DELETE: the STAGE CLEAR SPOTLIGHT vignette — it dimmed the screen
+  // exactly while the player reads the after-action report; its trigger is also gone.)
 
   // SWARM DIVE WARNING — appears when 3+ enemies transition to dive same frame.
   // Center-top red bracketed banner, shorter life than rare-spawn alert.
