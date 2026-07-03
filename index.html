@@ -284,6 +284,14 @@ let minimalHud = localStorage.getItem('galagaMinimalHud') !== '0';
 function pushInfoText(ft) {
   if (!minimalHud && typeof game !== 'undefined' && game && game.floatTexts) game.floatTexts.push(ft);
 }
+// NIGHT-DIMMER CACHE — preference + in-window flag refreshed at most once per
+// minute (the 22:00/06:00 boundary moves slowly); the J toggle flips the cached
+// boolean directly. Avoids per-frame localStorage + Date churn in draw().
+let _nightDimOff = (() => { try { return localStorage.getItem('galagaNightOff') === '1'; } catch (e) { return false; } })();
+let _nightDimHourly = (() => { const h = new Date().getHours(); return h >= 22 || h < 6; })();
+let _nightDimLastCheck = 0;
+setInterval(() => { const h = new Date().getHours(); _nightDimHourly = (h >= 22 || h < 6); }, 60000);
+
 // ACCESSIBILITY — respect the OS "reduce motion" preference (WCAG): when set,
 // full-screen impact flashes are dampened (photosensitivity) and screen shake is
 // capped to 'low'. Read once at load; guarded so a missing matchMedia (e.g. the
@@ -4015,13 +4023,15 @@ const BIOME_WHISPERS = {
   nebula:    ['STARS BIRTH HERE', 'COLOR WITHOUT END', 'WE BREATHE STARLIGHT']
 };
 
+// 12-cycle: interleaves 3 terrestrial (land) biomes + nebula stellar nursery among
+// the space biomes. HOISTED to module level — biomeForStage is called per-star/
+// per-bullet/per-spark/per-enemy every frame; the inline literal allocated
+// 100-200 arrays per rendered frame (perf sweep finding).
+const BIOME_CYCLE = ['planet', 'ruins', 'dawn', 'asteroid', 'desert', 'ice', 'gasGiant', 'corona', 'canyon', 'blackhole', 'nebula', 'starfield'];
 function biomeForStage(stage) {
   if (stage <= 7) return null;
   const idx = Math.floor((stage - 8) / 4);
-  // 12-cycle: interleaves 3 terrestrial (land) biomes + nebula stellar nursery
-  // among the space biomes. NEBULA sits between blackhole and starfield as a
-  // colorful breather after the void.
-  return ['planet', 'ruins', 'dawn', 'asteroid', 'desert', 'ice', 'gasGiant', 'corona', 'canyon', 'blackhole', 'nebula', 'starfield'][idx % 12];
+  return BIOME_CYCLE[idx % 12];
 }
 
 // DAYLIGHT GROUND BIOMES — the four terrestrial/sky biomes render as a genuinely
@@ -5284,7 +5294,15 @@ function drawVectorGrid() {
   // bloom's brightness FLOOR — too high and combat brightness tips the frame to white.
   const BASE_A = 0.17;
   // Displayed positions = anchor + ripple displacement + stateless idle breathing.
-  const px = new Array(pts.length), py = new Array(pts.length), en = new Array(pts.length);
+  // Perf: module-level reused buffers — the old per-frame `new Array(...)`×3 + a
+  // closure + per-hot-segment rgba strings churned GC every frame (sweep finding).
+  if (!_vgPx || _vgPx.length < pts.length) {
+    _vgPx = new Float32Array(pts.length);
+    _vgPy = new Float32Array(pts.length);
+    _vgEn = new Float32Array(pts.length);
+    _vgHot = new Float32Array(3 * (rows * cols * 2));
+  }
+  const px = _vgPx, py = _vgPy, en = _vgEn;
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
     const bx = Math.sin(p.ay * 0.05 + t * 0.020) * 1.2;
@@ -5299,35 +5317,61 @@ function drawVectorGrid() {
   // Pass 1 — all calm segments in ONE path / ONE stroke (cheap).
   ctx.beginPath();
   const HOT = 2.0; // energy threshold: above this, segment is overdrawn brighter
-  const hotSegs = [];
-  function consider(a, b) {
-    const e = en[a] > en[b] ? en[a] : en[b];
-    if (e > HOT) { hotSegs.push(a, b, e); }
-    else { ctx.moveTo(px[a], py[a]); ctx.lineTo(px[b], py[b]); }
-  }
+  let hotN = 0;
+  const hot = _vgHot;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const idx = r * cols + c;
-      if (c + 1 < cols) consider(idx, idx + 1);
-      if (r + 1 < rows) consider(idx, idx + cols);
+      if (c + 1 < cols) {
+        const b1 = idx + 1;
+        const e1 = en[idx] > en[b1] ? en[idx] : en[b1];
+        if (e1 > HOT) { hot[hotN++] = idx; hot[hotN++] = b1; hot[hotN++] = e1; }
+        else { ctx.moveTo(px[idx], py[idx]); ctx.lineTo(px[b1], py[b1]); }
+      }
+      if (r + 1 < rows) {
+        const b2 = idx + cols;
+        const e2 = en[idx] > en[b2] ? en[idx] : en[b2];
+        if (e2 > HOT) { hot[hotN++] = idx; hot[hotN++] = b2; hot[hotN++] = e2; }
+        else { ctx.moveTo(px[idx], py[idx]); ctx.lineTo(px[b2], py[b2]); }
+      }
     }
   }
   ctx.strokeStyle = 'rgba(' + baseRGB + ',' + BASE_A + ')';
   ctx.stroke();
-  // Pass 2 — energized segments overdrawn, brightness lerps toward the hot color.
-  for (let i = 0; i < hotSegs.length; i += 3) {
-    const a = hotSegs[i], b = hotSegs[i + 1], e = hotSegs[i + 2];
-    const k = Math.min(1, e / 12);
-    const cr = Math.round(60 + (hotR - 60) * k);
-    const cg = Math.round(104 + (hotG - 104) * k);
-    const cb = Math.round(196 + (hotB - 196) * k);
-    ctx.strokeStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + (BASE_A + 0.30 * k) + ')';
-    ctx.beginPath();
-    ctx.moveTo(px[a], py[a]); ctx.lineTo(px[b], py[b]);
-    ctx.stroke();
+  // Pass 2 — energized segments, BUCKETED: 8 quantized brightness levels per mood,
+  // one beginPath/stroke per non-empty bucket (was: one stroke + one rgba string
+  // per segment — up to ~362 of each in a bomb cascade).
+  if (hotN > 0) {
+    const lut = danger ? _vgLutDanger : _vgLutCalm;
+    for (let bk = 0; bk < 8; bk++) {
+      let open = false;
+      for (let i = 0; i < hotN; i += 3) {
+        const k = Math.min(1, hot[i + 2] / 12);
+        if (Math.min(7, (k * 8) | 0) !== bk) continue;
+        if (!open) { ctx.beginPath(); open = true; }
+        const a = hot[i], b = hot[i + 1];
+        ctx.moveTo(px[a], py[a]); ctx.lineTo(px[b], py[b]);
+      }
+      if (open) { ctx.strokeStyle = lut[bk]; ctx.stroke(); }
+    }
   }
   ctx.restore();
 }
+
+// Reused draw buffers + the two 8-entry hot-colour LUTs (built once — quantized
+// lerp toward the calm/danger hot colours at bucket midpoints).
+let _vgPx = null, _vgPy = null, _vgEn = null, _vgHot = null;
+function _vgBuildLut(hr, hg, hb) {
+  const out = [];
+  for (let bk = 0; bk < 8; bk++) {
+    const k = (bk + 0.5) / 8;
+    out.push('rgba(' + Math.round(60 + (hr - 60) * k) + ',' + Math.round(104 + (hg - 104) * k)
+      + ',' + Math.round(196 + (hb - 196) * k) + ',' + (0.17 + 0.30 * k).toFixed(3) + ')');
+  }
+  return out;
+}
+const _vgLutCalm = _vgBuildLut(150, 224, 255);
+const _vgLutDanger = _vgBuildLut(255, 150, 170);
 
 function drawBiome() {
   if (!game) return;
@@ -8168,6 +8212,7 @@ function initInput() {
     if (k === 'j') {
       const cur = localStorage.getItem('galagaNightOff') === '1';
       try { localStorage.setItem('galagaNightOff', cur ? '0' : '1'); } catch (err) {}
+      _nightDimOff = !cur; // keep the draw-side cache in sync
       if (game) game.floatTexts.push({
         x: BASE_W/2, y: 50, text: 'NIGHT DIM: ' + (cur ? 'ON' : 'OFF'),
         color: COL.cyan, life: 50, maxLife: 50, size: 8
@@ -15623,9 +15668,10 @@ function update() {
 }
 
 // --- Draw functions ---
+const _fontCache = {}; // per-size font strings — drawRetroText runs dozens of times/frame
 function drawRetroText(text, x, y, size, color, align) {
   ctx.save();
-  ctx.font = `bold ${size}px monospace`;
+  ctx.font = _fontCache[size] || (_fontCache[size] = 'bold ' + size + 'px monospace');
   ctx.fillStyle = color || '#fff';
   ctx.textAlign = align || 'center';
   ctx.textBaseline = 'middle';
@@ -16223,15 +16269,14 @@ function draw() {
 
   // Night mode auto-dimmer — eases eye strain between 22:00 and 06:00 local time.
   // Toggle off persistently with localStorage galagaNightOff = '1'.
-  if (localStorage.getItem('galagaNightOff') !== '1') {
-    const hour = new Date().getHours();
-    if (hour >= 22 || hour < 6) {
-      ctx.save();
-      ctx.globalAlpha = 0.10;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, BASE_W, BASE_H);
-      ctx.restore();
-    }
+  // Perf: cached — the old form did a sync localStorage read + new Date() EVERY
+  // rendered frame (up to 120Hz) in every state (perf sweep finding).
+  if (!_nightDimOff && _nightDimHourly) {
+    ctx.save();
+    ctx.globalAlpha = 0.10;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, BASE_W, BASE_H);
+    ctx.restore();
   }
 
   ctx.restore();
@@ -17943,7 +17988,9 @@ function drawStageIntro() {
   // mission is active and incomplete; auto-hides on completion.
   if (game.dailyMode && typeof dailyMission === 'function'
       && !game._dailyMissionFired
-      && !(typeof isDailyMissionDoneToday === 'function' && isDailyMissionDoneToday())
+      && !(game._dailyMissionAlreadyDoneCached === undefined
+           ? (game._dailyMissionAlreadyDoneCached = isDailyMissionDoneToday())
+           : game._dailyMissionAlreadyDoneCached)
       && slide >= 1) {
     const m = dailyMission();
     if (m) {
@@ -20343,7 +20390,9 @@ function drawHUD() {
   if (game.dailyMode && typeof dailyMission === 'function'
       && (isCombatState())) {
     const isDone = game._dailyMissionFired
-                  || (typeof isDailyMissionDoneToday === 'function' && isDailyMissionDoneToday());
+                  || (game._dailyMissionAlreadyDoneCached === undefined
+                      ? (game._dailyMissionAlreadyDoneCached = isDailyMissionDoneToday())
+                      : game._dailyMissionAlreadyDoneCached); // perf: cached (was per-frame storage+Date)
     if (!isDone) {
       const m = dailyMission();
       if (m) {
