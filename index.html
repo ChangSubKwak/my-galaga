@@ -8157,7 +8157,9 @@ function initInput() {
       }
     }
     // Audio controls (anywhere)
-    if (k === 'm') {
+    // Mute-all moved M → T (2026-07): 'm' was DOUBLE-BOUND — every HUD
+    // simple/detailed toggle silently muted the game. M is now exclusively HUD.
+    if (k === 't') {
       audioMuted = !audioMuted;
       ensureAudio();
       applyVolume();
@@ -17132,7 +17134,7 @@ function drawTitleScreen() {
   drawRetroText('ARROWS MOVE   SPACE FIRE', BASE_W/2, BASE_H - 14, 6, COL.gray);
   // First-time players get a brighter color on the H/I keys in this row to draw the eye
   const firstTime = (unlockedAchievements ? unlockedAchievements.size : 0) === 0;
-  drawRetroText('P PAUSE  H HELP  I STATS  M MUTE', BASE_W/2, BASE_H - 6, 6, firstTime ? COL.cyan : COL.gray);
+  drawRetroText('P PAUSE  H HELP  M HUD  T MUTE', BASE_W/2, BASE_H - 6, 6, firstTime ? COL.cyan : COL.gray);
   // Gamepad connection indicator (small green dot bottom-right) — pulses
   if (navigator.getGamepads) {
     const pads = navigator.getGamepads();
@@ -19775,10 +19777,9 @@ function drawGameplay() {
 
     ctx.restore();
   }
-  // STAGE INTRO STATS PEEK — top 2 run highlights at very bottom (above intercept echo).
-  // Gives the player a sense of "what's been great this run" between stages. Reuses
-  // pickRunHighlights logic so labels match the GAME_OVER summary.
-  if (typeof pickRunHighlights === 'function') {
+  // STAGE INTRO STATS PEEK — top 2 run highlights at very bottom. Detail-view only
+  // (GUI-simplify: meta info lives behind M).
+  if (!minimalHud && typeof pickRunHighlights === 'function') {
     const _hl = pickRunHighlights();
     if (_hl && _hl.length > 0) {
       ctx.save();
@@ -19794,24 +19795,8 @@ function drawGameplay() {
       ctx.restore();
     }
   }
-  // STAGE INTRO INTERCEPT ECHO — show the 2 most recent enemy comms above the HUD
-  // separator. Carries narrative continuity across stage transitions when the live
-  // terminal is hidden. Subtle green, low alpha so it doesn't compete with stage data.
-  if (game.interceptQueue && game.interceptQueue.length > 0) {
-    ctx.save();
-    const _maxLines = Math.min(2, game.interceptQueue.length);
-    for (let i = 0; i < _maxLines; i++) {
-      const m = game.interceptQueue[i];
-      const _y = BASE_H - 50 + i * 7;
-      // Steady alpha during STAGE_INTRO (no tick); subtle so it reads as backdrop
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = '#020';
-      ctx.fillRect(2, _y - 1, 132, 7);
-      ctx.globalAlpha = 0.75;
-      drawRetroText('< ' + m.text, 4, _y + 5, 4, '#0a8', 'left');
-    }
-    ctx.restore();
-  }
+  // (GUI-simplify DELETE: the STAGE INTRO INTERCEPT ECHO — an ungated double-render
+  // of the already-gated enemy-comms terminal — was removed.)
   drawHUD();
 }
 
@@ -20385,7 +20370,7 @@ function drawHUD() {
     if (tf < 300)        hint = 'ARROWS / A D : MOVE';
     else if (tf < 600)   hint = 'SPACE : FIRE';
     else if (tf < 900)   hint = 'SHIFT : DASH (INVINCIBLE)';
-    else if (tf < 1080)  hint = 'H : HELP, I : STATS';
+    else if (tf < 1080)  hint = 'M : HUD DETAIL, H : HELP';
     if (hint) {
       const blink = blinkPhase(3) ? '#fc4' : '#fff';
       drawRetroText(hint, BASE_W/2, 30, 6, blink);
@@ -22711,7 +22696,8 @@ function drawHelpOverlay() {
   kvRow('H / I',        'HELP / STATS');
   kvRow('TAB',          'STATS PAGE NEXT');
   kvRow('F',            'FULLSCREEN');
-  kvRow('M',            'MUTE ALL');
+  kvRow('M',            'HUD SIMPLE/DETAILED');
+  kvRow('T',            'MUTE ALL');
   kvRow('B / N',        'BGM / SFX TOGGLE');
   kvRow('[ / ]',        'VOLUME');
   kvRow('G',            'DIFFICULTY E/N/H');
