@@ -9917,20 +9917,7 @@ function drawBonusGame() {
 
   const glow = 0.6 + 0.4 * Math.sin(game.animFrame * 0.1);
 
-  // Atmospheric vertical scan columns — neon CRT ambiance
-  const scanFracs = [0.22, 0.42, 0.62, 0.82];
-  for (const frac of scanFracs) {
-    const sx = Math.floor(BASE_W * frac);
-    ctx.fillStyle = 'rgba(0,220,255,0.025)';
-    ctx.fillRect(sx, 0, 1, BASE_H);
-    const streak = ((game.animFrame * 1.5 + frac * 200) % BASE_H);
-    const sg = ctx.createLinearGradient(0, streak - 14, 0, streak + 14);
-    sg.addColorStop(0, 'rgba(0,220,255,0)');
-    sg.addColorStop(0.5, 'rgba(0,220,255,0.15)');
-    sg.addColorStop(1, 'rgba(0,220,255,0)');
-    ctx.fillStyle = sg;
-    ctx.fillRect(sx - 0.5, streak - 14, 2, 28);
-  }
+  // (GUI-simplify DELETE: the vertical CRT scan columns — ambient chrome.)
 
   // Header
   ctx.save();
@@ -9940,7 +9927,7 @@ function drawBonusGame() {
   ctx.restore();
   const clearedStage = game.stage - 1;
   drawRetroText('STAGE ' + clearedStage + ' CLEARED', BASE_W / 2, 62, 7, COL.gray);
-  drawRetroText('SLOT REWARD', BASE_W / 2, 74, 8, COL.cyan);
+  // (GUI-simplify DELETE: the 'SLOT REWARD' subtitle — '* BONUS *' says it.)
 
   // Prize tier illumination track — visible only after result is revealed
   if (bg.resultShown) {
@@ -18958,26 +18945,8 @@ function drawGameplay() {
     ctx.fillRect(0, 0, BASE_W, BASE_H);
     ctx.restore();
 
-    // Slow red scan-sweep top→bottom (cycles every ~60 frames)
-    {
-      const sp = (ct % 60) / 60;
-      if (sp < 0.80) {
-        ctx.save();
-        ctx.globalAlpha = 0.12 * slideA * _outFade;
-        ctx.fillStyle = _captorCol;
-        ctx.fillRect(0, Math.round(sp / 0.80 * BASE_H) - 1, BASE_W, 2);
-        ctx.restore();
-      }
-    }
-
-    // Sparse glitch bar
-    if ((_t & 5) === 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.20 * slideA * _outFade;
-      ctx.fillStyle = _captorCol;
-      ctx.fillRect(0, 20 + (_t * 37) % (BASE_H - 40), BASE_W, 1);
-      ctx.restore();
-    }
+    // (GUI-simplify DELETE: the scan-sweep + sparse glitch bar — the dark overlay
+    // + headline + countdown bar carry the cutscene.)
 
     // ── "FIGHTER / CAPTURED" headline (Phase A) ─────────────────────────────
     {
@@ -19018,20 +18987,7 @@ function drawGameplay() {
       ctx.fillRect(panX + panW - 1, panY + panH - _co, 1, _co);
       ctx.restore();
 
-      // SOS dot row — 3 lit · gap · 3 lit, blinking
-      {
-        const sosBlink = (_t >> 2) % 2 === 0;
-        const _sosY    = panY + 10;
-        const _dotsX   = Math.round(BASE_W / 2) - 16;
-        ctx.save();
-        for (let di = 0; di < 7; di++) {
-          const lit = di !== 3;
-          ctx.globalAlpha = (lit ? (sosBlink ? 0.92 : 0.30) : 0.08) * _bAlpha;
-          ctx.fillStyle = lit ? '#f44' : '#300';
-          ctx.fillRect(_dotsX + di * 5, _sosY, 3, 3);
-        }
-        ctx.restore();
-      }
+      // (GUI-simplify DELETE: the SOS dot row — decorative morse flavor.)
 
       // Callsign typed-in line (character-by-character reveal)
       {
@@ -19075,7 +19031,7 @@ function drawGameplay() {
         ctx.restore();
         ctx.save();
         ctx.globalAlpha = 0.50 * _bAlpha;
-        drawRetroText('EJECTION', panX + 11, barY - 6, 4, '#555', 'left');
+        // (GUI-simplify DELETE: the 'EJECTION' caption — the bar reads on its own.)
         ctx.restore();
       }
     }
@@ -19121,15 +19077,7 @@ function drawGameplay() {
       ctx.fillRect(0, 0, BASE_W, BASE_H);
       ctx.globalAlpha = 1;
 
-      // Red CRT scan sweep (marks the death moment spatially)
-      {
-        const swY = Math.round(((1 - fadeIn) * BASE_H));
-        ctx.save();
-        ctx.globalAlpha = 0.18 * fadeIn;
-        ctx.fillStyle = '#f00';
-        ctx.fillRect(0, swY, BASE_W, 2);
-        ctx.restore();
-      }
+      // (GUI-simplify DELETE: the red CRT scan sweep.)
 
       // "PILOT DOWN" headline — strong blink
       const blink = (t >> 2) % 2 === 0;
@@ -19200,11 +19148,7 @@ function drawGameplay() {
 
       ctx.restore();
 
-      // "REVIVAL SEQUENCE INITIATED" — below panel, fades in second
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, fadeIn - 0.4) / 0.6 * 0.60;
-      drawRetroText('REVIVAL SEQUENCE INITIATED', BASE_W/2, panY + panH + 10, 5, '#a44');
-      ctx.restore();
+      // (GUI-simplify DELETE: the 'REVIVAL SEQUENCE INITIATED' flavor line.)
 
     } else if (rt >= 20) {
       // ── PHASE B: HULL REBOOT + DIAGNOSTIC TICKER (rt 60→20) ────
@@ -19219,35 +19163,8 @@ function drawGameplay() {
       // "HULL REBOOT" label above bar
       drawRetroText('HULL REBOOT', BASE_W/2, _ry - 30, 7, '#0c8');
 
-      // DIAGNOSTIC TICKER — 4 stages type in sequentially as bar fills
-      {
-        const _diag = [
-          { at: 0.00, text: 'POWER CORE........RESET',    col: '#0a6' },
-          { at: 0.30, text: 'WEAPON SYSTEMS....OFFLINE',  col: '#fa8' },
-          { at: 0.60, text: 'HULL INTEGRITY....REBUILD',  col: '#0c8' },
-          { at: 0.88, text: 'ALL SYSTEMS.......ONLINE',   col: '#0f8' },
-        ];
-        const _tickerY = _ry - 18;
-        for (let di = _diag.length - 1; di >= 0; di--) {
-          if (prog >= _diag[di].at) {
-            const _dFade = Math.min(1, (prog - _diag[di].at) / 0.12);
-            const _revChars = Math.floor(_dFade * _diag[di].text.length);
-            const _shown = _diag[di].text.slice(0, _revChars);
-            ctx.save();
-            ctx.globalAlpha = 0.80 * _dFade;
-            drawRetroText(_shown, BASE_W/2, _tickerY, 5, _diag[di].col);
-            // Blinking cursor after last char
-            if (_revChars < _diag[di].text.length && (t >> 2) % 2 === 0) {
-              const _cw = _revChars * 3.5;
-              ctx.globalAlpha = 0.90 * _dFade;
-              ctx.fillStyle = _diag[di].col;
-              ctx.fillRect(BASE_W/2 - (_diag[di].text.length * 1.75) + _cw, _tickerY - 5, 2, 5);
-            }
-            ctx.restore();
-            break;
-          }
-        }
-      }
+      // (GUI-simplify DELETE: the 4-line diagnostic typing ticker — flavor noise
+      // over the one meaningful element, the HULL REBOOT progress bar.)
 
       // Progress bar (72px wide, 4px tall)
       const barW = 72, barH = 4;
@@ -19291,7 +19208,7 @@ function drawGameplay() {
 
       // Percent label
       ctx.globalAlpha = 0.72;
-      drawRetroText(Math.round(prog * 100) + '%', BASE_W/2, _ry + 10, 5, '#0c8');
+      // (GUI-simplify DELETE: the percent label — the bar IS the percent.)
       ctx.globalAlpha = 1;
 
       // POWER LEVEL READOUT — S/N/P at 1/1/1 after death, shown so player
@@ -21131,12 +21048,7 @@ function drawGameOverScreen() {
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   const panelH = 110 * entry;
   ctx.fillRect(0, cy - panelH / 2, BASE_W, panelH);
-  // Decorative dashed borders
-  ctx.fillStyle = 'rgba(255,68,68,0.6)';
-  for (let i = 0; i < BASE_W; i += 6) {
-    ctx.fillRect(i, cy - panelH / 2, 3, 1);
-    ctx.fillRect(i, cy + panelH / 2 - 1, 3, 1);
-  }
+  // (GUI-simplify DELETE: the decorative dashed red borders.)
   ctx.restore();
 
   if (entry < 1) return;
@@ -21197,22 +21109,7 @@ function drawGameOverScreen() {
   // Score color escalates as it counts up — yellow at high totals, magenta at 10M+
   const scCol = game.score >= 10000000 ? '#f6f' : game.score >= 1000000 ? COL.yellow : game.score >= 100000 ? '#ff8' : COL.white;
   drawRetroText(fmtScore(displayScore), BASE_W/2 + 40, cy - 12, 9, scCol, 'right');
-  // SCORE TIER LABEL — name tier based on final score
-  if (linearT >= 1) {
-    const _sT = game.score >= 10000000 ? 'LEGEND'
-              : game.score >= 1000000  ? 'PLATINUM'
-              : game.score >= 100000   ? 'GOLD'
-              : game.score >= 10000    ? 'SILVER'
-              : game.score >= 1000     ? 'BRONZE'
-              : null;
-    if (_sT) {
-      const _sTcol = game.score >= 10000000 ? '#f6f'
-                   : game.score >= 1000000  ? '#fc4'
-                   : game.score >= 100000   ? '#ff8'
-                   : game.score >= 10000    ? '#0ff' : '#0f8';
-      drawRetroText(_sT + ' TIER', BASE_W/2 - 40, cy - 4, 4, _sTcol, 'left');
-    }
-  }
+  // (GUI-simplify DELETE: the SCORE TIER label — third encoding of the score.)
   // SCORE PB COMPARE — when count finishes (linearT >=1) show 'NEW HIGH!' or 'HI: N'.
   if (linearT >= 1 && (game.highScore || 0) > 0) {
     if (game.score >= game.highScore) {
@@ -21845,8 +21742,7 @@ function drawPauseScreen() {
   // Heavy backdrop dim with subtle grid pattern for distinct paused mood
   ctx.fillStyle = 'rgba(0,0,0,0.78)';
   ctx.fillRect(0, 0, BASE_W, BASE_H);
-  ctx.fillStyle = 'rgba(0,170,255,0.06)';
-  for (let yy = 0; yy < BASE_H; yy += 8) ctx.fillRect(0, yy, BASE_W, 1);
+  // (GUI-simplify DELETE: the cyan grid scanline pattern over the dim.)
 
   const cy = BASE_H / 2;
   const panelW = 144, panelH = 168;
@@ -21908,46 +21804,9 @@ function drawPauseScreen() {
   infoRow('ACC',   acc);
   // ry is now py+102
 
-  // PAUSE BIOME WHEEL — visualize the 8-biome cycle and player's current
-  // position in it. Active only at stage >= 8 (when biomes turn on). Sits
-  // top-right of the panel, ABOVE the info rows (which start at py+46) so
-  // it no longer overlaps the SHIP row. Radius shrunk 14→10 to clear it.
-  if (typeof biomeForStage === 'function' && game.stage >= 8) {
-    const wheelCx = px + panelW - 18;
-    const wheelCy = py + 22;
-    const wheelR = 10;
-    const _curBiome = biomeForStage(game.stage);
-    const _order = ['planet', 'dawn', 'asteroid', 'ice', 'gasGiant', 'corona', 'blackhole', 'starfield'];
-    ctx.save();
-    ctx.globalAlpha = 0.4;
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(wheelCx, wheelCy, wheelR, 0, Math.PI * 2);
-    ctx.stroke();
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
-      const pxw = wheelCx + Math.cos(a) * wheelR;
-      const pyw = wheelCy + Math.sin(a) * wheelR;
-      const _bid = _order[i];
-      const _isCur = _bid === _curBiome;
-      // Current biome dot breathes (matches CYCLE DOT current-pulse pattern).
-      ctx.globalAlpha = _isCur
-        ? (0.85 + 0.15 * Math.sin(game.animFrame * 0.2))
-        : 0.45;
-      ctx.fillStyle = BIOME_NAMES[_bid] ? BIOME_NAMES[_bid].col : '#fff';
-      const sz = _isCur ? 4 : 2;
-      ctx.fillRect(pxw - sz/2, pyw - sz/2, sz, sz);
-    }
-    ctx.restore();
-  }
-
-  // ── TACTICAL CONSOLE DIVIDER ──
-  ctx.save();
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = '#0af';
-  ctx.fillRect(px + 12, ry + 2, panelW - 24, 1);
-  ctx.restore();
+  // (GUI-simplify DELETE: the PAUSE BIOME WHEEL — it hardcoded the OLD 8-biome
+  // order while the live cycle has 12, so it silently lied about position.)
+  // (GUI-simplify DELETE: the tactical console divider hairline.)
 
   // WEAPON BUFF TIMER BARS — depleting color bars for every active timed power-up.
   // Gives real resource visibility during pause: player knows exactly what's left
@@ -21977,12 +21836,8 @@ function drawPauseScreen() {
         ctx.globalAlpha = 0.50;
         drawRetroText(_m.desc, BASE_W/2, _buffY + 12, 4, '#aaa');
         ctx.restore();
-      } else {
-        ctx.save();
-        ctx.globalAlpha = 0.28;
-        drawRetroText('NO ACTIVE BUFFS', BASE_W/2, _buffY + 6, 4, '#666');
-        ctx.restore();
       }
+      // (GUI-simplify DELETE: the 'NO ACTIVE BUFFS' placeholder — absence needs no label.)
     } else {
       // Stage mutation compact badge (top-right of buff section, same line as first bar)
       if (game.stageMutation) {
