@@ -16405,26 +16405,10 @@ function drawTitleScreen() {
   // TIME-OF-DAY PILOT GREETING — top-left accent. Reads system clock at draw
   // time and picks one of 5 phases: NIGHT/DAWN/MORNING/AFTERNOON/EVENING.
   // Shown only when a callsign is set (not '???') and not in callsign editor.
-  if (!callsignInput.active && playerCallsign && playerCallsign !== '???') {
-    const _hr = new Date().getHours();
-    let _phase, _phCol;
-    if (_hr < 5)       { _phase = 'LATE NIGHT'; _phCol = '#888'; }
-    else if (_hr < 9)  { _phase = 'GOOD MORNING'; _phCol = '#fc8'; }
-    else if (_hr < 12) { _phase = 'GOOD MORNING'; _phCol = '#fc4'; }
-    else if (_hr < 17) { _phase = 'GOOD AFTERNOON'; _phCol = '#fff'; }
-    else if (_hr < 21) { _phase = 'GOOD EVENING'; _phCol = '#f88'; }
-    else               { _phase = 'GOOD NIGHT'; _phCol = '#888'; }
-    drawRetroText(_phase + ', [' + playerCallsign + ']', BASE_W/2, 12, 5, _phCol);
-  }
+  // (GUI-simplify DELETE: the time-of-day greeting — decorative; the PILOT
+  // callsign line below carries identity.)
 
-  // Top decorative dashed border (animated marquee)
-  ctx.fillStyle = '#fff';
-  for (let i = 0; i < BASE_W; i += 8) {
-    if ((i + (t * 2)) % 16 < 4) {
-      ctx.fillRect(i, 30, 4, 1);
-      ctx.fillRect(i, 78, 4, 1);
-    }
-  }
+  // (GUI-simplify DELETE: the animated marquee borders — perpetual motion chrome.)
 
   // TROPHY ROW — single horizontal badge strip at y=22 (above top dashed
   // border, below greeting). Previously badges stacked at y=40-76 *inside*
@@ -16433,6 +16417,7 @@ function drawTitleScreen() {
   // BESTIARY text labels removed — the colored dot rows below the logo
   // already communicate that progression visually, avoiding duplication.
   try {
+    if (minimalHud) throw 0; // detail view only (GUI-simplify: trophy strip)
     const _gcCnt = parseInt(localStorage.getItem('galagaGameCompleteCount') || '0', 10) || 0;
     const _achAll = (typeof unlockedAchievements !== 'undefined' && typeof ACHIEVEMENTS !== 'undefined'
                     && unlockedAchievements.size >= Object.keys(ACHIEVEMENTS).length);
@@ -16467,7 +16452,7 @@ function drawTitleScreen() {
   // PARRY MASTER / COMBO LEGEND text badges removed — consolidated into the
   // trophy row above. Dot rows below still cover the categorical progression.)
   // COMPOSITE COMPLETION % — weighted aggregate via shared helper.
-  if (typeof computeCompositeCompletion === 'function') {
+  if (!minimalHud && typeof computeCompositeCompletion === 'function') {
     const _comp = computeCompositeCompletion();
     if (_comp >= 5) {
       const _cmpCol = _comp >= 80 ? '#fc4' : _comp >= 50 ? '#fff' : _comp >= 20 ? '#aaa' : '#888';
@@ -16604,9 +16589,9 @@ function drawTitleScreen() {
   }
   ctx.restore();
 
-  // Demo enemy flyby across the band between borders
+  // Demo enemy flyby across the band between borders — detail view only
   const flybyTypes = [drawBee, drawButterfly, drawBoss];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < (minimalHud ? 0 : 4); i++) {
     const cycle = 280;
     const phase = (t + i * 70) % cycle;
     const fx = (phase / cycle) * (BASE_W + 40) - 20;
@@ -16616,13 +16601,15 @@ function drawTitleScreen() {
     else fn(fx, fy, t >> 4);
   }
 
-  // Score legend
-  drawBee(BASE_W/2 - 50, 140, t >> 4);
-  drawRetroText('= 50 PTS', BASE_W/2 + 10, 140, 8, COL.white, 'left');
-  drawButterfly(BASE_W/2 - 50, 160, t >> 4);
-  drawRetroText('= 80 PTS', BASE_W/2 + 10, 160, 8, COL.white, 'left');
-  drawBoss(BASE_W/2 - 50, 182, t >> 4, false);
-  drawRetroText('= 150 PTS', BASE_W/2 + 10, 182, 8, COL.white, 'left');
+  // Score legend — detail view only (GUI-simplify)
+  if (!minimalHud) {
+    drawBee(BASE_W/2 - 50, 140, t >> 4);
+    drawRetroText('= 50 PTS', BASE_W/2 + 10, 140, 8, COL.white, 'left');
+    drawButterfly(BASE_W/2 - 50, 160, t >> 4);
+    drawRetroText('= 80 PTS', BASE_W/2 + 10, 160, 8, COL.white, 'left');
+    drawBoss(BASE_W/2 - 50, 182, t >> 4, false);
+    drawRetroText('= 150 PTS', BASE_W/2 + 10, 182, 8, COL.white, 'left');
+  }
 
   if (game.titleBlink % 60 < 40) {
     const sCol = challengeModeRequested ? COL.red : dailyModeRequested ? COL.green : COL.cyan;
@@ -16636,7 +16623,7 @@ function drawTitleScreen() {
   // A PB run tints the whole line gold-blink + stars it (replaces the old
   // separate centered ★ PB badge).
   try {
-    const _lrRaw = localStorage.getItem('galagaLastRun');
+    const _lrRaw = (!minimalHud) ? localStorage.getItem('galagaLastRun') : null;
     if (_lrRaw && !callsignInput.active && !dailyModeRequested) {
       const _lr = JSON.parse(_lrRaw);
       if (_lr && _lr.stage > 0) {
@@ -16648,26 +16635,15 @@ function drawTitleScreen() {
   } catch (e) {}
   // INPUT DEVICE ICON — detect gamepad / touch / keyboard at draw time.
   // Small label corner-bottom-right. Defaults to KBD when no other signal.
-  {
-    let _dev = 'KBD';
-    if ('ontouchstart' in window) _dev = 'TCH';
-    try {
-      if (navigator.getGamepads) {
-        const _gps = navigator.getGamepads();
-        for (const _gp of _gps) { if (_gp) { _dev = 'GPD'; break; } }
-      }
-    } catch (e) {}
-    drawRetroText(_dev, BASE_W - 4, BASE_H - 4, 4, '#666', 'right');
-  }
+  // (GUI-simplify DELETE: the input-device icon — an always-on 'KBD' default was
+  // corner noise; the GP indicator covers the gamepad case.)
   // BGM TRACK PEEK — show current track id at bottom-left if active. Helps
   // confirm audio is wired correctly and surfaces variety for music nerds.
-  if (typeof bgmTrack === 'string' && bgmTrack) {
-    drawRetroText('♪ ' + bgmTrack.toUpperCase(), 4, BASE_H - 4, 4, '#555', 'left');
-  }
+  // (GUI-simplify DELETE: the BGM track peek — debug info, not player info.)
   // TITLE TIPS ROTATION — bottom hint area cycles gameplay reminders every
   // 216 frames (3.6s). Hidden during callsign editor and in daily mode (daily
   // extras at y=266/272 reuse that slot).
-  if (!callsignInput.active && !dailyModeRequested) {
+  if (!minimalHud && !callsignInput.active && !dailyModeRequested) {
     const _titleTips = [
       'SHIFT TO DASH',
       'DASH THRU BULLETS = PARRY',
@@ -16806,7 +16782,11 @@ function drawTitleScreen() {
   // Hidden while editing the callsign (the editor's CALLSIGN label at y=220 +
   // letter slots at y=228 sit right on top of the TOP SCORES header at y=222 and
   // the score rows at y=230+, so the editor needs this space to itself).
-  if (!callsignInput.active) {
+  if (!callsignInput.active && minimalHud) {
+    // Simple view: the top-5 table collapses to a single HI line (GUI-simplify).
+    drawRetroText('HI ' + fmtScore(game.highScore || 0), BASE_W/2, 222, 6, COL.red);
+  }
+  if (!callsignInput.active && !minimalHud) {
   const showMode = dailyModeRequested ? 'daily'
                 : challengeModeRequested ? 'challenge'
                 : 'normal';
@@ -16900,10 +16880,12 @@ function drawTitleScreen() {
     }
   }
   // Tiny build/version mark + total achievements unlocked indicator
-  drawRetroText('GAM-42', BASE_W - 4, BASE_H - 22, 5, '#446', 'right');
-  const ach = unlockedAchievements ? unlockedAchievements.size : 0;
-  const total = Object.keys(ACHIEVEMENTS).length;
-  drawRetroText('ACH ' + ach + '/' + total, 4, BASE_H - 22, 5, '#446', 'left');
+  // (GUI-simplify DELETE: the 'GAM-42' faux version mark — decorative lore noise.)
+  if (!minimalHud) { // detail view only (GUI-simplify: meta counter)
+    const ach = unlockedAchievements ? unlockedAchievements.size : 0;
+    const total = Object.keys(ACHIEVEMENTS).length;
+    drawRetroText('ACH ' + ach + '/' + total, 4, BASE_H - 22, 5, '#446', 'left');
+  }
   // Setting-change toasts (DIFFICULTY / SHAKE / RUMBLE / COLORBLIND / etc.) — visible feedback
   // when the player toggles a global setting from the title screen.
   if (game.floatTexts) for (const ft of game.floatTexts) drawFloatText(ft);
