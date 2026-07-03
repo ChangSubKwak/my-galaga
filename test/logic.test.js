@@ -2720,6 +2720,39 @@ if (typeof G.nextBloomPerfState === 'function') {
   ok(s.off === false, 'fps==0 sentinel never trips the valve');
 } else { console.log('  (skipped — nextBloomPerfState not exposed)'); }
 
+section('nextLensLiteState — mid-tier valve (shed spectral ghosts in the 30..50fps band)');
+if (typeof G.nextLensLiteState === 'function') {
+  // The whole point: fps in the 30..48 band trips THIS valve even though the binary
+  // bloom valve (fps<30) never would — the previously-unshed "slow" band.
+  let s = { lite: false, low: 0, high: 0 };
+  for (let i = 0; i < 3; i++) s = G.nextLensLiteState(s.lite, 40, s.low, s.high);
+  ok(s.lite === false, '3 samples at 40fps not yet enough (hysteresis)');
+  s = G.nextLensLiteState(s.lite, 40, s.low, s.high); // 4th
+  ok(s.lite === true, '4th sustained sub-48 sample → ghosts shed (mid band now sheds load)');
+  // Cross-check with the binary valve: 40fps NEVER trips full-bloom-off.
+  let b = { off: false, low: 0, high: 0 };
+  for (let i = 0; i < 20; i++) b = G.nextBloomPerfState(b.off, 40, b.low, b.high);
+  ok(b.off === false, '40fps never trips the binary valve — the lite valve is what catches it');
+  // Healthy fps: never trips.
+  s = { lite: false, low: 0, high: 0 };
+  for (let i = 0; i < 20; i++) s = G.nextLensLiteState(s.lite, 60, s.low, s.high);
+  ok(s.lite === false, '60fps sustained → ghosts stay on');
+  // Restore path: sustained ≥56 for 8 samples.
+  s = { lite: true, low: 0, high: 0 };
+  for (let i = 0; i < 7; i++) s = G.nextLensLiteState(s.lite, 58, s.low, s.high);
+  ok(s.lite === true, '7 high samples not yet enough to restore');
+  s = G.nextLensLiteState(s.lite, 58, s.low, s.high);
+  ok(s.lite === false, '8th sustained high sample → ghosts restored');
+  // 50fps sits between the shed (48) and restore (56) thresholds → no flapping either way.
+  s = { lite: true, low: 0, high: 0 };
+  for (let i = 0; i < 20; i++) s = G.nextLensLiteState(s.lite, 50, s.low, s.high);
+  ok(s.lite === true, '50fps while lite → stays lite (no flap in the dead band)');
+  // fps==0 sentinel ignored.
+  s = { lite: false, low: 0, high: 0 };
+  for (let i = 0; i < 10; i++) s = G.nextLensLiteState(s.lite, 0, s.low, s.high);
+  ok(s.lite === false, 'fps==0 sentinel never trips the lite valve');
+} else { console.log('  (skipped — nextLensLiteState not exposed)'); }
+
 section('SPECTRAL LENS GRADE — post-process heat → chromatic split / vignette');
 if (typeof G.bloomHeat === 'function') {
   // bloomHeat — combo ramps 0..1, last-life & boss phase2 floor it.
@@ -2738,9 +2771,10 @@ if (typeof G.bloomHeat === 'function') {
   ok(G.chromaSplitForHeat(0.5) > G.chromaSplitForHeat(0.1), 'split grows with heat');
   ok(G.chromaSplitForHeat(2) === G.chromaSplitForHeat(1), 'split clamps above heat 1');
 
-  // chromaAlphaForHeat — stays low so additive ghosts add colour, not white.
-  ok(Math.abs(G.chromaAlphaForHeat(0) - 0.05) < 1e-9, 'calm ghost alpha = 0.05');
-  ok(G.chromaAlphaForHeat(1) <= 0.18, 'hot ghost alpha capped low (guards whiteout)');
+  // chromaAlphaForHeat — stays low so additive ghosts add colour, not white. The cap is
+  // load-bearing: peak stack (bloom 0.34+0.22 + 2 ghosts) must stay well under ~0.8.
+  ok(Math.abs(G.chromaAlphaForHeat(0) - 0.04) < 1e-9, 'calm ghost alpha = 0.04');
+  ok(G.chromaAlphaForHeat(1) <= 0.12, 'hot ghost alpha capped ≤ 0.12 (whiteout guard: 0.56 + 2×0.11 < 0.8)');
   ok(G.chromaAlphaForHeat(1) > G.chromaAlphaForHeat(0), 'ghost alpha grows with heat');
 
   // vignetteAlphaForHeat — deepens with heat; bright daylight biomes keep it faint.

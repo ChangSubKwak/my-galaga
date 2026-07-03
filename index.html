@@ -165,6 +165,19 @@ function nextBloomPerfState(off, fps, low, high) {
   else if (off && high >= 8) { off = false; high = 0; }
   return { off, low, high };
 }
+// MID-TIER LENS VALVE — the binary bloom valve only trips below 30fps, which left a
+// 30..50fps "slow but never sheds load" band (the user-felt slowdown). This second,
+// EARLIER valve sheds only the spectral chromatic ghosts (the priciest lens layer)
+// when fps sags below 48 for ~2s, and restores them after a sustained recovery.
+// Same hysteresis style as nextBloomPerfState; pure + logic-tested.
+let _perfLensLite = false, _liteLowStreak = 0, _liteHighStreak = 0;
+function nextLensLiteState(lite, fps, low, high) {
+  low  = (fps > 0 && fps < 48) ? low + 1 : 0;
+  high = (fps >= 56)           ? high + 1 : 0;
+  if (!lite && low >= 4)  { lite = true;  low = 0; }
+  else if (lite && high >= 8) { lite = false; high = 0; }
+  return { lite, low, high };
+}
 // ===== SPECTRAL LENS GRADE — pure post-process drivers (logic-tested) =====
 // One "combat heat" scalar (0..1) drives the chromatic-aberration split + grade so
 // the whole frame intensifies under pressure. Inputs are the same signals the grid /
@@ -180,11 +193,12 @@ function chromaSplitForHeat(heat) {
   heat = heat < 0 ? 0 : heat > 1 ? 1 : heat;
   return 0.6 + heat * 1.8;
 }
-// Spectral ghost alpha: subtle at rest, prismatic when hot. Stays low so the additive
-// ghosts add COLOR, not white (guards the whiteout fix).
+// Spectral ghost alpha: subtle at rest, prismatic when hot. Kept LOW so the additive
+// ghosts add COLOR, not white — the peak total additive stack (bloom 0.34+0.22 + two
+// ghosts) must stay well under ~0.8 or bright combat tips the frame to white.
 function chromaAlphaForHeat(heat) {
   heat = heat < 0 ? 0 : heat > 1 ? 1 : heat;
-  return 0.05 + heat * 0.12;
+  return 0.04 + heat * 0.07;
 }
 // Vignette grade alpha: focuses the eye + deepens mood; heavily reduced on the bright
 // daylight biomes so daytime sky stays bright.
@@ -16465,14 +16479,18 @@ function draw() {
     ctx.drawImage(canvas, 0, 0, cw, ch);
     // Spectral chromatic-aberration ghosts — a warm ghost shifted one way + a cool ghost
     // the other, recolored via sepia+hue-rotate so bright edges split into prismatic
-    // fringe (the Rez/Tetris-Effect lens look). Skipped under reduceMotion (reads as motion).
-    if (!reduceMotion) {
+    // fringe (the Rez/Tetris-Effect lens look). SHARP (no blur): real lens CA is a crisp
+    // shifted fringe, and dropping the blur removes two full-frame convolutions per frame
+    // (the recurring whiteout/slowdown class — a colour-matrix filter is ~10× cheaper) and
+    // stops bright pixels smearing into dark areas. Skipped under reduceMotion (reads as
+    // motion) and under the mid-tier perf valve (_perfLensLite) when fps sags below 48.
+    if (!reduceMotion && !_perfLensLite) {
       const _sp = Math.round(chromaSplitForHeat(_heat) * SCALE);
-      const _caBlur = 'blur(' + Math.max(2, Math.round(SCALE * 1.6)) + 'px) sepia(1) saturate(6) ';
+      const _caFilt = 'sepia(1) saturate(6) ';
       ctx.globalAlpha = chromaAlphaForHeat(_heat);
-      ctx.filter = _caBlur + 'hue-rotate(-58deg)';   // warm (red/orange) ghost
+      ctx.filter = _caFilt + 'hue-rotate(-58deg)';   // warm (red/orange) ghost
       ctx.drawImage(canvas, -_sp, 0, cw, ch);
-      ctx.filter = _caBlur + 'hue-rotate(150deg)';   // cool (cyan/blue) ghost
+      ctx.filter = _caFilt + 'hue-rotate(150deg)';   // cool (cyan/blue) ghost
       ctx.drawImage(canvas, _sp, 0, cw, ch);
     }
     ctx.filter = 'none';
@@ -23305,6 +23323,10 @@ function gameLoop(timestamp) {
       // Adaptive perf valve: suspend/restore the bloom based on sustained FPS.
       const _ps = nextBloomPerfState(_perfBloomOff, _fpsValue, _perfLowStreak, _perfHighStreak);
       _perfBloomOff = _ps.off; _perfLowStreak = _ps.low; _perfHighStreak = _ps.high;
+      // Mid-tier valve: shed the spectral ghosts FIRST when fps sags below 48 —
+      // catches the 30..50fps slow band the binary valve never trips on.
+      const _ls = nextLensLiteState(_perfLensLite, _fpsValue, _liteLowStreak, _liteHighStreak);
+      _perfLensLite = _ls.lite; _liteLowStreak = _ls.low; _liteHighStreak = _ls.high;
     }
 
     accumulator += dt;
