@@ -296,6 +296,12 @@ let colorBlindMode = localStorage.getItem('galagaColorBlind') === '1';
 // overall GUI very simple" — simple is the default experience; M toggles the
 // detail view back on). A user who previously toggled it off ('0') is respected.
 let minimalHud = localStorage.getItem('galagaMinimalHud') !== '0';
+// GUI-simplify: INFO-tier floatTexts (score chatter, stat banners, meta callouts)
+// render only in the detail view — one shared gate instead of 35 inline ifs.
+// VITAL cues (buff expiry, LAST LIFE, SHIELD, boss phase…) keep pushing directly.
+function pushInfoText(ft) {
+  if (!minimalHud && typeof game !== 'undefined' && game && game.floatTexts) game.floatTexts.push(ft);
+}
 // ACCESSIBILITY — respect the OS "reduce motion" preference (WCAG): when set,
 // full-screen impact flashes are dampened (photosensitivity) and screen shake is
 // capped to 'low'. Read once at load; guarded so a missing matchMedia (e.g. the
@@ -5810,23 +5816,8 @@ function pickAmbientEvent() {
 }
 function startAmbientEvent(type) {
   if (!type) { game.ambientEvent = null; return; }
-  // AMBIENT EVENT ENTRY BANNER — brief atmospheric label so the player notices
-  // the event onset. Faded gray to keep ambient tone, not gameplay alarm.
-  const _evLabels = {
-    cargoShip: 'CARGO TRANSIT',
-    supernova: 'DISTANT SUPERNOVA',
-    satellite: 'SATELLITE PASS',
-    comet:     'COMET DRIFT',
-    pulsar:    'PULSAR PULSE',
-    meteorShower: 'METEOR SHOWER'
-  };
-  const _lab = _evLabels[type];
-  if (_lab && game.floatTexts) {
-    game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H - 50, text: _lab,
-      color: '#888', life: 50, maxLife: 50, size: 4
-    });
-  }
+  // (GUI-simplify DELETE: the ambient-event entry label — an ambient event should
+  // be noticed by SEEING it, not read off a text banner.)
   if (type === 'cargoShip') {
     const fromLeft = Math.random() < 0.5;
     game.ambientEvent = {
@@ -7067,9 +7058,9 @@ function updateOneMegaBoss(mb) {
       game.stats.shotsHit++;
       game.stageShotsHit++;
       const dmgDealt = b.dmg || 1;
-      // CRIT hit feedback at boss hit site
+      // CRIT hit feedback at boss hit site (text = detail view; ring/sparks stay)
       if (b.crit) {
-        game.floatTexts.push({
+        pushInfoText({
           x: b.x + (Math.random() * 4 - 2), y: b.y - 8,
           text: 'CRIT!', color: '#fc4', life: 30, maxLife: 30, size: 7
         });
@@ -7109,7 +7100,7 @@ function updateOneMegaBoss(mb) {
         // BIG HIT TEXT — size scales with damage. 3+ = big bold, 2 = normal+,
         // 1 = compact. Makes heavy-hit moments read at a glance.
         const _dmgSize = dmgDealt >= 3 ? 9 : dmgDealt >= 2 ? 7 : 5;
-        game.floatTexts.push({
+        pushInfoText({ // detail-view only (per-hit damage chatter)
           x: b.x + (Math.random() * 6 - 3),
           y: b.y - 4,
           text: '-' + dmgDealt,
@@ -7588,7 +7579,7 @@ function startStage() {
   // 'MISSION START' float text + tick SFX. Helps mark the new-run beat
   // alongside score reset etc.
   if (game.stage === 1 && (game.stats && (game.stats.kills || 0) === 0)) {
-    game.floatTexts.push({
+    pushInfoText({
       x: BASE_W/2, y: BASE_H/2 - 60,
       text: 'MISSION START',
       color: '#0cf', life: 90, maxLife: 90, size: 8
@@ -7675,7 +7666,7 @@ function startStage() {
   if ((game.combo || 0) >= 5) {
     // TIER NAME — same scale as HUD combo tier label (shared helper)
     const _ctN = comboTierName(game.combo);
-    game.floatTexts.push({
+    pushInfoText({
       x: BASE_W/2, y: BASE_H/2 + 50,
       text: 'COMBO CARRIES x' + game.combo + ' (' + _ctN + ')',
       color: '#0ff', life: 80, maxLife: 80, size: 7
@@ -7683,22 +7674,8 @@ function startStage() {
   }
   // MARATHON BANNER — when zenStreak >= 10, push big gold banner so the elite
   // no-death streak feels weighty alongside the existing MARATHON x5/10/20 award.
-  if ((game.zenStreak || 0) >= 10) {
-    game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H/2 - 56,
-      text: 'MARATHON x' + game.zenStreak,
-      color: '#fc4', life: 90, maxLife: 90, size: 9
-    });
-  }
-  // NEXT MILESTONE NUDGE — when zenStreak is exactly 4/9/19 (one stage shy
-  // of 5/10/20 marathon awards), push a 'KEEP IT UP!' nudge.
-  if ([4, 9, 19].indexOf(game.zenStreak || 0) >= 0) {
-    game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H/2 + 60,
-      text: 'KEEP IT UP — NEXT IS MILESTONE',
-      color: '#fc4', life: 80, maxLife: 80, size: 5
-    });
-  }
+  // (GUI-simplify DELETE: the stage-start MARATHON xN duplicate and the
+  // 'KEEP IT UP' nudge — stat chatter; the zenStreak tracking stays.)
   // NEW PB STAGE BANNER — when entering a stage exceeding lifetime best across
   // both normal and challenge modes (one-shot per run via _stagePbFired flag).
   if (!game._stagePbFired) {
@@ -7708,7 +7685,7 @@ function startStage() {
       const _bestEver = Math.max(_csN.bestStage || 0, _csC.bestStage || 0);
       if (_bestEver > 0 && game.stage > _bestEver) {
         game._stagePbFired = true;
-        game.floatTexts.push({
+        pushInfoText({
           x: BASE_W/2, y: BASE_H/2 - 64, text: 'NEW DEEPEST STAGE',
           color: '#fc4', life: 120, maxLife: 120, size: 8
         });
@@ -7741,11 +7718,11 @@ function startStage() {
           && game.runBiomesSeen.size >= 2) {
         const _bn = BIOME_NAMES[_bid].name || _bid.toUpperCase();
         const _bc = BIOME_NAMES[_bid].col || '#0cf';
-        game.floatTexts.push({
+        pushInfoText({
           x: BASE_W/2, y: BASE_H/2 - 50, text: 'BIOME SHIFT',
           color: '#fff', life: 90, maxLife: 90, size: 6
         });
-        game.floatTexts.push({
+        pushInfoText({
           x: BASE_W/2, y: BASE_H/2 - 38, text: _bn,
           color: _bc, life: 100, maxLife: 100, size: 12
         });
@@ -7849,7 +7826,7 @@ function startStage() {
   if (game.stageWeather && typeof WEATHER_TABLE !== 'undefined'
       && WEATHER_TABLE[game.stageWeather.id] && game.floatTexts) {
     const _w = WEATHER_TABLE[game.stageWeather.id];
-    game.floatTexts.push({
+    pushInfoText({
       x: BASE_W/2, y: 60, text: '— ' + _w.label + ' —',
       color: _w.col, life: 90, maxLife: 90, size: 7
     });
@@ -8669,7 +8646,7 @@ function addScore(pts) {
     if (mission && mission.check(game)) {
       game._dailyMissionFired = true;
       markDailyMissionDone();
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H/2 - 36, text: 'DAILY MISSION!',
         color: '#fc4', life: 120, maxLife: 120, size: 14
       });
@@ -8720,7 +8697,7 @@ function addScore(pts) {
     if (old < ms && game.score >= ms) {
       const label = ms >= 100000 ? (ms / 1000) + 'K!' : (ms / 1000) + 'K';
       const col = ms >= 100000 ? '#f6f' : ms >= 50000 ? COL.yellow : COL.cyan;
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H/2 - 40, text: label,
         color: col, life: 70, maxLife: 70, size: ms >= 100000 ? 14 : 11
       });
@@ -8785,10 +8762,7 @@ function addScore(pts) {
         x: BASE_W/2, y: BASE_H/2 - 30, text: 'EXTRA LIFE!',
         color: '#0f8', life: 100, maxLife: 100, size: 13, glow: 8
       });
-      game.floatTexts.push({
-        x: BASE_W/2, y: BASE_H/2 - 16, text: '+1 LIFE',
-        color: '#cfc', life: 100, maxLife: 100, size: 7
-      });
+      // (GUI-simplify DELETE: the '+1 LIFE' subtitle — one line per event.)
       if (typeof spawnConfetti === 'function') spawnConfetti(14);
       game.flashTimer = Math.max(game.flashTimer || 0, 8);
       game.flashColor = '#0f8';
@@ -8982,7 +8956,7 @@ function updatePlayer() {
       color: synergy === 'OVERLOAD' ? '#fc4' : synergy === 'BLINK' ? '#0ff' : '#f8a',
       life: 80, maxLife: 80, size: 14
     });
-    game.floatTexts.push({
+    pushInfoText({
       x: BASE_W/2, y: BASE_H/2 - 18,
       text: 'WEAPON SYNERGY',
       color: '#fff', life: 80, maxLife: 80, size: 6
@@ -9038,7 +9012,6 @@ function updatePlayer() {
     const offsets = n === 1 ? [0] : n === 2 ? [-4, 4] : [-6, 0, 6];
     const pods = game.dualFighter ? [game.playerX - 8, game.playerX + 8] : [game.playerX];
     let _critFiredThisShot = false;
-    const _sfBefore = game.stats.shotsFired;
     for (const cx of pods) {
       for (const ox of offsets) {
         const bx = cx + ox;
@@ -9089,23 +9062,11 @@ function updatePlayer() {
             }
           }
         }
-        // MARKSMAN MILESTONE — once per run, when 50+ shots fired AND accuracy
-        // >= 90%, surface banner. Skill recognition without score inflation.
+        // (GUI-simplify DELETE: the MARKSMAN mid-run banner — accuracy recognition
+        // lives in the stage grade / AAR / GAME_OVER stats; the flag stays for them.)
         if (!game._marksmanFired && game.stats.shotsFired >= 50) {
           const _accPct = (game.stats.shotsHit / game.stats.shotsFired) * 100;
-          if (_accPct >= 90) {
-            game._marksmanFired = true;
-            game.floatTexts.push({
-              x: BASE_W/2, y: BASE_H/2 - 40, text: 'MARKSMAN',
-              color: '#0ff', life: 80, maxLife: 80, size: 10
-            });
-            game.floatTexts.push({
-              x: BASE_W/2, y: BASE_H/2 - 28, text: '90%+ ACCURACY',
-              color: '#cce', life: 80, maxLife: 80, size: 5
-            });
-            if (typeof playSound === 'function') playSound('milestone');
-            if (typeof spawnConfetti === 'function') spawnConfetti(8);
-          }
+          if (_accPct >= 90) game._marksmanFired = true;
         }
         // Muzzle flash particle (6-frame fade) at gun barrel
         game.muzzleFlashes = game.muzzleFlashes || [];
@@ -9128,20 +9089,8 @@ function updatePlayer() {
     // was fired this shot. Caps to once-per-shot regardless of pods × offsets
     // to avoid SFX stacking at multi-pod fire.
     if (_critFiredThisShot) playSound('tick');
-    // SHOTS FIRED MILESTONES — gray banner at 100/500/1000/2000. Checked as a
-    // crossing over the whole fire event (not a per-shot === on shotsFired) so a
-    // FORK burst that bumps shotsFired by 3 at a time can't step over the exact
-    // milestone value and silently skip the banner.
-    for (const _m of [100, 500, 1000, 2000]) {
-      if (_sfBefore < _m && game.stats.shotsFired >= _m) {
-        game.floatTexts.push({
-          x: BASE_W/2, y: BASE_H/2 + 30,
-          text: 'SHOTS ' + _m,
-          color: '#888', life: 40, maxLife: 40, size: 5
-        });
-        break;
-      }
-    }
+    // (GUI-simplify DELETE: the SHOTS 100/500/1000/2000 gray milestone banner —
+    // pure stat chatter; shotsFired still accumulates for stats.)
   }
 }
 
@@ -9208,7 +9157,7 @@ function updateBullets() {
       // LASER PIERCE COUNT — when a laser bullet exits, if it pierced 3+
       // enemies, emit a magenta "PIERCE xN" text at its final position.
       if (b.kind === 'laser' && b.pierced && b.pierced.size >= 3) {
-        game.floatTexts.push({
+        pushInfoText({
           x: b.x, y: Math.max(20, b.y),
           text: 'PIERCE x' + b.pierced.size,
           color: '#f6c', life: 50, maxLife: 50, size: 8
@@ -9276,7 +9225,7 @@ function updateBullets() {
         game.grazeCount = (game.grazeCount || 0) + 1;
         if (game.grazeCount === 50) unlockAchievement('ghostPilot');
         if (game.grazeCount === 100) unlockAchievement('phantom');
-        game.floatTexts.push({
+        pushInfoText({ // detail-view only (per-graze score chatter; spark stays)
           x: b.x, y: b.y - 6, text: label,
           color: lcol, life: 28, maxLife: 28, size: 5
         });
@@ -9563,7 +9512,7 @@ function unlockDex(type) {
   try { localStorage.setItem(DEX_KEY, JSON.stringify([...dexUnlocked])); } catch (e) {}
   if (game && game.state !== STATE.TITLE && game.state !== STATE.GAME_OVER) {
     const info = ENEMY_INFO[type];
-    game.floatTexts.push({
+    pushInfoText({
       x: BASE_W/2, y: 60, text: 'FIRST CONTACT',
       color: info.col, life: 90, maxLife: 90, size: 9
     });
@@ -9766,27 +9715,9 @@ function unlockAchievement(id) {
       game._achFirstSeen = true;
       pushIntercept('achievementFirst');
     }
-    // Mega celebration: expanding shockwave from screen center, golden confetti, distinctive sound chord
-    if (game.shockwaves) {
-      game.shockwaves.push({
-        x: BASE_W/2, y: BASE_H/2 - 14,
-        life: 0, maxLife: 32, maxR: 70, color: '#fc4'
-      });
-    }
-    spawnConfetti(20);
-    // Star burst — 8 streaks radiating from achievement banner area
-    if (game.shootingStars) {
-      const sx = BASE_W - 50, sy = 50;
-      for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * Math.PI * 2 + Math.random() * 0.2;
-        const sp = 1.5 + Math.random() * 1.2;
-        game.shootingStars.push({
-          x: sx, y: sy,
-          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-          life: 0, maxLife: 28 + randInt(14)
-        });
-      }
-    }
+    // (GUI-simplify DELETE: the mega celebration — center shockwave + 20 confetti +
+    // 8 star streaks. The toast panel + chord alone are the reward; the burst fired
+    // at the busiest combat moments, exactly when the screen least needed it.)
     playSound('extraLife');
     setTimeout(() => playSound('comboStep'), 140);
     rumble(220, 0.5, 0.3);
@@ -10747,7 +10678,7 @@ function updatePowerUps() {
           for (const en of cw) if (en.alive) bombKill(en);
         }
         game.shockwaves.push({ x: BASE_W/2, y: BASE_H/2, life: 0, maxLife: 24, maxR: 90, color });
-        game.floatTexts.push({
+        pushInfoText({
           x: BASE_W/2, y: BASE_H/2 - 14, text: 'BOMB!',
           color, life: 70, maxLife: 70, size: 14
         });
@@ -10782,7 +10713,7 @@ function updatePowerUps() {
         }
         game.flashTimer = Math.max(game.flashTimer || 0, 6);
         game.flashColor = '#0ff';
-        game.floatTexts.push({
+        pushInfoText({
           x: BASE_W/2, y: BASE_H/2 - 14, text: 'DASH READY',
           color: '#0ff', life: 60, maxLife: 60, size: 9
         });
@@ -10813,7 +10744,7 @@ function updatePowerUps() {
           // Big "MAX POWER!" banner + flash + brief invincibility + persistent counter.
           if (!game.maxPowerRevealed) {
             game.maxPowerRevealed = true;
-            game.floatTexts.push({
+            pushInfoText({
               x: BASE_W/2, y: BASE_H/2 - 20, text: 'MAX POWER!',
               color: '#fc4', life: 120, maxLife: 120, size: 16, glow: 10
             });
@@ -10878,15 +10809,7 @@ function updatePowerUps() {
       // PER-TYPE PICKUP TALLY — feeds GAME_OVER "FAVORITE" highlight.
       if (!game.pickupTypesRun) game.pickupTypesRun = {};
       game.pickupTypesRun[p.type] = (game.pickupTypesRun[p.type] || 0) + 1;
-      // POWERUP COUNT MILESTONES — small gold banner at 5/10/20/50 pickups
-      if (game.runPowerUps === 5 || game.runPowerUps === 10 || game.runPowerUps === 20 || game.runPowerUps === 50) {
-        game.floatTexts.push({
-          x: BASE_W/2, y: BASE_H/2 - 24,
-          text: 'PICKUPS x' + game.runPowerUps,
-          color: '#fc4', life: 60, maxLife: 60, size: 7
-        });
-        if (typeof playSound === 'function') playSound('tick');
-      }
+      // (GUI-simplify DELETE: the PICKUPS xN count-milestone banner — pure stat chatter.)
       // PICKUP HISTORY — last 5 drop types as small icon row; FIFO ring buffer
       if (!game.pickupHistory) game.pickupHistory = [];
       game.pickupHistory.unshift(p.type);
@@ -10923,11 +10846,8 @@ function updatePowerUps() {
                          : 0;
       if (_streakBonus > 0) {
         addScore(_streakBonus);
-        game.floatTexts.push({
-          x: BASE_W/2, y: BASE_H/2 - 28,
-          text: 'PICKUP STREAK x' + game.pickupStreak + '! +' + _streakBonus,
-          color: '#0ff', life: 80, maxLife: 80, size: 8
-        });
+        // (GUI-simplify DELETE: the PICKUP STREAK center banner — stat chatter;
+        // the milestone sfx + score stay.)
         playSound('milestone');
       }
       // POWERUP SFX VARIETY — type-specific audio cues so the player can identify
@@ -10961,6 +10881,10 @@ function updatePowerUps() {
 }
 
 function updateFloatTexts() {
+  // Soft cap — a pathological burst (chained events in one frame) can't stack an
+  // unreadable wall of text: drop the OLDEST entries beyond 40. Cheap insurance now
+  // that the remaining pushes are the important ones (GUI-simplify).
+  if (game.floatTexts.length > 40) game.floatTexts.splice(0, game.floatTexts.length - 40);
   for (let i = game.floatTexts.length - 1; i >= 0; i--) {
     const ft = game.floatTexts[i];
     ft.y -= 0.5;
@@ -11046,15 +10970,10 @@ function drawAchievementToast(t) {
   ctx.save();
   ctx.fillStyle = 'rgba(0,30,60,0.95)';
   ctx.fillRect(tx, ty, w, h);
-  // Animated marquee dashes along top + bottom
+  // Static borders (GUI-simplify: the animated marquee dashes were deleted)
   ctx.fillStyle = COL.yellow;
-  for (let i = 0; i < w; i += 6) {
-    if ((i + t.life * 2) % 12 < 3) {
-      ctx.fillRect(tx + i, ty, 3, 1);
-      ctx.fillRect(tx + i, ty + h - 1, 3, 1);
-    }
-  }
-  // Side borders
+  ctx.fillRect(tx, ty, w, 1);
+  ctx.fillRect(tx, ty + h - 1, w, 1);
   ctx.fillRect(tx, ty, 1, h);
   ctx.fillRect(tx + w - 1, ty, 1, h);
   // Bigger trophy icon (left side)
@@ -11159,7 +11078,7 @@ function bumpCombo() {
         life: 0, maxLife: _is100 ? 32 : 24, maxR: _is100 ? 50 : 32, color: _ringCol
       });
     }
-    game.floatTexts.push({
+    pushInfoText({
       x: BASE_W / 2, y: BASE_H / 2 - 50,
       text: _is100 ? 'MASTER COMBO!' : 'DEEP COMBO!',
       color: _ringCol, life: 90, maxLife: 90, size: _is100 ? 13 : 11
@@ -11187,7 +11106,7 @@ function bumpCombo() {
                    : game._mkCount >= 5  ? '#fc4'
                    : '#0ff';
       const _mkSize = game._mkCount >= 10 ? 11 : 8;
-      game.floatTexts.push({
+      pushInfoText({
         x: game.playerX, y: game.playerY - 26,
         text: _mkLabel + (game._mkCount >= 5 ? ' x' + game._mkCount : ''),
         color: _mkCol, life: 60, maxLife: 60, size: _mkSize
@@ -11222,7 +11141,7 @@ function bumpCombo() {
       if (game.combo > prevBest) {
         game._comboPbFired = true;
         localStorage.setItem('galagaMaxComboEver', String(game.combo));
-        game.floatTexts.push({
+        pushInfoText({
           x: BASE_W/2, y: BASE_H/2 - 40, text: 'NEW COMBO RECORD!',
           color: '#fc4', life: 100, maxLife: 100, size: 11
         });
@@ -11268,7 +11187,7 @@ function bumpCombo() {
       x: BASE_W/2, y: BASE_H/2 - 36, text: label,
       color: game.flashColor, life: 90, maxLife: 90, size: 14
     });
-    game.floatTexts.push({
+    pushInfoText({ // detail-view only (subtitle; the COMBO N primary stays)
       x: BASE_W/2, y: BASE_H/2 - 22, text: subtitle,
       color: '#ff4', life: 90, maxLife: 90, size: 9
     });
@@ -11307,7 +11226,7 @@ function bumpCombo() {
     // x3.0) per run gets a banner + milestone SFX. Once per run via flag.
     if (!game._maxComboTierFired) {
       game._maxComboTierFired = true;
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H/2 - 30, text: 'MAX MULTIPLIER',
         color: '#fc4', life: 80, maxLife: 80, size: 10
       });
@@ -11421,7 +11340,7 @@ function updateCombo() {
           game.flashColor = '#666';
           game.comboLostVignette = huge ? 60 : 40;
         }
-        game.floatTexts.push({
+        pushInfoText({
           x: BASE_W / 2, y: BASE_H / 2 - 8,
           text: huge ? 'BIG COMBO LOST!!' : (big ? 'COMBO BROKEN!' : 'COMBO LOST'),
           color: huge ? '#f44' : (big ? '#f80' : '#888'),
@@ -11674,7 +11593,7 @@ function updateEnemies() {
     const aliveCount = game.enemies.filter(en => en.alive).length;
     if (aliveCount === 1) {
       game.lastStandAnnounced = true;
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H/2 - 30, text: 'LAST ONE!',
         color: '#fc4', life: 60, maxLife: 60, size: 10
       });
@@ -12268,7 +12187,7 @@ function updateChallengeEnemies() {
       if (typeof playSound === 'function') playSound('milestone');
       // RUN PERFECT WAVE MILESTONES — gold banner at 5/10/20 lifetime-of-run
       if (game.perfectWavesRun === 5 || game.perfectWavesRun === 10 || game.perfectWavesRun === 20) {
-        game.floatTexts.push({
+        pushInfoText({
           x: BASE_W/2, y: BASE_H/2 - 18,
           text: 'PERFECT WAVES x' + game.perfectWavesRun,
           color: '#fc4', life: 90, maxLife: 90, size: 9
@@ -12444,7 +12363,7 @@ function updateCollisions() {
         if (e.hp > 0 && e.maxHp > 1) {
           const _dn = b.dmg || 1;
           const _dCol = b.crit ? '#f44' : _dn >= 3 ? '#fc4' : _dn >= 2 ? '#0ff' : '#fff';
-          game.floatTexts.push({
+          pushInfoText({ // detail-view only (per-hit damage chatter)
             x: e.x + (Math.random() * 4 - 2),
             y: e.y - 8,
             text: '-' + _dn,
@@ -12463,7 +12382,7 @@ function updateCollisions() {
               life: -k, color: '#fc4'
             });
           }
-          game.floatTexts.push({
+          pushInfoText({ // detail-view only (sparks carry the crit in simple view)
             x: e.x, y: e.y - 10, text: 'CRIT',
             color: '#fc4', life: 28, maxLife: 28, size: 5
           });
@@ -12479,7 +12398,7 @@ function updateCollisions() {
               x: e.x, y: e.y, life: 0, maxLife: 18, maxR: 14, color: '#a8f'
             });
           }
-          game.floatTexts.push({
+          pushInfoText({ // detail-view only (the purple shockwave stays always)
             x: e.x, y: e.y - 10, text: 'REVEALED',
             color: '#a8f', life: 32, maxLife: 32, size: 5
           });
@@ -12506,7 +12425,7 @@ function updateCollisions() {
                 life: -k, color: '#fc4'
               });
             }
-            game.floatTexts.push({
+            pushInfoText({
               x: e.x, y: e.y - 14, text: 'CRIT KILL!',
               color: '#fc4', life: 42, maxLife: 42, size: 7
             });
@@ -12546,29 +12465,11 @@ function updateCollisions() {
           // can stutter under dense bomb/laser kills.
           if (!game.killsByTypeRun) game.killsByTypeRun = {};
           game.killsByTypeRun[e.type] = (game.killsByTypeRun[e.type] || 0) + 1;
-          // VARIETY HUNTER — one-shot banner when 8 unique types killed
+          // (GUI-simplify DELETE: the VARIETY HUNTER one-shot banner and the
+          // per-type HUNT xN streak popup — the purest stat chatter in the file.
+          // The killedTypes/_sameTypeStreak tracking stays for stats/achievements.)
           if (game.killedTypes.size === 8 && !game._varietyFired) {
             game._varietyFired = true;
-            game.floatTexts.push({
-              x: BASE_W/2, y: BASE_H/2 - 30, text: 'VARIETY HUNTER',
-              color: '#fc4', life: 90, maxLife: 90, size: 9
-            });
-            if (typeof spawnConfetti === 'function') spawnConfetti(10);
-            if (typeof playSound === 'function') playSound('milestone');
-          }
-          if (game._sameTypeStreak === 5 || game._sameTypeStreak === 10) {
-            const _typeColors = {
-              bee: '#fc4', butterfly: '#f48', boss: '#f8a', mirror: '#8ff',
-              splitter: '#0fc', shielded: '#4f8', ufo: '#f6f',
-              hoverer: '#fa0', kamikaze: '#f80', goldenBee: '#fc4', minibee: '#fa4'
-            };
-            game.floatTexts.push({
-              x: e.x, y: e.y - 18,
-              text: e.type.toUpperCase() + ' HUNT x' + game._sameTypeStreak,
-              color: _typeColors[e.type] || '#fff',
-              life: 50, maxLife: 50, size: 7
-            });
-            if (typeof playSound === 'function') playSound('tick');
           }
           if (game.stats.kills === 1) {
             unlockAchievement('firstBlood');
@@ -12578,7 +12479,7 @@ function updateCollisions() {
           if (game.activePerk === 'vampire' && game.stats.kills > 0 && game.stats.kills % 10 === 0
               && (game.shieldCharges || 0) < SHIELD_MAX) {
             game.shieldCharges = (game.shieldCharges || 0) + 1;
-            game.floatTexts.push({
+            pushInfoText({
               x: game.playerX, y: game.playerY - 12, text: 'VAMPIRE +SHIELD',
               color: '#f6f', life: 50, maxLife: 50, size: 6
             });
@@ -12620,7 +12521,7 @@ function updateCollisions() {
                 && !game._openingSalvoFired) {
               game._openingSalvoFired = true;
               addScore(500);
-              game.floatTexts.push({
+              pushInfoText({
                 x: BASE_W/2, y: BASE_H/2 - 20, text: 'OPENING SALVO',
                 color: '#ff4', life: 70, maxLife: 70, size: 11, glow: 7
               });
@@ -12641,7 +12542,7 @@ function updateCollisions() {
           // screen readable during normal play.
           if (pts >= 200) {
             const ksCol = pts >= 1000 ? '#ff4' : pts >= 500 ? '#fc4' : '#fff';
-            game.floatTexts.push({
+            pushInfoText({ // detail-view only (GUI-simplify: per-kill score chatter)
               x: e.x + (Math.random() * 4 - 2),
               y: e.y - 6,
               text: '+' + fmtScore(pts),
@@ -12652,7 +12553,7 @@ function updateCollisions() {
           }
           if (e.ghost) {
             // GHOST KILL CELEBRATION — purple sparkle burst + banner + persistent counter
-            game.floatTexts.push({
+            pushInfoText({
               x: e.x, y: e.y - 12, text: 'GHOST KILL!',
               color: '#a8f', life: 50, maxLife: 50, size: 8
             });
@@ -12702,7 +12603,7 @@ function updateCollisions() {
               pushIntercept('firstElite');
             }
             // Brief floating "ELITE!" tag so the kill reads as more meaningful
-            game.floatTexts.push({
+            pushInfoText({
               x: e.x, y: e.y - 10, text: 'ELITE!',
               color: '#f44', life: 32, maxLife: 32, size: 6
             });
@@ -12798,7 +12699,7 @@ function updateCollisions() {
                 _fe.panicOffY = 0;
               }
               // Announcement
-              game.floatTexts.push({
+              pushInfoText({
                 x: BASE_W / 2, y: BASE_H / 2 - 20,
                 text: 'FORMATION BREAK', color: '#f84', life: 60, maxLife: 60, size: 9
               });
@@ -12950,12 +12851,8 @@ function updateCollisions() {
           else if (_mkc === 10) { _mkBonus = 2000; _mkLabel = 'MULTI x10!'; }
           if (_mkBonus > 0) {
             addScore(_mkBonus);
-            game.floatTexts.push({
-              x: BASE_W/2, y: BASE_H/2 - 12, text: _mkLabel + ' +' + _mkBonus,
-              color: '#fc4', life: 50, maxLife: 50,
-              size: _mkc >= 10 ? 11 : 9,
-              glow: _mkc >= 10 ? 7 : 5
-            });
+            // (GUI-simplify DELETE: the center MULTI xN banner — multikill feedback is
+            // consolidated to the bumpCombo ladder; the bonus score stays, silently.)
             playSound('milestone');
           }
           game.lastKillFrame = game.animFrame;
@@ -13029,14 +12926,8 @@ function updateCollisions() {
             // Extra confetti for the celebration
             spawnConfetti(10);
           }
-          // Tiny "+1" near kill point — only while in an active combo, so it reinforces the streak
-          if (game.combo >= 3) {
-            const offX = jitter(6);
-            game.floatTexts.push({
-              x: e.x + offX, y: e.y - 8, text: '+1',
-              color: '#fff', life: 22, maxLife: 22, size: 5
-            });
-          }
+          // (GUI-simplify DELETE: the per-kill "+1" combo pip — pure per-kill noise;
+          // the combo box + kill-pitch ramp carry the streak.)
           // OVERKILL — track kill timestamps and trigger when many fall in a short window
           {
             const now = game.animFrame;
@@ -13054,14 +12945,9 @@ function updateCollisions() {
               else if (n >= 5)  { label = 'OVERKILL!'; bonus = 500;  col = '#ff4'; size = 12; shake = 6; }
               if (label) {
                 addScore(bonus);
-                game.floatTexts.push({
-                  x: BASE_W/2, y: BASE_H/3, text: label,
-                  color: col, life: 70, maxLife: 70, size
-                });
-                game.floatTexts.push({
-                  x: BASE_W/2, y: BASE_H/3 + size, text: '+' + fmtScore(bonus),
-                  color: '#ff4', life: 70, maxLife: 70, size: 10
-                });
+                // (GUI-simplify DELETE: the OVERKILL/MASSACRE/GODLIKE center banner
+                // pair — the shake/flash/rumble/sfx below already carry the moment;
+                // the bonus score stays, silently.)
                 game.overkillCooldown = 90;
                 game.shakeTimer = Math.min(20, (game.shakeTimer || 0) + shake);
                 game.flashTimer = Math.max(game.flashTimer || 0, n >= 12 ? 8 : n >= 8 ? 6 : 4);
@@ -13242,7 +13128,7 @@ function updateCollisions() {
                 });
               }
             }
-            game.floatTexts.push({
+            pushInfoText({
               x: e.x, y: e.y - 10, text: 'SPLIT',
               color: '#fa0', life: 24, maxLife: 24, size: 5
             });
@@ -13269,18 +13155,11 @@ function updateCollisions() {
             unlockAchievement('dualPilot');
             playSound('rescue');
             playSound('dualFighter');
-            // Triple-line celebration banner
+            // Celebration banner (GUI-simplify: single line — the 'RESCUED'/'FORMATION!'
+            // subtitle stack was deleted; the beam + sfx carry the moment)
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 - 18, text: 'DUAL FIGHTER!',
               color: '#ff4', life: 110, maxLife: 110, size: 14, glow: 9
-            });
-            game.floatTexts.push({
-              x: BASE_W/2, y: BASE_H/2 - 4, text: 'RESCUED',
-              color: '#0ff', life: 100, maxLife: 100, size: 9
-            });
-            game.floatTexts.push({
-              x: BASE_W/2, y: BASE_H/2 + 8, text: 'FORMATION!',
-              color: '#f6f', life: 100, maxLife: 100, size: 8
             });
             // Cascading vertical beam from rescue point down to the player
             const beamSteps = 22;
@@ -13515,7 +13394,7 @@ function updateCollisions() {
           } catch (_eL) {}
         }
         if (game.nearMissChain >= 3) {
-          game.floatTexts.push({
+          pushInfoText({
             x: game.playerX, y: game.playerY - 18,
             text: 'GRAZE x' + game.nearMissChain,
             color: '#0ff', life: 36, maxLife: 36, size: 7,
@@ -13540,7 +13419,7 @@ function updateCollisions() {
           // Legibility — only surface "COMBO HELD" when the graze actually rescued
           // a combo that was about to expire (timer < 40). Avoids spam on safe grazes.
           if (_wasDanger) {
-            game.floatTexts.push({
+            pushInfoText({
               x: 34, y: 42, text: 'COMBO HELD',
               color: '#0ff', life: 30, maxLife: 30, size: 5
             });
@@ -13568,11 +13447,7 @@ function updateCollisions() {
             });
           }
         }
-        // Tiny dot floattext above the bullet — reads as "just missed"
-        game.floatTexts.push({
-          x: b.x, y: b.y - 7, text: '·',
-          color: '#fff', life: 18, maxLife: 18, size: 6
-        });
+        // (GUI-simplify DELETE: the per-graze '·' dot — the graze ping + spark carry it.)
         if (typeof playSound === 'function') playSound('graze', b.x);
         break;
       }
@@ -13811,10 +13686,7 @@ function killPlayer(srcX, srcY, cause, srcType) {
       x: BASE_W/2, y: BASE_H/2 - 30, text: 'DUAL LOST',
       color: '#fa8', life: 85, maxLife: 85, size: 10
     });
-    game.floatTexts.push({
-      x: BASE_W/2, y: BASE_H/2 - 16, text: 'WINGMAN DOWN',
-      color: '#888', life: 75, maxLife: 75, size: 5
-    });
+    // (GUI-simplify DELETE: the 'WINGMAN DOWN' subtitle — one line per event.)
     if (typeof playSound === 'function') playSound('lowLife');
     // Lose one ship from dual, continue with single
     game.state = STATE.RESPAWN;
@@ -13829,10 +13701,7 @@ function killPlayer(srcX, srcY, cause, srcType) {
         x: BASE_W/2, y: BASE_H/2 - 30, text: 'LAST LIFE',
         color: '#f44', life: 100, maxLife: 100, size: 14
       });
-      game.floatTexts.push({
-        x: BASE_W/2, y: BASE_H/2 - 16, text: 'MAKE IT COUNT',
-        color: '#fff', life: 90, maxLife: 90, size: 6
-      });
+      // (GUI-simplify DELETE: the 'MAKE IT COUNT' subtitle — one line per event.)
       game.flashTimer = Math.max(game.flashTimer || 0, 12);
       game.flashColor = '#f44';
       if (typeof rumble === 'function') rumble(300, 0.95, 0.6);
@@ -14225,12 +14094,12 @@ function updateEnduranceTiers() {
       game._enduranceFired[tier.frames] = true;
       const minutes = Math.floor(tier.frames / 3600);
       // Big banner
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H/2 - 24, text: tier.label,
         color: tier.col, life: 100, maxLife: 100, size: tier.size
       });
       // Subtitle showing time + bonus
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H/2 - 12, text: minutes + ' MIN · +' + tier.bonus,
         color: '#cfc', life: 100, maxLife: 100, size: 6
       });
