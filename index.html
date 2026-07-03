@@ -17278,22 +17278,8 @@ function drawStageIntro() {
     ctx.fillRect(BASE_W - 1, 0, 1, BASE_H);
     ctx.restore();
   }
-  // STAGE TYPE BG TINT — faint 4-frame edge band by stage type so the player
-  // instantly reads what kind of stage is starting. Boss/challenge get the
-  // tint; normal stages stay clean (no distraction).
-  {
-    const _isBossT = game.stage % BOSS_STAGE_INTERVAL === 0;
-    const _isChallT = !_isBossT && game.stage % 4 === 0;
-    if ((_isBossT || _isChallT) && introElapsed < 36) {
-      const _tBand = 1 - introElapsed / 36;
-      ctx.save();
-      ctx.globalAlpha = 0.18 * _tBand;
-      ctx.fillStyle = _isBossT ? '#f44' : '#f6f';
-      ctx.fillRect(0, 0, BASE_W, 6);
-      ctx.fillRect(0, BASE_H - 6, BASE_W, 6);
-      ctx.restore();
-    }
-  }
+  // (GUI-simplify DELETE: the stage-type tint bands — the stage label colour +
+  // boss cinematic already encode stage type.)
   // BIOME ENTRY FLASH — 12-frame screen-wide tint matching the upcoming biome.
   // Fades from 0.25 alpha to 0 over the window. Reads as "we just arrived here".
   // BIOME TRANSITION FANFARE — if biome id changed from last stage, boost flash
@@ -17366,18 +17352,8 @@ function drawStageIntro() {
   // Variant formation only matters for non-boss/non-challenge stages
   const variant = (!isBoss && !isChallenge) ? pickFormationVariant() : 'grid';
   const isVariant = variant !== 'grid';
-  // Pulsing red warning border during boss-stage intros
-  if (isBoss) {
-    const pulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.28);
-    ctx.save();
-    ctx.globalAlpha = 0.22 + 0.30 * pulse;
-    ctx.fillStyle = COL.red;
-    ctx.fillRect(0, 0, BASE_W, 3);
-    ctx.fillRect(0, BASE_H - 3, BASE_W, 3);
-    ctx.fillRect(0, 0, 3, BASE_H);
-    ctx.fillRect(BASE_W - 3, 0, 3, BASE_H);
-    ctx.restore();
-  }
+  // (GUI-simplify DELETE: the boss-intro pulsing red border — one of five stacked
+  // red layers; the dark overlay + silhouette + name carry the dread.)
   const stageLabel = isBoss ? '!! BOSS STAGE !!' : isChallenge ? 'CHALLENGING STAGE' : ('STAGE ' + game.stage);
   const labelColor = isMilestone ? '#fc4' : (isBoss ? COL.red : (isChallenge ? '#f6f' : COL.cyan));
 
@@ -17478,8 +17454,8 @@ function drawStageIntro() {
   }
   // STAGE_INTRO STATUS PANEL — stat columns only on non-boss, non-challenge stages.
   // Boss stages get a full cinematic intro below; challenge stages get mission brief.
-  if (slide >= 1 && !isBoss && !isChallenge) {
-    // ---- LEFT COLUMN ----
+  if (!minimalHud && slide >= 1 && !isBoss && !isChallenge) {
+    // ---- LEFT COLUMN ---- (detail view only — GUI-simplify)
     // Callsign + rank
     if (playerCallsign && playerCallsign !== '???') {
       drawRetroText('[' + playerCallsign + ']', 4, BASE_H/2 - 18, 5, '#999', 'left');
@@ -17497,45 +17473,17 @@ function drawStageIntro() {
         ctx.restore();
       }
     }
-    // Power build S/N/P (hidden at 1/1/1)
-    if (game.lvl && (game.lvl.S > 1 || game.lvl.N > 1 || game.lvl.P > 1)) {
-      const _plY = BASE_H/2 - 2;
-      drawRetroText('S' + game.lvl.S, 4, _plY, 4, '#f44', 'left');
-      drawRetroText('N' + game.lvl.N, 15, _plY, 4, '#0ff', 'left');
-      drawRetroText('P' + game.lvl.P, 26, _plY, 4, '#f6f', 'left');
-      if (typeof isPowerMaxed === 'function' && isPowerMaxed()) {
-        // MAX power tier — gold glow matching the peak-threshold GLOW pattern
-        // (HIGH SCORE / ACC / COMBO MAX / SHIELD MAX / PB ALARM / MAX POWER).
-        ctx.save();
-        ctx.shadowColor = '#fc4';
-        ctx.shadowBlur = 4;
-        drawRetroText('MAX', 37, _plY, 4, '#fc4', 'left');
-        ctx.restore();
-      }
-    }
+    // (GUI-simplify DELETE: intro S/N/P row — the HUD power gems are canonical.)
     // Shield charges
     if ((game.shieldCharges || 0) > 0) {
       drawRetroText('E x' + game.shieldCharges, 4, BASE_H/2 + 6, 4, '#0f8', 'left');
     }
-    // Lives — last life adds a red pulsing glow so STAGE_INTRO carries the
-    // urgency cue into the next stage's planning beat.
-    {
-      const _lvCol = game.lives === 1 ? '#f44' : game.lives <= 2 ? '#fa8' : '#fff';
-      ctx.save();
-      if (game.lives === 1) {
-        ctx.shadowColor = '#f44';
-        ctx.shadowBlur = 3 + 2 * Math.sin(game.animFrame * 0.3);
-      }
-      drawRetroText('LIVES ' + game.lives, 4, BASE_H/2 + 13, 4, _lvCol, 'left');
-      ctx.restore();
-    }
+    // (GUI-simplify DELETE: intro LIVES row — the HUD lives row is canonical.)
     // Active perk — 4th row in left status column (only when a perk is held).
     // Short label (first word) so it fits the narrow left margin alongside the
     // other status lines. Color taken from the perk definition for identity.
-    if (game.activePerk && typeof PERKS !== 'undefined' && PERKS[game.activePerk]) {
-      const _ap = PERKS[game.activePerk];
-      drawRetroText('PERK ' + _ap.name.split(' ')[0], 4, BASE_H/2 + 20, 4, _ap.col, 'left');
-    }
+    // (GUI-simplify DELETE: intro perk short label — the full 'PERK: name' line at
+    // the bottom of the intro is canonical.)
     // DECLUTTER: the "recent grades trend" (last-3 D-B-A) chip was removed from the
     // intro — historical reflection, not next-stage planning; lives in the stats overlay.
     // CLEAN STREAK chip — consecutive no-death stages. Green at ≥ 2, picks up
@@ -17725,25 +17673,8 @@ function drawStageIntro() {
     ctx.globalAlpha = 0.55 + 0.08 * Math.sin(_t * 0.07);
     ctx.fillRect(0, 0, BASE_W, BASE_H);
     ctx.restore();
-    // Slow red scan-sweep (top → bottom, cycles every 4 sec)
-    {
-      const sp = (_t % 240) / 240;
-      if (sp < 0.72) {
-        ctx.save();
-        ctx.globalAlpha = 0.10;
-        ctx.fillStyle = '#f44';
-        ctx.fillRect(0, Math.round(sp / 0.72 * BASE_H) - 1, BASE_W, 2);
-        ctx.restore();
-      }
-    }
-    // Glitch bar (sparse, flickers)
-    if ((_t & 7) === 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.20;
-      ctx.fillStyle = '#f44';
-      ctx.fillRect(0, 28 + (_t * 41) % (BASE_H - 56), BASE_W, 1);
-      ctx.restore();
-    }
+    // (GUI-simplify DELETE: the red scan-sweep + glitch bar — two more of the five
+    // stacked boss-intro red layers.)
     // Boss silhouette — large, centered, ghostly
     ctx.save();
     ctx.globalAlpha = 0.18 + 0.07 * Math.sin(_t * 0.05);
@@ -17819,21 +17750,8 @@ function drawStageIntro() {
 
   // Enemy count + biome preview + PB — boss stages handled by cinematic above
   if (slide >= 1 && !isBoss) {
-    // Count label — moved BELOW the banner panel (no overlap with stage label)
-    const countLabel = isChallenge ? '8 WAVES' : '~40 ENEMIES';
-    const countCol = isChallenge ? '#f6f' : COL.cyan;
-    drawRetroText(countLabel, BASE_W/2 + offX, BASE_H/2 + 16, 6, countCol);
-    // Challenge wave pips — below count label
-    if (isChallenge) {
-      ctx.save();
-      ctx.fillStyle = '#f6f';
-      const _sp = 5, _startX = BASE_W/2 + offX - 3 * _sp;
-      for (let i = 0; i < 8; i++) {
-        ctx.globalAlpha = 0.55 + 0.25 * Math.sin(game.animFrame * 0.12 + i * 0.5);
-        ctx.fillRect(Math.round(_startX + i * _sp) - 1, BASE_H/2 + 24, 2, 2);
-      }
-      ctx.restore();
-    }
+    // (GUI-simplify DELETE: the '~40 ENEMIES / 8 WAVES' count label — near-constant,
+    // zero information — and the banner-row challenge pips [dup of the brief panel].)
     // Mutation banner — clear space below the panel (PB info is in right stat column)
     if (game.stageMutation) {
       const m = game.stageMutation;
@@ -17905,7 +17823,7 @@ function drawStageIntro() {
 
   // SYNERGY DISTANCE HINT — show OVERLOAD/BLINK/HEAVY distance when no synergy
   // is active. Helps the player prioritize pickups (e.g., "OVERLOAD: +1 N").
-  if (slide >= 1 && game.lvl && !game.activeSynergy) {
+  if (!minimalHud && slide >= 1 && game.lvl && !game.activeSynergy) {
     const lvS = game.lvl.S || 1, lvN = game.lvl.N || 1, lvP = game.lvl.P || 1;
     // Compute distances; only show if very close (need ≤2 total upgrades)
     const distOverload = Math.max(0, 5 - lvS) + Math.max(0, 3 - lvN) + Math.max(0, 3 - lvP);
@@ -17924,7 +17842,7 @@ function drawStageIntro() {
   // POWER CARRY-OVER — small S/N/P readout + active WEAPON SYNERGY label so the
   // player can plan pickup priorities for the new stage from the intro alone.
   // Drawn above the pilot quote band, fades in with same slide timing.
-  if (slide >= 1 && game.lvl) {
+  if (!minimalHud && slide >= 1 && game.lvl) {
     const lvS = game.lvl.S || 1, lvN = game.lvl.N || 1, lvP = game.lvl.P || 1;
     const synergyLabel = game.activeSynergy
                        ? game.activeSynergy
@@ -17989,34 +17907,19 @@ function drawStageIntro() {
     const _cnBlink = blinkPhase(2);
     drawRetroText('CHALLENGE NEXT', BASE_W/2, BASE_H - 38, 5, _cnBlink ? '#f6f' : '#fff');
   } else if (slide >= 1 && !isBoss && !isChallenge) {
-    // CHALLENGE-IN-N PEEK — when next challenge is 2-4 stages away, show small
-    // dim 'CHALL IN N' label. Helps planning + sustaining no-death runs.
-    let _cInN = 0;
-    for (let _s = game.stage + 1; _s < game.stage + 5; _s++) {
-      if (_s % BOSS_STAGE_INTERVAL === 0) break;
-      if (_s % 4 === 0) { _cInN = _s - game.stage; break; }
-    }
-    if (_cInN >= 2 && _cInN <= 4) {
-      drawRetroText('CHALL IN ' + _cInN, BASE_W/2, BASE_H - 38, 4, '#888');
-    }
+    // (GUI-simplify DELETE: 'CHALL IN N' — three text renderings of the stage
+    // schedule collapsed; the gated CYCLE DOTS strip is the one survivor.)
   }
 
   // BOSS COUNTDOWN PEEK — when next boss is 2-9 stages away, show dim
   // "BOSS IN N" tag so the player can plan power-up retention. Lives at
   // y = BASE_H - 30 so it doesn't conflict with BOSS NEXT / CHALL NEXT at -38.
-  if (slide >= 1 && !isBoss && !isBossNext) {
-    const _nextBossS = Math.ceil((game.stage + 1) / BOSS_STAGE_INTERVAL) * BOSS_STAGE_INTERVAL;
-    const _bossIn = _nextBossS - game.stage;
-    if (_bossIn >= 2 && _bossIn <= 9 && _nextBossS <= 80) {
-      const _biCol = _bossIn <= 2 ? '#fc8' : _bossIn <= 5 ? '#fc4' : '#888';
-      drawRetroText('BOSS IN ' + _bossIn, BASE_W/2, BASE_H - 30, 4, _biCol);
-    }
-  }
+  // (GUI-simplify DELETE: 'BOSS IN N' — schedule text #2; CYCLE DOTS survives.)
 
   // STAGE INTRO MARATHON PROGRESS — when no-death stage streak ≥ 2, show
   // current streak + distance to next milestone (5/10/20). Encourages
   // preservation by making progress visible at stage entry.
-  if (slide >= 1 && (game.zenStreak || 0) >= 2) {
+  if (!minimalHud && slide >= 1 && (game.zenStreak || 0) >= 2) {
     const zs = game.zenStreak;
     const nextMilestone = zs < 5 ? 5 : zs < 10 ? 10 : zs < 20 ? 20 : null;
     const label = nextMilestone
@@ -18027,14 +17930,7 @@ function drawStageIntro() {
 
   // PERK COUNTDOWN — show how many stages until the next boss (= next perk
   // pick opportunity). Useful for planning around expiring perks/build state.
-  if (slide >= 1 && !isBoss && game.stage > 0 && game.stage < 80) {
-    const nextBoss = Math.ceil(game.stage / 10) * 10;
-    const distance = nextBoss - game.stage;
-    if (distance > 0 && distance <= 5) {
-      drawRetroText('PERK IN ' + distance + ' STAGE' + (distance === 1 ? '' : 'S'),
-        BASE_W/2, BASE_H - 60, 4, '#888');
-    }
-  }
+  // (GUI-simplify DELETE: 'PERK IN N STAGES' — schedule text #3; CYCLE DOTS survives.)
 
   // STAGE INTRO ACTIVE PERK — if a perk is currently active (from prior boss),
   // surface it in the intro so the player knows their build going into the
@@ -18051,32 +17947,9 @@ function drawStageIntro() {
       ctx.restore();
     }
   }
-  // COUNTDOWN SECONDS — last ~1.5s of STAGE_INTRO countdown shown as 3/2/1
-  // bottom-center. Helps signal mission-imminent. Final 200ms (frames 12→1)
-  // flips to a brighter, larger cyan "GO!" so the handoff to PLAYING feels
-  // punchy instead of a stale "1" cutting to gameplay.
-  if (slide >= 1 && game.stageTimer > 0 && game.stageTimer <= 90) {
-    if (game.stageTimer <= 12) {
-      // STAGE LAUNCH GO! — final beat, slight scale pulse for liftoff feel
-      const _gp = 1 + 0.18 * Math.sin(game.animFrame * 0.9);
-      const _gs = Math.round(11 * _gp);
-      ctx.save();
-      ctx.shadowColor = '#0fc'; ctx.shadowBlur = 6;
-      drawRetroText('GO!', BASE_W/2, BASE_H - 16, _gs, '#0fc');
-      ctx.restore();
-    } else {
-      const _csNum = Math.ceil(game.stageTimer / 30);
-      const _csCol = _csNum === 1 ? '#fc4' : _csNum === 2 ? '#ff8' : '#888';
-      // Last second '1' picks up a small glow so the urgency builds into GO!.
-      ctx.save();
-      if (_csNum === 1) {
-        ctx.shadowColor = _csCol;
-        ctx.shadowBlur = 4;
-      }
-      drawRetroText(String(_csNum), BASE_W/2, BASE_H - 16, 9, _csCol);
-      ctx.restore();
-    }
-  }
+  // (GUI-simplify DELETE: the bottom 3/2/1+GO! mini countdown — it DISAGREED with
+  // the center countdown (ceil/30 vs 20-frame digits); the GO! beat moved to the
+  // center countdown below.)
   // PREV DEATH WARNING — if any of last 3 memorial entries died on this stage,
   // show small 'PREV DEATH HERE' red label. Encourages caution at danger stages.
   if (slide >= 1) {
@@ -18164,7 +18037,8 @@ function drawStageIntro() {
   // Each digit lasts 20 frames; "GO!" appears as timer hits 0 (handled by stage start).
   if (slide >= 1 && game.stageTimer <= 60) {
     let digit, digitCol, digitTimer;
-    if (game.stageTimer > 40)      { digit = '3'; digitCol = '#0f8'; digitTimer = 60 - game.stageTimer; }
+    if (game.stageTimer <= 12)     { digit = 'GO!'; digitCol = '#0fc'; digitTimer = 12 - game.stageTimer; } // launch beat (absorbed from the deleted bottom countdown)
+    else if (game.stageTimer > 40) { digit = '3'; digitCol = '#0f8'; digitTimer = 60 - game.stageTimer; }
     else if (game.stageTimer > 20) { digit = '2'; digitCol = '#ff4'; digitTimer = 40 - game.stageTimer; }
     else                            { digit = '1'; digitCol = '#f44'; digitTimer = 20 - game.stageTimer; }
     // Backdrop tint flash when a new digit begins (first 4 frames of each)
