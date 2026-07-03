@@ -2899,6 +2899,55 @@ if (typeof G.chooseDiveTactic === 'function') {
   }
 } else { console.log('  (skipped — chooseDiveTactic not exposed)'); }
 
+section('STORM FRONT — hazard weather strike (pure core + registry)');
+if (typeof G.weatherIsHazard === 'function' && typeof G.strikePhase === 'function'
+    && typeof G.weatherStrikeResolve === 'function') {
+  // Registry both sides: every hazard id exists in WEATHER_TABLE, and its biome is
+  // actually produced by biomeForStage (a hazard can't be dead data). The peaceful
+  // set stays peaceful (deliberate hostile/peaceful split).
+  const wt = G.__getWeatherTable && G.__getWeatherTable();
+  if (wt) {
+    const hazards = ['storm', 'solar', 'vortex', 'sandstorm', 'meteor'];
+    let wired = true, reachable = true;
+    const cycle = new Set();
+    for (let st = 8; st <= 8 + 12 * 4; st += 4) { const b = G.biomeForStage(st); if (b) cycle.add(b); }
+    for (const h of hazards) {
+      if (!G.weatherIsHazard(h)) wired = false;
+      if (!wt[h]) wired = false;
+      else if (!cycle.has(wt[h].biome)) reachable = false;
+    }
+    ok(wired, 'all 5 hazard ids are flagged AND exist in WEATHER_TABLE');
+    ok(reachable, 'every hazard weather maps to a biome the cycle actually produces');
+    ok(!G.weatherIsHazard('blizzard') && !G.weatherIsHazard('rockslide')
+       && !G.weatherIsHazard('aurora') && !G.weatherIsHazard('golden'),
+       'peaceful weathers stay peaceful (blizzard/rockslide keep their old roles)');
+    ok(!G.weatherIsHazard('not-a-weather'), 'unknown id is not a hazard');
+  }
+
+  // strikePhase — boundary exactness with defaults (tel 42, act 8).
+  ok(G.strikePhase(0, 480) === 'idle', 't=0 → idle');
+  ok(G.strikePhase(480 - 43, 480) === 'idle', 'one frame before the telegraph → idle');
+  ok(G.strikePhase(480 - 42, 480) === 'telegraph', 'telegraph opens exactly TELEGRAPH frames early');
+  ok(G.strikePhase(479, 480) === 'telegraph', 'last pre-impact frame → telegraph');
+  ok(G.strikePhase(480, 480) === 'active', 'impact frame → active');
+  ok(G.strikePhase(487, 480) === 'active', 'last lethal frame (act 8) → active');
+  ok(G.strikePhase(488, 480) === 'idle', 'after the active window → idle (caller re-arms)');
+  ok(G.strikePhase(-5, 480) === 'idle' && G.strikePhase(10, 0) === 'idle', 'bad inputs → idle (never a surprise strike)');
+  // The fairness floor: the telegraph is LONGER than a boss dive's 30-frame preview.
+  ok(G.strikePhase(480 - 36, 480) === 'telegraph', 'telegraph ≥ 36f (longer read than a lone dive)');
+
+  // weatherStrikeResolve — the verb ladder.
+  ok(G.weatherStrikeResolve(0, 10, true, false, 8) === 'parry', 'dash-through inside the column → STORM PARRY');
+  ok(G.weatherStrikeResolve(0, 10, true, true, 8) === 'parry', 'dash beats i-frames in priority (parry credit)');
+  ok(G.weatherStrikeResolve(5, 10, false, true, 8) === 'immune', 'i-frames inside → immune (no death, no credit)');
+  ok(G.weatherStrikeResolve(-9, 10, false, false, 8) === 'hit', 'inside the column, no defense → hit (routes to the killPlayer ladder)');
+  ok(G.weatherStrikeResolve(10, 10, false, false, 8) === 'hit', 'column edge inclusive');
+  ok(G.weatherStrikeResolve(15, 10, false, false, 8) === 'graze', 'just outside → graze (near-miss vocabulary)');
+  ok(G.weatherStrikeResolve(18, 10, false, false, 8) === 'graze', 'graze band edge inclusive');
+  ok(G.weatherStrikeResolve(19, 10, false, false, 8) === 'safe', 'clear of the band → safe');
+  ok(G.weatherStrikeResolve(NaN, 10, false, false, 8) === 'safe', 'NaN dx → safe (never a surprise kill)');
+} else { console.log('  (skipped — STORM FRONT core not exposed)'); }
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);

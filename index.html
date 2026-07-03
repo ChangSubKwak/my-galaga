@@ -4087,6 +4087,46 @@ const WEATHER_TABLE = {
   starBirth: { biome: 'nebula',    label: 'STAR BIRTH',    col: '#fff', whisper: 'LIGHT BEGINS HERE' }
 };
 
+// ===== STORM FRONT — the biome takes a shot =====
+// The five HAZARD weathers stop being wallpaper: on a long cadence they fire ONE
+// telegraphed vertical strike-column, answered with the exact verbs the player
+// already owns — dash through it = STORM PARRY, witch-time/shield absorb it (the
+// same killPlayer ladder as a bullet), skim its edge = graze. One strike at a time,
+// a >=42-frame telegraph (longer than a boss dive's 30), normal PLAYING stages only.
+// The other weathers (blizzard slow, rockslide bonus rocks, aurora/golden/ashfall/
+// starBirth/debris ambience) stay peaceful — a deliberate hostile/peaceful split.
+const HAZARD_WEATHER = new Set(['storm', 'solar', 'vortex', 'sandstorm', 'meteor']);
+function weatherIsHazard(id) { return HAZARD_WEATHER.has(id); }
+const STRIKE_TELEGRAPH = 42; // frames of readable warning before the hit
+const STRIKE_ACTIVE = 8;     // frames the column is lethal
+// Pure: where a strike cycle is, given its up-counting timer. idle -> telegraph
+// (last STRIKE_TELEGRAPH frames before interval) -> active (STRIKE_ACTIVE frames).
+function strikePhase(timer, interval, tel, act) {
+  tel = tel == null ? STRIKE_TELEGRAPH : tel;
+  act = act == null ? STRIKE_ACTIVE : act;
+  if (!(timer >= 0) || !(interval > 0)) return 'idle';
+  if (timer < interval - tel) return 'idle';
+  if (timer < interval) return 'telegraph';
+  if (timer < interval + act) return 'active';
+  return 'idle';
+}
+// Pure: how the player answers a landing strike. Priority mirrors the combat verbs:
+// dash-through beats everything (PARRY), i-frames shrug it ('immune'), inside the
+// column otherwise = 'hit' (the caller routes it through the SAME witch-time ->
+// killPlayer ladder as a bullet, so cheat/shield/witch all still save), a near edge
+// = 'graze', clear = 'safe'. NaN-safe: bad dx reads as safe (never a surprise kill).
+function weatherStrikeResolve(dx, halfW, dashing, invincible, grazeBand) {
+  const ax = Math.abs(dx);
+  if (!isFinite(ax)) return 'safe';
+  if (ax <= halfW) {
+    if (dashing) return 'parry';
+    if (invincible) return 'immune';
+    return 'hit';
+  }
+  if (ax <= halfW + grazeBand) return 'graze';
+  return 'safe';
+}
+
 function pickStageWeather() {
   if (!game) return null;
   const _stageMode = stageModeFor(game.stage);
@@ -4102,7 +4142,9 @@ function pickStageWeather() {
   return {
     id, label: info.label, col: info.col, whisper: info.whisper,
     frames: 0, banner: 180,
-    rocks: [], rockTimer: 90
+    rocks: [], rockTimer: 90,
+    // STORM FRONT strike state (only ticked when weatherIsHazard(id))
+    strikeTimer: 0, strikeInterval: 480 + randInt(240), strikeX: 0, strikeResolved: false
   };
 }
 
@@ -4115,6 +4157,77 @@ function updateStageWeather() {
   const w = game.stageWeather;
   w.frames++;
   if (w.banner > 0) w.banner--;
+
+  // ===== STORM FRONT strike cycle =====
+  // Only on normal PLAYING (pickStageWeather already returns null on boss/challenge),
+  // with a live player, formation fully entered, and not during end-of-stage grace —
+  // the environment fights fair. One strike at a time on a 8-12s cadence.
+  if (weatherIsHazard(w.id) && game.state === STATE.PLAYING && game.playerAlive
+      && game.allEntered && (game.stageEndGraceTimer || 0) === 0) {
+    const _prevPh = strikePhase(w.strikeTimer, w.strikeInterval);
+    w.strikeTimer++;
+    const _ph = strikePhase(w.strikeTimer, w.strikeInterval);
+    // Biome-key sonic voice (graft from the design panel): strike cues transpose to
+    // the biome's BGM key via biomeBgmPitch -> cents, so a solar strike in corona and
+    // a vortex strike in the black hole answer in different keys.
+    const _bioCents = (typeof biomeBgmPitch === 'function' && typeof biomeForStage === 'function')
+      ? Math.round(1200 * Math.log(biomeBgmPitch(biomeForStage(game.stage)) || 1) / Math.LN2) : 0;
+    if (_ph === 'telegraph' && _prevPh === 'idle') {
+      // Telegraph opens: pick the column, warn by sound + (in draw) the tinted column.
+      w.strikeX = 20 + Math.random() * (BASE_W - 40);
+      w.strikeResolved = false;
+      playSound('enemyDive', w.strikeX, _bioCents);
+      // Once per run, the enemy comms notice the sky joining the fight.
+      if (!game._stormFrontSeen && typeof pushIntercept === 'function') {
+        game._stormFrontSeen = true;
+        pushIntercept('stormFront');
+      }
+    }
+    if (_ph === 'active' && !w.strikeResolved) {
+      w.strikeResolved = true;
+      playSound('explode', w.strikeX, _bioCents);
+      game.shakeTimer = Math.max(game.shakeTimer || 0, 6);
+      // The vector grid takes the impact too (fusion with the reactive floor).
+      if (typeof gridRipple === 'function') gridRipple(w.strikeX, BASE_H - 60, 2.4, 48);
+      const _verdict = weatherStrikeResolve(
+        w.strikeX - game.playerX, 10,
+        (game.dashTimer || 0) > 0, (game.invincibleTimer || 0) > 0, 8);
+      if (_verdict === 'parry') {
+        // STORM PARRY — dashing through the column deflects it. Same vocabulary as
+        // the dash parry: cyan spark + graze ping + parry stat; small fixed score
+        // (perk 'parryDividend' applies, matching bullet parries).
+        game.parryCount = (game.parryCount || 0) + 1;
+        game.weatherParries = (game.weatherParries || 0) + 1;
+        addScore(game.activePerk === 'parryDividend' ? 150 : 50);
+        if (game.hitSparks) game.hitSparks.push({ x: game.playerX, y: game.playerY - 6, life: 0 });
+        playSound('graze', game.playerX);
+        game.floatTexts.push({
+          x: game.playerX, y: game.playerY - 16, text: 'STORM PARRY',
+          color: '#0ff', life: 45, maxLife: 45, size: 6
+        });
+      } else if (_verdict === 'hit') {
+        // Same defensive ladder as a bullet: witch-time window first, then
+        // killPlayer (whose internal ladder still honors cheat/shield).
+        if (!tryTriggerWitchTime(w.strikeX, game.playerY)) {
+          killPlayer(w.strikeX, game.playerY, 'weather', null);
+        }
+      } else if (_verdict === 'graze') {
+        // Edge-skim = the near-miss vocabulary: extends (never grows) the combo hold.
+        if ((game.combo || 0) >= 5) {
+          game.comboTimer = Math.min(COMBO_DECAY, (game.comboTimer || 0) + 20);
+        }
+        game.nearMissChain = (game.nearMissChain || 0) + 1;
+        game.nearMissChainTimer = 90;
+        playSound('graze', game.playerX);
+      }
+    }
+    if (w.strikeTimer >= w.strikeInterval + STRIKE_ACTIVE) {
+      // Cycle complete — re-arm with a fresh cadence + column.
+      w.strikeTimer = 0;
+      w.strikeInterval = 480 + randInt(240);
+      w.strikeResolved = false;
+    }
+  }
 
   if (w.id === 'rockslide') {
     // Spawn rocks periodically, capped at ~6 simultaneously to avoid screen clutter
@@ -4615,6 +4728,56 @@ function drawStageWeather() {
     drawRetroText(w.whisper, BASE_W / 2, 48, 4, w.col, 'center');
   }
 
+  // ===== STORM FRONT strike column (read-only render — all state ticks in update) =====
+  // Telegraph: a w.col-tinted column fades in with a downward chevron (colorblind-safe
+  // shape) + animated edge; active: a bright core flash for the lethal 8 frames.
+  // Bright daylight biomes (sandstorm/desert) get a dark backing so the column reads
+  // on the lit sky (the WING TACTICS bright-biome lesson).
+  if (weatherIsHazard(w.id) && game.state === STATE.PLAYING && (w.strikeInterval || 0) > 0) {
+    const _ph = strikePhase(w.strikeTimer, w.strikeInterval);
+    if (_ph !== 'idle') {
+      const _sx = w.strikeX, _hw = 10;
+      ctx.save();
+      if (_ph === 'telegraph') {
+        const _tprog = 1 - (w.strikeInterval - w.strikeTimer) / STRIKE_TELEGRAPH; // 0→1
+        const _ta = 0.10 + 0.16 * _tprog;
+        if (game._brightBiome) { // legibility backing on lit skies
+          ctx.globalAlpha = 0.30 * _tprog + 0.10;
+          ctx.fillStyle = '#0a0608';
+          ctx.fillRect(_sx - _hw - 1, 0, (_hw + 1) * 2, BASE_H - 16);
+        }
+        ctx.globalAlpha = _ta;
+        ctx.fillStyle = w.col;
+        ctx.fillRect(_sx - _hw, 0, _hw * 2, BASE_H - 16);
+        // Animated bright edges (dashes slide downward — "incoming from above")
+        ctx.globalAlpha = 0.35 + 0.25 * _tprog;
+        const _off = (game.animFrame * 2) % 12;
+        for (let yy = -12 + _off; yy < BASE_H - 16; yy += 12) {
+          ctx.fillRect(_sx - _hw, Math.max(0, yy), 1, 6);
+          ctx.fillRect(_sx + _hw - 1, Math.max(0, yy), 1, 6);
+        }
+        // Downward chevron marker near the top (shape redundancy, not color-only)
+        const _cy = 18 + 4 * Math.sin(game.animFrame * 0.3);
+        ctx.globalAlpha = 0.55 + 0.35 * _tprog;
+        for (let k = 0; k < 5; k++) {
+          ctx.fillRect(_sx - 5 + k, _cy + k, 1, 1);
+          ctx.fillRect(_sx + 5 - k, _cy + k, 1, 1);
+        }
+      } else if (_ph === 'active') {
+        const _aprog = (w.strikeTimer - w.strikeInterval) / STRIKE_ACTIVE; // 0→1
+        const _aa = 0.75 * (1 - _aprog);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = _aa;
+        ctx.fillStyle = w.col;
+        ctx.fillRect(_sx - _hw, 0, _hw * 2, BASE_H - 16);
+        ctx.globalAlpha = _aa * 0.9;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(_sx - 2, 0, 4, BASE_H - 16);
+      }
+      ctx.restore();
+    }
+  }
+
   ctx.restore();
 }
 
@@ -4626,6 +4789,7 @@ const INTERCEPT_MSG = {
   formationSet:  ['IN POSITION. AWAIT.', 'GRID LOCKED.', 'FORMATION SET.'],
   commanderDown: ['LEAD WING DOWN!', 'COMMAND OFFLINE.', 'ALL UNITS: FREE FIRE.'],
   moraleBreak:   ['WE CANNOT HOLD!', 'SCATTER! DISPERSE!', 'FORMATION BROKEN!'],
+  stormFront:    ['THE SKY FIGHTS US TOO!', 'WEATHER WEAPONIZED!', 'EVEN THE STORM STRIKES!'],
   wingPincer:    ['WINGS — PINCER!', 'FLANK AND CONVERGE!', 'BOX THE TARGET IN!'],
   wingWall:      ['WALL FORMATION — DIVE!', 'LINE ABREAST, DESCEND!', 'OVERWHELM AS ONE!'],
   playerDown:    ['HOSTILE NEUTRALIZED.', 'TARGET DOWN. ADVANCE.', 'ENEMY ELIMINATED.'],
@@ -14103,6 +14267,7 @@ function spawnConfetti(count) {
 // Gray ambient tone — narrative voice, not gameplay alarm.
 const RESPAWN_WHISPERS = {
   bullet:    ['STAY MOBILE.',  'READ THE FIRE.', 'WATCH THE ARC.'],
+  weather:   ['READ THE SKY.', 'THE STORM TELEGRAPHS.', 'DASH THROUGH THE COLUMN.'],
   collision: ['KEEP DISTANCE.','MIND THE LINES.','DODGE EARLY.'   ],
   unknown:   ['REFOCUS.',      'STAND READY.',   'AGAIN.'         ]
 };
