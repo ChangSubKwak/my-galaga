@@ -291,9 +291,11 @@ function rumbleMul() { return rumbleMode === 'off' ? 0 : rumbleMode === 'low' ? 
 // Color-blind mode — adds white outlines + shape markers to enemy bullets so kind is identifiable
 // without relying on color alone.
 let colorBlindMode = localStorage.getItem('galagaColorBlind') === '1';
-// Minimal HUD — toggles off non-essential widgets (accuracy %, kill counter,
-// pity dots, etc.) for clean screenshot / focused gameplay. Persisted toggle.
-let minimalHud = localStorage.getItem('galagaMinimalHud') === '1';
+// Minimal HUD — hides non-essential widgets (accuracy %, kill counter, info
+// chips, enemy-comms flavor…). DEFAULT ON (2026-07: user directive "make the
+// overall GUI very simple" — simple is the default experience; M toggles the
+// detail view back on). A user who previously toggled it off ('0') is respected.
+let minimalHud = localStorage.getItem('galagaMinimalHud') !== '0';
 // ACCESSIBILITY — respect the OS "reduce motion" preference (WCAG): when set,
 // full-screen impact flashes are dampened (photosensitivity) and screen shake is
 // capped to 'low'. Read once at load; guarded so a missing matchMedia (e.g. the
@@ -8308,7 +8310,7 @@ function initInput() {
       minimalHud = !minimalHud;
       try { localStorage.setItem('galagaMinimalHud', minimalHud ? '1' : '0'); } catch (err) {}
       if (game) game.floatTexts.push({
-        x: BASE_W/2, y: 50, text: 'MINIMAL HUD: ' + (minimalHud ? 'ON' : 'OFF'),
+        x: BASE_W/2, y: 50, text: 'HUD: ' + (minimalHud ? 'SIMPLE' : 'DETAILED'),
         color: '#0cf', life: 50, maxLife: 50, size: 8
       });
     }
