@@ -2885,6 +2885,30 @@ if (typeof G.chooseDiveTactic === 'function') {
     ok(pair && pair[0].x === 60 && pair[1].x === 140, 'pincer picks the nearest flanker on each side of the target');
     ok(G.planPincerPair([{x:20},{x:40}], 100) === null, 'all candidates on one side → null (falls back to a lone dive)');
   }
+  // wingInterceptForPool — POOL-span clamp. The playfield-wide clamp let a moving player
+  // push the prediction outside the formation span, so planPincerPair could never
+  // bracket it and the maneuver silently aborted (PINCER was 100% suppressed vs a
+  // dashing player). Span-clamping guarantees a bracket whenever the pool spans ≥ 2 columns.
+  if (typeof G.wingInterceptForPool === 'function') {
+    const pool = []; for (let c = 0; c < 10; c++) pool.push({ x: 32 + c * 16 }); // stage-like formation x=32..176
+    // moving player (2.5 px/f): prediction 112+100=212 would clamp to 208 playfield-wide
+    // (outside the span) — span clamp keeps it bracketable.
+    const tMove = G.wingInterceptForPool(112, 2.5, pool);
+    ok(G.planPincerPair(pool, tMove) !== null, 'moving player → pincer still commits (span-clamped target is bracketable)');
+    // dashing player (6.5 px/f): prediction 112+260=372 — worst case, still bracketable.
+    const tDash = G.wingInterceptForPool(112, 6.5, pool);
+    ok(G.planPincerPair(pool, tDash) !== null, 'dashing player → pincer still commits');
+    ok(tDash <= 175 && tDash >= 32, 'dash target clamped inside the pool span [poolMin, poolMax-1]');
+    // leftward dash symmetric.
+    const tLeft = G.wingInterceptForPool(112, -6.5, pool);
+    ok(G.planPincerPair(pool, tLeft) !== null, 'leftward dash → pincer still commits');
+    // single-column pool degenerates → target = the column → planPincerPair nulls (clean lone-dive fallback).
+    const one = [{ x: 96 }, { x: 96 }];
+    ok(G.planPincerPair(one, G.wingInterceptForPool(200, 6.5, one)) === null, 'single-column pool → null → lone-dive fallback');
+    // empty pool guard — safe centre, no NaN/Infinity.
+    const tEmpty = G.wingInterceptForPool(112, 2.5, []);
+    ok(isFinite(tEmpty), 'empty pool → finite safe value (no Infinity out)');
+  }
   // planWallRun — contiguous run of `size`, centre nearest target; null if too few.
   {
     const cs = [{x:10},{x:30},{x:50},{x:150},{x:170}];

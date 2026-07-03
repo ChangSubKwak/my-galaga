@@ -3691,13 +3691,32 @@ function planWallRun(candidates, targetX, size) {
   return best;
 }
 
+// Pure: intercept clamped to the POOL's bracketable x-span (not the playfield). A
+// playfield-wide clamp let a fast/dashing player push the prediction outside the
+// formation's span, so planPincerPair could never bracket it and the maneuver silently
+// aborted — the player-PREDICTING tactic couldn't fire at a moving player. Clamping to
+// [poolMin, poolMax-1] guarantees a bracket whenever the pool spans ≥ 2 columns (a
+// single-column pool degenerates to poolMin → planPincerPair nulls → clean lone-dive
+// fallback). Outer [16, BASE_W-16] keeps the aim on-screen. Logic-tested.
+function wingInterceptForPool(playerX, playerVX, pool) {
+  if (!pool || !pool.length) return BASE_W / 2;
+  let mnX = Infinity, mxX = -Infinity;
+  for (let i = 0; i < pool.length; i++) {
+    const x = pool[i].x;
+    if (x < mnX) mnX = x;
+    if (x > mxX) mxX = x;
+  }
+  return predictIntercept(playerX, playerVX, WING_LEAD_FRAMES,
+                          Math.max(16, mnX), Math.min(BASE_W - 16, mxX - 1));
+}
+
 // Impure: launch a coordinated maneuver on the live formation. Returns true if it
 // committed (enough non-boss, non-previewing formation enemies), else false so the caller
 // falls back to a single random dive. Bosses excluded (they run their own escort dives).
 function launchDiveTactic(tactic, candidates) {
   const pool = candidates.filter(e => e.type !== 'boss' && !e.previewTimer && e.state === 'formation');
   if (pool.length < tactic.size) return false;
-  const targetX = predictIntercept(game.playerX, game.playerVX, WING_LEAD_FRAMES, 16, BASE_W - 16);
+  const targetX = wingInterceptForPool(game.playerX, game.playerVX, pool);
   const squad = (tactic.id === 'pincer')
     ? planPincerPair(pool, targetX)
     : planWallRun(pool, targetX, tactic.size);
@@ -3729,6 +3748,10 @@ function launchDiveTactic(tactic, candidates) {
 function wingTacticColor() {
   if (game && typeof biomeForStage === 'function') {
     const _b = biomeForStage(game.stage);
+    // Bright daylight biomes: the biome tint is near-invisible against its own lit sky
+    // (planet '#48f' vs sky '#4f86c6' ≈ imperceptible at dot alpha) — fall back to the
+    // lone-dive crimson so the COORDINATED telegraph never reads weaker than a lone one.
+    if (_b && typeof biomeIsBright === 'function' && biomeIsBright(_b)) return COL.red;
     if (_b && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_b]) return BIOME_NAMES[_b].col;
   }
   return '#fc4';
@@ -5238,7 +5261,12 @@ function updateVectorGrid() {
   // DIVE WAKES — diving / kamikaze enemies drag a soft tight wake through the grid so
   // an incoming threat visibly disturbs the floor (weighty dives), not just kills.
   // Weak continuous push + a small radius = a trailing dent that recovers behind them.
-  if (game && game.enemies && (game.animFrame & 1) === 0) {
+  // Gated to states where enemies actually MOVE (combat + RESPAWN, whose branch still
+  // runs updateEnemies) — otherwise frozen divers pump a stationary hot ripple through
+  // PAUSED / CAPTURED / GAME_OVER and the grid never settles. The spring relaxation and
+  // the explosion-scan hook above stay global so in-flight energy still decays.
+  if (game && game.enemies && (game.animFrame & 1) === 0
+      && (isCombatState() || game.state === STATE.RESPAWN)) {
     for (let i = 0; i < game.enemies.length; i++) {
       const e = game.enemies[i];
       if (!e.alive) continue;
@@ -6229,12 +6257,14 @@ function resetGame() {
     commanderRageTimer: 0,
     commanderKills: 0,
     formationPanicked: false,
+    panicFiredThisStage: false,
     panicTimer: 0,
     formationMaxCount: 0,
     // WING TACTICS — sim-rate player velocity (for pincer intercept prediction) + the
-    // once-per-run per-maneuver-type intercept guard.
+    // once-per-run per-maneuver-type intercept guard. _prevPlayerX matches the playerX
+    // init so the first frame of a fresh run reads VX 0, not a phantom 112px jump.
     playerVX: 0,
-    _prevPlayerX: 0,
+    _prevPlayerX: BASE_W / 2,
     _wingSeen: null,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
@@ -11555,6 +11585,10 @@ function updateFormationBreathing() {
   const offY = Math.cos(game.breathPhase * 0.7) * 2;
   let _diveStartCount = 0;
   for (const e of game.enemies) {
+    // Corpse guard — a kill mid-telegraph leaves previewTimer ticking on the dead
+    // enemy: the corpse would flip to 'diving', push a phantom launch afterimage, and
+    // pollute the swarm-dive counter. Dead enemies take no part in formation motion.
+    if (!e.alive) continue;
     if (e.state === 'formation') {
       e.x = e.homeX + offX + (e.panicOffX || 0);
       e.y = e.homeY + offY + (e.panicOffY || 0);
@@ -11612,8 +11646,9 @@ function updateFormationBreathing() {
     game.swarmWarnCooldown = 180;
     playSound('tick');
   }
-  if ((game.swarmWarnLife || 0) > 0) game.swarmWarnLife--;
-  if ((game.swarmWarnCooldown || 0) > 0) game.swarmWarnCooldown--;
+  // (swarmWarnLife/Cooldown decrements live in update()'s state-independent timer
+  // block — decrementing here froze a stale 'SWARM DIVE!' banner over GAME_OVER /
+  // CAPTURED, where this function stops running.)
 }
 
 function updateEnemies() {
@@ -11981,6 +12016,7 @@ function updateEnemies() {
       }
       // Snapshot formation size for morale threshold calculation.
       game.formationMaxCount = game.enemies.filter(en => en.alive).length;
+      game.panicFiredThisStage = false; // re-arm the once-per-stage morale-break latch
       // SIGNAL INTERCEPT — broadcast formation-set chatter on first locked position
       if (typeof pushIntercept === 'function') pushIntercept('formationSet');
     }
@@ -12736,14 +12772,19 @@ function updateCollisions() {
           }
           game.explosions.push({x: e.x, y: e.y, timer: 0, maxTime: 20});
           // FORMATION MORALE BREAK — check if alive count crossed the 40% threshold.
-          // Only fires once per stage (formationPanicked gate). Requires formationMaxCount > 0
+          // Truly once per stage via panicFiredThisStage (the live formationPanicked
+          // flag clears when the 300f scatter ends, so gating on it alone re-fired the
+          // break — banner + intercept + scatter — on every kill after the window and
+          // flickered the WING TACTICS panic gate). Requires formationMaxCount > 0
           // so it never triggers on the very first kill before allEntered.
           if (game.state === STATE.PLAYING && game.allEntered && !game.formationPanicked
+              && !game.panicFiredThisStage
               && (game.formationMaxCount || 0) > 0) {
             const _aliveNow = game.enemies.filter(en => en.alive).length;
             const _threshold = Math.ceil(game.formationMaxCount * 0.40);
             if (_aliveNow > 0 && _aliveNow <= _threshold) {
               game.formationPanicked = true;
+              game.panicFiredThisStage = true;
               game.panicTimer = 300;
               if (typeof pushIntercept === 'function') pushIntercept('moraleBreak');
               // Assign scatter targets to all alive formation enemies
@@ -15337,6 +15378,10 @@ function update() {
     if ((game.comboLostVignette || 0) > 0) game.comboLostVignette--;
     // Rare spawn alert tick (UFO / golden bee announcement)
     if ((game.rareSpawnAlertLife || 0) > 0) game.rareSpawnAlertLife--;
+    // Swarm-dive warning fade + re-arm cooldown — state-independent so the banner
+    // never freezes over GAME_OVER/CAPTURED (moved from updateFormationBreathing).
+    if ((game.swarmWarnLife || 0) > 0) game.swarmWarnLife--;
+    if ((game.swarmWarnCooldown || 0) > 0) game.swarmWarnCooldown--;
     // Ambient event tick (cargoShip drift / supernova fade). Frozen during PAUSED with
     // the rest of these atmospheric timers so the scene holds in place while paused.
     updateAmbientEvent();
@@ -15448,6 +15493,18 @@ function update() {
       break;
 
     case STATE.STAGE_INTRO:
+      // BIOME-TRANSITION ONE-SHOT — detect "we changed biome" + play the fanfare ONCE
+      // per stage intro, at sim rate. Previously lived in drawStageIntro gated on
+      // introElapsed === 0 (a draw-side mutation + SFX that was skipped whenever the
+      // accumulator batched 2+ updates per frame, and killed the extended flash after
+      // frame 0). Self-keyed by stage number — no reset sites needed.
+      if (game._introBiomeStage !== game.stage) {
+        game._introBiomeStage = game.stage;
+        const _ibid = typeof biomeForStage === 'function' ? biomeForStage(game.stage) : null;
+        game._biomeTransIntro = _ibid !== null && _ibid !== (game._lastBiomeId || null);
+        game._lastBiomeId = _ibid;
+        if (game._biomeTransIntro && typeof playSound === 'function') playSound('milestone');
+      }
       // STAGE_INTRO SKIP — once ≥ 30 frames of intro have shown (warp + biome
       // flash + first boss klaxon played), a fire press fast-forwards the
       // countdown to its final frame. Edge-detected so a held fire button only
@@ -15644,6 +15701,10 @@ function update() {
       if (game.respawnTimer <= 0) {
         game.playerAlive = true;
         game.playerX = BASE_W / 2;
+        // Sync the velocity history at the teleport — otherwise the first post-respawn
+        // frame reads a bogus playerVX (respawn jump ≠ real movement) into predictIntercept.
+        game._prevPlayerX = game.playerX;
+        game.playerVX = 0;
         game.invincibleTimer = 120; // ~2s of post-respawn iframes
         game.state = game.pausedState === STATE.BOSS_STAGE ? STATE.BOSS_STAGE : STATE.PLAYING;
         // RESPAWN CINEMATIC — visual rebirth at player position: cyan ring
@@ -17486,7 +17547,11 @@ function drawStageIntro() {
   if (introElapsed < 24) {
     const biomeId = typeof biomeForStage === 'function' ? biomeForStage(game.stage) : null;
     const flashCol = (biomeId && BIOME_NAMES[biomeId]) ? BIOME_NAMES[biomeId].col : '#0ff';
-    const _isTransition = biomeId !== null && biomeId !== (game._lastBiomeId || null);
+    // Transition detection + SFX + _lastBiomeId bookkeeping live in update()'s
+    // STAGE_INTRO branch (draw must not mutate state); this only READS the flag —
+    // which also fixes the extended 24f fanfare window (it used to collapse to 12f
+    // after the first frame because _lastBiomeId was overwritten draw-side).
+    const _isTransition = !!game._biomeTransIntro;
     const winLen = _isTransition ? 24 : 12;
     if (introElapsed < winLen) {
       const flashFade = 1 - introElapsed / winLen;
@@ -17496,13 +17561,6 @@ function drawStageIntro() {
       ctx.fillStyle = flashCol;
       ctx.fillRect(0, 0, BASE_W, BASE_H);
       ctx.restore();
-    }
-    // One-shot SFX + flag update on first frame of transition
-    if (_isTransition && introElapsed === 0 && typeof playSound === 'function') {
-      playSound('milestone');
-      game._lastBiomeId = biomeId;
-    } else if (introElapsed === 0) {
-      game._lastBiomeId = biomeId;
     }
   }
   if (introElapsed < 30) {
@@ -18740,10 +18798,13 @@ function drawGameplay() {
           ctx.globalCompositeOperation = 'lighter';
           const _pulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.12 + e.x * 0.04);
           const _base = (auraStage ? 0.07 : 0.13) + 0.04 * _pulse;
+          // Warper teleport: fade the halo with the sprite (same curve/floor as
+          // drawWarper) so the glow square doesn't hang at full brightness mid-warp.
+          const _wf = (e.type === 'warper' && e.warpFade) ? Math.max(0.10, 1 - e.warpFade) : 1;
           ctx.fillStyle = _ei.col;
-          ctx.globalAlpha = _base;
+          ctx.globalAlpha = _base * _wf;
           ctx.fillRect(e.x - 8, e.y - 8, 16, 16);
-          ctx.globalAlpha = _base * 0.7;
+          ctx.globalAlpha = _base * 0.7 * _wf;
           ctx.fillRect(e.x - 6, e.y - 6, 12, 12);
           ctx.restore();
         }
