@@ -173,6 +173,7 @@ const shim = `
 ;try { globalThis.__getPowerupCol = function () { return (typeof POWERUP_COL !== 'undefined') ? POWERUP_COL : null; }; } catch (e) {}
 ;try { globalThis.__getGradeCol = function () { return (typeof GRADE_COL !== 'undefined') ? GRADE_COL : null; }; } catch (e) {}
 ;try { globalThis.__getVgrid = function () { return (typeof vgrid !== 'undefined') ? vgrid : null; }; } catch (e) {}
+;try { globalThis.__getDiveTactics = function () { return (typeof DIVE_TACTICS !== 'undefined') ? DIVE_TACTICS : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -2802,6 +2803,72 @@ if (typeof G.biomeBgmPitch === 'function' && typeof G.biomeForStage === 'functio
   }
   ok(wired, 'every non-planet biomeForStage output has a real transpose (registry wired)');
 } else { console.log('  (skipped — biomeBgmPitch not exposed)'); }
+
+section('WING TACTICS — dive director (pure core + registry)');
+if (typeof G.chooseDiveTactic === 'function') {
+  // chooseDiveTactic — panic disables, stage gates, commander boosts, deterministic on roll.
+  ok(G.chooseDiveTactic(20, true, true, 0.0) === null, 'panic → no coordinated tactic (shatters to lone dives)');
+  ok(G.chooseDiveTactic(1, false, false, 0.0) === null, 'stage 1 below all minStages → null');
+  ok(G.chooseDiveTactic(6, false, false, 0.0) !== null, 'stage 6 + roll 0 → a tactic (pincer available)');
+  ok(G.chooseDiveTactic(6, false, false, 0.99) === null, 'high roll → lone dive (a tactic is the exception, not the rule)');
+  ok(G.chooseDiveTactic(20, true, false, NaN) === null, 'NaN roll → null (no throw)');
+  // commander alive widens the tactic window (isCommander fusion): some roll misses without, hits with.
+  {
+    let boosted = false;
+    for (let r = 0; r < 1; r += 0.01) {
+      if (G.chooseDiveTactic(10, false, false, r) === null && G.chooseDiveTactic(10, true, false, r) !== null) { boosted = true; break; }
+    }
+    ok(boosted, 'commander alive raises tactic frequency (kill it → coordination drops)');
+  }
+  // both tactics reachable by sweeping roll at a stage where both are available.
+  {
+    const seen = new Set();
+    for (let r = 0; r < 1; r += 0.005) { const t = G.chooseDiveTactic(30, false, false, r); if (t) seen.add(t.id); }
+    ok(seen.has('pincer') && seen.has('wall'), 'both pincer + wall are reachable (selection covers the set)');
+  }
+  // wall gated to a later stage than pincer.
+  {
+    const s6 = new Set(); for (let r = 0; r < 1; r += 0.005) { const t = G.chooseDiveTactic(6, false, false, r); if (t) s6.add(t.id); }
+    ok(!s6.has('wall'), 'wall does not appear at stage 6 (minStage gate)');
+  }
+
+  // predictIntercept — lead math, clamp (fairness), NaN guard, zero-velocity identity.
+  ok(G.predictIntercept(100, 2, 10, 16, 208) === 120, 'lead: 100 + 2*10 = 120 (in bounds)');
+  ok(G.predictIntercept(100, 0, 40, 16, 208) === 100, 'zero velocity → current x (identity)');
+  ok(G.predictIntercept(200, 5, 40, 16, 208) === 208, 'runaway prediction clamps to playfield max (can never aim off-screen)');
+  ok(G.predictIntercept(20, -5, 40, 16, 208) === 16, 'leftward prediction clamps to playfield min');
+  { const v = G.predictIntercept(NaN, 2, 10, 16, 208); ok(v >= 16 && v <= 208, 'NaN playerX → safe in-bounds value (no NaN out)'); }
+
+  // planPincerPair — brackets targetX from both flanks; null if a side is empty.
+  {
+    const cs = [{x:20},{x:60},{x:140},{x:190}];
+    const pair = G.planPincerPair(cs, 100);
+    ok(pair && pair[0].x === 60 && pair[1].x === 140, 'pincer picks the nearest flanker on each side of the target');
+    ok(G.planPincerPair([{x:20},{x:40}], 100) === null, 'all candidates on one side → null (falls back to a lone dive)');
+  }
+  // planWallRun — contiguous run of `size`, centre nearest target; null if too few.
+  {
+    const cs = [{x:10},{x:30},{x:50},{x:150},{x:170}];
+    const run = G.planWallRun(cs, 40, 3);
+    ok(run && run.length === 3 && run[0].x <= run[1].x && run[1].x <= run[2].x, 'wall run = 3 enemies sorted left→right');
+    ok(G.planWallRun([{x:10},{x:20}], 15, 3) === null, 'fewer candidates than size → null');
+  }
+
+  // DIVE_TACTICS registry guard — minStage ascending, size≥2, every id wired in source.
+  if (G.__getDiveTactics) {
+    const reg = G.__getDiveTactics();
+    ok(Array.isArray(reg) && reg.length >= 2, 'DIVE_TACTICS has ≥ 2 entries');
+    let ascending = true, sized = true, launchWired = true;
+    for (let i = 0; i < reg.length; i++) {
+      if (i > 0 && reg[i].minStage < reg[i-1].minStage) ascending = false;
+      if (!(reg[i].size >= 2)) sized = false;
+      if (scriptSrc.indexOf("'" + reg[i].id + "'") < 0) launchWired = false;
+    }
+    ok(ascending, 'DIVE_TACTICS minStage is ascending');
+    ok(sized, 'every tactic needs ≥ 2 enemies (it is a COORDINATED maneuver)');
+    ok(launchWired, 'every tactic id is referenced in source (launch switch wired both sides)');
+  }
+} else { console.log('  (skipped — chooseDiveTactic not exposed)'); }
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);

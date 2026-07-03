@@ -3603,6 +3603,120 @@ function createEntryPath(startX, startY, endX, endY, curveDir) {
   };
 }
 
+// ===== WING TACTICS — the Dive Director =====
+// Turns random lone dives into telegraphed, player-PREDICTING coordinated maneuvers
+// (PINCER / WALL). Coordination is a LEGIBLE state of the swarm: it's more likely while
+// the tactical commander is alive (isCommander) and DISABLED entirely during formation
+// panic (formationPanicked) — so killing the commander or tripping the panic threshold
+// visibly shatters coordination back into chaotic solo dives. Rides the EXISTING 30f→36f
+// preview telegraph + path-dots + swarm warning (no new render layer); the coordinated
+// multi-threat frames route their payoff through the parry / CLUSTER PARRY / witch-time /
+// combo systems that already score — ZERO new points. NOTE: keyed strictly off the LIVE
+// panic (formationPanicked) + commander systems; the old enemyMorale/MORALE_STATES were
+// removed — 'panic' here is the independent formation-panic mechanic (name collision only).
+const DIVE_TACTICS = [
+  { id: 'pincer', minStage: 6,  size: 2, name: 'PINCER' },
+  { id: 'wall',   minStage: 11, size: 3, name: 'WALL' }
+];
+const WING_LEAD_FRAMES = 40; // how far ahead a pincer predicts the player (clamped to playfield)
+const WING_PREVIEW = 36;     // coordinated maneuvers telegraph 6f longer than a lone dive (30)
+const WING_COOLDOWN = 60;    // extra diveTimer delay after a maneuver so tactics never stack
+
+// Pure: pick a coordinated tactic (or null). Deterministic given roll∈[0,1). Panic → null,
+// so a shattered formation reverts to lone dives. Commander alive raises the odds.
+function chooseDiveTactic(stage, commanderAlive, panicked, roll) {
+  if (panicked) return null;
+  const avail = DIVE_TACTICS.filter(t => stage >= t.minStage);
+  if (avail.length === 0) return null;
+  let p = 0.12 + Math.max(0, stage - 6) * 0.012; // ramps with stage
+  if (commanderAlive) p *= 1.5;                   // intact command = crisper tactics
+  if (p > 0.6) p = 0.6;                            // never a coin-flip-or-worse
+  if (!(roll < p)) return null;                    // most dives stay lone (NaN roll → null)
+  const idx = Math.floor((roll / p) * avail.length) % avail.length;
+  return avail[idx];
+}
+
+// Pure: predict where the player will be in leadFrames, clamped to the playfield. NaN-safe
+// (zero/absent velocity → current x; non-finite → playfield centre). The clamp is the
+// fairness guard — a pincer can never aim off-screen or perfectly pin a screen edge.
+function predictIntercept(playerX, playerVX, leadFrames, minX, maxX) {
+  let x = playerX + (playerVX || 0) * leadFrames;
+  if (!isFinite(x)) x = playerX;
+  if (!isFinite(x)) x = (minX + maxX) / 2;
+  return Math.max(minX, Math.min(maxX, x));
+}
+
+// Pure: the nearest formation enemy on each side of targetX → [left, right], or null when
+// a side is empty (caller falls back to a lone dive). The pair brackets the predicted
+// player position from opposite flanks. left.x ≤ targetX ≤ right.x.
+function planPincerPair(candidates, targetX) {
+  let left = null, right = null, ld = Infinity, rd = Infinity;
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    if (c.x <= targetX) { const d = targetX - c.x; if (d < ld) { ld = d; left = c; } }
+    else                { const d = c.x - targetX; if (d < rd) { rd = d; right = c; } }
+  }
+  if (!left || !right) return null;
+  return [left, right];
+}
+
+// Pure: a horizontal run of `size` formation enemies whose centre is nearest targetX →
+// the wall (sorted left→right so they descend as a line), or null if fewer than `size`.
+function planWallRun(candidates, targetX, size) {
+  if (!candidates || candidates.length < size) return null;
+  const sorted = candidates.slice().sort((a, b) => a.x - b.x);
+  let best = null, bestD = Infinity;
+  for (let i = 0; i + size <= sorted.length; i++) {
+    const win = sorted.slice(i, i + size);
+    const cx = (win[0].x + win[win.length - 1].x) / 2;
+    const d = Math.abs(cx - targetX);
+    if (d < bestD) { bestD = d; best = win; }
+  }
+  return best;
+}
+
+// Impure: launch a coordinated maneuver on the live formation. Returns true if it
+// committed (enough non-boss, non-previewing formation enemies), else false so the caller
+// falls back to a single random dive. Bosses excluded (they run their own escort dives).
+function launchDiveTactic(tactic, candidates) {
+  const pool = candidates.filter(e => e.type !== 'boss' && !e.previewTimer && e.state === 'formation');
+  if (pool.length < tactic.size) return false;
+  const targetX = predictIntercept(game.playerX, game.playerVX, WING_LEAD_FRAMES, 16, BASE_W - 16);
+  const squad = (tactic.id === 'pincer')
+    ? planPincerPair(pool, targetX)
+    : planWallRun(pool, targetX, tactic.size);
+  if (!squad || squad.length < 2) return false;
+  squad.forEach((e, i) => {
+    e.previewTimer = WING_PREVIEW + (tactic.id === 'wall' ? i * 3 : 0); // wall staggers slightly
+    e.previewMax = e.previewTimer;
+    // pincer flankers arc toward the centre (converge on the target); wall keeps its natural side.
+    const side = (tactic.id === 'pincer') ? (e.x <= targetX ? 1 : -1) : (e.x < BASE_W / 2 ? 1 : -1);
+    e.previewPath = createLoopPath(e.x, e.y, side);
+    e._wingTactic = tactic.id;
+  });
+  playSound('enemyDive', targetX);
+  // Reuse the existing 3+-dive swarm warning as the "read this" cue (respects its cooldown).
+  if ((game.swarmWarnCooldown || 0) <= 0) { game.swarmWarnLife = 36; game.swarmWarnCooldown = 180; }
+  // One ambient enemy-comms line the FIRST time each maneuver type appears this run (no spam).
+  game._wingSeen = game._wingSeen || {};
+  if (!game._wingSeen[tactic.id] && typeof pushIntercept === 'function') {
+    game._wingSeen[tactic.id] = true;
+    pushIntercept(tactic.id === 'pincer' ? 'wingPincer' : 'wingWall');
+  }
+  return true;
+}
+
+// Telegraph tint for a coordinated maneuver — biome colour so a PINCER in the ice field
+// reads cold and a WALL in corona reads hot (fuses the shipped biome identity). Warm amber
+// before biomes begin (stage < 8).
+function wingTacticColor() {
+  if (game && typeof biomeForStage === 'function') {
+    const _b = biomeForStage(game.stage);
+    if (_b && typeof BIOME_NAMES !== 'undefined' && BIOME_NAMES[_b]) return BIOME_NAMES[_b].col;
+  }
+  return '#fc4';
+}
+
 // --- Game data ---
 let game, keys, stars;
 
@@ -4474,6 +4588,8 @@ const INTERCEPT_MSG = {
   formationSet:  ['IN POSITION. AWAIT.', 'GRID LOCKED.', 'FORMATION SET.'],
   commanderDown: ['LEAD WING DOWN!', 'COMMAND OFFLINE.', 'ALL UNITS: FREE FIRE.'],
   moraleBreak:   ['WE CANNOT HOLD!', 'SCATTER! DISPERSE!', 'FORMATION BROKEN!'],
+  wingPincer:    ['WINGS — PINCER!', 'FLANK AND CONVERGE!', 'BOX THE TARGET IN!'],
+  wingWall:      ['WALL FORMATION — DIVE!', 'LINE ABREAST, DESCEND!', 'OVERWHELM AS ONE!'],
   playerDown:    ['HOSTILE NEUTRALIZED.', 'TARGET DOWN. ADVANCE.', 'ENEMY ELIMINATED.'],
   comboCritical: ['THREAT UNCONTAINED!', 'CRITICAL TARGET!', 'REQUEST BACKUP.'],
   lastStand:     ['FINISH IT NOW.', 'ONE LIFE REMAINS.', 'STRIKE — STRIKE!'],
@@ -6098,6 +6214,11 @@ function resetGame() {
     formationPanicked: false,
     panicTimer: 0,
     formationMaxCount: 0,
+    // WING TACTICS — sim-rate player velocity (for pincer intercept prediction) + the
+    // once-per-run per-maneuver-type intercept guard.
+    playerVX: 0,
+    _prevPlayerX: 0,
+    _wingSeen: null,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
     comboArsenalClaimed: {},
@@ -8792,6 +8913,10 @@ function updatePlayer() {
   }
   const shipW = game.dualFighter ? 18 : 8;
   game.playerX = Math.max(shipW, Math.min(BASE_W - shipW, game.playerX));
+  // WING TACTICS — sim-rate horizontal velocity (px/frame), sampled AFTER the clamp so a
+  // wall-hugging player reads as stationary (fair). Feeds predictIntercept for pincers.
+  game.playerVX = game.playerX - (game._prevPlayerX != null ? game._prevPlayerX : game.playerX);
+  game._prevPlayerX = game.playerX;
 
   // Shoot — speed/count/power scale with power-up levels and ship loadout
   const n = game.lvl.N;
@@ -11851,7 +11976,24 @@ function updateEnemies() {
       game.diveTimer = 0;
       // Pick a random formation enemy to dive
       const candidates = game.enemies.filter(e => e.alive && e.state === 'formation');
-      if (candidates.length > 0) {
+      // WING TACTICS — the Dive Director. On normal PLAYING stages, sometimes launch a
+      // COORDINATED maneuver (PINCER / WALL) instead of a lone dive: disabled during panic,
+      // likelier while the commander lives. If one commits, add a cooldown so tactics never
+      // stack (guards against the mass-dive slowdown) and skip the lone-dive path this tick.
+      let _wingLaunched = false;
+      if (game.state === STATE.PLAYING && candidates.length > 0) {
+        const _tactic = chooseDiveTactic(
+          game.stage,
+          candidates.some(c => c.isCommander),
+          !!game.formationPanicked,
+          Math.random()
+        );
+        if (_tactic && launchDiveTactic(_tactic, candidates)) {
+          _wingLaunched = true;
+          game.diveTimer = -WING_COOLDOWN; // extend the gap before the next dive trigger
+        }
+      }
+      if (!_wingLaunched && candidates.length > 0) {
         const e = candidates[randInt(candidates.length)];
         // Boss might try to capture
         if (e.type === 'boss' && !e.capturedShip && !game.dualFighter && Math.random() < 0.2 && game.capturedShipEnemy === null) {
@@ -11864,6 +12006,8 @@ function updateEnemies() {
         } else {
           // Telegraph the dive: 30-frame preview where the path is visible but the enemy stays put.
           e.previewTimer = 30;
+          e.previewMax = 30;
+          e._wingTactic = null; // lone dive — clear any stale coordinated-maneuver tag
           e.previewPath = createLoopPath(e.x, e.y, e.x < BASE_W/2 ? 1 : -1);
           playSound('enemyDive', e.x);
           // If boss, escorts get a slightly-delayed preview. Selected by POSITION
@@ -11882,6 +12026,8 @@ function updateEnemies() {
               setTimeout(() => {
                 if (es.alive && es.state === 'formation' && !es.previewTimer) {
                   es.previewTimer = 30;
+                  es.previewMax = 30;
+                  es._wingTactic = null;
                   es.previewPath = createLoopPath(es.x, es.y, idx === 0 ? 1 : -1);
                 }
               }, 200);
@@ -19595,10 +19741,16 @@ function drawDivePreviewPaths() {
     const segs = e.previewPath;
     if (!segs || !segs.length) continue;
     ctx.save();
-    // Fade in over first 6 frames, then full alpha
-    const lifeFade = Math.min(1, (30 - e.previewTimer) / 6);
-    // Subtle pulse: dashes slide along
-    ctx.fillStyle = COL.red;
+    // Fade in over first 6 frames, then full alpha. Robust to a variable preview length
+    // (WING TACTICS uses a 36f telegraph, lone dives 30f) via e.previewMax.
+    const _pmax = e.previewMax || 30;
+    const lifeFade = Math.min(1, Math.max(0, (_pmax - e.previewTimer) / 6));
+    // WING TACTICS — a coordinated maneuver tints its telegraph the biome colour (cold in
+    // the ice field, hot in corona) so a PINCER/WALL reads by COLOUR as well as by its
+    // longer window; lone dives stay crimson.
+    const _wing = e._wingTactic;
+    const _tel = _wing ? wingTacticColor() : COL.red;
+    ctx.fillStyle = _tel;
     let drawn = 0;
     for (const seg of segs) {
       const samples = 24;
@@ -19607,18 +19759,40 @@ function drawDivePreviewPaths() {
         const p = bezierPoint(seg.p0, seg.p1, seg.p2, seg.p3, tt);
         // Dash pattern that animates: visible when (s + offset) % 4 < 2
         if ((s + Math.floor(t / 2)) % 4 >= 2) continue;
-        ctx.globalAlpha = 0.28 * lifeFade * (1 - tt * 0.4);
+        ctx.globalAlpha = (_wing ? 0.36 : 0.28) * lifeFade * (1 - tt * 0.4);
         ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
         drawn++;
       }
     }
     ctx.restore();
-    // Telegraph flash on the enemy itself (red blink)
+    // Telegraph flash on the enemy itself (biome-tinted for a maneuver, red for a lone dive).
     if ((t >> 1) % 2 === 0) {
       ctx.save();
       ctx.globalAlpha = 0.4;
-      ctx.fillStyle = COL.red;
+      ctx.fillStyle = _tel;
       ctx.fillRect(Math.round(e.x) - 8, Math.round(e.y) - 8, 16, 16);
+      ctx.restore();
+    }
+    // WING TACTICS — colorblind-safe SHAPE marker so a coordinated maneuver reads without a
+    // banner: a PINCER draws an inward-pointing chevron (converging on the target), a WALL a
+    // short horizontal bar (line-abreast). Distinct silhouettes from a plain lone dive.
+    if (_wing) {
+      ctx.save();
+      ctx.globalAlpha = (0.5 + 0.3 * Math.sin(t * 0.3)) * lifeFade;
+      ctx.fillStyle = _tel;
+      const mx = Math.round(e.x), my = Math.round(e.y) - 12;
+      if (_wing === 'pincer') {
+        // chevron pointing toward screen centre (the convergence direction)
+        const dir = e.x < BASE_W / 2 ? 1 : -1;
+        for (let k = 0; k < 4; k++) {
+          ctx.fillRect(mx + dir * k, my - k, 1, 1);
+          ctx.fillRect(mx + dir * k, my + k, 1, 1);
+        }
+      } else {
+        ctx.fillRect(mx - 4, my, 9, 1); // line-abreast bar
+        ctx.fillRect(mx - 4, my, 1, 2);
+        ctx.fillRect(mx + 4, my, 1, 2);
+      }
       ctx.restore();
     }
   }
