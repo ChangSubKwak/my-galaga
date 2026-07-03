@@ -9748,11 +9748,11 @@ function recordMilestoneTime() {
     // all runs. Future runs can start from this stage via TITLE R selector.
     // Gold banner + confetti so the progression beat is unmissable.
     if (game.floatTexts) {
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H/2 - 60, text: 'CHECKPOINT UNLOCKED',
         color: '#fc4', life: 110, maxLife: 110, size: 8, glow: 6
       });
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H/2 - 48, text: 'STAGE ' + justCleared,
         color: '#ff8', life: 100, maxLife: 100, size: 6, glow: 4
       });
@@ -10878,6 +10878,35 @@ function updatePowerUps() {
       }
     }
   }
+}
+
+// PILOT TITLE CACHE + PROMOTION DETECTION — ticked from update() once/sec (sim
+// rate). Moved out of drawHUD (draw-side localStorage writes + floatText pushes
+// violated the no-mutation-in-draw invariant). PROMOTED banner is detail-view only.
+function updatePilotTitleCache() {
+  if (!game || typeof computePilotTitle !== 'function') return;
+  if (game._titleCacheFrame && (game.animFrame - game._titleCacheFrame) <= 60) return;
+  game._titleCacheFrame = game.animFrame;
+  const _newTitle = computePilotTitle();
+  try {
+    const _prevSeen = localStorage.getItem('galagaTitleSeen');
+    if (_prevSeen != null && _prevSeen !== _newTitle && !game._titlePromoFired) {
+      game._titlePromoFired = true;
+      const _newCol = (typeof pilotTitleColor === 'function')
+        ? pilotTitleColor(_newTitle) : '#fc4';
+      pushInfoText({
+        x: BASE_W/2, y: BASE_H/2 - 50, text: 'PROMOTED',
+        color: '#fff', life: 100, maxLife: 100, size: 7, glow: 5
+      });
+      pushInfoText({
+        x: BASE_W/2, y: BASE_H/2 - 38, text: _newTitle,
+        color: _newCol, life: 110, maxLife: 110, size: 11
+      });
+      if (!minimalHud && typeof playSound === 'function') playSound('milestone');
+    }
+    localStorage.setItem('galagaTitleSeen', _newTitle);
+  } catch (e) {}
+  game._titleCache = _newTitle;
 }
 
 function updateFloatTexts() {
@@ -14063,7 +14092,7 @@ function checkPbHalfMark() {
   if (game.stageFrames >= pb * 0.5 && game.stageFrames < pb * 0.7) {
     game._pbHalfMarkFired = true;
     if (game.floatTexts) {
-      game.floatTexts.push({
+      pushInfoText({
         x: BASE_W/2, y: BASE_H - 70, text: 'HALF MARK',
         color: '#0cf', life: 40, maxLife: 40, size: 6
       });
@@ -15211,6 +15240,9 @@ function update() {
     // never freezes over GAME_OVER/CAPTURED (moved from updateFormationBreathing).
     if ((game.swarmWarnLife || 0) > 0) game.swarmWarnLife--;
     if ((game.swarmWarnCooldown || 0) > 0) game.swarmWarnCooldown--;
+    // Pilot-title cache + promotion detection (moved out of drawHUD — sim-rate,
+    // draw must not mutate state / write storage / push floats).
+    if (typeof updatePilotTitleCache === 'function') updatePilotTitleCache();
     // Ambient event tick (cargoShip drift / supernova fade). Frozen during PAUSED with
     // the rest of these atmospheric timers so the scene holds in place while paused.
     updateAmbientEvent();
@@ -19862,7 +19894,7 @@ function drawHUD() {
   // PLAYER EDGE VIGNETTE — faint cyan band on left/right when player is within
   // 20px of that edge. Alpha grows as player approaches the wall, peaking at
   // touching. Helps spatial awareness without compromising the playfield read.
-  if (game.playerAlive
+  if (!minimalHud && game.playerAlive
       && (isCombatState())) {
     const _edgeMax = 20;
     const _distL = Math.max(0, game.playerX);
@@ -19935,37 +19967,8 @@ function drawHUD() {
     drawRetroText('1UP', 28, 8, 7, _1upCol, 'center');
   }
   drawRetroText('[' + playerCallsign + ']', 28, 15, 5, callsignColor(), 'center');
-  // PILOT TITLE under callsign — cached once per second to avoid recomputing each frame
-  if (!game._titleCacheFrame || (game.animFrame - game._titleCacheFrame) > 60) {
-    game._titleCacheFrame = game.animFrame;
-    const _newTitle = computePilotTitle();
-    // PILOT PROMOTION DETECTION — compare to last seen title persisted in
-    // localStorage. On change to a new tier, fire banner + SFX once. Skips
-    // first observation (no prior 'seen' value) — treats it as baseline.
-    try {
-      const _prevSeen = localStorage.getItem('galagaTitleSeen');
-      if (_prevSeen != null && _prevSeen !== _newTitle && !game._titlePromoFired) {
-        game._titlePromoFired = true;
-        // New-tier color preview — the banner _newTitle uses the upcoming
-        // tier's signature color so promotion shows the rank's identity from
-        // the first beat (matches the 4-location ACE PILOT cohesion).
-        const _newCol = (typeof pilotTitleColor === 'function')
-          ? pilotTitleColor(_newTitle) : '#fc4';
-        game.floatTexts.push({
-          x: BASE_W/2, y: BASE_H/2 - 50, text: 'PROMOTED',
-          color: '#fff', life: 100, maxLife: 100, size: 7, glow: 5
-        });
-        game.floatTexts.push({
-          x: BASE_W/2, y: BASE_H/2 - 38, text: _newTitle,
-          color: _newCol, life: 110, maxLife: 110, size: 11
-        });
-        if (typeof playSound === 'function') playSound('milestone');
-        if (typeof spawnConfetti === 'function') spawnConfetti(14);
-      }
-      localStorage.setItem('galagaTitleSeen', _newTitle);
-    } catch (e) {}
-    game._titleCache = _newTitle;
-  }
+  // PILOT TITLE under callsign — cache maintained in update() (updatePilotTitleCache);
+  // the promotion detection + banner moved there too (draw must not mutate state).
   {
     const _hudTitleCol = typeof pilotTitleColor === 'function'
       ? pilotTitleColor(game._titleCache) : COL.gray;
@@ -20012,7 +20015,7 @@ function drawHUD() {
   // NEXT STAGE PREVIEW — during the end-of-stage grace window, render a small
   // preview of the upcoming stage type so the player can mentally prepare during
   // the bonus tally. Reads game.stage as still-current; next stage = stage+1.
-  if ((game.stageEndGraceTimer || 0) > 30 && game.stageEndGraceTimer < 110
+  if (!minimalHud && (game.stageEndGraceTimer || 0) > 30 && game.stageEndGraceTimer < 110
       && (isCombatState())) {
     const nextStage = (game.stage || 0) + 1;
     const isBossNext = nextStage % BOSS_STAGE_INTERVAL === 0;
@@ -20211,7 +20214,7 @@ function drawHUD() {
   // NEAR-BEST INDICATOR — small ▲ symbol next to the score when chasing the
   // best-ever (90-99% of highScore). Pulses faster as the player gets closer.
   // Disappears once they pass the threshold (highScoreGlow takes over there).
-  if (game.score < game.liveHighThreshold
+  if (!minimalHud && game.score < game.liveHighThreshold
       && game.liveHighThreshold > 0
       && game.score >= game.liveHighThreshold * 0.9) {
     const ratio = game.score / game.liveHighThreshold; // 0.9-0.999
@@ -20298,27 +20301,8 @@ function drawHUD() {
         ctx.restore();
       }
     }
-    // POWER LEVEL DISPLAY — S/N/P current level chip. Always visible during play
-    // so player can read their build (S3 N2 P1) at a glance instead of inferring
-    // from ship sprite. MAX level highlighted in gold.
-    {
-      const _lvl = game.lvl || { S: 1, N: 1, P: 1 };
-      const _lvlData = [
-        { l: 'S', cur: _lvl.S || 1, max: MAX_POWER_LVL.S, baseCol: '#f44' },
-        { l: 'N', cur: _lvl.N || 1, max: MAX_POWER_LVL.N, baseCol: '#0ff' },
-        { l: 'P', cur: _lvl.P || 1, max: MAX_POWER_LVL.P, baseCol: '#f6f' }
-      ];
-      let _plX = 4;
-      ctx.save();
-      for (const _ld of _lvlData) {
-        const _isMax = _ld.cur >= _ld.max;
-        const _plCol = _isMax ? '#fc4' : _ld.baseCol;
-        ctx.globalAlpha = _isMax ? (0.85 + 0.15 * Math.sin(game.animFrame * 0.18)) : 0.85;
-        drawRetroText(_ld.l + _ld.cur, _plX, 38, 4, _plCol, 'left');
-        _plX += 14;
-      }
-      ctx.restore();
-    }
+    // (GUI-simplify DELETE: the top-left S/N/P power chip — exact duplicate of the
+    // bottom-right power gems, which are the canonical build display.)
     // GUARDIAN STATUS CHIP — active escort drone remaining seconds + variant color.
     // Continues the HUD chip column under power levels. TTL <1s pulses for warning.
     if (game.guardian) {
@@ -20338,49 +20322,21 @@ function drawHUD() {
       ctx.restore();
     }
   }
-  // Mini combo multiplier badge right next to the score (only when combo ≥ 3)
-  if (game.combo >= 3) {
-    const mult = comboMultiplier(game.combo);
-    if (mult > 1) {
-      const mCol = comboTierColor(mult);
-      // COMBO MULTIPLIER BACKGROUND — subtle dark rect for readability against
-      // busy backdrops (combo edge flame, biome rainbow, etc.). Width sized to "x2.5".
-      ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(52, 13, 20, 6);
-      ctx.restore();
-      drawRetroText('×' + mult, 53, 17, 5, mCol, 'left');
-    }
-    // COMBO DECAY BAR — 12px under the multiplier badge showing remaining combo time
-    // before decay (90 frames). Tactical info for combo maintenance. Color tiers:
-    // cyan (70%+) → gold (40-70%) → red pulse (<40%).
-    const _cdRatio = clamp01((game.comboTimer || 0) / COMBO_DECAY);
-    const _cdW = 12;
-    const _cdFillW = Math.round(_cdW * _cdRatio);
-    let _cdCol = '#0ff';
-    let _cdAlpha = 1;
-    if (_cdRatio < 0.40) {
-      _cdCol = '#f44';
-      _cdAlpha = 0.70 + 0.30 * Math.sin(game.animFrame * 0.42);
-    } else if (_cdRatio < 0.70) {
-      _cdCol = '#fc4';
-    }
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    ctx.fillStyle = '#222';
-    ctx.fillRect(53, 23, _cdW, 1);
-    ctx.globalAlpha = _cdAlpha;
-    ctx.fillStyle = _cdCol;
-    ctx.fillRect(53, 23, _cdFillW, 1);
-    ctx.restore();
-  }
+  // (GUI-simplify DELETE: the mini combo x-badge + 12px decay bar next to the
+  // score — duplicate of the main combo box bottom-centre.)
 
-  // High score (replaced by boss title during BOSS_STAGE so they don't fight for the same row)
-  if (game.state === STATE.BOSS_STAGE && game._bossTitle) {
+  // High score (replaced by boss title during BOSS_STAGE so they don't fight for
+  // the same row). Boss title computed HERE read-only (no game.* writes in draw);
+  // detail view only — the simple view keeps the standard score row.
+  const _btAlive = (game.state === STATE.BOSS_STAGE && !minimalHud)
+    ? (game.megaBosses || []).filter(mb => mb.alive) : null;
+  if (_btAlive && _btAlive.length > 0) {
+    const _btSuper = _btAlive.some(mb => mb.super);
+    const _btTxt = _btSuper ? '!! SUPER BOSS !!' : _btAlive.length > 1 ? '!! DOUBLE BOSS !!' : '!! BOSS !!';
+    const _btSize = _btSuper ? 9 : _btAlive.length > 1 ? 7 : 8;
     ctx.save();
-    ctx.globalAlpha = game._bossTitleGlow || 1;
-    drawRetroText(game._bossTitle, BASE_W/2, 12, game._bossTitleSize || 8, COL.red);
+    ctx.globalAlpha = Math.sin(game.animFrame * 0.08) * 0.4 + 0.6;
+    drawRetroText(_btTxt, BASE_W/2, 12, _btSize, COL.red);
     ctx.restore();
   } else {
     drawRetroText('HIGH SCORE', BASE_W/2, 8, 7, COL.red, 'center');
@@ -20388,7 +20344,7 @@ function drawHUD() {
     // HIGH SCORE CALLSIGN — show holder of the top score for the active mode.
     // Looks up live top-1 from the leaderboard (loadTopScores) so it reflects all
     // entries, including ones higher than the running game.highScore.
-    if (typeof loadTopScores === 'function') {
+    if (!minimalHud && typeof loadTopScores === 'function') {
       const mode = game.dailyMode ? 'daily' : game.challengeMode ? 'challenge' : 'normal';
       const top1 = (loadTopScores(mode)[0]) || null;
       if (top1 && top1.callsign && top1.callsign !== '???' && top1.score > 0) {
@@ -20453,7 +20409,7 @@ function drawHUD() {
     const iconX = BASE_W - 5 - ('STAGE ' + game.stage).length * 5 - 8;
     const iconY = 5;
     ctx.save();
-    if (isSuperBoss) {
+    if (!minimalHud && isSuperBoss) {
       // Double-skull (×2 stacked) — gold/red blink
       const blink = blinkPhase(3) ? '#fc4' : '#f44';
       ctx.fillStyle = blink;
@@ -20551,7 +20507,7 @@ function drawHUD() {
   // ~5s (the clock reads ~0:00 then and PB compare is meaningless that early), so
   // the two stop overprinting; the full clock cluster returns the moment it fades.
   const _mutIntro = game.stageMutation && game.stageMutation.desc && (game.stageFrames || 0) < 300;
-  if ((isCombatState())
+  if (!minimalHud && (isCombatState())
       && (game.stageFrames || 0) > 0 && !_mutIntro) {
     const timeStr = fmtFrameTime(game.stageFrames || 0);
     let clockCol = '#aaa';
@@ -20808,7 +20764,7 @@ function drawHUD() {
   }
   // SECONDARY OBJECTIVE mini-badge — small two-line under stage label (or below
   // mutation if both active). Soft green so it doesn't shout for attention.
-  if (game.stageObjective && (isCombatState())) {
+  if (!minimalHud && game.stageObjective && (isCombatState())) {
     const obj = game.stageObjective;
     const baseY = game.stageMutation ? 22 : 16;
     const met = obj.met(game);
@@ -20837,7 +20793,7 @@ function drawHUD() {
   drawRetroText(mm + ':' + ss, BASE_W - 5, 16, 6, tCol, 'right');
   // STAGE PB GHOST — show personal best for current stage during play, color-tinted
   // by current pace. Gold if ahead of PB, gray if behind. Only when PB exists.
-  if (typeof stagePBs !== 'undefined' && stagePBs
+  if (!minimalHud && typeof stagePBs !== 'undefined' && stagePBs
       && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING)) {
     const _pbF = stagePBs[String(game.stage)];
     if (typeof _pbF === 'number' && _pbF > 0) {
@@ -20855,12 +20811,10 @@ function drawHUD() {
     }
   }
 
-  // Top HUD separator (subtle dashed line)
-  ctx.fillStyle = 'rgba(0,170,255,0.25)';
-  for (let i = 0; i < BASE_W; i += 6) ctx.fillRect(i, 23, 3, 1);
+  // (GUI-simplify DELETE: top dashed HUD separator — pure chrome.)
 
-  // Stage progression bar — rolls over every 30 stages so high-stage players still see progress.
-  {
+  // Stage progression bar — rolls over every 30 stages. Detail view only.
+  if (!minimalHud) {
     const PROG_MAX = 30;
     const cycle = Math.floor((game.stage - 1) / PROG_MAX);   // 0,1,2... shown as label
     const localStage = ((game.stage - 1) % PROG_MAX) + 1;     // 1..30 within current cycle
@@ -20897,15 +20851,13 @@ function drawHUD() {
     }
   }
 
-  // Bottom HUD separator
-  ctx.fillStyle = 'rgba(0,170,255,0.25)';
-  for (let i = 0; i < BASE_W; i += 6) ctx.fillRect(i, BASE_H - 16, 3, 1);
+  // (GUI-simplify DELETE: bottom dashed HUD separator — pure chrome.)
 
   // Extra-life threshold indicator — small note showing distance to next 30K extra life
   if (!game.challengeMode && game.score > 0 && (game.state === STATE.PLAYING || game.state === STATE.BOSS_STAGE || game.state === STATE.CHALLENGING)) {
     const next = Math.ceil(game.score / EXTRA_LIFE_SCORE) * EXTRA_LIFE_SCORE;
     const diff = next - game.score;
-    if (diff < 5000) {
+    if (!minimalHud && diff < 5000) {
       drawRetroText('+1UP IN ' + diff, BASE_W/2, 35, 5, COL.green);
     }
   }
@@ -21190,7 +21142,7 @@ function drawHUD() {
   // no longer renders on top of the arsenal progress bar. The band y56+ at x=4 is
   // otherwise clear in combat (challenge-telegraph backdrop draws under it; the
   // debug FPS panel is dev-only).
-  if (game.activePerk && PERKS[game.activePerk]) {
+  if (!minimalHud && game.activePerk && PERKS[game.activePerk]) {
     const p = PERKS[game.activePerk];
     drawRetroText('PERK: ' + p.name, 4, 59, 5, p.col, 'left');
   }
@@ -21368,7 +21320,7 @@ function drawHUD() {
   // with the PB readout at y23, so it was removed.)
   // Boss HP bar moved to drawBossStage() combined bar — no duplicate needed here.
 
-  drawMiniRadar();
+  if (!minimalHud) drawMiniRadar(); // detail view only (threat arrows cover off-screen danger)
 
   // Dash cooldown bar (bottom-right, above the power-up gems)
   if (game.dashCooldown > 0 || game.dashTimer > 0) {
@@ -21707,16 +21659,8 @@ function drawBossStage() {
   const bosses = game.megaBosses || [];
   const aliveBosses = bosses.filter(mb => mb.alive);
 
-  // Boss title — SUPER (single 1.5×) > DOUBLE (two) > regular
-  const glow = Math.sin(game.animFrame * 0.08) * 0.4 + 0.6;
-  const anySuper = aliveBosses.some(mb => mb.super);
-  // Boss title is rendered AFTER drawHUD (in drawHUD itself) to avoid overlap with HIGH SCORE row.
-  // Just store the metadata for drawHUD to read.
-  game._bossTitle = anySuper ? '!! SUPER BOSS !!'
-                  : aliveBosses.length > 1 ? '!! DOUBLE BOSS !!'
-                  : '!! BOSS !!';
-  game._bossTitleSize = anySuper ? 9 : aliveBosses.length > 1 ? 7 : 8;
-  game._bossTitleGlow = glow;
+  // (Boss title is computed read-only in drawHUD now — the game._bossTitle*
+  // writes here were a draw-side state mutation; GUI-simplify cleanup.)
 
   // Mega-bosses (super bosses render at 1.5× scale)
   for (const mb of aliveBosses) {
