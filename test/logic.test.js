@@ -2831,6 +2831,11 @@ if (typeof G.chooseDiveTactic === 'function') {
     const s6 = new Set(); for (let r = 0; r < 1; r += 0.005) { const t = G.chooseDiveTactic(6, false, false, r); if (t) s6.add(t.id); }
     ok(!s6.has('wall'), 'wall does not appear at stage 6 (minStage gate)');
   }
+  // FAIRNESS CAP — p is clamped to 0.6, so even at absurd depth (uncapped p > 3 at stage
+  // 200 + commander) a coordinated maneuver never becomes a coin-flip-or-worse. Load-
+  // bearing: remove/raise the cap and the roll-0.61 assertion fails.
+  ok(G.chooseDiveTactic(200, true, false, 0.59) !== null, 'deep stage: capped p still admits a tactic just below 0.6');
+  ok(G.chooseDiveTactic(200, true, false, 0.61) === null, 'fairness cap: p clamped to 0.6 — roll 0.61 stays a lone dive even at uncapped p>3');
 
   // predictIntercept — lead math, clamp (fairness), NaN guard, zero-velocity identity.
   ok(G.predictIntercept(100, 2, 10, 16, 208) === 120, 'lead: 100 + 2*10 = 120 (in bounds)');

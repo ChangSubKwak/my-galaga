@@ -3693,6 +3693,7 @@ function launchDiveTactic(tactic, candidates) {
     const side = (tactic.id === 'pincer') ? (e.x <= targetX ? 1 : -1) : (e.x < BASE_W / 2 ? 1 : -1);
     e.previewPath = createLoopPath(e.x, e.y, side);
     e._wingTactic = tactic.id;
+    e._wingSide = side; // true convergence sign — read by the chevron marker in draw
   });
   playSound('enemyDive', targetX);
   // Reuse the existing 3+-dive swarm warning as the "read this" cue (respects its cooldown).
@@ -12008,6 +12009,7 @@ function updateEnemies() {
           e.previewTimer = 30;
           e.previewMax = 30;
           e._wingTactic = null; // lone dive — clear any stale coordinated-maneuver tag
+          e._wingSide = 0;
           e.previewPath = createLoopPath(e.x, e.y, e.x < BASE_W/2 ? 1 : -1);
           playSound('enemyDive', e.x);
           // If boss, escorts get a slightly-delayed preview. Selected by POSITION
@@ -19782,8 +19784,9 @@ function drawDivePreviewPaths() {
       ctx.fillStyle = _tel;
       const mx = Math.round(e.x), my = Math.round(e.y) - 12;
       if (_wing === 'pincer') {
-        // chevron pointing toward screen centre (the convergence direction)
-        const dir = e.x < BASE_W / 2 ? 1 : -1;
+        // chevron pointing toward the PREDICTED TARGET (the direction this flanker's arc
+        // actually converges — stashed at launch; centre fallback for safety)
+        const dir = e._wingSide || (e.x < BASE_W / 2 ? 1 : -1);
         for (let k = 0; k < 4; k++) {
           ctx.fillRect(mx + dir * k, my - k, 1, 1);
           ctx.fillRect(mx + dir * k, my + k, 1, 1);
