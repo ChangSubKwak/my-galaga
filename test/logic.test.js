@@ -176,6 +176,7 @@ const shim = `
 ;try { globalThis.__getDiveTactics = function () { return (typeof DIVE_TACTICS !== 'undefined') ? DIVE_TACTICS : null; }; } catch (e) {}
 ;try { globalThis.__getRivalLines = function () { return (typeof RIVAL_LINES !== 'undefined') ? RIVAL_LINES : null; }; } catch (e) {}
 ;try { globalThis.__getEchoLines = function () { return (typeof ECHO_LINES !== 'undefined') ? ECHO_LINES : null; }; } catch (e) {}
+;try { globalThis.__getArchetypeMotifs = function () { return (typeof ARCHETYPE_MOTIFS !== 'undefined') ? ARCHETYPE_MOTIFS : null; }; } catch (e) {}
 ;try { globalThis.__getRespawnWhispers = function () { return (typeof RESPAWN_WHISPERS !== 'undefined') ? RESPAWN_WHISPERS : null; }; } catch (e) {}
 `;
 
@@ -3189,6 +3190,53 @@ if (typeof G.flightLogEntryValid === 'function' && typeof G.flightLogPush === 'f
   eq(G.loadFlightLog().length, 0, 'absent key → empty log');
   if (savedLog === null) LS2.removeItem('galagaFlightLog'); else LS2.setItem('galagaFlightLog', savedLog);
 } else { console.log('  (skipped — PILOT LOG helpers not exposed)'); }
+
+section('BOSS ARCHETYPE LEITMOTIF — signature-voice registry + accessor');
+if (typeof G.archetypeMotif === 'function' && G.__getArchetypeMotifs && G.__getArchetypeMotifs()) {
+  const M = G.__getArchetypeMotifs();
+  const CANON = ['standard', 'horned', 'tendril', 'crystal', 'phantom', 'rune'];
+  eq(Object.keys(M).sort().join(','), CANON.slice().sort().join(','),
+     'exactly the 6 canonical archetypes have motifs (matches archetypeFor cycle)');
+  const OSC = new Set(['sine', 'square', 'sawtooth', 'triangle']);
+  let wellFormed = true, audible = true, phraseLen = true;
+  for (const k of CANON) {
+    const m = M[k];
+    if (!m || !OSC.has(m.type) || !(m.vol > 0 && m.vol <= 0.08)) wellFormed = false;
+    if (!Array.isArray(m.notes) || m.notes.length < 4) wellFormed = false;
+    let beats = 0, hasNote = false;
+    for (const pair of m.notes) {
+      if (!Array.isArray(pair) || pair.length !== 2
+          || !isFinite(pair[0]) || pair[0] < 0
+          || !(pair[1] > 0)) wellFormed = false;
+      else { beats += pair[1]; if (pair[0] > 0) hasNote = true; }
+    }
+    if (!hasNote) audible = false;
+    if (beats < 4) phraseLen = false;
+  }
+  ok(wellFormed, 'every motif: valid osc type, vol in (0, 0.08], ≥4 [freq,beats] pairs');
+  ok(audible, 'every motif has at least one audible (freq>0) note');
+  ok(phraseLen, 'every motif phrase spans ≥4 beats (a phrase, not a blip)');
+  // Distinctness — six voices, six identities (pairwise different note data).
+  const sigs = CANON.map(k => JSON.stringify(M[k].notes) + M[k].type);
+  eq(new Set(sigs).size, CANON.length, 'all 6 motifs are pairwise distinct');
+  // Accessor fallback contract mirrors tauntFor: unknown/null → standard.
+  ok(G.archetypeMotif('rune') === M.rune, 'known archetype → its motif');
+  ok(G.archetypeMotif('not-an-archetype') === M.standard, 'unknown archetype → standard fallback');
+  ok(G.archetypeMotif(null) === M.standard, 'null archetype → standard fallback');
+
+  // currentBossArchetype — live read off game.megaBosses (null-safe).
+  if (typeof G.currentBossArchetype === 'function' && G.__getGame && G.__getGame()) {
+    const g = G.__getGame();
+    const saved = g.megaBosses;
+    g.megaBosses = [];
+    eq(G.currentBossArchetype(), null, 'no bosses → null (motif voice stays silent)');
+    g.megaBosses = [{ alive: false, archetype: 'horned' }, { alive: true, archetype: 'rune' }];
+    eq(G.currentBossArchetype(), 'rune', 'first ALIVE boss decides the motif');
+    g.megaBosses = [{ alive: true }];
+    eq(G.currentBossArchetype(), 'standard', 'alive boss without archetype → standard');
+    g.megaBosses = saved;
+  }
+} else { console.log('  (skipped — ARCHETYPE_MOTIFS not exposed)'); }
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
