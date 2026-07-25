@@ -4856,7 +4856,8 @@ const INTERCEPT_MSG = {
   homingTrack:   ['BULLETS HUNT US!', 'NO ESCAPE — THEY TURN!', 'TRACKING ROUNDS!'],
   rivalSpotted:  ['OUR ACE HAS FOUND YOU!', 'DUELIST ON APPROACH!', 'THE MIRROR HUNTS!'],
   rivalRetreat:  ['OUR ACE WITHDRAWS!', 'DUEL SUSPENDED!', 'THE ACE WILL RETURN!'],
-  rivalDown:     ['OUR ACE IS DOWN!', 'THE DUELIST FALLS!', 'IMPOSSIBLE — ACE LOST!']
+  rivalDown:     ['OUR ACE IS DOWN!', 'THE DUELIST FALLS!', 'IMPOSSIBLE — ACE LOST!'],
+  salvageDrop:   ['THEIR CORE SCATTERED!', 'DON\'T LET THEM REBUILD!', 'SEIZE THE WRECKAGE!']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
 const INTERCEPT_LIFE = 180;
@@ -5514,6 +5515,154 @@ function drawRivalAce() {
     ctx.strokeRect(bx - w / 2, by - 5, w, 10);
     drawRetroText(r.tauntText, bx, by, 5, '#fff');
     ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+// ============================ SALVAGE PROTOCOL =============================
+// Death erases the whole S/N/P build (reset to 1/1/1) — the classic death
+// spiral. SALVAGE PROTOCOL makes the wreck itself the counterplay: on a
+// confirmed death, part of the lost build scatters from the explosion as
+// letter-tagged power SHARDS. Catch one within its 5s TTL (it outlives the
+// 90f respawn cutscene) and that axis recovers +1 level. Difficulty shapes
+// the economy (same doctrine as drop/elite rates): easy salvages up to 3
+// levels, normal 2, hard 1. Recovery is capped by what was actually lost and
+// prefers the deepest-invested axes — a softener, never a source. The pure
+// planner (salvageShardPlan) is logic-tested.
+const SALVAGE_TTL = 300;
+
+// Pure: which axis letters scatter, given the pre-death levels and mode.
+// Greedy: always the axis with the most lost levels (ties resolve S > N > P).
+function salvageShardPlan(lvl, mode) {
+  if (!lvl) return [];
+  const cap = mode === 'easy' ? 3 : mode === 'hard' ? 1 : 2;
+  const lost = {
+    S: Math.max(0, (lvl.S || 1) - 1),
+    N: Math.max(0, (lvl.N || 1) - 1),
+    P: Math.max(0, (lvl.P || 1) - 1)
+  };
+  const out = [];
+  while (out.length < cap) {
+    let best = null;
+    for (const ax of ['S', 'N', 'P']) {
+      if (lost[ax] > 0 && (best === null || lost[ax] > lost[best])) best = ax;
+    }
+    if (!best) break;
+    lost[best]--;
+    out.push(best);
+  }
+  return out;
+}
+
+// Called from killPlayer BEFORE the lvl reset (needs the pre-death levels).
+function spawnSalvageShards(x, y) {
+  const plan = salvageShardPlan(game.lvl, difficultyMode);
+  if (!plan.length) return;
+  game.salvageShards = game.salvageShards || [];
+  for (let i = 0; i < plan.length; i++) {
+    // Fan the shards out of the wreck — pop upward, then drift down slowly.
+    const spread = plan.length === 1 ? 0 : (i - (plan.length - 1) / 2) * 1.0;
+    game.salvageShards.push({
+      x: Math.max(8, Math.min(BASE_W - 8, x + spread * 4)),
+      y, axis: plan[i],
+      vx: spread + jitter(0.5),
+      vy: -1.4 - Math.random() * 0.4,
+      ttl: SALVAGE_TTL + i * 8
+    });
+  }
+  if (!game._salvageSeen && typeof pushIntercept === 'function') {
+    game._salvageSeen = true;
+    pushIntercept('salvageDrop');
+  }
+}
+
+function updateSalvageShards() {
+  if (!game || !game.salvageShards || !game.salvageShards.length) return;
+  if (game.state === STATE.PAUSED) return;
+  // Shards only live inside the fight they fell in — stage transitions,
+  // game over, and menus sweep them (position context is gone).
+  if (!isCombatState() && game.state !== STATE.RESPAWN && game.state !== STATE.CAPTURED) {
+    game.salvageShards.length = 0;
+    return;
+  }
+  for (let i = game.salvageShards.length - 1; i >= 0; i--) {
+    const s = game.salvageShards[i];
+    s.vy = Math.min(0.5, s.vy + 0.05);
+    s.vx *= 0.97;
+    s.x = Math.max(8, Math.min(BASE_W - 8, s.x + s.vx));
+    s.y += s.vy;
+    s.ttl--;
+    if (s.ttl <= 0 || s.y > BASE_H + 8) {
+      // Fizzle — the lost level is gone for good.
+      game.itemBursts.push({ x: s.x, y: s.y, life: 0, color: '#456' });
+      game.salvageShards.splice(i, 1);
+      continue;
+    }
+    // CATCH — same reach as a power-up magnet's core radius.
+    if (game.playerAlive && Math.abs(s.x - game.playerX) < 10 && Math.abs(s.y - game.playerY) < 10) {
+      const col = (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[s.axis]) || '#0df';
+      if (game.lvl && game.lvl[s.axis] < MAX_POWER_LVL[s.axis]) {
+        game.lvl[s.axis]++;
+        game.floatTexts.push({
+          x: s.x, y: s.y - 8, text: 'SALVAGE ' + s.axis + ' Lv' + game.lvl[s.axis],
+          color: col, life: 55, maxLife: 55, size: 7
+        });
+      } else {
+        // Axis already rebuilt past the shard (caught pickups first) — token score.
+        addScore(100);
+        game.floatTexts.push({
+          x: s.x, y: s.y - 8, text: 'SALVAGE +100',
+          color: col, life: 45, maxLife: 45, size: 6
+        });
+      }
+      if (game.shockwaves) {
+        game.shockwaves.push({ x: s.x, y: s.y, life: 0, maxLife: 16, maxR: 14, color: col });
+      }
+      playSound('powerUp');
+      game.salvageCount = (game.salvageCount || 0) + 1;
+      try {
+        const sv = (parseInt(localStorage.getItem('galagaSalvageTotal') || '0', 10) || 0) + 1;
+        localStorage.setItem('galagaSalvageTotal', String(sv));
+        if (sv >= 5) unlockAchievement('salvager');
+      } catch (e) {}
+      game.salvageShards.splice(i, 1);
+    }
+  }
+}
+
+function drawSalvageShards() {
+  if (!game || !game.salvageShards || !game.salvageShards.length) return;
+  if (game.state === STATE.TITLE || game.state === STATE.GAME_OVER
+      || game.state === STATE.STAGE_INTRO || game.state === STATE.BONUS_GAME) return;
+  const t = game.animFrame;
+  ctx.save();
+  for (const s of game.salvageShards) {
+    const col = (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[s.axis]) || '#0df';
+    // Expiry urgency — gentle alpha pulse in the last 90 frames (no hard blink;
+    // the heavy-blink dialect was deliberately removed in the GUI cleanup).
+    const expiring = s.ttl < 90;
+    const alpha = expiring ? 0.55 + 0.35 * Math.sin(t * 0.4) : 0.95;
+    const px = Math.round(s.x), py = Math.round(s.y);
+    // Dark backing so the letter reads on bright daylight biomes too.
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(px - 4, py - 4, 9, 9);
+    // Diamond shard body + additive glint (bloom-friendly).
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(px, py - 4); ctx.lineTo(px + 4, py);
+    ctx.lineTo(px, py + 4); ctx.lineTo(px - 4, py);
+    ctx.closePath();
+    ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = alpha * (0.25 + 0.15 * Math.sin(t * 0.2 + s.x));
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(px, py, 1, 1);
+    drawRetroText(s.axis, px + 0.5, py - 7, 4, col);
   }
   ctx.restore();
 }
@@ -6872,6 +7021,9 @@ function resetGame() {
     supplyCrateSpawned: false,
     guardian: null,
     _comboGuardianFired: false,
+    salvageShards: [],
+    salvageCount: 0,
+    _salvageSeen: false,
     rival: null,
     rivalLevel: 0,
     rivalNextStage: RIVAL_FIRST_STAGE,
@@ -10242,6 +10394,7 @@ const ACHIEVEMENTS = {
   pillarsOf:     { name: 'PILLARS OF',    desc: 'Stage 100 reached' },
   rivalDown:     { name: 'NEMESIS DOWN',  desc: 'Destroy the rival ace' },
   rivalHunter:   { name: 'ACE HUNTER',    desc: 'Destroy 3 rival aces' },
+  salvager:      { name: 'SALVAGER',      desc: 'Recover 5 power shards' },
 };
 // Stats overlay page model — single source of truth for Tab navigation so the
 // keydown handler and the four draw branches can't desync. Pages, in order:
@@ -14202,6 +14355,12 @@ function killPlayer(srcX, srcY, cause, srcType) {
   if (srcType) game._revengeType = srcType;
   // SIGNAL INTERCEPT — enemy comms celebrate confirmed kill
   if (typeof pushIntercept === 'function') pushIntercept('playerDown');
+  // SALVAGE PROTOCOL — the lost build scatters as recoverable power shards.
+  // Must run BEFORE the lvl reset below (reads pre-death levels). Skipped when
+  // this death ends the run (no dual wing to absorb it and no spare ship left).
+  if (game.dualFighter || game.lives > 1) {
+    spawnSalvageShards(game.playerX, game.playerY);
+  }
   game.lvl = {S: 1, N: 1, P: 1};
   game._typeMaxedFlags = {};
   game.powerUps = [];
@@ -15844,6 +16003,8 @@ function update() {
     updateGuardian();
     // RIVAL ACE — nemesis duelist spawn/duel/dodge/retreat. Self-gates by state.
     updateRivalAce();
+    // SALVAGE PROTOCOL — power shards drift/expire/catch. Self-gates by state.
+    updateSalvageShards();
     // ENDURANCE TIERS — check run-frame thresholds, fire ceremony at crossings.
     updateEnduranceTiers();
     // RAPID STORM synergy — RAPID + FORK simultaneously active triggers a one-shot
@@ -16400,12 +16561,14 @@ function draw() {
       // particles read clearly. Self-gates internally by state.
       drawStageWeather();
       drawSupplyCrate();
+      drawSalvageShards();
       drawGuardian();
       drawRivalAce();
       drawInterceptTerminal();
       break;
     case STATE.BOSS_STAGE:
       drawBossStage();
+      drawSalvageShards();
       drawGuardian();
       drawInterceptTerminal();
       break;
@@ -16420,6 +16583,7 @@ function draw() {
       drawGameplay();
       drawStageWeather();
       drawSupplyCrate();
+      drawSalvageShards();
       drawGuardian();
       drawRivalAce();
       drawInterceptTerminal();
@@ -17723,6 +17887,10 @@ function pickRunHighlights() {
   // most personal win in the game; heavy priority so it headlines the recap.
   const _rivD = game.rivalDefeats || 0;
   if (_rivD >= 1)         out.push({ label: 'NEMESIS DOWN',    value: String(_rivD),    prio: _rivD * 50, col: '#f44' });
+  // SHARDS SALVAGED — power levels recovered from your own wrecks this run.
+  // Comeback-skill stat: it only exists on runs that both died AND rebuilt.
+  const _svR = game.salvageCount || 0;
+  if (_svR >= 2)          out.push({ label: 'SHARDS SALVAGED', value: String(_svR),     prio: _svR * 12, col: '#0df' });
   // CLUSTER PARRY MAX — most bullets deflected in one dash frame. High-skill
   // dive-into-fire stat. Gold to match the in-stage CLUSTER PARRY banner.
   const _cpBest = game.clusterParryBest || 0;
@@ -22832,6 +23000,14 @@ function drawStatsOverlay() {
         const _rwt = _rwT >= 10 ? 'NEMESIS' : _rwT >= 3 ? 'ACE KILLER' : '';
         _pRow('RIVAL ACE', _rwT + (_rwt ? '  ' + _rwt : ''),
               _rwT >= 10 ? '#fc4' : _rwT >= 3 ? '#f44' : '#f66');
+      }
+      // SALVAGE lifetime — power shards recovered from wrecks. Comeback craft.
+      // Tiers: 25 = SCAVENGER / 100 = PHOENIX (rise-from-the-wreck vocabulary).
+      const _svT = parseInt(localStorage.getItem('galagaSalvageTotal') || '0', 10) || 0;
+      if (_svT >= 5) {
+        const _svt = _svT >= 100 ? 'PHOENIX' : _svT >= 25 ? 'SCAVENGER' : '';
+        _pRow('SALVAGE', _svT + (_svt ? '  ' + _svt : ''),
+              _svT >= 100 ? '#fc4' : _svT >= 25 ? '#0ff' : '#0df');
       }
       // NEAR MISS lifetime — passive evasion stat, mirrors PARRY surface pattern.
       // Tier thresholds chosen higher than parry (near miss is passive — easier

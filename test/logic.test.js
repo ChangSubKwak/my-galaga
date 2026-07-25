@@ -3009,6 +3009,39 @@ if (typeof G.rivalCallsignFor === 'function' && typeof G.rivalStatsForLevel === 
   }
 } else { console.log('  (skipped — RIVAL ACE core not exposed)'); }
 
+section('SALVAGE PROTOCOL — death-economy shard planner (pure)');
+if (typeof G.salvageShardPlan === 'function') {
+  const plan = (lvl, mode) => G.salvageShardPlan(lvl, mode);
+  // Base build (nothing invested) drops nothing — a softener, never a source.
+  eq(plan({ S: 1, N: 1, P: 1 }, 'normal').length, 0, 'fresh 1/1/1 build → no shards');
+  eq(plan({ S: 1, N: 1, P: 1 }, 'easy').length, 0, 'fresh build → no shards even on easy');
+  // Difficulty shapes the economy: easy 3 / normal 2 / hard 1 (capped by loss).
+  eq(plan({ S: 5, N: 3, P: 3 }, 'easy').length, 3, 'easy salvages up to 3 levels');
+  eq(plan({ S: 5, N: 3, P: 3 }, 'normal').length, 2, 'normal salvages up to 2');
+  eq(plan({ S: 5, N: 3, P: 3 }, 'hard').length, 1, 'hard salvages only 1');
+  eq(plan({ S: 5, N: 3, P: 3 }, 'nonsense').length, 2, 'unknown mode falls back to normal cap');
+  // Greedy prefers the deepest-invested axis; ties resolve S > N > P.
+  eq(plan({ S: 5, N: 3, P: 3 }, 'normal').join(''), 'SS', 'deepest axis (S at 4 lost) drains first');
+  eq(plan({ S: 2, N: 2, P: 2 }, 'normal').join(''), 'SN', 'all-tied losses resolve in S > N > P order');
+  eq(plan({ S: 1, N: 1, P: 3 }, 'hard').join(''), 'P', 'only-invested axis is the one salvaged');
+  eq(plan({ S: 1, N: 3, P: 2 }, 'easy').join(''), 'NNP', 'greedy tracks remaining loss as it drains');
+  // Never exceeds what was actually lost.
+  eq(plan({ S: 2, N: 1, P: 1 }, 'easy').join(''), 'S', 'cap 3 but only 1 level lost → 1 shard');
+  // Robustness: null / partial level objects.
+  eq(plan(null, 'normal').length, 0, 'null lvl → no shards (never throws)');
+  eq(plan({ S: 3 }, 'normal').join(''), 'SS', 'missing axes treated as level 1');
+  // Every emitted letter is a real power axis.
+  ok(plan({ S: 5, N: 3, P: 3 }, 'easy').every(ax => ax === 'S' || ax === 'N' || ax === 'P'),
+     'plan emits only S/N/P letters');
+  // Intercept wiring for the one-shot comm beat.
+  const IM2 = G.__getInterceptMsg && G.__getInterceptMsg();
+  if (IM2) {
+    ok(Array.isArray(IM2.salvageDrop) && IM2.salvageDrop.length === 3
+       && IM2.salvageDrop.every(s => typeof s === 'string' && s.length),
+       'salvageDrop intercept wired with 3 variants');
+  }
+} else { console.log('  (skipped — salvageShardPlan not exposed)'); }
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
