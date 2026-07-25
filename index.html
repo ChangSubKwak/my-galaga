@@ -4857,7 +4857,10 @@ const INTERCEPT_MSG = {
   rivalSpotted:  ['OUR ACE HAS FOUND YOU!', 'DUELIST ON APPROACH!', 'THE MIRROR HUNTS!'],
   rivalRetreat:  ['OUR ACE WITHDRAWS!', 'DUEL SUSPENDED!', 'THE ACE WILL RETURN!'],
   rivalDown:     ['OUR ACE IS DOWN!', 'THE DUELIST FALLS!', 'IMPOSSIBLE — ACE LOST!'],
-  salvageDrop:   ['THEIR CORE SCATTERED!', 'DON\'T LET THEM REBUILD!', 'SEIZE THE WRECKAGE!']
+  salvageDrop:   ['THEIR CORE SCATTERED!', 'DON\'T LET THEM REBUILD!', 'SEIZE THE WRECKAGE!'],
+  magpieSpotted: ['MAGPIE UNIT DEPLOYED!', 'STEAL THEIR SUPPLIES!', 'THE MAGPIE HUNTS YOUR LOOT!'],
+  magpieEscape:  ['MAGPIE SECURED THE CARGO!', 'SUPPLY THEFT COMPLETE!', 'THEIR LOSS — OUR GAIN!'],
+  magpieDown:    ['MAGPIE LOST!', 'THE THIEF IS DOWN!', 'CARGO BACK IN THEIR HANDS!']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
 const INTERCEPT_LIFE = 180;
@@ -5788,6 +5791,212 @@ function drawDeathEcho() {
   drawPlayer(e.x, e.y, '#9ab');
   ctx.globalAlpha = Math.min(1, alpha * 1.6);
   drawRetroText(e.callsign, e.x, e.y - 12, 4, '#9ab');
+  ctx.restore();
+}
+
+// ================================ THE MAGPIE ===============================
+// The loot economy's third act. Drops give (power-ups), SALVAGE recovers
+// (shards) — THE MAGPIE contests: a cowardly scavenger drone that dives for
+// loot the player leaves floating too long (≥2s untouched), grabs it, and
+// flees off the top with it. It never shoots and never rams — the threat is
+// pure LOSS. Counterplay is the existing verb: shoot it down (2-3 HP) and the
+// stolen cargo drops right back, plus a flat +300. Ignoring your drops now
+// has a price, which quietly rewards active, mobile play. One at a time,
+// stage 7+, long cooldown between raids. Pure target-picker + stat curve are
+// logic-tested.
+const MAGPIE_MIN_AGE = 120;   // frames a drop must float untouched before it's stealable
+const MAGPIE_COOLDOWN = 1200; // frames between raids (20s)
+
+// Pure: escalation is mild — the magpie is a nuisance, not a duelist.
+function magpieStatsForStage(stage) {
+  const st = Math.max(1, Math.floor(stage) || 1);
+  return {
+    hp: st >= 25 ? 3 : 2,
+    speed: Math.min(1.8, 1.2 + st * 0.005)
+  };
+}
+
+// Pure: pick the loot to steal — the OLDEST eligible item (most neglected),
+// ties broken by smaller y (closer to the top, easiest getaway). Items carry
+// a `_mAge` frame counter (ticked by updateMagpie). Returns
+// { kind: 'powerup'|'shard', obj } or null.
+function magpiePickTarget(powerUps, shards, minAge) {
+  const age = minAge == null ? MAGPIE_MIN_AGE : minAge;
+  let best = null, bestKind = null;
+  const consider = (arr, kind) => {
+    if (!arr) return;
+    for (const it of arr) {
+      const a = it._mAge || 0;
+      if (a < age) continue;
+      if (!best || a > (best._mAge || 0)
+          || (a === (best._mAge || 0) && it.y < best.y)) {
+        best = it; bestKind = kind;
+      }
+    }
+  };
+  consider(powerUps, 'powerup');
+  consider(shards, 'shard');
+  return best ? { kind: bestKind, obj: best } : null;
+}
+
+function updateMagpie() {
+  if (!game) return;
+  if (game.state === STATE.PAUSED) return;
+  const m = game.magpie;
+
+  if (!m) {
+    if (game.state !== STATE.PLAYING) return;
+    // Age the field loot (both economies) so neglect becomes measurable.
+    if (game.powerUps) for (const p of game.powerUps) p._mAge = (p._mAge || 0) + 1;
+    if (game.salvageShards) for (const s of game.salvageShards) s._mAge = (s._mAge || 0) + 1;
+    if (game.stage < 7 || !game.allEntered || !game.playerAlive) return;
+    if ((game.magpieCd || 0) > 0) { game.magpieCd--; return; }
+    if ((game.animFrame % 30) !== 0 || Math.random() >= 0.3) return;
+    const target = magpiePickTarget(game.powerUps, game.salvageShards, MAGPIE_MIN_AGE);
+    if (!target) return;
+    const st = magpieStatsForStage(game.stage);
+    game.magpie = {
+      phase: 'seek', target,
+      x: target.obj.x < BASE_W / 2 ? BASE_W + 8 : -8, y: 18,
+      hp: st.hp, maxHp: st.hp, speed: st.speed,
+      carry: null, flash: 0, vx: 0, vy: 0
+    };
+    if (!game._magpieSeen && typeof pushIntercept === 'function') {
+      game._magpieSeen = true;
+      pushIntercept('magpieSpotted');
+    }
+    playSound('enemyDive', game.magpie.x);
+    return;
+  }
+
+  if (m.flash > 0) m.flash--;
+
+  // Outside live play (stage over / player down cutscene) the raid is off.
+  if (game.state !== STATE.PLAYING) { game.magpie = null; return; }
+
+  if (m.phase === 'seek') {
+    const t = m.target && m.target.obj;
+    // Target vanished (player caught it / shard expired) → flee empty-pawed.
+    const arr = m.target && (m.target.kind === 'powerup' ? game.powerUps : game.salvageShards);
+    if (!t || !arr || arr.indexOf(t) === -1) {
+      m.phase = 'flee';
+    } else {
+      const dx = t.x - m.x, dy = t.y - m.y;
+      const d = Math.max(0.001, magnitude(dx, dy));
+      m.x += (dx / d) * m.speed;
+      m.y += (dy / d) * m.speed;
+      // GRAB — pluck the item out of the world and run.
+      if (d < 5) {
+        arr.splice(arr.indexOf(t), 1);
+        m.carry = m.target.kind === 'powerup'
+          ? { kind: 'powerup', type: t.type }
+          : { kind: 'shard', axis: t.axis };
+        m.phase = 'flee';
+        playSound('tick', m.x);
+      }
+    }
+  } else if (m.phase === 'flee') {
+    m.vy = Math.min(2.2, (m.vy || 0.5) * 1.05);
+    m.y -= m.vy;
+    m.x += Math.sin(game.animFrame * 0.15) * 0.8;
+    if (m.y < -12) {
+      // Escaped. If it got away WITH cargo, the enemy comms gloat.
+      if (m.carry && typeof pushIntercept === 'function') pushIntercept('magpieEscape');
+      game.magpie = null;
+      game.magpieCd = MAGPIE_COOLDOWN;
+      return;
+    }
+  }
+
+  // PLAYER BULLETS vs MAGPIE — shooting the thief returns the cargo.
+  for (let bi = game.bullets.length - 1; bi >= 0; bi--) {
+    const b = game.bullets[bi];
+    if (!aabbHit(b.x - m.x, b.y - m.y, 6, 5)) continue;
+    if (b.kind === 'laser' && b.pierced) {
+      if (b.pierced.has(m)) continue;
+      b.pierced.add(m);
+    } else {
+      game.bullets.splice(bi, 1);
+    }
+    m.hp -= b.dmg || 1;
+    m.flash = 5;
+    game.stageShotsHit = (game.stageShotsHit || 0) + 1;
+    if (game.stats) game.stats.shotsHit = (game.stats.shotsHit || 0) + 1;
+    playSound('hit', m.x);
+    if (m.hp <= 0) {
+      game.explosions.push({ x: m.x, y: m.y, timer: 0, maxTime: 20 });
+      // Drop the cargo back into the world where it fell.
+      if (m.carry) {
+        if (m.carry.kind === 'powerup') {
+          game.powerUps.push({ x: m.x, y: m.y, vy: 0.6, type: m.carry.type });
+        } else if (game.salvageShards) {
+          game.salvageShards.push({
+            x: m.x, y: m.y, axis: m.carry.axis,
+            vx: jitter(0.4), vy: 0.2, ttl: 240
+          });
+        }
+        if (game.floatTexts) {
+          game.floatTexts.push({
+            x: m.x, y: m.y - 10, text: 'CARGO RECOVERED',
+            color: '#fc4', life: 50, maxLife: 50, size: 6
+          });
+        }
+      }
+      addScore(300);
+      bumpCombo();
+      if (typeof pushIntercept === 'function') pushIntercept('magpieDown');
+      try {
+        const mk = (parseInt(localStorage.getItem('galagaMagpieKills') || '0', 10) || 0) + 1;
+        localStorage.setItem('galagaMagpieKills', String(mk));
+        if (mk >= 5) unlockAchievement('thiefTaker');
+      } catch (e) {}
+      playSound('explode', m.x);
+      game.magpie = null;
+      game.magpieCd = MAGPIE_COOLDOWN;
+      return;
+    }
+  }
+}
+
+function drawMagpie() {
+  if (!game || !game.magpie) return;
+  if (game.state !== STATE.PLAYING && game.state !== STATE.PAUSED) return;
+  const m = game.magpie;
+  const t = game.animFrame;
+  const px = Math.round(m.x), py = Math.round(m.y);
+  const bodyCol = m.flash > 0 ? '#fff' : '#445';
+  ctx.save();
+  // Flapping wings — gold trim reads as "greed", silhouette is unlike any
+  // formation enemy (colorblind-safe shape identity).
+  const flap = (t & 4) ? 2 : 0;
+  ctx.fillStyle = m.flash > 0 ? '#fff' : '#fc4';
+  ctx.fillRect(px - 5, py - 1 - flap, 3, 2);
+  ctx.fillRect(px + 3, py - 1 - flap, 3, 2);
+  // Body + claws
+  ctx.fillStyle = bodyCol;
+  ctx.fillRect(px - 2, py - 2, 5, 4);
+  ctx.fillRect(px - 3, py + 2, 2, 2);
+  ctx.fillRect(px + 2, py + 2, 2, 2);
+  // Greedy red eye
+  ctx.fillStyle = '#f44';
+  ctx.fillRect(px, py - 1, 1, 1);
+  // Carried loot dangles below — the theft is always visible.
+  if (m.carry) {
+    if (m.carry.kind === 'powerup') {
+      const col = (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[m.carry.type]) || '#0df';
+      ctx.fillStyle = col;
+      ctx.fillRect(px - 2, py + 5, 5, 5);
+      drawRetroText(m.carry.type, px + 0.5, py + 8, 4, '#000');
+    } else {
+      const col = (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[m.carry.axis]) || '#0df';
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(px + 0.5, py + 4); ctx.lineTo(px + 3.5, py + 7);
+      ctx.lineTo(px + 0.5, py + 10); ctx.lineTo(px - 2.5, py + 7);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 
@@ -7151,6 +7360,9 @@ function resetGame() {
     deathEchoRec: (typeof loadDeathEcho === 'function' ? loadDeathEcho() : null),
     deathEcho: null,
     deathEchoDone: false,
+    magpie: null,
+    magpieCd: 600,
+    _magpieSeen: false,
     rival: null,
     rivalLevel: 0,
     rivalNextStage: RIVAL_FIRST_STAGE,
@@ -10523,6 +10735,7 @@ const ACHIEVEMENTS = {
   rivalHunter:   { name: 'ACE HUNTER',    desc: 'Destroy 3 rival aces' },
   salvager:      { name: 'SALVAGER',      desc: 'Recover 5 power shards' },
   echoBound:     { name: 'GHOST OF ME',   desc: 'Commune with your last wreck' },
+  thiefTaker:    { name: 'THIEF TAKER',   desc: 'Shoot down 5 magpie looters' },
 };
 // Stats overlay page model — single source of truth for Tab navigation so the
 // keydown handler and the four draw branches can't desync. Pages, in order:
@@ -16140,6 +16353,8 @@ function update() {
     updateSalvageShards();
     // DEATH ECHO — last run's wreck: spawn/drift/commune. Self-gates by state.
     updateDeathEcho();
+    // THE MAGPIE — loot-raider drone: age loot, raid, flee, drop cargo on kill.
+    updateMagpie();
     // ENDURANCE TIERS — check run-frame thresholds, fire ceremony at crossings.
     updateEnduranceTiers();
     // RAPID STORM synergy — RAPID + FORK simultaneously active triggers a one-shot
@@ -16698,6 +16913,7 @@ function draw() {
       drawSupplyCrate();
       drawDeathEcho();
       drawSalvageShards();
+      drawMagpie();
       drawGuardian();
       drawRivalAce();
       drawInterceptTerminal();
@@ -16722,6 +16938,7 @@ function draw() {
       drawSupplyCrate();
       drawDeathEcho();
       drawSalvageShards();
+      drawMagpie();
       drawGuardian();
       drawRivalAce();
       drawInterceptTerminal();

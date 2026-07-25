@@ -3101,6 +3101,44 @@ if (typeof G.deathEchoValid === 'function' && typeof G.recordDeathEcho === 'func
   }
 } else { console.log('  (skipped — DEATH ECHO helpers not exposed)'); }
 
+section('THE MAGPIE — loot-raider target picker + stat curve (pure)');
+if (typeof G.magpiePickTarget === 'function' && typeof G.magpieStatsForStage === 'function') {
+  // magpiePickTarget — oldest eligible loot wins; ties go to the higher item.
+  const pu = (age, y, type) => ({ _mAge: age, x: 100, y, type });
+  eq(G.magpiePickTarget([], [], 120), null, 'no loot → no target');
+  eq(G.magpiePickTarget([pu(60, 100, 'S')], [], 120), null, 'under-age loot is safe (player priority window)');
+  const t1 = G.magpiePickTarget([pu(200, 100, 'S'), pu(150, 50, 'R')], [], 120);
+  ok(!!t1 && t1.kind === 'powerup' && t1.obj.type === 'S', 'oldest item is stolen first');
+  const t2 = G.magpiePickTarget([pu(200, 100, 'S'), pu(200, 40, 'R')], [], 120);
+  ok(!!t2 && t2.obj.type === 'R', 'age tie → the higher (smaller y) item wins');
+  const t3 = G.magpiePickTarget([pu(130, 200, 'T')], [{ _mAge: 250, x: 50, y: 90, axis: 'P' }], 120);
+  ok(!!t3 && t3.kind === 'shard' && t3.obj.axis === 'P', 'salvage shards are stealable too — oldest across BOTH pools');
+  eq(G.magpiePickTarget(null, null, 120), null, 'null pools → null (never throws)');
+  const t4 = G.magpiePickTarget([{ x: 10, y: 10, type: 'W' }], [], 120);
+  eq(t4, null, 'missing _mAge counts as age 0 (fresh drop is safe)');
+
+  // magpieStatsForStage — a nuisance, not a duelist.
+  const m1 = G.magpieStatsForStage(7), m25 = G.magpieStatsForStage(25), m99 = G.magpieStatsForStage(99);
+  eq(m1.hp, 2, 'early magpie has 2 hp');
+  eq(m25.hp, 3, 'deep-stage magpie has 3 hp');
+  ok(m1.speed < m25.speed, 'speed ramps with stage');
+  ok(m99.speed <= 1.8, 'speed capped at 1.8 (always catchable)');
+  ok(m99.hp === 3, 'hp never exceeds 3');
+  const mBad = G.magpieStatsForStage(NaN);
+  ok(mBad.hp === 2 && mBad.speed > 0, 'bad stage input → sane floor stats');
+
+  // Intercept wiring — the three raid beats.
+  const IM3 = G.__getInterceptMsg && G.__getInterceptMsg();
+  if (IM3) {
+    let wired = true;
+    for (const k of ['magpieSpotted', 'magpieEscape', 'magpieDown']) {
+      if (!Array.isArray(IM3[k]) || IM3[k].length !== 3
+          || IM3[k].some(s => typeof s !== 'string' || !s.length)) wired = false;
+    }
+    ok(wired, 'magpieSpotted/magpieEscape/magpieDown intercepts wired with 3 variants each');
+  }
+} else { console.log('  (skipped — MAGPIE helpers not exposed)'); }
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
