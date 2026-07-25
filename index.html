@@ -10743,11 +10743,12 @@ const ACHIEVEMENTS = {
 //   1 .. G             ACHIEVEMENT grids   (G = statsAchGridPages())
 //   G + 1              BESTIARY
 //   G + 2              PROFILE
+//   G + 3              PILOT LOG (last 10 sorties — the run-history chronicle)
 const STATS_ACH_PER_PAGE = 30; // 10 rows × 3 cols
 function statsAchGridPages() {
   return Math.max(1, Math.ceil(Object.keys(ACHIEVEMENTS).length / STATS_ACH_PER_PAGE));
 }
-function statsTotalPages() { return statsAchGridPages() + 3; }
+function statsTotalPages() { return statsAchGridPages() + 4; }
 const ACH_KEY = 'galagaAchievements';
 let unlockedAchievements = (() => {
   try {
@@ -11319,6 +11320,66 @@ function runGradeLetter(t) {
   return 'D';
 }
 
+// ================================ PILOT LOG ================================
+// The run-history chronicle — the SIXTH persistence path. Aggregates
+// (cumStats), bests (top scores), and the single last-run snapshot all erase
+// individual histories; the PILOT LOG keeps the last 10 sorties as they were:
+// date, callsign worn, mode, final score, deepest stage, run grade, and what
+// ended it. Rendered as its own stats-overlay page (Tab), newest first —
+// the logbook the epitaphs and DEATH ECHO were always implying. Same
+// corrupt-storage-non-fatal contract as the other five paths; the pure
+// entry-validator and push/cap helpers are logic-tested.
+const FLIGHT_LOG_CAP = 10;
+
+function flightLogEntryValid(e) {
+  return !!(e && typeof e === 'object'
+    && typeof e.d === 'string' && e.d.length > 0
+    && typeof e.sc === 'number' && isFinite(e.sc) && e.sc >= 0
+    && Number.isInteger(e.st) && e.st >= 1
+    && typeof e.gr === 'string' && e.gr.length > 0
+    && typeof e.ca === 'string' && e.ca.length > 0);
+}
+
+// Pure: newest-first prepend with cap; silently drops malformed entries on
+// BOTH sides (a corrupt stored row can't crowd out real history, a corrupt
+// new entry can't poison the log).
+function flightLogPush(list, entry, cap) {
+  const c = (typeof cap === 'number' && cap > 0) ? cap : FLIGHT_LOG_CAP;
+  const base = Array.isArray(list) ? list.filter(flightLogEntryValid) : [];
+  if (!flightLogEntryValid(entry)) return base.slice(0, c);
+  return [entry].concat(base).slice(0, c);
+}
+
+function loadFlightLog() {
+  try {
+    const raw = localStorage.getItem('galagaFlightLog');
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter(flightLogEntryValid).slice(0, FLIGHT_LOG_CAP) : [];
+  } catch (e) { return []; }
+}
+
+// Reads the finished run off `game`; called from commitGameToCumStats so it
+// inherits the demo guard and covers every run-end path (game over + quit).
+function recordFlightLog() {
+  try {
+    const now = new Date();
+    const d = String(now.getMonth() + 1).padStart(2, '0') + '-'
+            + String(now.getDate()).padStart(2, '0');
+    const acc = computeAccuracy(game.stats);
+    const st = (game.stats && game.stats.maxStage) || game.stage || 1;
+    const entry = {
+      d,
+      sc: game.score || 0,
+      st,
+      gr: runGradeLetter(computeRunGradeScore(game.score || 0, acc, st)),
+      ca: String(game.lastDeathCause || 'abort').toUpperCase(),
+      cs: (typeof playerCallsign === 'string' && playerCallsign.length === 3) ? playerCallsign : '---',
+      md: game.challengeMode ? 'C' : (game.dailyMode ? 'D' : 'N')
+    };
+    localStorage.setItem('galagaFlightLog', JSON.stringify(flightLogPush(loadFlightLog(), entry)));
+  } catch (e) {}
+}
+
 // --- Cumulative lifetime stats (separate buckets per mode) ---
 const CUM_STATS_KEY = 'galagaCumStats';
 const CUM_STATS_KEY_CH = 'galagaCumStatsChallenge';
@@ -11353,6 +11414,8 @@ function commitGameToCumStats() {
       wasPb: _thisStage > _priorBest && _priorBest > 0
     }));
   } catch (e) {}
+  // PILOT LOG — append this sortie to the run-history chronicle (cap 10).
+  recordFlightLog();
   // First commit ever — FRESH START achievement
   if ((loadCumStats(false).sessions || 0) + (loadCumStats(true).sessions || 0) === 0) {
     unlockAchievement('freshStart');
@@ -23590,6 +23653,47 @@ function drawStatsOverlay() {
         }
       } catch(e){}
       drawRetroText(_ppNp + '/' + _ppNp + '  TAB', px + panelW - 8, py + panelH - 8, 5, COL.gray, 'right');
+      drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
+      return;
+    }
+  }
+
+  // PILOT LOG page — the last-10-sorties chronicle (dedicated full panel,
+  // mirrors the bestiary/profile early-return pattern). Newest first; the
+  // most recent sortie row is highlighted. Reads storage per frame like the
+  // profile page's lifetime-stat rows do (paused overlay — not the hot path).
+  {
+    if (game.statsAchPage === statsAchGridPages() + 3) {
+      drawRetroText('PILOT LOG', px + 8, y, 7, COL.white, 'left');
+      drawRetroText((game.statsAchPage + 1) + '/' + statsTotalPages() + '  TAB',
+                    px + panelW - 8, y, 5, COL.gray, 'right');
+      y += 9;
+      const _fl = loadFlightLog();
+      drawRetroText(_fl.length + ' SORTIES ON RECORD', px + 8, y, 5, COL.gray, 'left');
+      y += 8;
+      if (!_fl.length) {
+        drawRetroText('NO SORTIES LOGGED YET', px + 8, y + 6, 6, '#555', 'left');
+        drawRetroText('FLY. THE LOG REMEMBERS.', px + 8, y + 16, 5, '#444', 'left');
+      }
+      for (let i = 0; i < _fl.length; i++) {
+        const e = _fl[i];
+        ctx.fillStyle = i === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(40,40,40,0.35)';
+        ctx.fillRect(px + 6, y - 1, panelW - 12, 9);
+        // date · callsign · what ended it (dim chronicle text)
+        drawRetroText(e.d + ' ' + (e.cs || '---') + ' ' + e.ca,
+                      px + 8, y + 2, 5, i === 0 ? '#ccc' : '#888', 'left');
+        // stage reached + run grade (grade in its semantic color)
+        drawRetroText('S' + e.st, px + 108, y + 2, 5, '#aaa', 'left');
+        drawRetroText(e.gr, px + 126, y + 2, 6,
+                      (typeof GRADE_COL !== 'undefined' && GRADE_COL[e.gr]) || '#fff', 'left');
+        // non-normal mode tag (C = challenge, D = daily)
+        if (e.md && e.md !== 'N') {
+          drawRetroText(e.md, px + 134, y + 2, 5, e.md === 'C' ? COL.magenta : '#fc4', 'left');
+        }
+        drawRetroText(fmtScore(e.sc), px + panelW - 8, y + 2, 5,
+                      i === 0 ? '#fff' : '#999', 'right');
+        y += 10;
+      }
       drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
       return;
     }

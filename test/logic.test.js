@@ -1514,9 +1514,9 @@ if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'f
   const gp = G.statsAchGridPages();
   const tp = G.statsTotalPages();
   ok(gp >= 1, 'at least one achievement grid page');
-  // summary(1) + grids(gp) + bestiary(1) + profile(1)
-  eq(tp, gp + 3, 'total pages = grid pages + 3 (summary/bestiary/profile)');
-  // The four draw branches key off these indices; assert they stay distinct and
+  // summary(1) + grids(gp) + bestiary(1) + profile(1) + pilot log(1)
+  eq(tp, gp + 4, 'total pages = grid pages + 4 (summary/bestiary/profile/pilot log)');
+  // The five draw branches key off these indices; assert they stay distinct and
   // ordered so a future ACHIEVEMENTS change can't collapse two pages onto one
   // index or push a page out of the Tab cycle.
   const summaryPage  = 0;
@@ -1524,18 +1524,21 @@ if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'f
   const lastGridPg   = gp;
   const bestiaryPage = gp + 1;
   const profilePage  = gp + 2;
+  const pilotLogPage = gp + 3;
   ok(firstGridPg <= lastGridPg, 'grid page range is non-empty');
   ok(summaryPage < firstGridPg, 'summary precedes grids');
   ok(lastGridPg < bestiaryPage, 'grids precede bestiary');
   ok(bestiaryPage < profilePage, 'bestiary precedes profile');
-  eq(profilePage, tp - 1, 'profile is the last page (Tab wraps after it)');
-  // every page index in [0, tp) maps to exactly one of the four kinds
+  ok(profilePage < pilotLogPage, 'profile precedes pilot log');
+  eq(pilotLogPage, tp - 1, 'pilot log is the last page (Tab wraps after it)');
+  // every page index in [0, tp) maps to exactly one of the five kinds
   let covered = 0;
   for (let p = 0; p < tp; p++) {
     const kinds = (p === summaryPage ? 1 : 0)
                 + (p >= firstGridPg && p <= lastGridPg ? 1 : 0)
                 + (p === bestiaryPage ? 1 : 0)
-                + (p === profilePage ? 1 : 0);
+                + (p === profilePage ? 1 : 0)
+                + (p === pilotLogPage ? 1 : 0);
     if (kinds === 1) covered++;
   }
   eq(covered, tp, 'every Tab page maps to exactly one kind (no gaps/overlaps)');
@@ -3138,6 +3141,54 @@ if (typeof G.magpiePickTarget === 'function' && typeof G.magpieStatsForStage ===
     ok(wired, 'magpieSpotted/magpieEscape/magpieDown intercepts wired with 3 variants each');
   }
 } else { console.log('  (skipped — MAGPIE helpers not exposed)'); }
+
+section('PILOT LOG — run-history chronicle (sixth persistence path)');
+if (typeof G.flightLogEntryValid === 'function' && typeof G.flightLogPush === 'function'
+    && typeof G.loadFlightLog === 'function') {
+  const mk = (over) => Object.assign(
+    { d: '07-25', sc: 12345, st: 8, gr: 'B', ca: 'BULLET', cs: 'KWK', md: 'N' }, over || {});
+  // Entry validator.
+  ok(G.flightLogEntryValid(mk()), 'well-formed entry validates');
+  ok(!G.flightLogEntryValid(null), 'null entry rejected');
+  ok(!G.flightLogEntryValid(mk({ d: '' })), 'empty date rejected');
+  ok(!G.flightLogEntryValid(mk({ sc: -5 })), 'negative score rejected');
+  ok(!G.flightLogEntryValid(mk({ sc: NaN })), 'NaN score rejected');
+  ok(!G.flightLogEntryValid(mk({ st: 0 })), 'stage 0 rejected');
+  ok(!G.flightLogEntryValid(mk({ st: 2.5 })), 'fractional stage rejected');
+  ok(!G.flightLogEntryValid(mk({ gr: '' })), 'empty grade rejected');
+  ok(!G.flightLogEntryValid(mk({ ca: '' })), 'empty cause rejected');
+
+  // flightLogPush — pure newest-first prepend with cap.
+  const one = G.flightLogPush([], mk({ sc: 1 }));
+  eq(one.length, 1, 'push onto empty log → 1 entry');
+  const two = G.flightLogPush(one, mk({ sc: 2 }));
+  ok(two.length === 2 && two[0].sc === 2 && two[1].sc === 1, 'newest entry is prepended (index 0)');
+  let big = [];
+  for (let i = 1; i <= 13; i++) big = G.flightLogPush(big, mk({ sc: i }));
+  eq(big.length, 10, 'log caps at 10 entries');
+  ok(big[0].sc === 13 && big[9].sc === 4, 'cap drops the OLDEST entries, keeps the newest 10');
+  const kept = G.flightLogPush([mk({ sc: 7 })], mk({ st: 0 }));
+  ok(kept.length === 1 && kept[0].sc === 7, 'malformed new entry is dropped, history intact');
+  const cleaned = G.flightLogPush([mk({ sc: 7 }), { junk: true }, mk({ sc: 6 })], mk({ sc: 8 }));
+  ok(cleaned.length === 3 && cleaned.every(G.flightLogEntryValid),
+     'malformed STORED rows are swept on push');
+  ok(G.flightLogPush('not-an-array', mk({ sc: 9 })).length === 1, 'non-array list treated as empty');
+  eq(G.flightLogPush([], mk(), 3).length, 1, 'explicit cap parameter respected (shape)');
+
+  // loadFlightLog — corrupt-storage-non-fatal contract (path #6).
+  const LS2 = sandbox.localStorage;
+  const savedLog = LS2.getItem('galagaFlightLog');
+  LS2.setItem('galagaFlightLog', '{broken');
+  eq(G.loadFlightLog().length, 0, 'corrupt JSON → empty log, never throws');
+  LS2.setItem('galagaFlightLog', JSON.stringify({ a: 1 }));
+  eq(G.loadFlightLog().length, 0, 'non-array JSON → empty log');
+  LS2.setItem('galagaFlightLog', JSON.stringify([mk({ sc: 5 }), { bad: 1 }, mk({ sc: 4 })]));
+  const mixed = G.loadFlightLog();
+  ok(mixed.length === 2 && mixed.every(G.flightLogEntryValid), 'load filters malformed rows');
+  LS2.removeItem('galagaFlightLog');
+  eq(G.loadFlightLog().length, 0, 'absent key → empty log');
+  if (savedLog === null) LS2.removeItem('galagaFlightLog'); else LS2.setItem('galagaFlightLog', savedLog);
+} else { console.log('  (skipped — PILOT LOG helpers not exposed)'); }
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
