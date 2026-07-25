@@ -5667,6 +5667,130 @@ function drawSalvageShards() {
   ctx.restore();
 }
 
+// =============================== DEATH ECHO ================================
+// The Souls-bloodstain dialect, in Galaga grammar: when a run ENDS, the wreck
+// is left in the world. The NEXT run finds a ghostly, flickering copy of the
+// player's ship drifting down at the exact stage and x where the last run
+// died — wearing its callsign. Fly close to COMMUNE with it: the wreck
+// whispers a cause-specific last lesson (same coaching vocabulary as the
+// RESPAWN whispers) and hands its successor one shield charge. Once per run,
+// score-free, cross-run persistence via galagaDeathEcho. Pure record/load/
+// validate helpers are logic-tested (the fifth persistence path).
+const ECHO_LINES = {
+  bullet:    'WATCH THE LANES, SUCCESSOR.',
+  weather:   'THE SKY ITSELF STRIKES. MOVE.',
+  collision: 'NEVER TRADE HULLS. SLIP ASIDE.',
+  unknown:   'FLY FARTHER THAN I DID.'
+};
+function deathEchoLine(cause) { return ECHO_LINES[cause] || ECHO_LINES.unknown; }
+
+// Pure: shape guard for the persisted record — a corrupt echo must never
+// spawn a wreck at NaN or wear a broken callsign.
+function deathEchoValid(rec) {
+  return !!(rec && typeof rec === 'object'
+    && Number.isInteger(rec.stage) && rec.stage >= 1
+    && typeof rec.x === 'number' && isFinite(rec.x) && rec.x >= 0 && rec.x <= BASE_W
+    && typeof rec.callsign === 'string' && rec.callsign.length === 3
+    && typeof rec.cause === 'string' && rec.cause.length > 0);
+}
+
+function recordDeathEcho(stage, x, callsign, cause) {
+  try {
+    const rec = {
+      stage,
+      x: Math.max(0, Math.min(BASE_W, x)),
+      callsign: (typeof callsign === 'string' && callsign.length === 3) ? callsign : 'ACE',
+      cause: (typeof cause === 'string' && cause.length) ? cause : 'unknown'
+    };
+    if (!deathEchoValid(rec)) return false;
+    localStorage.setItem('galagaDeathEcho', JSON.stringify(rec));
+    return true;
+  } catch (e) { return false; }
+}
+
+function loadDeathEcho() {
+  try {
+    const raw = localStorage.getItem('galagaDeathEcho');
+    if (!raw) return null;
+    const rec = JSON.parse(raw);
+    return deathEchoValid(rec) ? rec : null;
+  } catch (e) { return null; }
+}
+
+function updateDeathEcho() {
+  if (!game) return;
+  if (game.state === STATE.PAUSED) return;
+  // SPAWN — once per run, on the exact stage where the LAST run ended.
+  if (!game.deathEcho && !game.deathEchoDone && game.deathEchoRec) {
+    const rec = game.deathEchoRec;
+    if (game.stage === rec.stage && isCombatState()) {
+      const settled = game.state === STATE.PLAYING
+        ? game.allEntered : (game.stageFrames || 0) > 120;
+      if (settled) {
+        game.deathEcho = {
+          x: Math.max(10, Math.min(BASE_W - 10, rec.x)), y: -12, vy: 0.3,
+          callsign: rec.callsign, cause: rec.cause, fade: 0
+        };
+        game.deathEchoDone = true;
+      }
+    }
+    if (!game.deathEcho) return;
+  }
+  const e = game.deathEcho;
+  if (!e) return;
+  if (!isCombatState() && game.state !== STATE.RESPAWN) { game.deathEcho = null; return; }
+  if (e.fade > 0) {
+    e.fade--;
+    if (e.fade === 0) game.deathEcho = null;
+    return;
+  }
+  e.y += e.vy;
+  e.x += Math.sin(game.animFrame * 0.02) * 0.15;
+  // Drifted past unclaimed — the echo is missed for this run.
+  if (e.y > BASE_H + 12) { game.deathEcho = null; return; }
+  // COMMUNE — fly close to your own wreck. It coaches, then arms you.
+  if (game.playerAlive && Math.abs(e.x - game.playerX) < 14 && Math.abs(e.y - game.playerY) < 14) {
+    e.fade = 50;
+    game.floatTexts.push({
+      x: e.x, y: e.y - 14, text: 'ECHO: ' + e.callsign,
+      color: '#9ab', life: 70, maxLife: 70, size: 7
+    });
+    if (typeof pushInfoText === 'function') {
+      pushInfoText({
+        x: BASE_W / 2, y: BASE_H / 2 + 30, text: deathEchoLine(e.cause),
+        color: '#9ab', life: 90, maxLife: 90, size: 6
+      });
+    }
+    if ((game.shieldCharges || 0) < SHIELD_MAX) {
+      game.shieldCharges = (game.shieldCharges || 0) + 1;
+      game.floatTexts.push({
+        x: e.x, y: e.y - 4, text: 'SHIELD +1',
+        color: '#4f8', life: 55, maxLife: 55, size: 6
+      });
+    }
+    playSound('rescue');
+    unlockAchievement('echoBound');
+  }
+}
+
+function drawDeathEcho() {
+  if (!game || !game.deathEcho) return;
+  if (game.state === STATE.TITLE || game.state === STATE.GAME_OVER
+      || game.state === STATE.STAGE_INTRO || game.state === STATE.BONUS_GAME) return;
+  const e = game.deathEcho;
+  const t = game.animFrame;
+  // Spectral flicker — two incommensurate sines so it never settles into a
+  // strobe (reduce-motion safe: slow drift, low amplitude, low alpha).
+  const flicker = 0.26 + 0.10 * Math.sin(t * 0.11) + 0.05 * Math.sin(t * 0.37);
+  const alpha = Math.max(0, e.fade > 0 ? flicker * (e.fade / 50) : flicker);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  drawPlayer(e.x, e.y, '#9ab');
+  ctx.globalAlpha = Math.min(1, alpha * 1.6);
+  drawRetroText(e.callsign, e.x, e.y - 12, 4, '#9ab');
+  ctx.restore();
+}
+
 function pickSupplyCrate() {
   if (!game) return false;
   const _stageMode = stageModeFor(game.stage);
@@ -7024,6 +7148,9 @@ function resetGame() {
     salvageShards: [],
     salvageCount: 0,
     _salvageSeen: false,
+    deathEchoRec: (typeof loadDeathEcho === 'function' ? loadDeathEcho() : null),
+    deathEcho: null,
+    deathEchoDone: false,
     rival: null,
     rivalLevel: 0,
     rivalNextStage: RIVAL_FIRST_STAGE,
@@ -10395,6 +10522,7 @@ const ACHIEVEMENTS = {
   rivalDown:     { name: 'NEMESIS DOWN',  desc: 'Destroy the rival ace' },
   rivalHunter:   { name: 'ACE HUNTER',    desc: 'Destroy 3 rival aces' },
   salvager:      { name: 'SALVAGER',      desc: 'Recover 5 power shards' },
+  echoBound:     { name: 'GHOST OF ME',   desc: 'Commune with your last wreck' },
 };
 // Stats overlay page model — single source of truth for Tab navigation so the
 // keydown handler and the four draw branches can't desync. Pages, in order:
@@ -14502,6 +14630,11 @@ function killPlayer(srcX, srcY, cause, srcType) {
       }
       game.state = STATE.GAME_OVER;
       game.gameOverTimer = 180;
+      // DEATH ECHO — leave this run's wreck in the world for the NEXT run
+      // (Souls-bloodstain dialect). Demo runs returned above, never recorded.
+      recordDeathEcho(game.stage, game.playerX,
+        (typeof playerCallsign === 'string' ? playerCallsign : null),
+        game.lastDeathCause || 'unknown');
       // GAME OVER FANFARE TIER — SFX scaled by max stage reached so deeper
       // runs end with more triumphant tone even at game over.
       {
@@ -16005,6 +16138,8 @@ function update() {
     updateRivalAce();
     // SALVAGE PROTOCOL — power shards drift/expire/catch. Self-gates by state.
     updateSalvageShards();
+    // DEATH ECHO — last run's wreck: spawn/drift/commune. Self-gates by state.
+    updateDeathEcho();
     // ENDURANCE TIERS — check run-frame thresholds, fire ceremony at crossings.
     updateEnduranceTiers();
     // RAPID STORM synergy — RAPID + FORK simultaneously active triggers a one-shot
@@ -16561,6 +16696,7 @@ function draw() {
       // particles read clearly. Self-gates internally by state.
       drawStageWeather();
       drawSupplyCrate();
+      drawDeathEcho();
       drawSalvageShards();
       drawGuardian();
       drawRivalAce();
@@ -16568,6 +16704,7 @@ function draw() {
       break;
     case STATE.BOSS_STAGE:
       drawBossStage();
+      drawDeathEcho();
       drawSalvageShards();
       drawGuardian();
       drawInterceptTerminal();
@@ -16583,6 +16720,7 @@ function draw() {
       drawGameplay();
       drawStageWeather();
       drawSupplyCrate();
+      drawDeathEcho();
       drawSalvageShards();
       drawGuardian();
       drawRivalAce();

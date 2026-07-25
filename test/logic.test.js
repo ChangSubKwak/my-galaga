@@ -175,6 +175,8 @@ const shim = `
 ;try { globalThis.__getVgrid = function () { return (typeof vgrid !== 'undefined') ? vgrid : null; }; } catch (e) {}
 ;try { globalThis.__getDiveTactics = function () { return (typeof DIVE_TACTICS !== 'undefined') ? DIVE_TACTICS : null; }; } catch (e) {}
 ;try { globalThis.__getRivalLines = function () { return (typeof RIVAL_LINES !== 'undefined') ? RIVAL_LINES : null; }; } catch (e) {}
+;try { globalThis.__getEchoLines = function () { return (typeof ECHO_LINES !== 'undefined') ? ECHO_LINES : null; }; } catch (e) {}
+;try { globalThis.__getRespawnWhispers = function () { return (typeof RESPAWN_WHISPERS !== 'undefined') ? RESPAWN_WHISPERS : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -3041,6 +3043,63 @@ if (typeof G.salvageShardPlan === 'function') {
        'salvageDrop intercept wired with 3 variants');
   }
 } else { console.log('  (skipped — salvageShardPlan not exposed)'); }
+
+section('DEATH ECHO — cross-run wreck persistence (fifth persistence path)');
+if (typeof G.deathEchoValid === 'function' && typeof G.recordDeathEcho === 'function'
+    && typeof G.loadDeathEcho === 'function') {
+  const LS = sandbox.localStorage;
+  const savedEcho = LS.getItem('galagaDeathEcho');
+  // deathEchoValid — shape guard.
+  ok(G.deathEchoValid({ stage: 12, x: 100, callsign: 'KWK', cause: 'bullet' }), 'well-formed record validates');
+  ok(!G.deathEchoValid(null), 'null record rejected');
+  ok(!G.deathEchoValid({ stage: 0, x: 100, callsign: 'KWK', cause: 'bullet' }), 'stage 0 rejected');
+  ok(!G.deathEchoValid({ stage: 1.5, x: 100, callsign: 'KWK', cause: 'bullet' }), 'fractional stage rejected');
+  ok(!G.deathEchoValid({ stage: 3, x: -1, callsign: 'KWK', cause: 'bullet' }), 'x below playfield rejected');
+  ok(!G.deathEchoValid({ stage: 3, x: 500, callsign: 'KWK', cause: 'bullet' }), 'x beyond BASE_W rejected');
+  ok(!G.deathEchoValid({ stage: 3, x: NaN, callsign: 'KWK', cause: 'bullet' }), 'NaN x rejected (no NaN wreck)');
+  ok(!G.deathEchoValid({ stage: 3, x: 100, callsign: 'AB', cause: 'bullet' }), 'non-3-char callsign rejected');
+  ok(!G.deathEchoValid({ stage: 3, x: 100, callsign: 'KWK', cause: '' }), 'empty cause rejected');
+
+  // record → load round trip.
+  ok(G.recordDeathEcho(12, 111.5, 'KWK', 'bullet'), 'record accepts a real death');
+  const rt = G.loadDeathEcho();
+  ok(!!rt && rt.stage === 12 && rt.x === 111.5 && rt.callsign === 'KWK' && rt.cause === 'bullet',
+     'load returns exactly what was recorded');
+  // Fallbacks: broken callsign/cause are repaired, x is clamped.
+  ok(G.recordDeathEcho(3, 9999, null, null), 'record repairs null callsign/cause and clamps x');
+  const rt2 = G.loadDeathEcho();
+  ok(!!rt2 && rt2.callsign === 'ACE' && rt2.cause === 'unknown' && rt2.x <= 224,
+     'repaired record: ACE callsign, unknown cause, clamped x');
+  // Invalid stage never overwrites the stored echo.
+  ok(!G.recordDeathEcho(0, 50, 'KWK', 'bullet'), 'stage 0 record refused');
+  const rt3 = G.loadDeathEcho();
+  ok(!!rt3 && rt3.stage === 3, 'refused record did not clobber the stored echo');
+  // Corrupt storage is non-fatal (documented invariant, extended to path #5).
+  LS.setItem('galagaDeathEcho', '{not json');
+  ok(G.loadDeathEcho() === null, 'corrupt JSON → null, never throws');
+  LS.setItem('galagaDeathEcho', JSON.stringify({ stage: 'x' }));
+  ok(G.loadDeathEcho() === null, 'wrong-shaped JSON → null');
+  LS.removeItem('galagaDeathEcho');
+  ok(G.loadDeathEcho() === null, 'absent key → null');
+  if (savedEcho === null) LS.removeItem('galagaDeathEcho'); else LS.setItem('galagaDeathEcho', savedEcho);
+
+  // ECHO_LINES ↔ RESPAWN_WHISPERS — the wreck coaches in the SAME cause
+  // vocabulary as the respawn whisper (cross-registry guard, both sides).
+  const EL = G.__getEchoLines && G.__getEchoLines();
+  const RW = G.__getRespawnWhispers && G.__getRespawnWhispers();
+  ok(!!EL && !!RW, 'ECHO_LINES + RESPAWN_WHISPERS exposed');
+  if (EL && RW) {
+    eq(Object.keys(EL).sort().join(','), Object.keys(RW).sort().join(','),
+       'echo causes exactly mirror the respawn-whisper causes');
+    ok(Object.values(EL).every(s => typeof s === 'string' && s.length > 0),
+       'every echo line is a non-empty string');
+  }
+  if (typeof G.deathEchoLine === 'function' && EL) {
+    eq(G.deathEchoLine('bullet'), EL.bullet, 'known cause → its line');
+    eq(G.deathEchoLine('not-a-cause'), EL.unknown, 'unknown cause → unknown fallback');
+    eq(G.deathEchoLine(null), EL.unknown, 'null cause → unknown fallback');
+  }
+} else { console.log('  (skipped — DEATH ECHO helpers not exposed)'); }
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
