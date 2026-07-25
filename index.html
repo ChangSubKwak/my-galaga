@@ -4853,7 +4853,10 @@ const INTERCEPT_MSG = {
   forkSpread:    ['SPREAD FIRE!', 'THREE PATHS — DODGE WHERE?', 'FORMATION VULNERABLE!'],
   waveActive:    ['ERRATIC FIRE!', 'BULLETS DANCE!', 'PATTERN UNPREDICTABLE!'],
   rapidFire:     ['FIRE RATE SURGE!', 'CONTINUOUS SHOOTING!', 'BARRAGE INCOMING!'],
-  homingTrack:   ['BULLETS HUNT US!', 'NO ESCAPE — THEY TURN!', 'TRACKING ROUNDS!']
+  homingTrack:   ['BULLETS HUNT US!', 'NO ESCAPE — THEY TURN!', 'TRACKING ROUNDS!'],
+  rivalSpotted:  ['OUR ACE HAS FOUND YOU!', 'DUELIST ON APPROACH!', 'THE MIRROR HUNTS!'],
+  rivalRetreat:  ['OUR ACE WITHDRAWS!', 'DUEL SUSPENDED!', 'THE ACE WILL RETURN!'],
+  rivalDown:     ['OUR ACE IS DOWN!', 'THE DUELIST FALLS!', 'IMPOSSIBLE — ACE LOST!']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
 const INTERCEPT_LIFE = 180;
@@ -5127,6 +5130,390 @@ function drawGuardian() {
     for (let p = 0; p < pipCount; p++) {
       ctx.fillRect(Math.round(g.x) - 4 + p * 3, Math.round(g.y) + 4, 1, 1);
     }
+  }
+  ctx.restore();
+}
+
+// ============================== RIVAL ACE ==================================
+// THE MIRROR ACE — a recurring 1v1 nemesis duelist. A crimson INVERTED twin of
+// the player's own ship (same silhouette, flipped upside-down) wearing the
+// player's callsign REVERSED. It mirrors the player's horizontal movement,
+// fires predicted bursts, and DODGES player fire with brief intangible
+// sidesteps — the enemy that plays like you. Arc: first HP depletion → the
+// pilot EJECTS and escapes ("this isn't over"); later encounters are killable.
+// Duel timeout → it disengages and returns stronger (level 0..RIVAL_MAX_LEVEL
+// ramps hp / fire rate / burst / dodge chance). Its shots are ordinary
+// enemyBullets (kind 'dive', fromType 'rival') so every existing defensive
+// layer — shield, witch time, dash parry, graze — works against it unchanged.
+// Deliberate reward: flat +2000 (no combo multiplier), one timed power-up,
+// NEMESIS DOWN run highlight, rivalDown/rivalHunter achievements, and the
+// galagaRivalWins lifetime stat. Pure helpers + RIVAL_LINES are logic-tested.
+const RIVAL_LINES = {
+  intro:   ['SO YOU ARE THE ONE.', 'SHOW ME YOUR WINGS.', 'ONE OF US FALLS TODAY.'],
+  return:  ['DID YOU MISS ME?', 'ROUND TWO, PILOT.', 'I LEARNED YOUR MOVES.'],
+  dodge:   ['TOO SLOW.', 'I KNOW THAT TRICK.', 'PREDICTABLE.'],
+  eject:   ['THIS ISN\'T OVER!', 'NEXT TIME, PILOT!', 'I WILL REMEMBER THIS!'],
+  retreat: ['ANOTHER DAY, PILOT.', 'YOU BORE ME. FOR NOW.', 'WE FINISH THIS LATER.'],
+  mock:    ['IS THAT ALL?', 'PATHETIC.', 'GET UP. AGAIN.'],
+  death:   ['A WORTHY... WING...', 'YOU EARNED THE SKY.', 'SO THIS IS DEFEAT.']
+};
+const RIVAL_MAX_LEVEL = 4;
+const RIVAL_DUEL_FRAMES = 900; // 15s engagement window before it disengages
+const RIVAL_FIRST_STAGE = 6;
+
+// Pure: the rival wears the player's callsign REVERSED (the mirror). A
+// palindrome gets its last letter swapped to 'X' so the twin never reads
+// identical; anything that isn't a 3-char string falls back to 'VPR'.
+function rivalCallsignFor(cs) {
+  if (typeof cs !== 'string' || cs.length !== 3) return 'VPR';
+  const rev = cs.split('').reverse().join('');
+  return rev === cs ? cs.slice(0, 2) + 'X' : rev;
+}
+
+// Pure: escalation curve per encounter level (clamped 0..RIVAL_MAX_LEVEL).
+// hp/burst ramp up, fireInterval ramps down (floored), dodge chance capped
+// at 0.7 so focused fire always lands eventually — pressure, not immunity.
+function rivalStatsForLevel(level) {
+  const lv = Math.max(0, Math.min(RIVAL_MAX_LEVEL, Math.floor(level) || 0));
+  return {
+    hp: 14 + lv * 8,
+    fireInterval: Math.max(28, 52 - lv * 6),
+    burst: 2 + (lv >= 2 ? 1 : 0) + (lv >= 4 ? 1 : 0),
+    dodge: Math.min(0.7, 0.35 + lv * 0.09),
+    bulletSpeed: 1.5 + lv * 0.12,
+    duelFrames: RIVAL_DUEL_FRAMES
+  };
+}
+
+// Pure: spawn gate — normal formation stages only, stage 6+, and only once
+// the scheduled encounter stage has been reached.
+function rivalShouldSpawn(stage, nextStage, mode) {
+  return mode === 'normal' && stage >= RIVAL_FIRST_STAGE && stage >= (nextStage || RIVAL_FIRST_STAGE);
+}
+
+// Speech bubble on the rival — same field pattern as boss taunts, with a
+// cooldown so dodge chatter can't spam.
+function rivalSay(r, situation) {
+  if (!r || (r.tauntCd || 0) > 0) return;
+  const lines = RIVAL_LINES[situation];
+  if (!lines || !lines.length) return;
+  r.tauntText = lines[randInt(lines.length)];
+  r.tauntLife = 80;
+  r.tauntMax = 80;
+  r.tauntCd = 140;
+}
+
+function spawnRivalAce() {
+  const lv = Math.max(0, Math.min(RIVAL_MAX_LEVEL, game.rivalLevel || 0));
+  const st = rivalStatsForLevel(lv);
+  // Enters from the side OPPOSITE the player — the mirror approaches head-on.
+  const entryX = game.playerX < BASE_W / 2 ? BASE_W - 44 : 44;
+  game.rival = {
+    phase: 'warning', timer: 48, entryX,
+    x: entryX, y: -14, vy: 0,
+    level: lv, hp: st.hp, maxHp: st.hp,
+    fireCd: st.fireInterval + 30, burstLeft: 0, burstGap: 0,
+    dodgeCd: 30, dodgeTimer: 0, dodgeDir: 0,
+    duelTimer: st.duelFrames, mockTimer: 0, flash: 0,
+    tauntText: null, tauntLife: 0, tauntMax: 80, tauntCd: 0,
+    callsign: rivalCallsignFor(typeof playerCallsign === 'string' ? playerCallsign : null),
+    after: []
+  };
+  game.rivalEncounters = (game.rivalEncounters || 0) + 1;
+  if (typeof pushIntercept === 'function') pushIntercept('rivalSpotted');
+  playSound('bossWarning');
+}
+
+// Shared exit bookkeeping — schedule the next encounter and start the retreat.
+function rivalDisengage(r, saySituation, levelUp, stageGap) {
+  if (levelUp) game.rivalLevel = Math.min(RIVAL_MAX_LEVEL, (game.rivalLevel || 0) + 1);
+  game.rivalNextStage = game.stage + stageGap;
+  if (saySituation) rivalSay(r, saySituation);
+  if (typeof pushIntercept === 'function') pushIntercept('rivalRetreat');
+  r.phase = 'retreat';
+  r.vy = 0.4;
+}
+
+function updateRivalAce() {
+  if (!game) return;
+  if (game.state === STATE.PAUSED) return;
+  const r = game.rival;
+
+  // SPAWN check — normal PLAYING stages, formation settled, no end-grace.
+  if (!r) {
+    if (game.state !== STATE.PLAYING) return;
+    if (!game.playerAlive || !game.allEntered) return;
+    if ((game.stageFrames || 0) < 300) return;
+    if ((game.stageEndGraceTimer || 0) !== 0) return;
+    if (game.megaBosses && game.megaBosses.length) return;
+    if (!rivalShouldSpawn(game.stage, game.rivalNextStage || RIVAL_FIRST_STAGE, stageModeFor(game.stage))) return;
+    spawnRivalAce();
+    return;
+  }
+
+  // Timers that draw() reads but must never mutate.
+  if (r.flash > 0) r.flash--;
+  if (r.tauntLife > 0) r.tauntLife--;
+  if (r.tauntCd > 0) r.tauntCd--;
+  for (let i = r.after.length - 1; i >= 0; i--) {
+    r.after[i].life--;
+    if (r.after[i].life <= 0) r.after.splice(i, 1);
+  }
+
+  // Stage over / captured / anything but the live duel states → break off.
+  if (game.state !== STATE.PLAYING && game.state !== STATE.RESPAWN) {
+    if (r.phase !== 'retreat') { r.phase = 'retreat'; r.vy = 0.4; }
+  }
+
+  if (r.phase === 'warning') {
+    r.timer--;
+    if (r.timer <= 0) { r.phase = 'enter'; r.x = r.entryX; r.y = -14; }
+    return;
+  }
+
+  if (r.phase === 'enter') {
+    r.y += (56 - r.y) * 0.08 + 0.3;
+    if (r.y >= 54) {
+      r.phase = 'duel';
+      rivalSay(r, (game.rivalEncounters || 1) > 1 ? 'return' : 'intro');
+    }
+  } else if (r.phase === 'duel') {
+    // Player down mid-duel → hover and gloat, then break off (same level,
+    // it comes back sooner — cocky).
+    if (!game.playerAlive) {
+      r.phase = 'mock';
+      r.mockTimer = 110;
+      r.tauntCd = 0;
+      rivalSay(r, 'mock');
+      game.rivalNextStage = game.stage + 3;
+    } else {
+      const st = rivalStatsForLevel(r.level);
+      // MIRROR MOVEMENT — loosely tracks the player's x reflected across the
+      // playfield centre, plus a sine wobble. Reads as an uncanny reflection.
+      const targetX = Math.max(16, Math.min(BASE_W - 16, BASE_W - game.playerX));
+      if (r.dodgeTimer > 0) {
+        r.dodgeTimer--;
+        r.x += r.dodgeDir * 3.2;
+        if ((r.dodgeTimer & 1) === 0) r.after.push({ x: r.x, y: r.y, life: 10 });
+      } else {
+        r.x += (targetX - r.x) * 0.055 + Math.sin(game.animFrame * 0.07) * 0.25;
+        if (r.dodgeCd > 0) r.dodgeCd--;
+        // DODGE — sidestep an incoming player bullet with brief intangibility
+        // (the rival uses the player's own verb). Chance capped by level curve.
+        if (r.dodgeCd <= 0 && game.state === STATE.PLAYING) {
+          for (const b of game.bullets) {
+            if (b.y > r.y && b.y < r.y + 70 && Math.abs(b.x - r.x) < 9) {
+              if (Math.random() < st.dodge) {
+                r.dodgeTimer = 9;
+                r.dodgeDir = r.x > BASE_W / 2 ? -1 : 1;
+                r.dodgeCd = 48;
+                playSound('enemyDive', r.x);
+                if (Math.random() < 0.3) rivalSay(r, 'dodge');
+              } else {
+                r.dodgeCd = 24; // failed read — brief refractory so it can't re-roll per frame
+              }
+              break;
+            }
+          }
+        }
+      }
+      r.x = Math.max(10, Math.min(BASE_W - 10, r.x));
+      r.y = 56 + Math.sin(game.animFrame * 0.045) * 5;
+      // FIRE — aimed bursts at the player's PREDICTED position (clamped to the
+      // playfield, same fairness rule as WING TACTICS pincers).
+      if (game.state === STATE.PLAYING && r.dodgeTimer === 0) {
+        if (r.burstLeft > 0) {
+          r.burstGap--;
+          if (r.burstGap <= 0) {
+            r.burstLeft--;
+            r.burstGap = 6;
+            const tx = Math.max(10, Math.min(BASE_W - 10, game.playerX + (game.playerVX || 0) * 16));
+            const av = aimVelocity(r.x, r.y + 5, tx, game.playerY, st.bulletSpeed);
+            game.enemyBullets.push({ x: r.x, y: r.y + 5, vx: av.vx, vy: av.vy, kind: 'dive', fromType: 'rival' });
+          }
+        } else {
+          r.fireCd--;
+          if (r.fireCd <= 0) {
+            r.fireCd = st.fireInterval + randInt(20);
+            r.burstLeft = st.burst;
+            r.burstGap = 0;
+          }
+        }
+      }
+      // Engagement window — it doesn't stay forever; disengage returns STRONGER.
+      r.duelTimer--;
+      if (r.duelTimer <= 0) rivalDisengage(r, 'retreat', true, 4);
+    }
+  } else if (r.phase === 'mock') {
+    r.x += Math.sin(game.animFrame * 0.05) * 0.4;
+    r.mockTimer--;
+    if (r.mockTimer <= 0) { r.phase = 'retreat'; r.vy = 0.4; }
+  } else if (r.phase === 'retreat') {
+    r.vy = (r.vy || 0.4) * 1.06;
+    r.y -= r.vy;
+    r.x += (r.entryX - r.x) * 0.02;
+    if (r.y < -24) game.rival = null;
+    return;
+  }
+
+  // PLAYER BULLETS vs RIVAL — vulnerable while entering, dueling, or gloating;
+  // intangible during a dodge. Laser pierce semantics preserved.
+  if (r.phase === 'enter' || r.phase === 'duel' || r.phase === 'mock') {
+    if (r.dodgeTimer === 0) {
+      for (let bi = game.bullets.length - 1; bi >= 0; bi--) {
+        const b = game.bullets[bi];
+        if (!aabbHit(b.x - r.x, b.y - r.y, 7, 6)) continue;
+        if (b.kind === 'laser' && b.pierced) {
+          if (b.pierced.has(r)) continue;
+          b.pierced.add(r);
+        } else {
+          game.bullets.splice(bi, 1);
+        }
+        r.hp -= b.dmg || 1;
+        r.flash = 5;
+        game.stageShotsHit = (game.stageShotsHit || 0) + 1;
+        if (game.stats) game.stats.shotsHit = (game.stats.shotsHit || 0) + 1;
+        game.itemBursts.push({ x: b.x, y: b.y, life: 0, color: '#f66' });
+        playSound('hit', r.x);
+        if (r.hp <= 0) { resolveRivalDepleted(r); return; }
+      }
+    }
+  }
+}
+
+// HP depleted — first time the pilot EJECTS and escapes (guaranteed return,
+// the nemesis arc's hook); every later depletion is a confirmed kill.
+function resolveRivalDepleted(r) {
+  if (!game.rivalEjected) {
+    game.rivalEjected = true;
+    game.explosions.push({ x: r.x, y: r.y, timer: 0, maxTime: 18 });
+    if (game.floatTexts) {
+      game.floatTexts.push({ x: r.x, y: r.y - 12, text: 'RIVAL EJECTED', color: '#f66', life: 50, maxLife: 50, size: 6 });
+    }
+    r.hp = 0;
+    r.tauntCd = 0;
+    rivalDisengage(r, 'eject', true, 4);
+    playSound('enemyDive', r.x);
+    return;
+  }
+  // CONFIRMED KILL — deliberate flat reward, no combo multiplier on the score.
+  for (let k = 0; k < 3; k++) {
+    game.explosions.push({ x: r.x + (k - 1) * 8, y: r.y + (k % 2) * 6, timer: -k * 4, maxTime: 24 });
+  }
+  if (game.shockwaves) {
+    game.shockwaves.push({ x: r.x, y: r.y, life: 0, maxLife: 20, maxR: 22, color: '#ff3b3b' });
+  }
+  if (typeof gridRipple === 'function') gridRipple(r.x, r.y, 2.2, 40);
+  addScore(2000);
+  if (game.floatTexts) {
+    game.floatTexts.push({ x: r.x, y: r.y - 12, text: '+2000 NEMESIS DOWN', color: '#f44', life: 60, maxLife: 60, size: 7 });
+    const dl = RIVAL_LINES.death;
+    game.floatTexts.push({ x: r.x, y: r.y + 2, text: dl[randInt(dl.length)], color: '#f99', life: 55, maxLife: 55, size: 5 });
+  }
+  bumpCombo();
+  // One timed power-up — a duel trophy, never a permanent S/N/P level.
+  const pool = ['R', 'T', 'H', 'W'];
+  game.powerUps.push({ x: r.x, y: r.y, vy: 0.6, type: pool[randInt(pool.length)] });
+  if (typeof pushIntercept === 'function') pushIntercept('rivalDown');
+  unlockAchievement('rivalDown');
+  // REVENGE payback — if the rival was the last thing that killed the player.
+  if (game._revengeType === 'rival') {
+    game._revengeType = null;
+    game.revengeCount = (game.revengeCount || 0) + 1;
+    try {
+      const rv = parseInt(localStorage.getItem('galagaRevengeTotal') || '0', 10) || 0;
+      localStorage.setItem('galagaRevengeTotal', String(rv + 1));
+    } catch (e) {}
+  }
+  try {
+    const rw = (parseInt(localStorage.getItem('galagaRivalWins') || '0', 10) || 0) + 1;
+    localStorage.setItem('galagaRivalWins', String(rw));
+    if (rw >= 3) unlockAchievement('rivalHunter');
+  } catch (e) {}
+  game.rivalDefeats = (game.rivalDefeats || 0) + 1;
+  playSound('killFormationBoss', r.x);
+  // The squadron sends the NEXT ace later, stronger — deep runs stay contested.
+  game.rivalLevel = Math.min(RIVAL_MAX_LEVEL, (game.rivalLevel || 0) + 1);
+  game.rivalNextStage = game.stage + 6;
+  game.rival = null;
+}
+
+function drawRivalAce() {
+  if (!game || !game.rival) return;
+  if (game.state === STATE.STAGE_INTRO || game.state === STATE.GAME_OVER
+      || game.state === STATE.TITLE || game.state === STATE.BONUS_GAME) return;
+  const r = game.rival;
+  const t = game.animFrame;
+
+  // WARNING TELEGRAPH — pulsing crimson lock diamond + descent dashes at the
+  // entry point. VITAL danger telegraph (SIMPLE-GUI: allowed, no text — the
+  // intercept line carries the words).
+  if (r.phase === 'warning') {
+    const pulse = 0.5 + 0.4 * Math.sin(t * 0.35);
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.strokeStyle = '#ff3b3b';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(r.entryX, 6); ctx.lineTo(r.entryX + 5, 11);
+    ctx.lineTo(r.entryX, 16); ctx.lineTo(r.entryX - 5, 11);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.globalAlpha = pulse * 0.5;
+    ctx.fillStyle = '#ff3b3b';
+    for (let d = 0; d < 3; d++) ctx.fillRect(r.entryX, 20 + d * 7 + (t % 7), 1, 3);
+    ctx.restore();
+    return;
+  }
+
+  ctx.save();
+  // Dodge afterimages — additive crimson ghosts (bloom-friendly).
+  if (r.after.length) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const a of r.after) {
+      ctx.globalAlpha = 0.28 * (a.life / 10);
+      ctx.fillStyle = '#f33';
+      ctx.fillRect(Math.round(a.x) - 3, Math.round(a.y) - 3, 7, 7);
+    }
+    ctx.restore();
+  }
+  // THE MIRROR — the player's own ship, inverted and crimson. Silhouette +
+  // callsign label give shape/text redundancy on top of the color identity.
+  ctx.globalAlpha = r.dodgeTimer > 0 ? 0.45 : 1;
+  ctx.save();
+  ctx.translate(r.x, r.y);
+  ctx.scale(1, -1);
+  drawPlayer(0, 0, r.flash > 0 ? '#fff' : '#ff3b3b');
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  if (r.phase === 'duel' || r.phase === 'enter') {
+    // Callsign + HP bar — dark backing keeps it legible on bright biomes.
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(Math.round(r.x) - 10, Math.round(r.y) - 22, 20, 10);
+    drawRetroText(r.callsign, r.x, r.y - 18, 4, '#f66');
+    const frac = Math.max(0, r.hp / r.maxHp);
+    ctx.fillStyle = '#400';
+    ctx.fillRect(Math.round(r.x) - 9, Math.round(r.y) - 14, 18, 2);
+    ctx.fillStyle = '#ff3b3b';
+    ctx.fillRect(Math.round(r.x) - 9, Math.round(r.y) - 14, Math.round(18 * frac), 2);
+  }
+
+  // Speech bubble — boss-taunt dialect in the rival's crimson.
+  if (r.tauntLife > 0 && r.tauntText) {
+    const alpha = Math.min(1, r.tauntLife / 30);
+    const w = r.tauntText.length * 3.2 + 8;
+    const bx = Math.max(4 + w / 2, Math.min(BASE_W - 4 - w / 2, r.x));
+    const by = r.y - 30;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgba(10,4,6,0.85)';
+    ctx.fillRect(bx - w / 2, by - 5, w, 10);
+    ctx.strokeStyle = '#ff3b3b';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx - w / 2, by - 5, w, 10);
+    drawRetroText(r.tauntText, bx, by, 5, '#fff');
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
 }
@@ -6485,6 +6872,12 @@ function resetGame() {
     supplyCrateSpawned: false,
     guardian: null,
     _comboGuardianFired: false,
+    rival: null,
+    rivalLevel: 0,
+    rivalNextStage: RIVAL_FIRST_STAGE,
+    rivalEncounters: 0,
+    rivalDefeats: 0,
+    rivalEjected: false,
     perfectStagesRun: 0,
     _enduranceFired: {},
     prevBiome: null,
@@ -9847,6 +10240,8 @@ const ACHIEVEMENTS = {
   combo45:       { name: 'COMBO 45',      desc: 'First combo 45' },
   combo75:       { name: 'COMBO 75',      desc: 'First combo 75' },
   pillarsOf:     { name: 'PILLARS OF',    desc: 'Stage 100 reached' },
+  rivalDown:     { name: 'NEMESIS DOWN',  desc: 'Destroy the rival ace' },
+  rivalHunter:   { name: 'ACE HUNTER',    desc: 'Destroy 3 rival aces' },
 };
 // Stats overlay page model — single source of truth for Tab navigation so the
 // keydown handler and the four draw branches can't desync. Pages, in order:
@@ -15447,6 +15842,8 @@ function update() {
     updateSupplyCrate();
     // PLAYER GUARDIAN — tick follow, fire, ttl. Self-gates by state.
     updateGuardian();
+    // RIVAL ACE — nemesis duelist spawn/duel/dodge/retreat. Self-gates by state.
+    updateRivalAce();
     // ENDURANCE TIERS — check run-frame thresholds, fire ceremony at crossings.
     updateEnduranceTiers();
     // RAPID STORM synergy — RAPID + FORK simultaneously active triggers a one-shot
@@ -16004,6 +16401,7 @@ function draw() {
       drawStageWeather();
       drawSupplyCrate();
       drawGuardian();
+      drawRivalAce();
       drawInterceptTerminal();
       break;
     case STATE.BOSS_STAGE:
@@ -16023,6 +16421,7 @@ function draw() {
       drawStageWeather();
       drawSupplyCrate();
       drawGuardian();
+      drawRivalAce();
       drawInterceptTerminal();
       if (game.helpOverlay) drawHelpOverlay();
       else if (game.statsOverlay) drawStatsOverlay();
@@ -17320,6 +17719,10 @@ function pickRunHighlights() {
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
   if (_rvR >= 1)          out.push({ label: 'REVENGE',         value: String(_rvR),     prio: _rvR * 14, col: '#f44' });
+  // NEMESIS DOWN — rival aces destroyed this run. The 1v1 duel is the rarest,
+  // most personal win in the game; heavy priority so it headlines the recap.
+  const _rivD = game.rivalDefeats || 0;
+  if (_rivD >= 1)         out.push({ label: 'NEMESIS DOWN',    value: String(_rivD),    prio: _rivD * 50, col: '#f44' });
   // CLUSTER PARRY MAX — most bullets deflected in one dash frame. High-skill
   // dive-into-fire stat. Gold to match the in-stage CLUSTER PARRY banner.
   const _cpBest = game.clusterParryBest || 0;
@@ -22420,6 +22823,15 @@ function drawStatsOverlay() {
         const _pt = _pT >= 500 ? 'GUARDIAN' : _pT >= 200 ? 'WARDEN' : _pT >= 50 ? 'DEFLECTOR' : '';
         _pRow('PARRY', _pT + (_pt ? '  ' + _pt : ''),
               _pT >= 500 ? '#fc4' : _pT >= 200 ? '#0ff' : '#0f8');
+      }
+      // RIVAL ACE lifetime — 1v1 duel wins. Rare by design (one duel every
+      // few stages, first depletion is always an eject), so tiers sit low:
+      // 3 = ACE KILLER / 10 = NEMESIS. Crimson matches the rival's identity.
+      const _rwT = parseInt(localStorage.getItem('galagaRivalWins') || '0', 10) || 0;
+      if (_rwT >= 1) {
+        const _rwt = _rwT >= 10 ? 'NEMESIS' : _rwT >= 3 ? 'ACE KILLER' : '';
+        _pRow('RIVAL ACE', _rwT + (_rwt ? '  ' + _rwt : ''),
+              _rwT >= 10 ? '#fc4' : _rwT >= 3 ? '#f44' : '#f66');
       }
       // NEAR MISS lifetime — passive evasion stat, mirrors PARRY surface pattern.
       // Tier thresholds chosen higher than parry (near miss is passive — easier

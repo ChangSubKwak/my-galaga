@@ -174,6 +174,7 @@ const shim = `
 ;try { globalThis.__getGradeCol = function () { return (typeof GRADE_COL !== 'undefined') ? GRADE_COL : null; }; } catch (e) {}
 ;try { globalThis.__getVgrid = function () { return (typeof vgrid !== 'undefined') ? vgrid : null; }; } catch (e) {}
 ;try { globalThis.__getDiveTactics = function () { return (typeof DIVE_TACTICS !== 'undefined') ? DIVE_TACTICS : null; }; } catch (e) {}
+;try { globalThis.__getRivalLines = function () { return (typeof RIVAL_LINES !== 'undefined') ? RIVAL_LINES : null; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -2947,6 +2948,66 @@ if (typeof G.weatherIsHazard === 'function' && typeof G.strikePhase === 'functio
   ok(G.weatherStrikeResolve(19, 10, false, false, 8) === 'safe', 'clear of the band → safe');
   ok(G.weatherStrikeResolve(NaN, 10, false, false, 8) === 'safe', 'NaN dx → safe (never a surprise kill)');
 } else { console.log('  (skipped — STORM FRONT core not exposed)'); }
+
+section('RIVAL ACE — nemesis duelist (pure core + registries)');
+if (typeof G.rivalCallsignFor === 'function' && typeof G.rivalStatsForLevel === 'function'
+    && typeof G.rivalShouldSpawn === 'function') {
+  // rivalCallsignFor — the mirror callsign.
+  eq(G.rivalCallsignFor('ACE'), 'ECA', 'callsign is reversed');
+  eq(G.rivalCallsignFor('KWK'), 'KWX', 'palindrome → last letter swapped to X (twin never reads identical)');
+  eq(G.rivalCallsignFor('AAA'), 'AAX', 'uniform palindrome → X suffix');
+  eq(G.rivalCallsignFor(''), 'VPR', 'empty string → VPR fallback');
+  eq(G.rivalCallsignFor(null), 'VPR', 'null → VPR fallback');
+  eq(G.rivalCallsignFor('ABBA'), 'VPR', 'non-3-char → VPR fallback');
+
+  // rivalStatsForLevel — monotonic escalation, clamped, capped.
+  const s0 = G.rivalStatsForLevel(0), s2 = G.rivalStatsForLevel(2), s4 = G.rivalStatsForLevel(4);
+  ok(s0.hp < s2.hp && s2.hp < s4.hp, 'hp ramps up with level');
+  ok(s0.fireInterval > s2.fireInterval && s2.fireInterval >= s4.fireInterval, 'fire interval ramps down');
+  ok(s4.fireInterval >= 28, 'fire interval floored at 28 (never machine-gun)');
+  ok(s0.burst >= 2 && s4.burst > s0.burst, 'burst grows with level, min 2');
+  ok(s4.dodge <= 0.7 && G.rivalStatsForLevel(99).dodge <= 0.7, 'dodge chance capped at 0.7 (pressure, not immunity)');
+  ok(s0.dodge > 0 && s0.dodge < s4.dodge, 'dodge chance ramps up');
+  ok(s0.bulletSpeed > 0 && s4.bulletSpeed < 2.5, 'bullet speed positive and bounded');
+  eq(JSON.stringify(G.rivalStatsForLevel(-5)), JSON.stringify(s0), 'negative level clamps to 0');
+  eq(JSON.stringify(G.rivalStatsForLevel(99)), JSON.stringify(s4), 'over-cap level clamps to RIVAL_MAX_LEVEL');
+  ok(s0.duelFrames > 0, 'duel window is positive');
+
+  // rivalShouldSpawn — the gate.
+  eq(G.rivalShouldSpawn(5, 6, 'normal'), false, 'below first stage → no spawn');
+  eq(G.rivalShouldSpawn(6, 6, 'normal'), true, 'first eligible normal stage → spawn');
+  eq(G.rivalShouldSpawn(7, 10, 'normal'), false, 'scheduled encounter not reached → no spawn');
+  eq(G.rivalShouldSpawn(12, 10, 'normal'), true, 'past the scheduled stage → spawn');
+  eq(G.rivalShouldSpawn(12, 10, 'challenge'), false, 'challenge stage → never');
+  eq(G.rivalShouldSpawn(20, 10, 'boss'), false, 'boss stage → never');
+  eq(G.rivalShouldSpawn(8, null, 'normal'), true, 'null nextStage falls back to first-stage gate');
+
+  // RIVAL_LINES registry guard — every situation the code speaks is present,
+  // non-empty, and made of non-empty strings (a silent rival is a wiring bug).
+  const RL = G.__getRivalLines && G.__getRivalLines();
+  ok(!!RL, 'RIVAL_LINES registry exposed');
+  if (RL) {
+    const situations = ['intro', 'return', 'dodge', 'eject', 'retreat', 'mock', 'death'];
+    eq(Object.keys(RL).sort().join(','), situations.slice().sort().join(','), 'RIVAL_LINES has exactly the 7 spoken situations');
+    let allGood = true;
+    for (const k of situations) {
+      const arr = RL[k];
+      if (!Array.isArray(arr) || arr.length < 2) allGood = false;
+      else for (const line of arr) if (typeof line !== 'string' || !line.length) allGood = false;
+    }
+    ok(allGood, 'every situation has ≥2 non-empty string variants');
+  }
+
+  // Intercept wiring — the three rival comm beats exist with 3 variants each.
+  const IM = G.__getInterceptMsg && G.__getInterceptMsg();
+  if (IM) {
+    let wired = true;
+    for (const k of ['rivalSpotted', 'rivalRetreat', 'rivalDown']) {
+      if (!Array.isArray(IM[k]) || IM[k].length !== 3 || IM[k].some(s => typeof s !== 'string' || !s.length)) wired = false;
+    }
+    ok(wired, 'rivalSpotted/rivalRetreat/rivalDown intercepts wired with 3 variants each');
+  }
+} else { console.log('  (skipped — RIVAL ACE core not exposed)'); }
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
