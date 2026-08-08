@@ -56,7 +56,7 @@ node test/logic.test.js   # exit 0 = pass, 1 = failure
 
 ### Logic tests
 
-A standalone Node harness lives at `test/logic.test.js` (430+ assertions, no test
+A standalone Node harness lives at `test/logic.test.js` (1,140+ assertions, no test
 framework or dependencies). It extracts the inline `<script>`, runs it inside a
 `vm` sandbox with hand-rolled browser-API stubs (canvas/2d ctx, `localStorage`,
 `document`, `window`, `AudioContext` — including `createStereoPanner` / node
@@ -102,7 +102,7 @@ need a browser.
 
 ### Single-file structure
 
-`index.html` (~23,000 lines) contains the entire game: HTML shell, CSS, and an inline `<script>` block that holds all game logic. The two `*.svg` files (`bullet_concepts.svg`, `bullet_readability.svg`) are design references for player-bullet visuals and are not loaded by the game.
+`index.html` (~22,500 lines) contains the entire game: HTML shell, CSS, and an inline `<script>` block that holds all game logic. The two `*.svg` files (`bullet_concepts.svg`, `bullet_readability.svg`) are design references for player-bullet visuals and are not loaded by the game.
 
 ### Fixed-timestep loop with internal resolution
 
@@ -133,15 +133,15 @@ A normal stage's enemies move through `entering → formation → diving → ret
 
 `CHALLENGING` stages are different: enemies are pre-built into `game.challengeWaves` (8 waves × 16 enemies) by `setupChallengingStage()`. Collision code in `updateCollisions()` switches its enemy source between `game.enemies` and the active challenge wave (`game.challengeWaves[game.challengeWaveIdx]`).
 
-`BOSS_STAGE` runs on the `game.megaBosses` array. Boss count scales by stage band (`setupBossStage`): 1 solo boss below stage 20, 2 reduced-HP bosses (0.65× each) at stages 20–29, and a single SUPER boss (2.5× HP, 1.5× scale, faster) at stage 30+. Each boss has an `archetype` (`standard | horned | tendril | crystal | phantom | rune`, cycled by `archetypeFor(stage)`) — affects color, decorations, and the `signaturePattern` (split shot / laser sweep / fragment burst) fired by `sigTimer`. At 40% HP, `phase2` triggers METAMORPHOSIS: archetype morphs to the next in `morphMap`, `sigTimer` resets, BGM switches to `bossEnrage`, and a 24-frame freeze + ring burst cinematic plays. Each archetype has a `BOSS_TAUNTS` dialogue set; taunts fire at phase 2 entry / 25% HP / first dash.
+`BOSS_STAGE` runs on the `game.megaBosses` array. Boss count scales by stage band (`setupBossStage`): 1 solo boss below stage 20, 2 reduced-HP bosses (0.65× each) at stages 20–29, and a single SUPER boss (2.5× HP, 1.5× scale, faster) at stage 30+. Each boss has an `archetype` (`standard | horned | tendril | crystal | phantom | rune`, cycled by `archetypeFor(stage)`) — affects color, decorations, and the archetype signature attack (split shot / laser sweep / fragment burst) fired on `sigTimer`. At 40% HP, `phase2` triggers METAMORPHOSIS: archetype morphs to the next in `morphMap`, `sigTimer` resets, BGM switches to `bossEnrage`, and a 24-frame freeze + ring burst cinematic plays. Each archetype has a `BOSS_TAUNTS` dialogue set; taunts fire at phase 2 entry / 25% HP / first dash.
 
 ### Enemy variety
 
-12 enemy types in `ENEMY_INFO`: `bee` / `butterfly` / `boss` / `mirror` / `splitter` / `shielded` / `ufo` / `hoverer` / `kamikaze` / `goldenBee` / `minibee` / `warper` (warper teleports while diving; spawns stage 8+ in place of a bee/butterfly). Each has unique sprite, behavior, points, and (for several types: mirror/shielded/kamikaze/ufo) **type-specific death visuals** layered on top of base explosion. First kill of each type unlocks a `dexUnlocked` entry persisted to `galagaDexUnlocked` — viewable in the BESTIARY tab of stats overlay (last Tab page).
+14 entries in `ENEMY_INFO`: the 12 formation types `bee` / `butterfly` / `boss` / `mirror` / `splitter` / `shielded` / `ufo` / `hoverer` / `kamikaze` / `goldenBee` / `minibee` / `warper`, plus the two bespoke hostiles `rival` / `magpie`. (`warper` teleports while diving; it spawns from stage 8+ in place of a bee/butterfly.) Each has unique sprite, behavior, points, and (for several types: mirror/shielded/kamikaze/ufo) **type-specific death visuals** layered on top of base explosion. First kill of each type unlocks a `dexUnlocked` entry persisted to `galagaDexUnlocked` — viewable in the BESTIARY tab of the stats overlay. **Bespoke hostiles must opt in**: formation enemies are registered by the shared kill path, so a one-off entity has to call `unlockDex()` and bump `killsByTypeRun` / `stats.kills` / `stageKills` itself.
 
 **Elite variants**: stage 5+ formation enemies of common types (bee/butterfly/mirror/kamikaze) have a 3-5% chance to spawn as `e.elite` — +1 HP, red pulsing outline + gold corner pips, 1.5× score, 35% drop rate (vs 20%), and a "ELITE!" floatText on kill. Tracked via `game.eliteKills`.
 
-**Ghost variants**: deep-stage (60+) enemies have a 3% chance to spawn as `e.ghost` (mutually exclusive with elite). Ghosts render semi-invisible until the first hit flips `e.ghostRevealed`, score **2×** (the `ghost` factor in `killScore`), and fire the `ghostKill` intercept on death. Tracked toward the GHOST HUNTER / GHOST SLAYER achievements (5 / 25 ghost kills).
+**Ghost variants**: deep-stage (60+) enemies have a 3% chance to spawn as `e.ghost` (mutually exclusive with elite). Ghosts render semi-invisible until the first hit flips `e.ghostRevealed`, score **2×** (the `ghost` factor in `killScore`), Tracked toward the GHOST SLAYER achievement (25 ghost kills). The per-kill ghost intercept and the 5-kill GHOST HUNTER badge were cut in the simplification pass.
 
 ### Power-up system
 
@@ -299,7 +299,7 @@ robustness, retreating-rival exclusion).
 ### Dynamic systems (set per-stage, read per-frame)
 
 - **`stageMutation`** (`rapidFire | fastDives | slowBullets | denseFire`, 30% / normal stages only) — flips one rule for the whole stage. Read sites: `updatePlayer` (rapidFire fire cd), `updateEnemies` diving branch (fastDives pathSpeed), `updateBullets` enemy slowMul (slowBullets), `diffFireMul` (denseFire).
-- **`stageBiome`** (`biomeForStage(stage)`, stage 8+, 12-cycle, 4 stages each) — `planet | ruins | dawn | asteroid | desert | ice | gasGiant | corona | canyon | blackhole | nebula | starfield` (interleaves terrestrial biomes among the space ones). Drawn in `drawBiome()` between nebulae and stars; each has a `BIOME_NAMES` label/color and a `BIOME_WHISPERS` set.
+- **Biome** — derived, not stored: call `biomeForStage(game.stage)` (stage 8+, 12-cycle, 4 stages each) — `planet | ruins | dawn | asteroid | desert | ice | gasGiant | corona | canyon | blackhole | nebula | starfield` (interleaves terrestrial biomes among the space ones). Drawn in `drawBiome()` between nebulae and stars; each has a `BIOME_NAMES` label/color and a `BIOME_WHISPERS` set.
   - **DAYLIGHT GROUND BIOMES** — the four terrestrial/sky biomes (`planet | dawn | desert | canyon`, predicate `biomeIsBright(id)` / `BRIGHT_BIOMES` set, logic-tested) render a genuinely BRIGHT daytime scene instead of the noir void: a lit sky gradient + scrolling ground via the shared `drawBrightSky(pal)` helper, plus each biome's signature detail (sun/dunes/canyon walls/city lights). They set `game._brightBiome = true` (reset false at `draw()` top + `drawBiome()` top), which: hides the starfield (`drawStar` early-returns — no stars in daylight), lays a dark gradient HUD backing top+bottom (`drawHUD`), and adds a thin dark backing behind player bullets (`drawPlayerBullet`) for legibility on the bright sky. The other 8 biomes stay on the noir void — this is the space(dark)↔ground(bright) environmental contrast (see DESIGN.md). Bright biomes intentionally break the global Ink Noir void: noir governs space/chrome, daylight governs the ground stages.
 - **STORM FRONT — hazard weather strikes**: the five HAZARD weathers (`storm/solar/vortex/sandstorm/meteor`, `HAZARD_WEATHER`/`weatherIsHazard` — the rest stay peaceful) fire ONE telegraphed vertical strike-column on an 8–12s cadence during normal PLAYING only (live player, `allEntered`, no end-grace). Pure, logic-tested core: `strikePhase(timer, interval)` (idle→42f telegraph→8f active — a longer read than a 30f dive preview) and `weatherStrikeResolve(dx, halfW, dashing, invincible, grazeBand)` → `parry|immune|hit|graze|safe`. Answered with the existing verbs: dash-through = **STORM PARRY** (+50, `parryDividend` applies, `weatherParries` stat), a hit routes through the SAME `tryTriggerWitchTime` → `killPlayer('weather')` ladder as a bullet (cheat/shield/witch all still save; `RESPAWN_WHISPERS.weather` coaches), edge-skim = graze (extends combo hold). Strike SFX transpose to the biome's BGM key via `biomeBgmPitch` → cents; impact ripples the vector grid; telegraph renders in `drawStageWeather` (read-only: tinted column + sliding edge dashes + colorblind-safe chevron, dark backing on bright biomes); one-time `stormFront` intercept per run.
 - **`ambientEvent`** (`cargoShip | supernova | satellite | comet | pulsar | meteorShower`, 35% / stage > 3) — atmospheric one-shot. Ticked in `updateAmbientEvent`.
@@ -334,7 +334,7 @@ BGM tracks have 5 voices: `lead` (square/saw, detuned chorus) + `bass` (triangle
 
 ### Persistence
 
-`localStorage` holds 60+ keys, all prefixed `galaga*`:
+`localStorage` holds ~77 keys, all prefixed `galaga*`:
 - Scoring: `galagaHigh`, `galagaTopScoresNormal/Challenge/Daily`, `galagaCumStats[Challenge]`, `galagaBestTimes`, `galagaBonusWins`
 - Mode/settings: `galagaDaily`, `galagaChallenge`, `galagaShip`, `galagaDifficulty`, `galagaMute`, `galagaBGMOff`, `galagaSFXOff`, `galagaVol`, `galagaShake`, `galagaRumble`, `galagaColorBlind`, `galagaNightOff`, `galagaCheckpoint`, `galagaIntroSeen`
 - Progression: `galagaAchievements`, `galagaDexUnlocked`, `galagaCallsign`, `galagaDailyDays`, `galagaShipsUsed`, `galagaDifficultiesUsed`
@@ -360,6 +360,43 @@ Player firing is rate-capped via `game.fireCooldown` (6 frames base, halved by R
 ### Accessibility
 - **Reduce motion** — `reduceMotion` reads the OS `prefers-reduced-motion` media query once at load (guarded). When set, the four intense motion/strobe effects are dampened: full-screen impact flash → 30% (`flashAlpha`), screen shake → capped to 'low' (`effectiveShakeMul`), and the camera zoom-punch + spiral-entry rotation are disabled. Both tunable cores are pure + logic-tested. No toggle UI (respects the OS preference). Deep-stage world-corruption glitch is left alone (verified non-strobing — holds steady ~1s, not a flicker risk).
 - **Colorblind** — `colorBlindMode` (toggle 'X') adds white outlines + shape markers to enemy bullets and enemy auras; color-coded gameplay (power-ups, grades, difficulty) carries letter/number/shape redundancy.
+
+## Simplification pass (2026-08-08) — what was deliberately removed
+
+User directive: make the game simple. A fresh complexity audit found the bloat was not in
+gameplay but in **presentation and content** — `drawHUD` alone was 1,467 lines, there were
+391 text-draw sites, 109 achievements and 75 enemy-comms message types. The game said more
+than it played. Nine commits cut it back; the **core loop is untouched** (move / fire /
+dash-parry / combo / formation dives / boss / power-ups).
+
+| | before | after |
+|---|---|---|
+| enemy comms | 75 types | **20** — only beats that are rare, dangerous, or need a reaction |
+| achievements | 109 | **30** — 7 combo badges, 6 daily, 13 per-enemy-type and the "you changed a setting" cluster are gone |
+| `drawHUD` | 1,467 lines | **716** |
+| `drawStageIntro` | 1,030 lines | **681** |
+| stats overlay | 8 Tab pages | **4** |
+| persistence paths | 6 | **4** |
+
+**The DETAIL HUD tier no longer exists.** `minimalHud` used to gate a second, denser HUD
+behind the M key with **default ON**, so ~50 widgets were code almost nobody saw. The
+hidden tier was deleted rather than toggled: there is one HUD, and `minimalHud`, the M
+hotkey and `galagaMinimalHud` are all gone. Removed with it: the stage progress bar, the
+combat-state chip column (parry streak / weather / biome / act / guardian), the stage type
+icon, PB bars, the extra-life bar, the daily-mission label, the title trophy strip, and
+the stage intro's status panel, adaptive tip, perk countdowns, cycle dots and death warning.
+
+**DEATH ECHO and PILOT LOG were removed entirely** — a cross-run wreck ghost and a
+last-ten-runs Tab page. Both were pure meta rather than core loop.
+
+Two scale assertions had to be **inverted**: the suite required `INTERCEPT_MSG >= 50` and
+`ACHIEVEMENTS >= 50`, i.e. it encoded the bloat as a *requirement*. Both are now bands with
+an **upper bound** (comms 15–24, achievements 20–40) so chatter cannot creep back.
+
+**When cutting, verify with the test suite, not the parse check.** A deleted section can
+leave a dangling identifier that parses fine and only fails at runtime — that happened, and
+only the suite caught it. And an `if (...) {...}` whose branch you delete must have its
+`else` **promoted**, not orphaned; a naive line-delete broke the parse twice.
 
 ## Working methodology — Quantum Leap default
 
@@ -395,6 +432,6 @@ When the user requests "의미있는 작업 진행" / "기조로 작업" / "다�
 - Game tuning constants are mostly at the top of the script (`PLAYER_SPEED`, `BULLET_SPEED`, `BOSS_STAGE_INTERVAL`, `EXTRA_LIFE_SCORE`, `STAR_COUNT`, `MILESTONE_STAGES`) or grouped near the relevant function (`SHIELD_MAX`, `SLOW/RAPID/WAVE/HOMING/LASER_DURATION`, `WITCH_WINDOW=30`, `WITCH_COOLDOWN=720`, `COMBO_DECAY=90`, `COMBO_MILESTONE=40`). Per-ship caps live on `SHIPS[*].bulletCap` and difficulty scales speed/fire-rate via `diffSpeedMul()` / `diffFireMul()`. Difficulty scaling typically multiplies by `game.stage`.
 - Sprite art is drawn procedurally via `ctx.fillRect` calls in `drawPlayer` / `drawBee` / `drawButterfly` / `drawBoss` / `drawMegaBoss` / `drawPlayerBullet` / etc. There are no image assets.
 - Hit detection is AABB with hardcoded half-extents (commonly `8 × 8` for bullets-vs-enemies, `7` or `16` for the player depending on `dualFighter`). When changing sprite size, update the corresponding collision constants too.
-- **Draw functions must NOT mutate game state.** Camera/effect timers (`zoomPulse`, `cinematicBars`, `camNudgeX/Y`, `comboLostFlashTimer`, `highScoreGlow`, `worldCorruption`-driven counters) all tick in `update()` under a PAUSED guard. If you add a timer-driven visual, add its decrement next to those.
+- **Draw functions must NOT mutate game state.** Camera/effect timers (`cinematicBars`, `camNudgeX/Y`, `comboLostFlashTimer`, `highScoreGlow`, `worldCorruption`-driven counters) all tick in `update()` under a PAUSED guard. If you add a timer-driven visual, add its decrement next to those.
 - `BOSS_STAGE_INTERVAL = 10` is the production cadence — confirm with the user before changing stage cadence.
 - The `bgmTimerId` global tracks the in-flight scheduler timer; `stopBGM` clears it. When changing tracks via `startBGM`, the old scheduler chain is severed and the audio bus fades over `BGM_FADE = 0.35s` before disconnecting.

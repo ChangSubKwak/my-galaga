@@ -99,8 +99,10 @@ The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
 User directive: "make the overall GUI VERY simple." The default view now shows only
 VITAL elements (score/lives/stage, buff strip, combo box, boss HP, danger telegraphs,
 shield/dash/witch cues, one line per event); ~120 INFO elements (chips, stat banners,
-speedrun cluster, radar, meta counters, score chatter) live behind the **M toggle**
-(`minimalHud`, default ON — "HUD: SIMPLE/DETAILED"). DECOR was deleted outright
+speedrun cluster, radar, meta counters, score chatter) lived behind an **M toggle**
+(`minimalHud`, default ON). **UPDATE 2026-08-08: that hidden tier is now deleted, not
+toggled** — it was a second HUD almost nobody saw, so there is one HUD and no M key.
+DECOR was deleted outright
 (duplicate chips, marquees, stacked red layers, extra vignettes/scanlines, subtitle
 lines, celebration bursts). Principles: **edges mean danger** (no permanent decorative
 borders), **one text per event**, **one rendering per fact** (the AAR panel is the
