@@ -3905,6 +3905,128 @@ if (ST && typeof G.checkStageComplete === 'function' && G.__getGame && G.__getGa
   G.resetGame();
 } else { console.log('  (skipped — core loop not drivable)'); }
 
+section('BONUS GAME — the whole mode driven end to end (was never run)');
+// evalBonusResult and bonusSkillStop were unit-tested as pure functions, but
+// STATE.BONUS_GAME itself had never been entered. The mode's exit is gated on
+// ONE exact-equality frame (`elapsed === stopAt[2] + 18`); if that frame is
+// ever missed the player is stuck in a slot machine forever, at a milestone
+// stage, with no input that escapes. That is the failure worth proving absent.
+if (ST && typeof G.startBonusGame === 'function' && G.__getGame && G.__getGame()) {
+  const K = G.__getKeys ? G.__getKeys() : null;
+
+  // --- it terminates, under every fire pattern including none ---
+  const PATTERNS = {
+    'no input':        () => false,
+    'held down':       () => true,
+    'mashing':         f => (f % 2) === 0,
+    'slow taps':       f => (f % 37) < 3,
+    'one late tap':    f => f === 115,
+    'one early tap':   f => f === 1,
+    'burst then held': f => f > 3,
+  };
+  let allEnded = true, worstFrames = 0, everStuck = '';
+  for (const [name, fire] of Object.entries(PATTERNS)) {
+    G.resetGame();
+    const g = G.__getGame();
+    g.stage = 6;
+    G.startBonusGame();
+    let ended = false, frames = 0;
+    for (let f = 0; f < 1200 && !ended; f++) {
+      if (K) { K[' '] = !!fire(f); }
+      G.update();
+      frames = f;
+      if (g.state !== ST.BONUS_GAME) ended = true;
+    }
+    if (K) K[' '] = false;
+    if (!ended) { allEnded = false; everStuck = name; }
+    worstFrames = Math.max(worstFrames, frames);
+  }
+  ok(allEnded, 'the bonus game always ends — no fire pattern soft-locks it'
+     + (everStuck ? ' (stuck on: ' + everStuck + ')' : ''));
+  ok(worstFrames < 1000, 'and ends promptly (worst case ' + worstFrames + ' frames)');
+
+  // --- it hands off cleanly, leaving nothing behind ---
+  {
+    G.resetGame();
+    const g = G.__getGame();
+    g.stage = 6;
+    G.startBonusGame();
+    for (let f = 0; f < 1200 && g.state === ST.BONUS_GAME; f++) G.update();
+    eq(g.state, ST.STAGE_INTRO, 'the bonus game hands off to STAGE_INTRO');
+    eq(g.bonusGame, null, 'and clears its own state so nothing leaks into the stage');
+    ok(g.score > 0, 'a spin always pays something (got ' + g.score + ')');
+  }
+
+  // --- skill stop: a press must actually take a reel out of the machine's hands ---
+  {
+    G.resetGame();
+    const g = G.__getGame();
+    g.stage = 6;
+    G.startBonusGame();
+    const bg = g.bonusGame;
+    const before = bg.stopAt.slice();
+    for (let f = 0; f < 20; f++) {
+      if (K) K[' '] = (f % 2) === 0;
+      G.update();
+    }
+    if (K) K[' '] = false;
+    ok(bg.stopAt[0] < before[0], 'pressing fire stops a reel early ('
+       + before[0] + ' -> ' + bg.stopAt[0] + ')');
+    ok((bg.skillStopped || 0) > 0, 'and the skill stop is counted');
+    ok(bg.locked[0] !== false, 'the stopped reel is locked at a real symbol');
+  }
+
+  // --- held fire is ONE stop, not three: the edge detection has to hold ---
+  {
+    G.resetGame();
+    const g = G.__getGame();
+    g.stage = 6;
+    G.startBonusGame();
+    const bg = g.bonusGame;
+    for (let f = 0; f < 12; f++) { if (K) K[' '] = true; G.update(); }
+    if (K) K[' '] = false;
+    eq(bg.skillStopped || 0, 1, 'holding fire stops exactly one reel, not the whole machine');
+  }
+
+  // --- the mode renders ---
+  {
+    G.resetGame();
+    const g = G.__getGame();
+    g.stage = 6;
+    G.startBonusGame();
+    let dErr = null;
+    for (let f = 0; f < 400 && g.state === ST.BONUS_GAME; f++) {
+      G.update();
+      try { G.draw(); } catch (e) { dErr = dErr || e; }
+    }
+    ok(!dErr, 'the bonus game renders every frame of a full spin'
+       + (dErr ? ' — ' + dErr.message : ''));
+  }
+
+  // --- it only appears where it is supposed to ---
+  if (typeof G.tryTriggerBonusGame === 'function') {
+    G.resetGame();
+    const g = G.__getGame();
+    const fires = [];
+    for (const justCleared of [4, 5, 6, 9, 10, 11, 19, 20, 29, 30, 31]) {
+      g.state = ST.PLAYING;
+      g.bonusGame = null;
+      g.isDemo = false;
+      g.challengeMode = false;
+      g.stage = justCleared + 1;
+      if (G.tryTriggerBonusGame()) fires.push(justCleared);
+    }
+    eq(fires.join(','), '5,10,20,30', 'the slot machine appears only after milestone clears');
+
+    g.state = ST.PLAYING; g.bonusGame = null; g.stage = 6; g.isDemo = true;
+    ok(!G.tryTriggerBonusGame(), 'the attract-mode demo never plays the slot machine');
+    g.isDemo = false; g.challengeMode = true;
+    ok(!G.tryTriggerBonusGame(), 'and neither does challenge mode');
+    g.challengeMode = false;
+  }
+  G.resetGame();
+} else { console.log('  (skipped — bonus game not drivable)'); }
+
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of
 // driven play) because the beam's first visible frame WAS its first grabbing
