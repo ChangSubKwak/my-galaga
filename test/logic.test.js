@@ -2296,15 +2296,15 @@ if (typeof G.setupBossStage === 'function' && typeof G.makeMegaBoss === 'functio
   const g = fresh();
   g.stage = 10; G.setupBossStage();
   eq(g.megaBosses.length, 1, 'stage 10 (<20) → 1 boss');
-  eq(g.megaBosses[0].super, false, 'stage 10 boss not super');
+  eq(g.megaBosses[0] && g.megaBosses[0].super, false, 'stage 10 boss not super');
   g.stage = 20; G.setupBossStage();
   eq(g.megaBosses.length, 2, 'stage 20-29 → 2 bosses');
   ok(g.megaBosses.every(b => !b.super), 'twin bosses not super');
-  ok(g.megaBosses[0].maxHp < G.makeMegaBoss(20).maxHp, 'twin bosses use reduced HP (0.65×) vs solo');
+  ok(!!g.megaBosses[0] && g.megaBosses[0].maxHp < G.makeMegaBoss(20).maxHp, 'twin bosses use reduced HP (0.65×) vs solo');
   g.stage = 30; G.setupBossStage();
   eq(g.megaBosses.length, 1, 'stage 30+ → 1 SUPER boss');
-  eq(g.megaBosses[0].super, true, 'stage 30 boss is super');
-  ok(g.megaBosses[0].maxHp > G.makeMegaBoss(30).maxHp, 'super boss HP exceeds base (2.5× scale)');
+  eq(g.megaBosses[0] && g.megaBosses[0].super, true, 'stage 30 boss is super');
+  ok(!!g.megaBosses[0] && g.megaBosses[0].maxHp > G.makeMegaBoss(30).maxHp, 'super boss HP exceeds base (2.5× scale)');
 } else { console.log('  (skipped — setupBossStage / makeMegaBoss not exposed)'); }
 
 // ============================================================
@@ -3904,6 +3904,66 @@ if (ST && typeof G.checkStageComplete === 'function' && G.__getGame && G.__getGa
   ok(g4.stageDied, 'the stage is still marked as not clean');
   G.resetGame();
 } else { console.log('  (skipped — core loop not drivable)'); }
+
+section('ALTERNATE STAGE MODES — challenge waves and boss stages actually run');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()) {
+  // Every existing challengeMode/dailyMode reference in this suite sets the flag
+  // to exercise a SCORING function. Nothing ever played one. Two of the game's
+  // three stage modes could have been completely broken - a challenge stage that
+  // never advances a wave, a boss that cannot die - and the suite would stay
+  // green, because the smoke tests only assert that update() does not throw.
+  const K = G.__getKeys() || {};
+
+  // --- CHALLENGE: waves are built, and they advance ---
+  G.resetGame();
+  const gc = G.__getGame();
+  gc.stage = 8;                       // 8 % 4 === 0 and not a boss stage
+  eq(G.stageModeFor(8), 'challenge', 'stage 8 is a challenge stage');
+  G.startStage();
+  eq(gc.state, ST.CHALLENGING, 'startStage puts the game in CHALLENGING');
+  eq((gc.challengeWaves || []).length, 8, 'eight waves are built');
+  ok((gc.challengeWaves[0] || []).length > 0, 'the first wave has enemies ('
+     + (gc.challengeWaves[0] || []).length + ')');
+  ok((gc.challengeTotal || 0) > 0, 'a total enemy count is recorded');
+
+  gc.playerAlive = true;
+  const waveStart = gc.challengeWaveIdx || 0;
+  let threwC = null, waveMoved = false;
+  try {
+    for (let f = 0; f < 2000; f++) {
+      K[' '] = true;
+      G.update();
+      if ((f & 31) === 0) G.draw();
+      if ((gc.challengeWaveIdx || 0) > waveStart) { waveMoved = true; break; }
+    }
+    K[' '] = false;
+  } catch (e) { threwC = e; }
+  ok(!threwC, 'a challenge stage runs without throwing' + (threwC ? ' — ' + threwC.message : ''));
+  ok(waveMoved, 'challenge waves advance (' + waveStart + ' -> ' + gc.challengeWaveIdx + ')');
+
+  // --- BOSS: the boss is built, can be killed, and the stage then advances ---
+  G.resetGame();
+  const gb = G.__getGame();
+  gb.stage = 10;
+  eq(G.stageModeFor(10), 'boss', 'stage 10 is a boss stage');
+  G.startStage();
+  eq(gb.state, ST.BOSS_STAGE, 'startStage puts the game in BOSS_STAGE');
+  ok((gb.megaBosses || []).length > 0, 'a boss exists (' + (gb.megaBosses || []).length + ')');
+  ok(gb.megaBosses.every(mb => mb.hp > 0 && mb.alive), 'it starts alive at full HP');
+
+  gb.playerAlive = true;
+  gb.megaBosses.forEach(mb => { mb.alive = false; mb.hp = 0; });
+  gb.explosions.length = 0;
+  const bossStageBefore = gb.stage;
+  let bossAdvanced = false;
+  for (let f = 0; f < 400; f++) {
+    G.checkStageComplete();
+    if (gb.stage > bossStageBefore) { bossAdvanced = true; break; }
+  }
+  ok(bossAdvanced, 'killing the boss advances the stage ('
+     + bossStageBefore + ' -> ' + gb.stage + ')');
+  G.resetGame();
+} else { console.log('  (skipped — alternate modes not drivable)'); }
 
 section('LONG SESSION — no unbounded growth, no non-finite state (leak guard)');
 if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame() && G.__getKeys) {
