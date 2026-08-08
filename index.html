@@ -20453,47 +20453,6 @@ function drawHUD() {
   // PLAYER EDGE VIGNETTE — faint cyan band on left/right when player is within
   // 20px of that edge. Alpha grows as player approaches the wall, peaking at
   // touching. Helps spatial awareness without compromising the playfield read.
-  // STAGE PROGRESS BAR — 1px high bar at top of screen showing how far into the
-  // current stage the player is. Stage-type specific:
-  //   PLAYING:     killed/total formation enemies
-  //   CHALLENGING: completed waves / total waves
-  //   BOSS_STAGE:  cumulative damage dealt to bosses
-  // Drawn here so the bar reads above the score row without competing.
-  if (isCombatState()) {
-    let prog = 0, barCol = COL.cyan;
-    if (game.state === STATE.PLAYING) {
-      const total = game.enemies ? game.enemies.length : 0;
-      const alive = total === 0 ? 0 : game.enemies.filter(e => e.alive).length;
-      prog = total === 0 ? 0 : 1 - alive / total;
-      barCol = COL.cyan;
-    } else if (game.state === STATE.CHALLENGING) {
-      const totalW = game.challengeWaves ? game.challengeWaves.length : 1;
-      prog = Math.min(1, (game.challengeWaveIdx || 0) / totalW);
-      barCol = '#f6f';
-    } else if (game.state === STATE.BOSS_STAGE) {
-      const bosses = game.megaBosses || [];
-      let maxSum = 0, curSum = 0;
-      for (const mb of bosses) { maxSum += mb.maxHp || 0; curSum += mb.alive ? (mb.hp || 0) : 0; }
-      prog = maxSum > 0 ? 1 - curSum / maxSum : 0;
-      barCol = COL.red;
-    }
-    ctx.save();
-    // Track (dim) — near-end (prog >= 0.9) pulses brighter so the player
-    // reads 'this stage is almost done' at a glance. Stage type color
-    // preserved; only alpha varies. Stays subtle in the 1px bar.
-    const _nearEnd = prog >= 0.9;
-    ctx.globalAlpha = _nearEnd
-      ? (0.4 + 0.3 * Math.sin(game.animFrame * 0.4))
-      : 0.25;
-    ctx.fillStyle = barCol;
-    ctx.fillRect(0, 0, BASE_W, 1);
-    // Filled portion (bright)
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(0, 0, Math.round(BASE_W * prog), 1);
-    ctx.restore();
-    // STAGE PROGRESS PERCENT — small N% number once progress >= 25% so the
-    // player sees exact stage completion (helps "almost done" decisions).
-  }
   // 1UP + PILOT callsign small line below (pilot identity persistent across runs).
   // Daily mode swaps red → green so the mode reads at a glance (challenge mode
   // already uses red elsewhere and keeps the standard 1UP red).
@@ -20711,85 +20670,10 @@ function drawHUD() {
     }
     drawRetroText(fmtScore(game.scoreDisplay || 0), 50, 17, 7, _scCol, 'right');
   }
-  // NEAR-BEST INDICATOR — small ▲ symbol next to the score when chasing the
-  // best-ever (90-99% of highScore). Pulses faster as the player gets closer.
-  // Disappears once they pass the threshold (highScoreGlow takes over there).
-  // HIGH SCORE CHASE DISTANCE — numeric gap remaining when within 10K of personal best.
-  // Sits below the score (y=25) so it doesn't crowd the score itself. Color tier
-  // intensifies as gap shrinks: white(10K) → cyan(5K) → gold(1K) → red(100-).
-  // Owns the y=25 row — the stage-score "+N" further below yields while this shows.
-  let _highChaseShown = false;
-  if (!game.crossedHighOnce && game.liveHighThreshold > 0
-      && game.score > 0 && game.score < game.liveHighThreshold) {
-    const _gap = game.liveHighThreshold - game.score;
-    if (_gap <= 10000) {
-      let _gapCol = '#fff';
-      let _gapPulse = 1.0;
-      if (_gap <= 100) {
-        _gapCol = '#f44';
-        _gapPulse = 0.7 + 0.3 * Math.sin(game.animFrame * 0.45);
-      } else if (_gap <= 1000) {
-        _gapCol = '#fc4';
-        _gapPulse = 0.85 + 0.15 * Math.sin(game.animFrame * 0.25);
-      } else if (_gap <= 5000) {
-        _gapCol = '#0ff';
-      }
-      ctx.save();
-      ctx.globalAlpha = _gapPulse;
-      drawRetroText('↑ HIGH: -' + fmtScore(_gap), 50, 25, 4, _gapCol, 'right');
-      ctx.restore();
-      _highChaseShown = true;
-    }
-  }
-  // Combat-state HUD chips (parry streak, weather, biome, act title, …). The
-  // active-buff timers live in the ACTIVE BUFF STRIP further below — a single
-  // canonical display, not duplicated here.
-  // The weather chip and the pickup-streak counter both target the right-rail
-  // y=38 slot; this flag lets the streak yield when weather (stage context) owns it.
-  let _weatherChipShown = false;
-  if (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING
-      || game.state === STATE.BOSS_STAGE) {
-    // PARRY STREAK CHIP — current parry streak count (the one consolidated streak
-    // cue). CEO subtraction: the tier color escalation + ULTRA glow were flattened
-    // to a single cyan. Disappears on streak break (parryStreakTimer === 0). Hidden
-    // when streak < 2 to keep HUD clean.
-    if ((game.parryStreak || 0) >= 2 && (game.parryStreakTimer || 0) > 0) {
-      const _ps = game.parryStreak;
-      const _psFade = Math.min(1, game.parryStreakTimer / 30);
-      ctx.save();
-      ctx.globalAlpha = 0.85 * _psFade;
-      drawRetroText('P×' + _ps, BASE_W - 30, 32, 5, '#0ff', 'right');
-      ctx.restore();
-    }
-    // STAGE WEATHER LIVE CHIP — active weather label always visible in HUD so the
-    // player can identify their stage condition even after the entry banner fades.
-    // Color matches the weather's signature tone (e.g. sandstorm orange, blizzard cyan).
-    // STAGE BIOME LIVE CHIP — current biome label always visible. Pairs with weather
-    // chip directly above for a complete "where am I" HUD column. Hidden in stages 1-7
-    // where biomeForStage returns null.
-    // (GUI-simplify DELETE: the top-left S/N/P power chip — exact duplicate of the
-    // bottom-right power gems, which are the canonical build display.)
-    // GUARDIAN STATUS CHIP — active escort drone remaining seconds + variant color.
-    // Continues the HUD chip column under power levels. TTL <1s pulses for warning.
-    if (game.guardian) {
-      const _g = game.guardian;
-      const _gSec = Math.max(0, _g.ttl / 60).toFixed(1);
-      const _gCol = _g.col || '#0ff';
-      const _gExpSoon = (_g.ttl || 0) <= 60;
-      const _gAlpha = _gExpSoon
-        ? (0.50 + 0.50 * Math.sin(game.animFrame * 0.40))
-        : 0.92;
-      // Variant 3-letter prefix (BASE/ATK/SPT/RAP) — pulled from GUARDIAN_VARIANTS table
-      const _gvInfo = (typeof GUARDIAN_VARIANTS !== 'undefined') ? GUARDIAN_VARIANTS[_g.variant || 'standard'] : null;
-      const _gLabel = (_gvInfo && _gvInfo.chip) || 'BASE';
-      ctx.save();
-      ctx.globalAlpha = _gAlpha;
-      drawRetroText(_gLabel + ' ' + _gSec + 's', 4, 44, 4, _gCol, 'left');
-      ctx.restore();
-    }
-  }
-  // (GUI-simplify DELETE: the mini combo x-badge + 12px decay bar next to the
-  // score — duplicate of the main combo box bottom-centre.)
+  // (The combat-state chip column is gone: parry streak, weather, biome, act
+  // title and guardian status were each a small always-on label competing with
+  // the play area. Active buffs still show in the ACTIVE BUFF STRIP below —
+  // one canonical display, which is all the column was ever duplicating.)
 
   // High score — one compact line. This used to be a three-way chain: a
   // BOSS_STAGE title bar and a two-line 'HIGH SCORE' header, both detail-view
@@ -20820,86 +20704,6 @@ function drawHUD() {
     } else {
       drawRetroText('STAGE ' + game.stage, BASE_W - 5, 8, 6, stageCol, 'right');
     }
-  }
-  // ACT HUD CHIP — small persistent indicator of current narrative chapter.
-  // Hidden during ACT I (stages 1-10, implicit). Color matches act accent.
-  {
-    let _actCur = null;
-    if (_actCur) {
-      ctx.save();
-      ctx.globalAlpha = 0.65;
-      // ACT VII = FINAL ACT (stage 91+) — picks up a small glow so the endgame
-      // chapter reads visually distinct (matches the 9-peak-threshold GLOW
-      // pattern across the HUD).
-      if (_actCur.num === 'VII') {
-        ctx.shadowColor = _actCur.col;
-        ctx.shadowBlur = 3;
-      }
-      drawRetroText('ACT ' + _actCur.num, BASE_W - 5, 14, 4, _actCur.col, 'right');
-      ctx.restore();
-    }
-  }
-  // STAGE TYPE ICON — small 5×5 marker left of the stage label so players can read
-  // the stage type at a glance (normal/challenging/boss/super-boss).
-  {
-    const isBossSt = game.stage % BOSS_STAGE_INTERVAL === 0;
-    const isSuperBoss = isBossSt && game.stage >= 30;
-    const isChallSt = !isBossSt && game.stage % 4 === 0;
-    const iconX = BASE_W - 5 - ('STAGE ' + game.stage).length * 5 - 8;
-    const iconY = 5;
-    ctx.save();
-if (isBossSt) {
-      // Skull — red
-      ctx.fillStyle = '#f44';
-      ctx.fillRect(iconX, iconY, 5, 5);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(iconX + 1, iconY + 1, 1, 1);
-      ctx.fillRect(iconX + 3, iconY + 1, 1, 1);
-      ctx.fillRect(iconX + 2, iconY + 3, 1, 1);
-    } else if (isChallSt) {
-      // Diamond — magenta
-      ctx.fillStyle = '#f6f';
-      ctx.fillRect(iconX + 2, iconY,     1, 1);
-      ctx.fillRect(iconX + 1, iconY + 1, 3, 1);
-      ctx.fillRect(iconX,     iconY + 2, 5, 1);
-      ctx.fillRect(iconX + 1, iconY + 3, 3, 1);
-      ctx.fillRect(iconX + 2, iconY + 4, 1, 1);
-    } else {
-      // Ring — cyan
-      ctx.fillStyle = '#0ff';
-      ctx.fillRect(iconX + 1, iconY,     3, 1);
-      ctx.fillRect(iconX + 1, iconY + 4, 3, 1);
-      ctx.fillRect(iconX,     iconY + 1, 1, 3);
-      ctx.fillRect(iconX + 4, iconY + 1, 1, 3);
-    }
-    ctx.restore();
-  }
-  // STAGE PB PROGRESS BAR — 1px-tall bar showing current stage vs lifetime
-  // best across both modes. Hidden when not yet exceeded stage 3. Visible
-  // throughout gameplay so the chase is continuously felt.
-  // (LIVE PB PACE INDICATOR at y=58 removed — it duplicated the PB delta the
-  // STAGE TIME CLOCK below already shows at y=22. One PB read, not two.
-  // LIVE STAGE CLOCK / NEXT EXTRA LIFE bar / BUFF TIMER BARS also removed in
-  // earlier HUD cleanup — active buffs still surface via weapon callouts and
-  // the STAGE_INTRO status panel.)
-  // WORLD CORRUPTION HUD INDICATOR — small "CORR XX%" label when stage 30+ enters
-  // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
-  // pure context cue for late-game depth.
-  // STAGE TIME CLOCK — real-time mm:ss.t timer + PB delta indicator. Only renders
-  // during active gameplay states (no TITLE/INTRO/GAME_OVER pollution). Color shifts
-  // green when ahead of PB, red when behind. PB compare requires existing record.
-  // Yields its y=22 row to the transient stage-mutation descriptor for the first
-  // ~5s (the clock reads ~0:00 then and PB compare is meaningless that early), so
-  // the two stop overprinting; the full clock cluster returns the moment it fades.
-  const _mutIntro = game.stageMutation && game.stageMutation.desc && (game.stageFrames || 0) < 300;
-  // EXTRA LIFE PROGRESS — 30px green bar (right rail, y39) toward the next 30K
-  // extra-life threshold. Top-level so it no longer blinks out during dive surges
-  // or mutation-intros (it used to be nested under the run-timer/stage-clock).
-  // HUD DIFFICULTY — single HARD/EASY label (right rail, y56) on non-default runs.
-  // (Previously duplicated: a left-side y30 copy overlapped the combo box; removed.)
-  if (isCombatState() && (difficultyMode === 'hard' || difficultyMode === 'easy')) {
-    const dCol = difficultyMode === 'hard' ? COL.red : COL.green;
-    drawRetroText(difficultyMode === 'hard' ? 'HARD' : 'EASY', BASE_W - 5, 56, 4, dCol, 'right');
   }
   // INCOMING WAVE ALERT CINEMATIC — between CHALLENGING waves the 35-frame
   // telegraph window becomes a 3-phase tactical briefing (backdrop flash-in →
@@ -20961,38 +20765,6 @@ if (isBossSt) {
     ctx.restore();
   }
 
-  // DAILY MISSION HUD — small label during daily-mode runs reminding the player
-  // of today's objective. Only shows when mission is incomplete + during active
-  // gameplay. Provides live progress (X/Y or ✓/—) via mission.progress(g).
-  if (game.dailyMode && typeof dailyMission === 'function'
-      && (isCombatState())) {
-    const isDone = game._dailyMissionFired
-                  || (game._dailyMissionAlreadyDoneCached === undefined
-                      ? (game._dailyMissionAlreadyDoneCached = isDailyMissionDoneToday())
-                      : game._dailyMissionAlreadyDoneCached); // perf: cached (was per-frame storage+Date)
-    if (!isDone) {
-      const m = dailyMission();
-      if (m) {
-        const pStr = (typeof m.progress === 'function') ? m.progress(game) : '';
-        const label = pStr ? ('M: ' + m.label + ' ' + pStr) : ('M: ' + m.label);
-        // y=50 (one row below the biome chip at y=44) — daily mode and stage 8+
-        // both put a chip on the right rail, and biome owns y=44.
-        drawRetroText(label, BASE_W - 5, 50, 4, '#f6f', 'right');
-        // Small pulse dot to the left of the mission label — daily mode signal
-        ctx.save();
-        const dotPulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.18);
-        ctx.globalAlpha = dotPulse;
-        ctx.fillStyle = '#f6f';
-        const dotX = BASE_W - 5 - label.length * 4 - 5;
-        ctx.fillRect(dotX, 51, 2, 2);
-        ctx.restore();
-      }
-    } else {
-      // DAILY MISSION DONE — show ✓ in green so the player has a persistent
-      // visual confirmation that today's mission was completed.
-      drawRetroText('M: ✓ DONE', BASE_W - 5, 50, 4, '#0f8', 'right');
-    }
-  }
 
   // Wave counter + pip row superseded by drawChallengeWaveHUD() (called from drawGameplay).
   // STAGE MUTATION mini-badge — under the stage label, blinks between mutation color/white
