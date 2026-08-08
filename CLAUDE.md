@@ -27,8 +27,16 @@ The entire game is a single static file. To play:
 There is no build step, no package manager, and no lint config. All game code goes into `index.html`. After every meaningful change, run the full verification (JS parse + logic tests) in one command:
 
 ```bash
-bash test/run.sh        # JS parse + logic tests + layout audit; exit 0 only if all pass
+bash test/run.sh        # JS parse + logic tests + layout audit + fresh boot; exit 0 only if all pass
 ```
+
+`test/fresh-boot.js` (step 4) covers the **first-time player**: it boots a sandbox whose
+localStorage is genuinely empty, then runs init plus a real driven session. The game
+reads storage in 112 places, each behind a try/catch and a default, and nothing checked
+that a virgin profile actually starts — the main suite's sandbox accumulates keys as it
+runs and the layout audit deliberately seeds a maxed profile, so the most common first
+experience was the one path never exercised end to end. Mutation-verified: making a
+single default dereference its null read fails the boot immediately.
 
 `test/layout-audit.js` (step 3) catches **text that renders permanently off-screen** —
 the failure mode a canvas game with no layout engine cannot otherwise detect without a

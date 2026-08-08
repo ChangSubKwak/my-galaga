@@ -3,6 +3,7 @@
 # 1) JS parse check on the inline <script> in index.html
 # 2) logic test harness (test/logic.test.js)
 # 3) layout audit — no permanently off-screen text (test/layout-audit.js)
+# 4) fresh boot   — the first-time player path (test/fresh-boot.js)
 # Exit 0 only if all three pass. Usage:  bash test/run.sh   (or ./test/run.sh)
 #
 # NOT run here: test/curve-audit.js. That one is a REPORT (difficulty + score
@@ -13,7 +14,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "== [1/3] JS parse check =="
+echo "== [1/4] JS parse check =="
 node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=h.match(/<script>([\s\S]*?)<\/script>/);if(!m){console.error('no <script> block');process.exit(1);}new Function(m[1]);const lines=h.split('\n').length;console.log('  JS parse OK ('+lines+' lines)');"
 PARSE=$?
 if [ "$PARSE" -ne 0 ]; then
@@ -21,7 +22,7 @@ if [ "$PARSE" -ne 0 ]; then
   exit 1
 fi
 
-echo "== [2/3] logic tests =="
+echo "== [2/4] logic tests =="
 node test/logic.test.js
 TESTS=$?
 if [ "$TESTS" -ne 0 ]; then
@@ -30,15 +31,25 @@ if [ "$TESTS" -ne 0 ]; then
   exit 1
 fi
 
-echo "== [3/3] layout audit =="
+echo "== [3/4] layout audit =="
 node test/layout-audit.js | tail -n 6
 LAYOUT=${PIPESTATUS[0]}
 
+if [ "$LAYOUT" -ne 0 ]; then
+  echo "========================================"
+  echo "LAYOUT AUDIT FAILED (text renders permanently off-screen)"
+  exit 1
+fi
+
+echo "== [4/4] fresh boot =="
+node test/fresh-boot.js | tail -n 3
+FRESH=${PIPESTATUS[0]}
+
 echo "========================================"
-if [ "$LAYOUT" -eq 0 ]; then
+if [ "$FRESH" -eq 0 ]; then
   echo "ALL CHECKS PASSED"
   exit 0
 else
-  echo "LAYOUT AUDIT FAILED (text renders permanently off-screen)"
+  echo "FRESH BOOT FAILED (a first-time profile cannot start)"
   exit 1
 fi
