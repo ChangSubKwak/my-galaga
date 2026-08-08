@@ -4886,81 +4886,26 @@ function drawStageWeather() {
 // at bottom-left of the play field. Score-neutral, no gameplay impact —
 // pure narrative reactivity. Per-type 5-second cooldown prevents spam.
 const INTERCEPT_MSG = {
-  formationSet:  ['IN POSITION. AWAIT.', 'GRID LOCKED.', 'FORMATION SET.'],
   commanderDown: ['LEAD WING DOWN!', 'COMMAND OFFLINE.', 'ALL UNITS: FREE FIRE.'],
-  moraleBreak:   ['WE CANNOT HOLD!', 'SCATTER! DISPERSE!', 'FORMATION BROKEN!'],
   stormFront:    ['THE SKY FIGHTS US TOO!', 'WEATHER WEAPONIZED!', 'EVEN THE STORM STRIKES!'],
   wingPincer:    ['WINGS — PINCER!', 'FLANK AND CONVERGE!', 'BOX THE TARGET IN!'],
   wingWall:      ['WALL FORMATION — DIVE!', 'LINE ABREAST, DESCEND!', 'OVERWHELM AS ONE!'],
   playerDown:    ['HOSTILE NEUTRALIZED.', 'TARGET DOWN. ADVANCE.', 'ENEMY ELIMINATED.'],
-  comboCritical: ['THREAT UNCONTAINED!', 'CRITICAL TARGET!', 'REQUEST BACKUP.'],
-  lastStand:     ['FINISH IT NOW.', 'ONE LIFE REMAINS.', 'STRIKE — STRIKE!'],
   witchSave:     ['IMPOSSIBLE...', 'NO HIT REGISTERED?', 'CHECK SENSORS!'],
-  eliteDown:     ['ACE DOWN!', 'ELITE LOST!', 'WING ACE FALLEN!'],
   supplyDrop:    ['CARGO IN ZONE!', 'PROTECT THE DROP!', 'RESUPPLY EXPOSED!'],
-  actBegin:      ['NEW SECTOR DETECTED.', 'UNCHARTED ZONE.', 'WE ENTER NEW SPACE.'],
   guardianArrives: ['SECOND TARGET!', 'WHERE DID THAT COME FROM?', 'TWO HOSTILES NOW!'],
   ufoSpotted:    ['SCOUT VESSEL — INTERCEPT.', 'UNKNOWN SIGNATURE!', 'RADAR ECHO INCOMING.'],
   goldenSpotted: ['ROYAL CARGO DETECTED!', 'GUARD THE GOLDEN ONE!', 'HIGH-VALUE TARGET!'],
-  ghostKill:     ['IT WAS HERE...', 'HOW DID YOU SEE THAT?', 'INVISIBLE NO MORE.'],
-  minibeeSwarm:  ['SWARM SCATTERED!', 'WORKERS DOWN!', 'COLONY LOSING DRONES!'],
   bossRage:      ['BOSS ENTERS RAGE!', 'CRITICAL HOSTILE — APEX!', 'TARGET UNLEASHED!'],
-  actEnd:        ['SECTOR CLEARED!', 'GATE COMPROMISED!', 'WE LOSE THIS HORIZON!'],
-  scoreMilestone:['CASUALTIES EXTREME!', 'WE LOSE THE GROUND!', 'IMPOSSIBLE SCORE!'],
   perfectStage:  ['NO HITS LANDED!', 'TARGET UNTOUCHED!', 'PRECISION ENEMY!'],
-  endurance:     ['HOSTILE STILL ACTIVE!', 'TIME HAS NOT BROKEN IT!', 'PERSISTENT THREAT!'],
   maxPower:      ['TARGET FULLY ARMED!', 'OVERPOWERED!', 'RETREAT — STAGE TWO!'],
-  lifeGain:      ['TARGET REINFORCED!', 'WHERE DID THAT COME FROM?', 'ANOTHER ONE INCOMING!'],
-  biomeShift:    ['TERRAIN SHIFTED!', 'NEW ZONE — ADAPT!', 'ENVIRONMENT CHANGED!'],
   firstBlood:    ['CONTACT CONFIRMED!', 'HOSTILE ENGAGES!', 'TARGET HAS WEAPONS!'],
-  witchReady:    ['TARGET REGAINS THE TRICK', 'WATCH FOR DODGE', 'EVASION RESET'],
-  voidEntry:     ['VOID DETECTED!', 'GRAVITY BEYOND COMPUTE', 'WE LOSE SIGNAL HERE'],
-  nebulaEntry:   ['STAR NURSERY DETECTED', 'NEW LIFE IGNITES', 'WE ARE WITNESSED'],
-  coronaEntry:   ['SUN PROXIMITY CRITICAL', 'OUR PLATING FAILS', 'WHY ARE WE HERE?'],
-  shieldHold:    ['WE HIT — NO DAMAGE?!', 'DEFLECTED!', 'WHAT IS THAT FIELD?'],
-  bombDetonate:  ['MASSIVE BLAST!', 'FIELD DEVASTATED!', 'WIPED OUT IN ONE!'],
-  killMaster:    ['ATTRITION CRITICAL!', 'WE LOST 100 ALREADY!', 'DEFENSE NEAR COLLAPSE!'],
-  witchStreak:   ['AGAIN — IMPOSSIBLE!', 'TWO TIMES — HOW?', 'THIS ONE IS GHOST!'],
-  extinction:    ['EXTINCTION EVENT!', 'WE ARE BEING ERASED!', 'PROTOCOL OMEGA — RETREAT!'],
-  diverseArms:   ['TARGET ARMS DIVERSE!', 'MANY WEAPONS DETECTED!', 'ARSENAL UNPREDICTABLE!'],
-  allBiomeSeen:  ['ALL ZONES BREACHED!', 'TARGET CHARTS EVERYTHING!', 'NO PLACE HIDES US!'],
-  cleanRun:      ['TARGET IS UNHIT!', 'FLAWLESS APPROACH!', 'HOW DO WE STOP THIS?'],
-  witchLegend:   ['TARGET IS LEGEND!', 'FIVE TIMES — NO HIT LANDS!', 'WE FIGHT A MYTH!'],
-  beyondTime:    ['TARGET DEFIES TIME!', '30 MINUTES AND COUNTING!', 'WE FACE AN HOUR OF FIRE!'],
-  firstBoss:     ['MEGA-HOSTILE DOWN!', 'OUR APEX FELL!', 'FIRST OF MANY?'],
-  eliteSpree:    ['ACE SQUAD GONE!', 'ALL WING LEADS LOST!', 'WHO IS THIS PILOT?!'],
-  sustainedSkill:['RHYTHM UNBROKEN!', 'TARGET MAINTAINS PRESSURE!', 'WE CANNOT BREATHE!'],
-  parryMaster:   ['DEFLECTION SPECIALIST!', 'ALL OUR SHOTS RETURN!', 'WEAPONS FAIL US!'],
-  nearMissAce:   ['EVASION SPECIALIST!', 'NO HIT REGISTERED!', 'TARGET DEFIES FIRE!'],
-  firstParry:    ['PILOT GRAZES OUR FIRE!', 'DEFLECTION DETECTED!', 'NEW THREAT VECTOR!'],
-  grazeChain:    ['THEY WEAVE THROUGH IT ALL!', 'OUR FIRE FINDS NOTHING!', 'A GHOST IN THE BARRAGE!'],
-  flawlessKill:  ['THE CHAMPION FELL UNTOUCHED!', 'NOT A SCRATCH ON THEM!', 'FLAWLESS — HOW?!'],
-  firstExtra:    ['ENEMY GAINS STRENGTH!', 'IT GROWS RESILIENT!', 'WE LOST GROUND!'],
-  firstElite:    ['PILOT KILLED AN ACE!', 'WING COMMANDER DOWN!', 'OUR BEST IS DEAD!'],
-  guardianMaster:['TARGET COMMANDS DRONES!', 'FOUR ALLIES!', 'UNSTOPPABLE FORMATION!'],
-  shieldMaxed:   ['DEFENSE STACKED!', 'TWO BARRIERS — HOW?', 'WE CANNOT BREAK THROUGH!'],
-  beamActive:    ['BEAM WEAPON ACTIVE!', 'PIERCING ATTACK!', 'ARMOR USELESS!'],
-  rapidStorm:    ['BULLET STORM!', 'WALL OF FIRE!', 'WE DROWN IN PROJECTILES!'],
-  achievementFirst: ['TARGET EARNS GLORY!', 'HISTORY RECORDS THIS!', 'WE WITNESS GREATNESS!'],
-  firstChallenge: ['BONUS RUN CLEARED!', 'TARGET FORMS BROKEN!', 'WE FAILED THE TRAP!'],
   superBoss:     ['APEX HOSTILE INCOMING!', 'DEPLOY EVERYTHING!', 'LAST LINE — HOLD!'],
-  comboResetHigh:['THEIR RHYTHM BROKE!', 'FINALLY — A MISS!', 'WE BREATHE AGAIN!'],
   finalLife:     ['FINAL SHIP STANDING!', 'ONE MORE TO FINISH!', 'VICTORY WITHIN REACH!'],
-  aceMaster:     ['CONSISTENT EXCELLENCE!', 'NO MISTAKES — 5 CLEARS!', 'PROFESSIONAL THREAT!'],
-  multikillRampage: ['MASS EXTINCTION!', 'TEN AT ONCE — IMPOSSIBLE!', 'FRONT LINE COLLAPSED!'],
-  frozenTime:    ['TIME WARPS!', 'OUR BULLETS LAG!', 'REALITY SHIFTED!'],
-  pickupSpree:   ['ALL CARGO LOST!', 'TARGET RESUPPLIED!', 'WE ARMED THE ENEMY!'],
-  forkSpread:    ['SPREAD FIRE!', 'THREE PATHS — DODGE WHERE?', 'FORMATION VULNERABLE!'],
-  waveActive:    ['ERRATIC FIRE!', 'BULLETS DANCE!', 'PATTERN UNPREDICTABLE!'],
-  rapidFire:     ['FIRE RATE SURGE!', 'CONTINUOUS SHOOTING!', 'BARRAGE INCOMING!'],
-  homingTrack:   ['BULLETS HUNT US!', 'NO ESCAPE — THEY TURN!', 'TRACKING ROUNDS!'],
   rivalSpotted:  ['OUR ACE HAS FOUND YOU!', 'DUELIST ON APPROACH!', 'THE MIRROR HUNTS!'],
-  rivalRetreat:  ['OUR ACE WITHDRAWS!', 'DUEL SUSPENDED!', 'THE ACE WILL RETURN!'],
   rivalDown:     ['OUR ACE IS DOWN!', 'THE DUELIST FALLS!', 'IMPOSSIBLE — ACE LOST!'],
   salvageDrop:   ['THEIR CORE SCATTERED!', 'DON\'T LET THEM REBUILD!', 'SEIZE THE WRECKAGE!'],
-  magpieSpotted: ['MAGPIE UNIT DEPLOYED!', 'STEAL THEIR SUPPLIES!', 'THE MAGPIE HUNTS YOUR LOOT!'],
-  magpieEscape:  ['MAGPIE SECURED THE CARGO!', 'SUPPLY THEFT COMPLETE!', 'THEIR LOSS — OUR GAIN!'],
-  magpieDown:    ['MAGPIE LOST!', 'THE THIEF IS DOWN!', 'CARGO BACK IN THEIR HANDS!']
+  magpieSpotted: ['MAGPIE UNIT DEPLOYED!', 'STEAL THEIR SUPPLIES!', 'THE MAGPIE HUNTS YOUR LOOT!']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
 const INTERCEPT_LIFE = 180;
@@ -5111,7 +5056,6 @@ function spawnGuardian(variant) {
     const _wasNewG = !game._guardianVariants.has(variantId);
     game._guardianVariants.add(variantId);
     if (_wasNewG && game._guardianVariants.size === 4) {
-      pushIntercept('guardianMaster');
     }
   }
   // GUARDIAN ARRIVAL LABEL — variant chip ('ALLY: BASE/ATK/SPT/RAP') in
@@ -5459,7 +5403,6 @@ function rivalDisengage(r, saySituation, levelUp, stageGap) {
   if (levelUp) game.rivalLevel = Math.min(RIVAL_MAX_LEVEL, (game.rivalLevel || 0) + 1);
   game.rivalNextStage = game.stage + stageGap;
   if (saySituation) rivalSay(r, saySituation);
-  if (typeof pushIntercept === 'function') pushIntercept('rivalRetreat');
   r.phase = 'retreat';
   r.vy = 0.4;
 }
@@ -6165,7 +6108,6 @@ function updateMagpie() {
     m.x += Math.sin(game.animFrame * 0.15) * 0.8;
     if (m.y < -12) {
       // Escaped. If it got away WITH cargo, the enemy comms gloat.
-      if (m.carry && typeof pushIntercept === 'function') pushIntercept('magpieEscape');
       game.magpie = null;
       game.magpieCd = MAGPIE_COOLDOWN;
       return;
@@ -6208,7 +6150,6 @@ function updateMagpie() {
       }
       addScore(300);
       bumpCombo();
-      if (typeof pushIntercept === 'function') pushIntercept('magpieDown');
       // BESTIARY + LIFETIME KILL TALLY (see the rival kill site).
       if (typeof unlockDex === 'function') unlockDex('magpie');
       game.killsByTypeRun = game.killsByTypeRun || {};
@@ -8586,15 +8527,12 @@ function updateOneMegaBoss(mb) {
         }
         // SIGNAL INTERCEPT — first boss kill of run (== 1 exact match)
         if (game.bossesKilledThisRun === 1 && typeof pushIntercept === 'function') {
-          pushIntercept('firstBoss');
         }
         // SIGNAL INTERCEPT — 100 kill milestone — also fires here if boss is the 100th kill
         if (game.stats.kills === 100 && typeof pushIntercept === 'function') {
-          pushIntercept('killMaster');
         }
         // SIGNAL INTERCEPT — 500 kill milestone — also fires here if boss is the 500th kill
         if (game.stats.kills === 500 && typeof pushIntercept === 'function') {
-          pushIntercept('extinction');
         }
         bumpCombo();
         unlockAchievement('bossSlayer');
@@ -8636,7 +8574,6 @@ function updateOneMegaBoss(mb) {
           } catch (_eFB) {}
           if (typeof playSound === 'function') playSound('extraLife');
           // NARRATIVE FUSION — enemy comms react to the untouched takedown.
-          if (typeof pushIntercept === 'function') pushIntercept('flawlessKill');
         }
         // Cinematic camera cut: black bars + slow zoom for ~60 frames
         game.cinematicBars = Math.max(game.cinematicBars || 0, 60);
@@ -8756,7 +8693,6 @@ function updateOneMegaBoss(mb) {
                 color: '#cfc', life: 180, maxLife: 180, size: 5
               });
               game.cinematicBars = Math.max(game.cinematicBars || 0, 120);
-              if (typeof pushIntercept === 'function') pushIntercept('actEnd');
             }
           }
           // BOSS DEFEATED CHECKLIST — mark the boss for this stage as defeated.
@@ -9304,7 +9240,6 @@ function startStage() {
   // ACT TRANSITION — queue "new sector" intercept message when this stage opens an act
   if (typeof actStartFor === 'function' && actStartFor(game.stage)
       && typeof pushIntercept === 'function') {
-    pushIntercept('actBegin');
   }
   // BIOME SHIFT — detect biome change and broadcast intercept. Compares vs prevBiome
   // tracked at run scope. Null on stages 1-7 (no biome) means first biome triggers.
@@ -9313,7 +9248,6 @@ function startStage() {
   if (typeof biomeForStage === 'function' && typeof pushIntercept === 'function') {
     const _curBiome = biomeForStage(game.stage);
     if (_curBiome && _curBiome !== game.prevBiome) {
-      pushIntercept('biomeShift');
       // BIOME SHIFT FLASH — short screen flash in the new biome's signature
       // color, paired with the narrative INTERCEPT. Reinforces the tonal change
       // before STAGE_INTRO's biome-tinted backdrop settles in.
@@ -9322,16 +9256,12 @@ function startStage() {
         game.flashColor = BIOME_NAMES[_curBiome].col;
       }
       // Dramatic biome entries get a tailored narrative beat
-      if (_curBiome === 'blackhole') pushIntercept('voidEntry');
-      else if (_curBiome === 'nebula') pushIntercept('nebulaEntry');
-      else if (_curBiome === 'corona') pushIntercept('coronaEntry');
       // BIOME COMPLETION MILESTONE — track unique biomes seen this run; fire once
       // when all 12 are visited. Deep-run exploration achievement narrative.
       if (game._biomesSeen) {
         const _wasNewB = !game._biomesSeen.has(_curBiome);
         game._biomesSeen.add(_curBiome);
         if (_wasNewB && game._biomesSeen.size === 12) {
-          pushIntercept('allBiomeSeen');
         }
       }
     }
@@ -10123,7 +10053,6 @@ function addScore(pts) {
         if (_t.shake > 0) game.shakeTimer = Math.max(game.shakeTimer || 0, _t.shake);
         if (_t.bars > 0) game.cinematicBars = Math.max(game.cinematicBars || 0, _t.bars);
         if (_t.intercept && typeof pushIntercept === 'function') {
-          pushIntercept('scoreMilestone');
         }
         // Big-milestone shockwave at player position (100K+)
         if (_t.th >= 100000 && game.shockwaves && game.playerAlive) {
@@ -10259,7 +10188,6 @@ function addScore(pts) {
     game.extraShipsRun = (game.extraShipsRun || 0) + 1;
     // SIGNAL INTERCEPT — first extra life of the run is a score-milestone beat.
     if (game.extraShipsRun === 1 && typeof pushIntercept === 'function') {
-      pushIntercept('firstExtra');
     }
     playSound('extraLife');
     // EXTRA LIFE BANNER — celebrate threshold crossing with banner + confetti
@@ -10274,7 +10202,6 @@ function addScore(pts) {
       game.flashColor = '#0f8';
       if (typeof rumble === 'function') rumble(220, 0.7, 0.4);
       // SIGNAL INTERCEPT — enemy comms react to fresh reinforcement
-      if (typeof pushIntercept === 'function') pushIntercept('lifeGain');
     }
   }
 }
@@ -11227,7 +11154,6 @@ function unlockAchievement(id) {
     // SIGNAL INTERCEPT — first achievement unlock of the run (one-shot narrative beat)
     if (!game._achFirstSeen && typeof pushIntercept === 'function') {
       game._achFirstSeen = true;
-      pushIntercept('achievementFirst');
     }
     // (GUI-simplify DELETE: the mega celebration — center shockwave + 20 confetti +
     // 8 star streaks. The toast panel + chord alone are the reward; the burst fired
@@ -12079,7 +12005,6 @@ function updatePowerUps() {
         // SIGNAL INTERCEPT — first SLOW activation of run (time warp reveal)
         if (!game._slowSeen && typeof pushIntercept === 'function') {
           game._slowSeen = true;
-          pushIntercept('frozenTime');
         }
         game.floatTexts.push({
           x: p.x, y: p.y, text: (wasActive ? 'SLOW REFRESHED' : 'SLOW TIME!') + ' ' + _durSec(SLOW_DURATION),
@@ -12092,7 +12017,6 @@ function updatePowerUps() {
         // SIGNAL INTERCEPT — first RAPID activation of run
         if (!game._rapidSeen && typeof pushIntercept === 'function') {
           game._rapidSeen = true;
-          pushIntercept('rapidFire');
         }
         game.rapidTimer = Math.round(RAPID_DURATION * _scavMul);
         game.floatTexts.push({
@@ -12107,7 +12031,6 @@ function updatePowerUps() {
         // SIGNAL INTERCEPT — first WAVE activation of run (erratic fire reveal)
         if (!game._waveSeen && typeof pushIntercept === 'function') {
           game._waveSeen = true;
-          pushIntercept('waveActive');
         }
         game.floatTexts.push({
           x: p.x, y: p.y, text: (wasActive ? 'WAVE REFRESHED' : 'WAVE SHOT!') + ' ' + _durSec(WAVE_DURATION),
@@ -12121,7 +12044,6 @@ function updatePowerUps() {
         // SIGNAL INTERCEPT — first HOMING activation of run
         if (!game._homingSeen && typeof pushIntercept === 'function') {
           game._homingSeen = true;
-          pushIntercept('homingTrack');
         }
         game.floatTexts.push({
           x: p.x, y: p.y, text: (wasActive ? 'HOMING REFRESHED' : 'HOMING SHOT!') + ' ' + _durSec(HOMING_DURATION),
@@ -12136,7 +12058,6 @@ function updatePowerUps() {
         // SIGNAL INTERCEPT — first LASER activation of run (rare power-up reveal)
         if (!game._laserSeen && typeof pushIntercept === 'function') {
           game._laserSeen = true;
-          pushIntercept('beamActive');
         }
         game.floatTexts.push({
           x: p.x, y: p.y, text: (wasActive ? 'LASER REFRESHED' : 'LASER!') + ' ' + _durSec(LASER_DURATION),
@@ -12153,7 +12074,6 @@ function updatePowerUps() {
         // SIGNAL INTERCEPT — first FORK activation of run (spread weapon reveal)
         if (!game._forkSeen && typeof pushIntercept === 'function') {
           game._forkSeen = true;
-          pushIntercept('forkSpread');
         }
         game.floatTexts.push({
           x: p.x, y: p.y, text: (wasActive ? 'FORK REFRESHED' : 'FORK SHOT!') + ' ' + _durSec(360),
@@ -12167,7 +12087,6 @@ function updatePowerUps() {
         game.shieldCharges = Math.min(SHIELD_MAX, (game.shieldCharges || 0) + 1);
         // SIGNAL INTERCEPT — first reach to SHIELD_MAX (transition from non-max → max)
         if (!wasMax && game.shieldCharges >= SHIELD_MAX && typeof pushIntercept === 'function') {
-          pushIntercept('shieldMaxed');
         }
         game.floatTexts.push({
           x: p.x, y: p.y, text: wasMax ? 'SHIELD MAX' : 'SHIELD +1',
@@ -12259,7 +12178,6 @@ function updatePowerUps() {
         }
         rumble(360, 0.9, 0.6);
         // SIGNAL INTERCEPT — enemy comms reel from screen-clear devastation
-        if (typeof pushIntercept === 'function') pushIntercept('bombDetonate');
       } else if (p.type === 'D') {
         // DASH REFRESH — instantly resets dash cooldown + sets ready-glow window.
         // Tactical escape tool for high-pressure moments.
@@ -12397,7 +12315,6 @@ function updatePowerUps() {
       // STAGE-SCOPE PICKUP COUNTER — track within-stage pickups for spree intercept
       game.stagePickups = (game.stagePickups || 0) + 1;
       if (game.stagePickups === 5 && typeof pushIntercept === 'function') {
-        pushIntercept('pickupSpree');
       }
       // SIGNAL INTERCEPT — unique pickup type diversity milestone (6 distinct types)
       if (game._pickupTypes) {
@@ -12405,7 +12322,6 @@ function updatePowerUps() {
         game._pickupTypes.add(p.type);
         if (_wasNew && game._pickupTypes.size === 6
             && typeof pushIntercept === 'function') {
-          pushIntercept('diverseArms');
         }
       }
       if (game.pickupStreak > (game.pickupStreakBest || 0)) game.pickupStreakBest = game.pickupStreak;
@@ -12659,7 +12575,6 @@ function bumpCombo() {
   if (game.combo === 20 && typeof coachFire === 'function') coachFire('arsenal');
   if (game.combo === 10 && !game._stageComboInterceptFired) {
     game._stageComboInterceptFired = true;
-    if (typeof pushIntercept === 'function') pushIntercept('comboCritical');
   }
   // GUARDIAN VARIANT — combo 50+ first kill awards a red ATTACK drone (one-shot per run)
   if (game.combo >= 50 && !game._comboGuardianFired) {
@@ -12723,7 +12638,6 @@ function bumpCombo() {
         if (typeof playSound === 'function') playSound('milestone');
         // SIGNAL INTERCEPT — RAMPAGE tier (10+ same-frame kills) triggers narrative
         if (game._mkCount === 10 && typeof pushIntercept === 'function') {
-          pushIntercept('multikillRampage');
         }
       }
       game.multiKillsRun = (game.multiKillsRun || 0) + 1;
@@ -12900,7 +12814,6 @@ function bumpCombo() {
     rumble(200, 0.5, 0.3);
     // SIGNAL INTERCEPT — combo-driven extra life triggers enemy panic
     if (!game.challengeMode && typeof pushIntercept === 'function') {
-      pushIntercept('lifeGain');
     }
   }
 }
@@ -12924,7 +12837,6 @@ function updateCombo() {
       resetComboMilestone();
       // SIGNAL INTERCEPT — high combo break (100+) triggers adversary relief beat
       if (lostCount >= 100 && typeof pushIntercept === 'function') {
-        pushIntercept('comboResetHigh');
       }
       // Feedback scales with how big the combo was
       if (lostCount >= 3) {
@@ -13199,7 +13111,6 @@ function updateEnemies() {
         color: '#fc4', life: 60, maxLife: 60, size: 10
       });
       playSound('milestone');
-      if (typeof pushIntercept === 'function') pushIntercept('lastStand');
     }
   }
 
@@ -13540,7 +13451,6 @@ function updateEnemies() {
       game.formationMaxCount = game.enemies.filter(en => en.alive).length;
       game.panicFiredThisStage = false; // re-arm the once-per-stage morale-break latch
       // SIGNAL INTERCEPT — broadcast formation-set chatter on first locked position
-      if (typeof pushIntercept === 'function') pushIntercept('formationSet');
     }
   }
 
@@ -14061,11 +13971,9 @@ function updateCollisions() {
           }
           // SIGNAL INTERCEPT — 100 kill milestone — adversary attrition warning
           if (game.stats.kills === 100 && typeof pushIntercept === 'function') {
-            pushIntercept('killMaster');
           }
           // SIGNAL INTERCEPT — 500 kill milestone — extinction-level threat
           if (game.stats.kills === 500 && typeof pushIntercept === 'function') {
-            pushIntercept('extinction');
           }
           // SAME-TYPE KILL STREAK — track consecutive kills of same enemy type
           if (game._lastKillType === e.type) {
@@ -14175,7 +14083,6 @@ function updateCollisions() {
               color: '#a8f', life: 50, maxLife: 50, size: 8
             });
             // SIGNAL INTERCEPT — confused enemy chatter when invisible variant is killed
-            if (typeof pushIntercept === 'function') pushIntercept('ghostKill');
             // GHOST CHAIN — per-stage tally. 2nd+ ghost in same stage adds
             // a +100 bonus and a "GHOST CHAIN x N" callout.
             game.stageGhostKills = (game.stageGhostKills || 0) + 1;
@@ -14217,7 +14124,6 @@ function updateCollisions() {
             } catch (_e) {}
             // SIGNAL INTERCEPT — first elite kill of the run = ace-pilot milestone.
             if (game.eliteKills === 1 && typeof pushIntercept === 'function') {
-              pushIntercept('firstElite');
             }
             // Brief floating "ELITE!" tag so the kill reads as more meaningful
             pushInfoText({
@@ -14256,11 +14162,9 @@ function updateCollisions() {
               playSound('comboBreak');
             }
             // SIGNAL INTERCEPT — broadcast elite loss to enemy comms terminal
-            if (typeof pushIntercept === 'function') pushIntercept('eliteDown');
             // SIGNAL INTERCEPT — 3 elite kills in same stage = elite spree milestone
             game.stageEliteKills = (game.stageEliteKills || 0) + 1;
             if (game.stageEliteKills === 3 && typeof pushIntercept === 'function') {
-              pushIntercept('eliteSpree');
             }
           }
           // FORMATION COMMANDER KILL — triggers 360-frame DIVE SURGE enrage.
@@ -14306,7 +14210,6 @@ function updateCollisions() {
               game.formationPanicked = true;
               game.panicFiredThisStage = true;
               game.panicTimer = 300;
-              if (typeof pushIntercept === 'function') pushIntercept('moraleBreak');
               // Assign scatter targets to all alive formation enemies
               for (const _fe of game.enemies) {
                 if (!_fe.alive || _fe.state !== 'formation') continue;
@@ -14524,7 +14427,6 @@ function updateCollisions() {
             // SIGNAL INTERCEPT — per-stage swarm chatter at 5th minibee kill (one-shot)
             game.stageMinibeeKills = (game.stageMinibeeKills || 0) + 1;
             if (game.stageMinibeeKills === 5 && typeof pushIntercept === 'function') {
-              pushIntercept('minibeeSwarm');
             }
           }
           // Achievement: shooting a golden bee
@@ -14910,11 +14812,9 @@ function updateCollisions() {
         game.parryCount = (game.parryCount || 0) + 1;
         // SIGNAL INTERCEPT — first parry of run announces the dash-deflect read.
         if (game.parryCount === 1 && typeof pushIntercept === 'function') {
-          pushIntercept('firstParry');
         }
         // SIGNAL INTERCEPT — 10 parries in run = deflection mastery milestone
         if (game.parryCount === 10 && typeof pushIntercept === 'function') {
-          pushIntercept('parryMaster');
         }
         // PARRY LIFETIME TROPHIES — accumulate to localStorage for cross-run trophies
         try {
@@ -15023,7 +14923,6 @@ function updateCollisions() {
         if (game.nearMissChain >= 8 && !game._grazeChainInterceptFired
             && typeof pushIntercept === 'function') {
           game._grazeChainInterceptFired = true;
-          pushIntercept('grazeChain');
         }
         // GRAZE COMBO GRACE — a graze during an active combo (≥ 5) refreshes the
         // combo decay timer by +20f (capped at COMBO_DECAY). Lets skilled dodging
@@ -15052,7 +14951,6 @@ function updateCollisions() {
         // intercept. Threshold higher than parry (10) since near misses are
         // passive (just survive) rather than active (dash timing).
         if (game.nearMissCount === 25 && typeof pushIntercept === 'function') {
-          pushIntercept('nearMissAce');
         }
         // Quiet visual — 3 small white ring puffs at the bullet position
         if (game.itemBursts) {
@@ -15165,7 +15063,6 @@ function killPlayer(srcX, srcY, cause, srcType) {
     game.flashColor = '#4f8';
     game.shakeTimer = Math.max(game.shakeTimer || 0, 10);
     // SIGNAL INTERCEPT — enemy comms confused by absorbed hit
-    if (typeof pushIntercept === 'function') pushIntercept('shieldHold');
     // SHIELD ABSORB CINEMATIC — 3 staggered expanding shockwave rings + 12
     // itemBurst sparks + bigger banner + tiny hitStop. Makes the save feel
     // earned without changing the gameplay outcome.
@@ -16004,11 +15901,9 @@ function checkStageComplete() {
         // CLEAN RUN streak — 5 consecutive no-death clears triggers intercept
         game._stagesCleanStreak = game.stageDied ? 0 : ((game._stagesCleanStreak || 0) + 1);
         if (game._stagesCleanStreak === 5 && typeof pushIntercept === 'function') {
-          pushIntercept('cleanRun');
         }
         // SUSTAINED SKILL — sustained combo 10+ through stage clear
         if ((game.combo || 0) >= 10 && typeof pushIntercept === 'function') {
-          pushIntercept('sustainedSkill');
         }
         // OBJECTIVE check on boss stage clear (Turn 183 extension)
         if (game.stageObjective) {
@@ -16081,7 +15976,6 @@ function checkStageComplete() {
       // SIGNAL INTERCEPT — first CHALLENGING clear of run is a distinct milestone
       if (!game._challengeFirstSeen && typeof pushIntercept === 'function') {
         game._challengeFirstSeen = true;
-        pushIntercept('firstChallenge');
       }
       // OBJECTIVE check on challenging stage clear (Turn 183 extension)
       if (game.stageObjective) {
@@ -16160,11 +16054,9 @@ function checkStageComplete() {
           // CLEAN RUN streak — 5 consecutive no-death clears triggers intercept
           game._stagesCleanStreak = game.stageDied ? 0 : ((game._stagesCleanStreak || 0) + 1);
           if (game._stagesCleanStreak === 5 && typeof pushIntercept === 'function') {
-            pushIntercept('cleanRun');
           }
           // SUSTAINED SKILL — sustained combo 10+ through stage clear (PLAYING variant)
           if ((game.combo || 0) >= 10 && typeof pushIntercept === 'function') {
-            pushIntercept('sustainedSkill');
           }
           // SECONDARY OBJECTIVE check (visual reward when met, miss hint when not)
           if (game.stageObjective && game.stageObjective.met(game)) {
@@ -16365,7 +16257,6 @@ function checkStageComplete() {
                 if (typeof playSound === 'function') playSound('milestone');
                 // SIGNAL INTERCEPT — sustained S/A grade excellence at streak 5+
                 if (game.aceStreak === 5 && typeof pushIntercept === 'function') {
-                  pushIntercept('aceMaster');
                 }
               }
             } else {
@@ -16767,11 +16658,9 @@ function update() {
         if (typeof pushIntercept === 'function') pushIntercept('witchSave');
         // SIGNAL INTERCEPT — 2nd witch save in same run escalates enemy terror
         if (game.witchSaves === 2 && typeof pushIntercept === 'function') {
-          pushIntercept('witchStreak');
         }
         // SIGNAL INTERCEPT — 5th witch save: adversary acknowledges legend status
         if (game.witchSaves === 5 && typeof pushIntercept === 'function') {
-          pushIntercept('witchLegend');
         }
         // PLAYER GUARDIAN — witch save grants a temporary AI escort drone (10s)
         if (typeof spawnGuardian === 'function') spawnGuardian();
@@ -16801,7 +16690,6 @@ function update() {
       game.witchCooldown--;
       if (game.witchCooldown === 0) {
         // SIGNAL INTERCEPT — adversary notes evasion ability has reset
-        if (typeof pushIntercept === 'function') pushIntercept('witchReady');
         // WITCH READY VISUAL — short cyan shockwave around player so the reset
         // reads as a visible beat alongside the narrative INTERCEPT.
         if (game.shockwaves && game.playerAlive) {
@@ -16885,7 +16773,6 @@ function update() {
     if ((game.rapidTimer || 0) > 0 && (game.forkTimer || 0) > 0
         && !game._rapidStormSeen && typeof pushIntercept === 'function') {
       game._rapidStormSeen = true;
-      pushIntercept('rapidStorm');
     }
     // CORRUPTION VOICE — late stage (corruption > 0.4) randomly spawn distorted
     // 1-word whispers at random screen position. Adds narrative voice layer to

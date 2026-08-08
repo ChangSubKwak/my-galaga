@@ -2023,7 +2023,12 @@ section('INTERCEPT_MSG: every literal pushIntercept(id) is a defined message');
       if (km) defined.add(km[1]);
     }
   }
-  ok(closed && defined.size >= 50, 'INTERCEPT_MSG found with >= 50 keys (got ' + defined.size + ')');
+  // Enemy comms were cut 75 -> 20 in the simplification pass. The old floor of
+  // 50 encoded the bloat as a REQUIREMENT; this is now a band, with an upper
+  // bound so in-play chatter cannot creep back. Every kept beat is rare,
+  // dangerous, or needs an immediate reaction — no ambient commentary.
+  ok(closed && defined.size >= 15, 'INTERCEPT_MSG has enough beats (got ' + defined.size + ')');
+  ok(defined.size <= 24, 'INTERCEPT_MSG stays lean (<= 24, got ' + defined.size + ')');
   const refs = new Set((scriptSrc.match(/pushIntercept\('([a-zA-Z]+)'\)/g) || [])
     .map(s => s.match(/'([a-zA-Z]+)'/)[1]));
   let allDefined = true, undef = [];
@@ -3061,10 +3066,10 @@ if (typeof G.rivalCallsignFor === 'function' && typeof G.rivalStatsForLevel === 
   const IM = G.__getInterceptMsg && G.__getInterceptMsg();
   if (IM) {
     let wired = true;
-    for (const k of ['rivalSpotted', 'rivalRetreat', 'rivalDown']) {
+    for (const k of ['rivalSpotted', 'rivalDown']) {
       if (!Array.isArray(IM[k]) || IM[k].length !== 3 || IM[k].some(s => typeof s !== 'string' || !s.length)) wired = false;
     }
-    ok(wired, 'rivalSpotted/rivalRetreat/rivalDown intercepts wired with 3 variants each');
+    ok(wired, 'the surviving rival intercepts are wired with 3 variants each');
   }
 } else { console.log('  (skipped — RIVAL ACE core not exposed)'); }
 
@@ -3188,11 +3193,11 @@ if (typeof G.magpiePickTarget === 'function' && typeof G.magpieStatsForStage ===
   const IM3 = G.__getInterceptMsg && G.__getInterceptMsg();
   if (IM3) {
     let wired = true;
-    for (const k of ['magpieSpotted', 'magpieEscape', 'magpieDown']) {
+    for (const k of ['magpieSpotted']) {
       if (!Array.isArray(IM3[k]) || IM3[k].length !== 3
           || IM3[k].some(s => typeof s !== 'string' || !s.length)) wired = false;
     }
-    ok(wired, 'magpieSpotted/magpieEscape/magpieDown intercepts wired with 3 variants each');
+    ok(wired, 'the surviving magpie intercept is wired with 3 variants');
   }
 } else { console.log('  (skipped — MAGPIE helpers not exposed)'); }
 
