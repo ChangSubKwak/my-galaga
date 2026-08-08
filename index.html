@@ -296,16 +296,13 @@ function rumbleMul() { return rumbleMode === 'off' ? 0 : rumbleMode === 'low' ? 
 // Color-blind mode — adds white outlines + shape markers to enemy bullets so kind is identifiable
 // without relying on color alone.
 let colorBlindMode = localStorage.getItem('galagaColorBlind') === '1';
-// Minimal HUD — hides non-essential widgets (accuracy %, kill counter, info
-// chips, enemy-comms flavor…). DEFAULT ON (2026-07: user directive "make the
-// overall GUI very simple" — simple is the default experience; M toggles the
-// detail view back on). A user who previously toggled it off ('0') is respected.
-let minimalHud = localStorage.getItem('galagaMinimalHud') !== '0';
+// (The minimalHud DETAIL tier was deleted in the simplification pass. It was a
+// second, denser HUD hidden behind M and off by default — ~50 gated widgets
+// nobody saw. There is now one HUD, so there is nothing to toggle.)
 // GUI-simplify: INFO-tier floatTexts (score chatter, stat banners, meta callouts)
 // render only in the detail view — one shared gate instead of 35 inline ifs.
 // VITAL cues (buff expiry, LAST LIFE, SHIELD, boss phase…) keep pushing directly.
 function pushInfoText(ft) {
-  if (!minimalHud && typeof game !== 'undefined' && game && game.floatTexts) game.floatTexts.push(ft);
 }
 // NIGHT-DIMMER CACHE — preference + in-window flag refreshed at most once per
 // minute (the 22:00/06:00 boundary moves slowly); the J toggle flips the cached
@@ -4931,7 +4928,6 @@ function updateInterceptQueue() {
 
 function drawInterceptTerminal() {
   if (!game || !game.interceptQueue || game.interceptQueue.length === 0) return;
-  if (minimalHud) return; // enemy-comms flavor — hidden in the clean/minimal view
   if (game.state === STATE.TITLE || game.state === STATE.STAGE_INTRO
       || game.state === STATE.GAME_OVER || game.state === STATE.BONUS_GAME) return;
   ctx.save();
@@ -9693,15 +9689,6 @@ function initInput() {
         color: COL.cyan, life: 50, maxLife: 50, size: 8
       });
     }
-    // Minimal HUD toggle — M (hides accuracy/kills/pity/etc. for cleaner play)
-    if (k === 'm') {
-      minimalHud = !minimalHud;
-      try { localStorage.setItem('galagaMinimalHud', minimalHud ? '1' : '0'); } catch (err) {}
-      if (game) game.floatTexts.push({
-        x: BASE_W/2, y: 50, text: 'HUD: ' + (minimalHud ? 'SIMPLE' : 'DETAILED'),
-        color: '#0cf', life: 50, maxLife: 50, size: 8
-      });
-    }
     if (e.key === '[') {
       audioVolume = Math.max(0, Math.round((audioVolume - 0.1) * 10) / 10);
       ensureAudio();
@@ -12264,7 +12251,6 @@ function updatePilotTitleCache() {
         x: BASE_W/2, y: BASE_H/2 - 38, text: _newTitle,
         color: _newCol, life: 110, maxLife: 110, size: 11
       });
-      if (!minimalHud && typeof playSound === 'function') playSound('milestone');
     }
     localStorage.setItem('galagaTitleSeen', _newTitle);
   } catch (e) {}
@@ -16124,23 +16110,6 @@ function checkStageComplete() {
               rumble(220, 0.85, 0.5);
               // S GRADE CINEMATIC — detail view only (the glowing S letter on the
               // AAR panel is the reward in the simple view).
-              if (!minimalHud) {
-                if (game.shockwaves) {
-                  game.shockwaves.push({
-                    x: BASE_W/2, y: 60,
-                    life: 0, maxLife: 28, maxR: 70, color: '#fc4'
-                  });
-                  game.shockwaves.push({
-                    x: BASE_W/2, y: 60,
-                    life: -8, maxLife: 22, maxR: 50, color: '#ff4'
-                  });
-                }
-                if (typeof spawnConfetti === 'function') spawnConfetti(16);
-                pushInfoText({
-                  x: BASE_W/2, y: 84, text: 'PERFECT!',
-                  color: '#fff', life: 100, maxLife: 100, size: 6
-                });
-              }
             }
             // Persist grade-tier counters for PROFILE page display
             try {
@@ -16612,23 +16581,6 @@ function update() {
     // CORRUPTION VOICE — late stage (corruption > 0.4) randomly spawn distorted
     // 1-word whispers at random screen position. Adds narrative voice layer to
     // the existing purely-visual worldCorruption system. Score-neutral.
-    if (!minimalHud && game.stage >= 50 && game.playerAlive
-        && (isCombatState())) {
-      // Spawn chance ramps from 0.0008 at stage 50 to 0.004 at stage 80 (~once per 4-15s)
-      const _voiceChance = Math.min(0.006, 0.0008 + (game.stage - 50) * 0.00013);
-      if (Math.random() < _voiceChance) {
-        const _voiceWords = ['STATIC', 'WHO?', 'WAKE.', 'WRONG', 'ECHO', 'HOLLOW',
-                             'TURN BACK', 'REMEMBER', '01010', 'INSIDE', 'NULL',
-                             'COLD', 'WATCHING', 'EMPTY'];
-        const _w = _voiceWords[randInt(_voiceWords.length)];
-        const _vx = 30 + Math.random() * (BASE_W - 60);
-        const _vy = 40 + Math.random() * (BASE_H - 80);
-        const _vc = Math.random() < 0.5 ? '#f48' : '#0cf';
-        game.floatTexts.push({
-          x: _vx, y: _vy, text: _w, color: _vc, life: 50, maxLife: 50, size: 5
-        });
-      }
-    }
     // Camera FX timers — moved out of draw() so they tick at simulation rate (60Hz)
     // instead of render rate (varies by monitor: 60/120/144Hz), keeping their
     // durations refresh-rate independent.
@@ -17166,42 +17118,11 @@ function draw() {
   // DRIFT EMBERS — at stage 50+, slow upward red/orange particles drift across
   // screen to amplify the deep-territory pressure. Deterministic positions
   // derived from animFrame so they self-reset cleanly on state change.
-  if (!minimalHud && (game.stage || 0) >= 50
-      && game.state !== STATE.PAUSED && game.state !== STATE.TITLE && game.state !== STATE.GAME_OVER) {
-    const _emT = game.animFrame;
-    ctx.save();
-    for (let _ei = 0; _ei < 5; _ei++) {
-      const _ex = ((_ei * 53 + _emT * 0.05) % BASE_W);
-      const _ey = (BASE_H - ((_ei * 71 + _emT * 0.25) % (BASE_H + 20)));
-      ctx.globalAlpha = 0.30 + 0.15 * Math.sin((_emT + _ei * 17) * 0.04);
-      ctx.fillStyle = _ei % 2 === 0 ? '#f80' : '#f44';
-      ctx.fillRect(Math.round(_ex), Math.round(_ey), 1, 1);
-    }
-    ctx.restore();
-  }
   // AMBIENT EVENTS — narrative one-shots (cargo ship traversal, supernova flash).
   // Drawn after biome but before aurora/stars so engine glow / silhouette read clearly.
   drawAmbientEvent();
   // Aurora streaks — only during BOSS_STAGE for added drama. Detail view only
   // (GUI-simplify: ambient chrome; the boss arena reads cleaner without it).
-  if (!minimalHud && game.state === STATE.BOSS_STAGE) {
-    const t = game.animFrame;
-    // Noir crimson aurora — boss-stage ominous heat in the Ink Noir palette
-    // (was three blues #48f/#8af/#a8f, replaced to match the crimson frame glow).
-    const auroraCols = ['#933', '#a55', '#864'];
-    ctx.save();
-    for (let band = 0; band < 3; band++) {
-      ctx.globalAlpha = 0.08 + 0.04 * Math.sin(t * 0.025 + band * 1.7);
-      ctx.fillStyle = auroraCols[band];
-      const yBase = 18 + band * 9;
-      for (let x = 0; x < BASE_W; x += 2) {
-        const wave = Math.sin(x * 0.05 + t * 0.04 + band * 1.3) * 5;
-        const h = 6 + 3 * Math.sin(x * 0.07 - t * 0.03 + band);
-        ctx.fillRect(x, yBase + wave, 2, h);
-      }
-    }
-    ctx.restore();
-  }
   // STARFIELD COMBAT MOOD — compute tint once per frame from game state.
   // Witch (cold cyan) overrides; otherwise boss-phase-2 + last-life paint a
   // hostile red, while a 3× combo (≥20) paints a warm gold. drawStar reads
@@ -17349,25 +17270,6 @@ function draw() {
   // border diluted the semantics of transient danger borders; the stage label's
   // tier colour already encodes depth.)
   // High-combo edge glow — detail view only (edges mean DANGER in the simple view)
-  if (!minimalHud && game.combo >= 30 && (isCombatState())) {
-    const tierCol = game.combo >= 60 ? '#f6f' : game.combo >= 45 ? '#f80' : '#ff4';
-    ctx.save();
-    const pulse = 0.55 + 0.35 * Math.sin(game.animFrame * 0.22);
-    ctx.globalAlpha = pulse * 0.35;
-    ctx.fillStyle = tierCol;
-    // Top + bottom + left + right thick borders
-    ctx.fillRect(-10, -10, BASE_W + 20, 4);
-    ctx.fillRect(-10, BASE_H - 4, BASE_W + 20, 14);
-    ctx.fillRect(-10, -10, 4, BASE_H + 20);
-    ctx.fillRect(BASE_W - 4, -10, 14, BASE_H + 20);
-    // Softer second band
-    ctx.globalAlpha = pulse * 0.18;
-    ctx.fillRect(-10, 4, BASE_W + 20, 4);
-    ctx.fillRect(-10, BASE_H - 8, BASE_W + 20, 4);
-    ctx.fillRect(4, -10, 4, BASE_H + 20);
-    ctx.fillRect(BASE_W - 8, -10, 4, BASE_H + 20);
-    ctx.restore();
-  }
 
   // Slow-time cyan tint (subtle, full-screen) + radial vignette
   if ((game.slowTimer || 0) > 0) {
@@ -17440,104 +17342,12 @@ function draw() {
       // Corruption SUB-LAYERS (edge noise / RGB bleed / glitch bars / violet pulse /
       // overscan) — detail view only; the base dark vignette above IS the corruption
       // identity in the simple view.
-      if (!minimalHud) {
-      // Edge noise — random corrupted pixels at screen edges. Density scales with corr.
-      const noiseCount = Math.floor(corr * 30);
-      ctx.globalAlpha = 0.45;
-      for (let i = 0; i < noiseCount; i++) {
-        const onLeft = Math.random() < 0.5;
-        const x = onLeft ? Math.random() * 12 : BASE_W - Math.random() * 12;
-        const y = Math.random() * BASE_H;
-        ctx.fillStyle = (Math.random() < 0.5) ? '#f44' : '#0cf';
-        ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
-      }
-      // Edge color bleed — RGB-split-style hint at vertical edges
-      if (corr > 0.2) {
-        ctx.globalAlpha = 0.04 + corr * 0.06;
-        ctx.fillStyle = '#f22';
-        ctx.fillRect(0, 0, 4, BASE_H);
-        ctx.fillStyle = '#0cf';
-        ctx.fillRect(BASE_W - 4, 0, 4, BASE_H);
-      }
-      // Glitch bars — rare horizontal displacement effect. Trigger every ~6s for ~1s.
-      if (corr > 0.4) {
-        const cycleLen = Math.max(180, Math.floor(360 - corr * 240));
-        const cycleProg = t % cycleLen;
-        const isGlitching = cycleProg < 60;
-        if (isGlitching) {
-          const intensity = 1 - cycleProg / 60;
-          ctx.globalAlpha = 0.35 * intensity;
-          // Pseudo-random bars based on cycle phase so the same glitch holds for a few frames
-          const seed = Math.floor(t / cycleLen);
-          const barCount = Math.floor(corr * 4);
-          for (let b = 0; b < barCount; b++) {
-            const yPos = ((seed * 73 + b * 137) % BASE_H);
-            const h = 1 + ((seed * 31 + b * 17) % 3);
-            ctx.fillStyle = (b & 1) ? '#fff' : '#000';
-            ctx.fillRect(0, yPos, BASE_W, h);
-          }
-        }
-      }
-      // Subtle pulse vignette at very high corruption — dims corners with red-shift.
-      if (corr > 0.7) {
-        ctx.globalAlpha = (corr - 0.7) * 0.3 * (0.5 + 0.5 * Math.sin(t * 0.04));
-        ctx.fillStyle = '#400';
-        ctx.fillRect(0, 0, BASE_W, 6);
-        ctx.fillRect(0, BASE_H - 6, BASE_W, 6);
-      }
-      // CORRUPTION DEEP PULSE — at corr > 0.5, periodic violet vignette pulse
-      // (every ~5 sec, 18-frame fade). Adds 'something is here' atmospheric
-      // pressure beyond static edge effects.
-      if (corr > 0.5) {
-        const _dpCyc = 300; // ~5s at 60fps
-        const _dpPos = t % _dpCyc;
-        if (_dpPos < 18) {
-          const _dpA = (1 - _dpPos / 18) * (corr - 0.5) * 0.45;
-          ctx.globalAlpha = _dpA;
-          ctx.fillStyle = '#618';
-          ctx.fillRect(0, 0, BASE_W, BASE_H);
-        }
-      }
-      // OVERSCAN GLITCH — 1-2 frame horizontal "vsync drop" white line at random
-      // y, briefly. Fires ~once every 2-4 seconds at stage 70+, more often near 80.
-      // Pure aesthetic noise — sells the "deep instability" tone of the late game.
-      if (corr > 0.6) {
-        const cyc = Math.max(120, Math.floor(240 - corr * 120));
-        if (t % cyc < 2) {
-          // Use cycle index as deterministic position for a stable 2-frame line
-          const cycIdx = Math.floor(t / cyc);
-          const yLine = (cycIdx * 53 + 17) % BASE_H;
-          ctx.globalAlpha = 0.55;
-          ctx.fillStyle = '#fff';
-          ctx.fillRect(0, yLine, BASE_W, 1);
-          ctx.globalAlpha = 0.35;
-          ctx.fillRect(0, yLine + 1, BASE_W, 1);
-        }
-      }
-      }
       ctx.restore();
     }
   }
   // BIG COMBO LOST vignette — gray screen-edge fade when a 10+ combo breaks. Reads
   // as visual weight to the loss. Falls under scanline overlay so it doesn't
   // permanently darken the playfield.
-  if (!minimalHud && (game.comboLostVignette || 0) > 0) {
-    const v = game.comboLostVignette;
-    const vRatio = v / 60;
-    ctx.save();
-    ctx.globalAlpha = 0.45 * vRatio;
-    ctx.fillStyle = '#222';
-    // Top + bottom bands fade in
-    ctx.fillRect(0, 0, BASE_W, 18);
-    ctx.fillRect(0, BASE_H - 18, BASE_W, 18);
-    // Side bands
-    ctx.fillRect(0, 0, 12, BASE_H);
-    ctx.fillRect(BASE_W - 12, 0, 12, BASE_H);
-    // Inner subtle wash
-    ctx.globalAlpha = 0.12 * vRatio;
-    ctx.fillRect(0, 0, BASE_W, BASE_H);
-    ctx.restore();
-  }
   // WEAPON ACTIVATION CALLOUT — pulsing screen-edge color band that fades over
   // ~0.6s when a timed weapon activates (pickup or combo arsenal). Cleaner than a
   // full-screen flash; reads as "FX armed" without obscuring the playfield.
@@ -17693,20 +17503,6 @@ function draw() {
   // biome/danger grade IS the vignette now; this was a third vignette system.)
   // DEEP STAGE FOG — additional subtle fog gradient at stage 60+. Pure visual
   // atmosphere on top of standard vignette. Animated alpha for slight breathing.
-  if (!minimalHud && game && game.stage >= 60
-      && (isCombatState())) {
-    ctx.save();
-    const fogPulse = 0.6 + 0.4 * Math.sin(game.animFrame * 0.04);
-    ctx.fillStyle = '#445';
-    for (let i = 0; i < 6; i++) {
-      ctx.globalAlpha = 0.04 * fogPulse * (1 - i / 6);
-      ctx.fillRect(0, i, BASE_W, 1);
-      ctx.fillRect(0, BASE_H - 1 - i, BASE_W, 1);
-      ctx.fillRect(i, 0, 1, BASE_H);
-      ctx.fillRect(BASE_W - 1 - i, 0, 1, BASE_H);
-    }
-    ctx.restore();
-  }
 
   // Night mode auto-dimmer — eases eye strain between 22:00 and 06:00 local time.
   // Toggle off persistently with localStorage galagaNightOff = '1'.
@@ -17859,58 +17655,10 @@ function drawTitleScreen() {
   // 2-letter codes on one row. ALL SHIPS / ALL DIFFICULTIES / ALL BIOMES /
   // BESTIARY text labels removed — the colored dot rows below the logo
   // already communicate that progression visually, avoiding duplication.
-  try {
-    if (minimalHud) throw 0; // detail view only (GUI-simplify: trophy strip)
-    const _gcCnt = parseInt(localStorage.getItem('galagaGameCompleteCount') || '0', 10) || 0;
-    const _achAll = (typeof unlockedAchievements !== 'undefined' && typeof ACHIEVEMENTS !== 'undefined'
-                    && unlockedAchievements.size >= Object.keys(ACHIEVEMENTS).length);
-    const _csNp = (typeof loadCumStats === 'function') ? loadCumStats(false) : {};
-    const _csCp = (typeof loadCumStats === 'function') ? loadCumStats(true) : {};
-    const _psPm = Math.max(_csNp.parryStreakBest || 0, _csCp.parryStreakBest || 0);
-    const _cbEver = parseInt(localStorage.getItem('galagaMaxComboEver') || '0', 10) || 0;
-    const _lr = Math.max(_csNp.longestRun || 0, _csCp.longestRun || 0);
-    const _trophies = [];
-    if (_gcCnt > 0) {
-      _trophies.push({ text: _gcCnt >= 5 ? '★3' : _gcCnt >= 2 ? '★2' : '★', col: '#fc4' });
-    }
-    if (_achAll) {
-      _trophies.push({ text: '100%', col: '#fc4' });
-    }
-    if (_psPm >= 10) _trophies.push({ text: 'PM', col: '#fff' });
-    if (_cbEver >= 50) _trophies.push({ text: _cbEver >= 100 ? 'CG' : 'CL', col: _cbEver >= 100 ? '#fc4' : '#fff' });
-    if (_lr >= 54000) _trophies.push({ text: _lr >= 216000 ? 'IP' : _lr >= 108000 ? 'MR' : 'LR',
-                                        col: _lr >= 216000 ? '#fc4' : _lr >= 108000 ? '#fff' : '#aaa' });
-    if (_trophies.length > 0) {
-      const _gap = 8;
-      const _slotW = 16;  // fixed slot width keeps spacing uniform
-      const _trTotal = _trophies.length * _slotW + (_trophies.length - 1) * _gap;
-      let _trX = BASE_W/2 - _trTotal/2 + _slotW/2;
-      for (const _e of _trophies) {
-        drawRetroText(_e.text, _trX, 22, 5, _e.col, 'center');
-        _trX += _slotW + _gap;
-      }
-    }
-  } catch (e) {}
   // (ALL SHIPS / ALL DIFFICULTIES / ALL BIOMES / BESTIARY / 100% ACH /
   // PARRY MASTER / COMBO LEGEND text badges removed — consolidated into the
   // trophy row above. Dot rows below still cover the categorical progression.)
   // COMPOSITE COMPLETION % — weighted aggregate via shared helper.
-  if (!minimalHud && typeof computeCompositeCompletion === 'function') {
-    const _comp = computeCompositeCompletion();
-    if (_comp >= 5) {
-      const _cmpCol = _comp >= 80 ? '#fc4' : _comp >= 50 ? '#fff' : _comp >= 20 ? '#aaa' : '#888';
-      drawRetroText('CMPL ' + _comp + '%', BASE_W/2, 94, 4, _cmpCol, 'center');
-      // Mini bar under text
-      ctx.save();
-      const _cbW = 40, _cbX = BASE_W/2 - _cbW/2, _cbY = 99;
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillRect(_cbX, _cbY, _cbW, 1);
-      ctx.fillStyle = _cmpCol;
-      ctx.globalAlpha = 0.8;
-      ctx.fillRect(_cbX, _cbY, Math.round(_cbW * _comp / 100), 1);
-      ctx.restore();
-    }
-  }
   // PERKS DOTS — 10 dots showing perks tried at least once (lifetime).
   try {
     const _pkRaw = localStorage.getItem('galagaPerkPicks') || '{}';
@@ -18034,25 +17782,8 @@ function drawTitleScreen() {
 
   // Demo enemy flyby across the band between borders — detail view only
   const flybyTypes = [drawBee, drawButterfly, drawBoss];
-  for (let i = 0; i < (minimalHud ? 0 : 4); i++) {
-    const cycle = 280;
-    const phase = (t + i * 70) % cycle;
-    const fx = (phase / cycle) * (BASE_W + 40) - 20;
-    const fy = 100 + Math.sin(phase * 0.04 + i * 1.3) * 6;
-    const fn = flybyTypes[i % flybyTypes.length];
-    if (fn === drawBoss) fn(fx, fy, t >> 4, false);
-    else fn(fx, fy, t >> 4);
-  }
 
   // Score legend — detail view only (GUI-simplify)
-  if (!minimalHud) {
-    drawBee(BASE_W/2 - 50, 140, t >> 4);
-    drawRetroText('= 50 PTS', BASE_W/2 + 10, 140, 8, COL.white, 'left');
-    drawButterfly(BASE_W/2 - 50, 160, t >> 4);
-    drawRetroText('= 80 PTS', BASE_W/2 + 10, 160, 8, COL.white, 'left');
-    drawBoss(BASE_W/2 - 50, 182, t >> 4, false);
-    drawRetroText('= 150 PTS', BASE_W/2 + 10, 182, 8, COL.white, 'left');
-  }
 
   if (game.titleBlink % 60 < 40) {
     const sCol = challengeModeRequested ? COL.red : dailyModeRequested ? COL.green : COL.cyan;
@@ -18065,17 +17796,6 @@ function drawTitleScreen() {
   // ACH count above and the BGM tag below. Hidden on first-ever run / daily mode.
   // A PB run tints the whole line gold-blink + stars it (replaces the old
   // separate centered ★ PB badge).
-  try {
-    const _lrRaw = (!minimalHud) ? localStorage.getItem('galagaLastRun') : null;
-    if (_lrRaw && !callsignInput.active && !dailyModeRequested) {
-      const _lr = JSON.parse(_lrRaw);
-      if (_lr && _lr.stage > 0) {
-        const _lrStr = (_lr.wasPb ? '★ ' : '') + 'LAST S' + _lr.stage + ' ' + fmtScore(_lr.score) + ' C×' + _lr.combo;
-        const _lrCol = _lr.wasPb ? ((t >> 2) % 2 === 0 ? '#fc4' : '#ff8') : '#555';
-        drawRetroText(_lrStr, 4, BASE_H - 14, 4, _lrCol, 'left');
-      }
-    }
-  } catch (e) {}
   // INPUT DEVICE ICON — detect gamepad / touch / keyboard at draw time.
   // Small label corner-bottom-right. Defaults to KBD when no other signal.
   // (GUI-simplify DELETE: the input-device icon — an always-on 'KBD' default was
@@ -18086,32 +17806,6 @@ function drawTitleScreen() {
   // TITLE TIPS ROTATION — bottom hint area cycles gameplay reminders every
   // 216 frames (3.6s). Hidden during callsign editor and in daily mode (daily
   // extras at y=266/272 reuse that slot).
-  if (!minimalHud && !callsignInput.active && !dailyModeRequested) {
-    const _titleTips = [
-      'SHIFT TO DASH',
-      'DASH THRU BULLETS = PARRY',
-      'DASH MANY BULLETS = CLUSTER PARRY',
-      'CHAIN 5 KILLS = X1.5 SCORE',
-      'GRAB S / N / P TO POWER UP',
-      'BOSS EVERY 10 STAGES',
-      'CHALLENGE STAGE EVERY 4',
-      'FIRE SKIPS STAGE INTRO',
-      'TAP FIRE TO STOP BONUS SLOTS',
-      'AVENGE THE TYPE THAT KILLS YOU',
-      'TAB FOR STATS',
-      'P / ESC TO PAUSE',
-      'U TO EDIT CALLSIGN'
-    ];
-    const _ttIdx = Math.floor(game.animFrame / 216) % _titleTips.length;
-    const _ttLocal = (game.animFrame % 216);
-    const _ttAlpha = _ttLocal < 30 ? _ttLocal / 30
-                  : _ttLocal > 186 ? Math.max(0, 1 - (_ttLocal - 186) / 30)
-                  : 1;
-    ctx.save();
-    ctx.globalAlpha = _ttAlpha * 0.65;
-    drawRetroText(_titleTips[_ttIdx], BASE_W/2, 266, 4, '#888');
-    ctx.restore();
-  }
   // PILOT CALLSIGN — shown below the title, swaps to live editor when active.
   // Editor: 3 letter boxes, current slot highlighted + arrow hints.
   if (callsignInput.active) {
@@ -18225,85 +17919,11 @@ function drawTitleScreen() {
   // Hidden while editing the callsign (the editor's CALLSIGN label at y=220 +
   // letter slots at y=228 sit right on top of the TOP SCORES header at y=222 and
   // the score rows at y=230+, so the editor needs this space to itself).
-  if (!callsignInput.active && minimalHud) {
+  if (!callsignInput.active) {
     // Simple view: the top-5 table collapses to a single HI line (GUI-simplify).
     drawRetroText('HI ' + fmtScore(game.highScore || 0), BASE_W/2, 222, 6, COL.red);
   }
-  if (!callsignInput.active && !minimalHud) {
-  const showMode = dailyModeRequested ? 'daily'
-                : challengeModeRequested ? 'challenge'
-                : 'normal';
-  const topHeader = showMode === 'daily'     ? 'TOP SCORES (DAILY)'
-                  : showMode === 'challenge' ? 'TOP SCORES (CHALLENGE)'
-                  : 'TOP SCORES';
-  const topHeaderCol = showMode === 'daily' ? COL.green : COL.red;
-  drawRetroText(topHeader, BASE_W/2, 222, 6, topHeaderCol);
-  // DAILY MODIFIER preview — shows today's deterministic modifier so players know
-  // what they're signing up for before pressing Start.
-  if (dailyModeRequested) {
-    // Daily extras live BELOW the score rows (which now end at y=258) and
-    // replace the tips rotation slot. Two compact rows so no overlap with
-    // mode toggles (y=200), PILOT (y=208), or TOP SCORES header (y=222).
-    const seed = (typeof dailySeed === 'function' ? dailySeed() : 0) | 0;
-    const dailyMod = STAGE_MUTATIONS[seed % STAGE_MUTATIONS.length];
-    const streak = computeDailyStreak();
-    if (streak >= 1) {
-      const streakCol = streak >= 30 ? '#fc4' : streak >= 7 ? '#0f8' : '#cfc';
-      drawRetroText('STREAK ' + streak + 'D', BASE_W/2 - 50, 266, 4, streakCol, 'center');
-    }
-    if (dailyMod) {
-      const blink = blinkPhase(3) ? dailyMod.color : '#fff';
-      drawRetroText('TODAY ' + dailyMod.label, BASE_W/2 + 20, 266, 4, blink, 'center');
-    }
-    if (typeof dailySeedCode === 'function') {
-      drawRetroText('SEED ' + dailySeedCode(), BASE_W/2 - 50, 272, 4, '#f6f', 'center');
-    }
-    if (typeof dailyMission === 'function') {
-      const m = dailyMission();
-      const done = (typeof isDailyMissionDoneToday === 'function') && isDailyMissionDoneToday();
-      const mLabel = (done ? 'DONE ' : 'GOAL ') + m.label;
-      const mCol = done ? '#0f8' : '#fc4';
-      drawRetroText(mLabel, BASE_W/2 + 20, 272, 4, mCol, 'center');
-    }
-  }
-  const topList = loadTopScores(showMode);
-  const startY = 230;
-  for (let i = 0; i < 5; i++) {
-    const e = topList[i];
-    const rowY = startY + i * 7;
-    const rowCol = i === 0 ? COL.yellow : (i < 3 ? '#fff' : COL.gray);
-    if (e) {
-      // SELF HIGHLIGHT — if this entry's callsign matches the current pilot, draw
-      // a soft yellow background band and a ▶ marker. Makes self-identification
-      // immediate on the leaderboard.
-      const isMine = e.callsign && e.callsign === playerCallsign;
-      if (isMine) {
-        ctx.save();
-        ctx.globalAlpha = 0.18 + 0.08 * Math.sin(game.animFrame * 0.18);
-        ctx.fillStyle = '#fc4';
-        ctx.fillRect(BASE_W/2 - 72, rowY - 3, 152, 7);
-        ctx.restore();
-        // ▶ marker on the left
-        drawRetroText('>', BASE_W/2 - 73, rowY, 6, '#fc4', 'left');
-      }
-      // Crown for #1 (red crown for challenge mode king)
-      if (i === 0) drawCrown(BASE_W/2 - 70, rowY, showMode === 'daily' ? COL.green : showMode === 'challenge' ? COL.red : COL.yellow);
-      drawRetroText('#' + (i + 1), BASE_W/2 - 62, rowY, 6, rowCol, 'left');
-      // CALLSIGN — 3-letter monogram (or '???' for legacy entries pre-callsign system)
-      const cs = e.callsign || '???';
-      const csCol = cs === '???' ? COL.gray : (isMine ? '#ff4' : '#fc4');
-      drawRetroText(cs, BASE_W/2 - 44, rowY, 6, csCol, 'left');
-      drawRetroText(fmtScore(e.score), BASE_W/2 - 22, rowY, 6, rowCol, 'left');
-      drawRetroText('S' + e.stage, BASE_W/2 + 26, rowY, 6, rowCol, 'left');
-      if (typeof e.accuracy === 'number' && e.accuracy > 0) {
-        drawRetroText(e.accuracy + '%', BASE_W/2 + 46, rowY, 6, rowCol, 'left');
-      }
-    } else {
-      drawRetroText('#' + (i + 1), BASE_W/2 - 62, rowY, 6, rowCol, 'left');
-      drawRetroText('---', BASE_W/2 - 22, rowY, 6, rowCol, 'left');
-    }
-  }
-  } // end !callsignInput.active (TOP SCORES block)
+// end !callsignInput.active (TOP SCORES block)
 
   // Controls hint (two compact lines at the bottom)
   drawRetroText('ARROWS MOVE   SPACE FIRE', BASE_W/2, BASE_H - 14, 6, COL.gray);
@@ -18324,11 +17944,6 @@ function drawTitleScreen() {
   }
   // Tiny build/version mark + total achievements unlocked indicator
   // (GUI-simplify DELETE: the 'GAM-42' faux version mark — decorative lore noise.)
-  if (!minimalHud) { // detail view only (GUI-simplify: meta counter)
-    const ach = unlockedAchievements ? unlockedAchievements.size : 0;
-    const total = Object.keys(ACHIEVEMENTS).length;
-    drawRetroText('ACH ' + ach + '/' + total, 4, BASE_H - 22, 5, COL.faint, 'left');
-  }
   // Setting-change toasts (DIFFICULTY / SHAKE / RUMBLE / COLORBLIND / etc.) — visible feedback
   // when the player toggles a global setting from the title screen.
   if (game.floatTexts) for (const ft of game.floatTexts) drawFloatText(ft);
@@ -18887,128 +18502,6 @@ function drawStageIntro() {
   }
   // STAGE_INTRO STATUS PANEL — stat columns only on non-boss, non-challenge stages.
   // Boss stages get a full cinematic intro below; challenge stages get mission brief.
-  if (!minimalHud && slide >= 1 && !isBoss && !isChallenge) {
-    // ---- LEFT COLUMN ---- (detail view only — GUI-simplify)
-    // Callsign + rank
-    if (playerCallsign && playerCallsign !== '???') {
-      drawRetroText('[' + playerCallsign + ']', 4, BASE_H/2 - 18, 5, '#999', 'left');
-      if (typeof computePilotTitle === 'function') {
-        const _ptl = computePilotTitle();
-        const _ptCol = typeof pilotTitleColor === 'function' ? pilotTitleColor(_ptl) : '#666';
-        // ACE PILOT (peak tier) picks up a white glow — matches GAME_OVER ACE
-        // PILOT glow for pilot-progression peak-tier visual cohesion.
-        ctx.save();
-        if (_ptl === 'ACE PILOT') {
-          ctx.shadowColor = _ptCol;
-          ctx.shadowBlur = 4;
-        }
-        drawRetroText(_ptl, 4, BASE_H/2 - 11, 4, _ptCol, 'left');
-        ctx.restore();
-      }
-    }
-    // (GUI-simplify DELETE: intro S/N/P row — the HUD power gems are canonical.)
-    // Shield charges
-    if ((game.shieldCharges || 0) > 0) {
-      drawRetroText('E x' + game.shieldCharges, 4, BASE_H/2 + 6, 4, '#0f8', 'left');
-    }
-    // (GUI-simplify DELETE: intro LIVES row — the HUD lives row is canonical.)
-    // Active perk — 4th row in left status column (only when a perk is held).
-    // Short label (first word) so it fits the narrow left margin alongside the
-    // other status lines. Color taken from the perk definition for identity.
-    // (GUI-simplify DELETE: intro perk short label — the full 'PERK: name' line at
-    // the bottom of the intro is canonical.)
-    // DECLUTTER: the "recent grades trend" (last-3 D-B-A) chip was removed from the
-    // intro — historical reflection, not next-stage planning; lives in the stats overlay.
-    // CLEAN STREAK chip — consecutive no-death stages. Green at ≥ 2, picks up
-    // a small glow at ≥ 5 (high-tier mastery threshold). Sits below recent
-    // grades on the LEFT column.
-    if ((game.cleanStreak || 0) >= 2) {
-      ctx.save();
-      if (game.cleanStreak >= 5) {
-        ctx.shadowColor = '#0f8';
-        ctx.shadowBlur = 4;
-      }
-      drawRetroText('CLEAN x' + game.cleanStreak, 4, BASE_H/2 + 34, 4, '#0f8', 'left');
-      ctx.restore();
-    }
-
-    // ---- RIGHT COLUMN ----
-    // Ship sprite + name
-    if (typeof drawPlayer === 'function') {
-      const _sCol = (game.ship && game.ship.color) || '#0cf';
-      drawPlayer(BASE_W - 28, BASE_H/2 - 18, _sCol, game.lvl);
-    }
-    if (game.ship && game.ship.name) {
-      drawRetroText(game.ship.name, BASE_W - 4, BASE_H/2 - 11, 4, game.ship.color || '#0cf', 'right');
-    }
-    // Active buff (single highest-priority)
-    {
-      let _bp = null, _bpCol = '#fff';
-      if ((game.laserTimer  || 0) > 0)      { _bp = 'LASER';  _bpCol = POWERUP_COL.L; }
-      else if ((game.forkTimer  || 0) > 0)  { _bp = 'FORK';   _bpCol = POWERUP_COL.F; }
-      else if ((game.homingTimer || 0) > 0) { _bp = 'HOMING'; _bpCol = POWERUP_COL.H; }
-      else if ((game.waveTimer   || 0) > 0) { _bp = 'WAVE';   _bpCol = POWERUP_COL.W; }
-      else if ((game.rapidTimer  || 0) > 0) { _bp = 'RAPID';  _bpCol = POWERUP_COL.R; }
-      else if ((game.slowTimer   || 0) > 0) { _bp = 'SLOW';   _bpCol = POWERUP_COL.T; }
-      if (_bp) drawRetroText(_bp, BASE_W - 4, BASE_H/2 - 4, 4, _bpCol, 'right');
-    }
-    // High score — glows yellow once the current run crosses 80% of the
-    // record (proximity), with a stronger glow when the run has already
-    // beaten/matched the record (hold tier).
-    if ((game.highScore || 0) > 0) {
-      const _hiOver = (game.score || 0) >= game.highScore;
-      const _hiNear = !_hiOver && (game.score || 0) / game.highScore >= 0.8;
-      ctx.save();
-      if (_hiOver) {
-        ctx.shadowColor = '#ff4';
-        ctx.shadowBlur = 7;
-      } else if (_hiNear) {
-        ctx.shadowColor = '#ff4';
-        ctx.shadowBlur = 4;
-      }
-      drawRetroText('HI ' + fmtScore(game.highScore), BASE_W - 4, BASE_H/2 + 4, 4, '#fc4', 'right');
-      ctx.restore();
-    }
-    // Run accuracy (when sample is meaningful). 90%+ also picks up a soft
-    // shadow glow so the high-skill threshold reads as a reward, not just a
-    // color shift. Mirrors HIGH SCORE PROXIMITY glow pattern.
-    if (game.stats && (game.stats.shotsFired || 0) >= 10) {
-      const _accInt = Math.round((game.stats.shotsHit / game.stats.shotsFired) * 100);
-      const _accCol = _accInt >= 90 ? '#0f8' : _accInt >= 70 ? '#0ff' : _accInt >= 50 ? '#fc4' : '#f88';
-      // ACC apex tier (95%+) is the S-grade threshold — picks up a stronger
-      // glow than the standard 90%+ green to surface peak-accuracy hold.
-      ctx.save();
-      if (_accInt >= 95) {
-        ctx.shadowColor = _accCol;
-        ctx.shadowBlur = 7;
-      } else if (_accInt >= 90) {
-        ctx.shadowColor = _accCol;
-        ctx.shadowBlur = 4;
-      }
-      drawRetroText('ACC ' + _accInt + '%', BASE_W - 4, BASE_H/2 + 11, 4, _accCol, 'right');
-      ctx.restore();
-    }
-    // Previous stage grade — high tiers (S/SS/A) get a soft glow so player
-    // reads "ace performance carried in" before the new stage begins. Lower
-    // grades render plain for clarity.
-    if (game.lastStageGrade) {
-      const _isHi = game.lastStageGrade === 'SS'
-                 || game.lastStageGrade === 'S'
-                 || game.lastStageGrade === 'A';
-      ctx.save();
-      if (_isHi) {
-        ctx.shadowColor = game.lastStageGradeCol || '#fff';
-        ctx.shadowBlur = 6;
-      }
-      drawRetroText('PREV ' + game.lastStageGrade, BASE_W - 4, BASE_H/2 + 18, 4,
-                    game.lastStageGradeCol || '#fff', 'right');
-      ctx.restore();
-    }
-    // DECLUTTER: the stage-PB row ("PB 12.3" / "NO PB YET") and the previous-clear-
-    // time row ("PRV …") were removed from the intro — speed-reflection stats that
-    // crowded the right column; the per-stage clear time still shows on the
-    // after-action report at stage end.
-  }
   // CHALLENGING STAGE MISSION BRIEF — for challenge intros, replace generic
   // stat columns with a tactical briefing panel: wave count, unit total,
   // objective line, and an 8-pip sequential wave preview.
@@ -19256,51 +18749,10 @@ function drawStageIntro() {
 
   // SYNERGY DISTANCE HINT — show OVERLOAD/BLINK/HEAVY distance when no synergy
   // is active. Helps the player prioritize pickups (e.g., "OVERLOAD: +1 N").
-  if (!minimalHud && slide >= 1 && game.lvl && !game.activeSynergy) {
-    const lvS = game.lvl.S || 1, lvN = game.lvl.N || 1, lvP = game.lvl.P || 1;
-    // Compute distances; only show if very close (need ≤2 total upgrades)
-    const distOverload = Math.max(0, 5 - lvS) + Math.max(0, 3 - lvN) + Math.max(0, 3 - lvP);
-    const distBlink    = Math.max(0, 5 - lvS) + Math.max(0, lvN - 1) + Math.max(0, lvP - 1);
-    const distHeavy    = Math.max(0, lvS - 1) + Math.max(0, lvN - 1) + Math.max(0, 3 - lvP);
-    let closest = null, closeName = '', closeDist = 99;
-    if (distOverload < closeDist) { closest = 'OVERLOAD'; closeDist = distOverload; closeName = 'OVERLOAD'; }
-    if (distBlink < closeDist)    { closest = 'BLINK';    closeDist = distBlink;    closeName = 'BLINK'; }
-    if (distHeavy < closeDist)    { closest = 'HEAVY';    closeDist = distHeavy;    closeName = 'HEAVY'; }
-    if (closest && closeDist > 0 && closeDist <= 2) {
-      const sCol = closest === 'OVERLOAD' ? '#fc4' : closest === 'BLINK' ? '#0ff' : '#f8a';
-      drawRetroText(closeName + ' IN ' + closeDist + ' MORE', BASE_W/2, BASE_H - 52, 4, sCol);
-    }
-  }
 
   // POWER CARRY-OVER — small S/N/P readout + active WEAPON SYNERGY label so the
   // player can plan pickup priorities for the new stage from the intro alone.
   // Drawn above the pilot quote band, fades in with same slide timing.
-  if (!minimalHud && slide >= 1 && game.lvl) {
-    const lvS = game.lvl.S || 1, lvN = game.lvl.N || 1, lvP = game.lvl.P || 1;
-    const synergyLabel = game.activeSynergy
-                       ? game.activeSynergy
-                       : null;
-    const synergyCol = synergyLabel === 'OVERLOAD' ? '#fc4'
-                     : synergyLabel === 'BLINK'    ? '#0ff'
-                     : synergyLabel === 'HEAVY'    ? '#f8a' : '#888';
-    const pcY = BASE_H - 44;
-    drawRetroText('POWER', BASE_W/2 - 36, pcY, 5, '#888', 'left');
-    // S / N / P with type-specific colors. MAX cap: gold pulse on letter.
-    const _sMax = lvS >= MAX_POWER_LVL.S, _nMax = lvN >= MAX_POWER_LVL.N, _pMax = lvP >= MAX_POWER_LVL.P;
-    const _maxPulse = blinkPhase(3) ? '#fc4' : '#fff';
-    drawRetroText('S' + lvS, BASE_W/2 - 10, pcY, 6, _sMax ? _maxPulse : '#f44', 'left');
-    drawRetroText('N' + lvN, BASE_W/2 + 4,  pcY, 6, _nMax ? _maxPulse : '#0ff', 'left');
-    drawRetroText('P' + lvP, BASE_W/2 + 18, pcY, 6, _pMax ? _maxPulse : '#f6f', 'left');
-    // POWER MAX INDICATOR — small "MAX" label when all three caps reached
-    if (_sMax && _nMax && _pMax) {
-      const _mxBlink = blinkPhase(2) ? '#fc4' : '#fff';
-      drawRetroText('MAX', BASE_W/2 + 33, pcY, 5, _mxBlink, 'left');
-    }
-    if (synergyLabel) {
-      const synBlink = blinkPhase(2) ? synergyCol : '#fff';
-      drawRetroText(synergyLabel + ' BUILD', BASE_W/2, pcY + 7, 5, synBlink);
-    }
-  }
 
   // STAGE 100+ ENDLESS BANNER — major milestone in endless mode. Stage 100/150/200
   // get a special "ENDLESS LEGEND" gold blink at top so the player knows they
@@ -19352,14 +18804,6 @@ function drawStageIntro() {
   // STAGE INTRO MARATHON PROGRESS — when no-death stage streak ≥ 2, show
   // current streak + distance to next milestone (5/10/20). Encourages
   // preservation by making progress visible at stage entry.
-  if (!minimalHud && slide >= 1 && (game.zenStreak || 0) >= 2) {
-    const zs = game.zenStreak;
-    const nextMilestone = zs < 5 ? 5 : zs < 10 ? 10 : zs < 20 ? 20 : null;
-    const label = nextMilestone
-                ? 'MARATHON x' + zs + ' → x' + nextMilestone
-                : 'MARATHON x' + zs;
-    drawRetroText(label, BASE_W/2, BASE_H - 28, 4, '#fc4');
-  }
 
   // PERK COUNTDOWN — show how many stages until the next boss (= next perk
   // pick opportunity). Useful for planning around expiring perks/build state.
@@ -20769,22 +20213,6 @@ function drawGameplay() {
   }
   // STAGE INTRO STATS PEEK — top 2 run highlights at very bottom. Detail-view only
   // (GUI-simplify: meta info lives behind M).
-  if (!minimalHud && typeof pickRunHighlights === 'function') {
-    const _hl = pickRunHighlights();
-    if (_hl && _hl.length > 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.80;
-      const _peekParts = [];
-      const _peekMax = Math.min(2, _hl.length);
-      for (let i = 0; i < _peekMax; i++) {
-        const h = _hl[i];
-        _peekParts.push(h.label + ' ' + h.value);
-      }
-      const _peekStr = 'BEST: ' + _peekParts.join('  ·  ');
-      drawRetroText(_peekStr, BASE_W / 2, BASE_H - 64, 4, '#0c8', 'center');
-      ctx.restore();
-    }
-  }
   // (GUI-simplify DELETE: the STAGE INTRO INTERCEPT ECHO — an ungated double-render
   // of the already-gated enemy-comms terminal — was removed.)
   drawHUD();
@@ -21025,26 +20453,6 @@ function drawHUD() {
   // PLAYER EDGE VIGNETTE — faint cyan band on left/right when player is within
   // 20px of that edge. Alpha grows as player approaches the wall, peaking at
   // touching. Helps spatial awareness without compromising the playfield read.
-  if (!minimalHud && game.playerAlive
-      && (isCombatState())) {
-    const _edgeMax = 20;
-    const _distL = Math.max(0, game.playerX);
-    const _distR = Math.max(0, BASE_W - game.playerX);
-    if (_distL < _edgeMax) {
-      ctx.save();
-      ctx.globalAlpha = (1 - _distL / _edgeMax) * 0.25;
-      ctx.fillStyle = '#0cf';
-      ctx.fillRect(0, 0, 3, BASE_H);
-      ctx.restore();
-    }
-    if (_distR < _edgeMax) {
-      ctx.save();
-      ctx.globalAlpha = (1 - _distR / _edgeMax) * 0.25;
-      ctx.fillStyle = '#0cf';
-      ctx.fillRect(BASE_W - 3, 0, 3, BASE_H);
-      ctx.restore();
-    }
-  }
   // STAGE PROGRESS BAR — 1px high bar at top of screen showing how far into the
   // current stage the player is. Stage-type specific:
   //   PLAYING:     killed/total formation enemies
@@ -21085,33 +20493,12 @@ function drawHUD() {
     ctx.restore();
     // STAGE PROGRESS PERCENT — small N% number once progress >= 25% so the
     // player sees exact stage completion (helps "almost done" decisions).
-    if (!minimalHud && prog >= 0.25) {
-      const pct = Math.round(prog * 100);
-      drawRetroText(pct + '%', BASE_W/2, 4, 4, barCol, 'center');
-    }
   }
   // 1UP + PILOT callsign small line below (pilot identity persistent across runs).
   // Daily mode swaps red → green so the mode reads at a glance (challenge mode
   // already uses red elsewhere and keeps the standard 1UP red).
   // SIMPLE VIEW: the identity stack (blinking 1UP + [callsign] + pilot title —
   // three text items) hides; the score alone owns the top-left. Detail (M) keeps it.
-  if (!minimalHud) {
-    if (game.animFrame % 60 < 40) {
-      const _1upCol = game.dailyMode ? COL.green : COL.red;
-      drawRetroText('1UP', 28, 8, 7, _1upCol, 'center');
-    }
-    drawRetroText('[' + playerCallsign + ']', 28, 15, 5, callsignColor(), 'center');
-    // PILOT TITLE under callsign — cache maintained in update() (updatePilotTitleCache).
-    const _hudTitleCol = typeof pilotTitleColor === 'function'
-      ? pilotTitleColor(game._titleCache) : COL.gray;
-    ctx.save();
-    if (game._titleCache === 'ACE PILOT') {
-      ctx.shadowColor = _hudTitleCol;
-      ctx.shadowBlur = 4;
-    }
-    drawRetroText(game._titleCache, 28, 21, 4, _hudTitleCol, 'center');
-    ctx.restore();
-  }
 
   // MISSILE LOCK — red crosshair brackets around the player when any mega-boss is
   // within 18 frames of firing its signature pattern. Reads as "an attack is
@@ -21144,22 +20531,6 @@ function drawHUD() {
   // NEXT STAGE PREVIEW — during the end-of-stage grace window, render a small
   // preview of the upcoming stage type so the player can mentally prepare during
   // the bonus tally. Reads game.stage as still-current; next stage = stage+1.
-  if (!minimalHud && (game.stageEndGraceTimer || 0) > 30 && game.stageEndGraceTimer < 110
-      && (isCombatState())) {
-    const nextStage = (game.stage || 0) + 1;
-    const isBossNext = nextStage % BOSS_STAGE_INTERVAL === 0;
-    const isChallNext = !isBossNext && nextStage % 4 === 0;
-    const typeLabel = isBossNext ? (nextStage >= 30 ? 'SUPER BOSS' : 'BOSS')
-                    : isChallNext ? 'CHALLENGING' : 'NORMAL';
-    const typeCol = isBossNext ? (nextStage >= 30 ? '#fc4' : '#f44')
-                  : isChallNext ? '#f6f' : '#0ff';
-    const previewTxt = 'NEXT: STAGE ' + nextStage + ' (' + typeLabel + ')';
-    ctx.save();
-    const fade = (game.stageEndGraceTimer - 30) / 30;
-    ctx.globalAlpha = Math.min(1, fade) * 0.9;
-    drawRetroText(previewTxt, BASE_W/2, BASE_H - 18, 5, typeCol);
-    ctx.restore();
-  }
 
   // STAGE AFTER-ACTION REPORT — compact summary panel at grace frames 60-115.
   // Positions below the rising "STAGE CLEAR!" float text (y≈134→80) and above
@@ -21343,20 +20714,6 @@ function drawHUD() {
   // NEAR-BEST INDICATOR — small ▲ symbol next to the score when chasing the
   // best-ever (90-99% of highScore). Pulses faster as the player gets closer.
   // Disappears once they pass the threshold (highScoreGlow takes over there).
-  if (!minimalHud && game.score < game.liveHighThreshold
-      && game.liveHighThreshold > 0
-      && game.score >= game.liveHighThreshold * 0.9) {
-    const ratio = game.score / game.liveHighThreshold; // 0.9-0.999
-    // Pulse rate scales with closeness (faster near best)
-    const pulseRate = 0.15 + (ratio - 0.9) * 5;        // ~0.15 at 90%, ~0.65 at 100%
-    const blink = (Math.sin(game.animFrame * pulseRate) + 1) * 0.5;
-    const sym = ratio >= 0.97 ? '!' : ratio >= 0.94 ? '^' : '~';
-    const col = ratio >= 0.97 ? '#fc4' : ratio >= 0.94 ? '#ff4' : '#cf4';
-    ctx.save();
-    ctx.globalAlpha = 0.5 + blink * 0.5;
-    drawRetroText(sym, 53, 17, 6, col, 'left');
-    ctx.restore();
-  }
   // HIGH SCORE CHASE DISTANCE — numeric gap remaining when within 10K of personal best.
   // Sits below the score (y=25) so it doesn't crowd the score itself. Color tier
   // intensifies as gap shrinks: white(10K) → cyan(5K) → gold(1K) → red(100-).
@@ -21407,29 +20764,9 @@ function drawHUD() {
     // STAGE WEATHER LIVE CHIP — active weather label always visible in HUD so the
     // player can identify their stage condition even after the entry banner fades.
     // Color matches the weather's signature tone (e.g. sandstorm orange, blizzard cyan).
-    if (!minimalHud && game.stageWeather && typeof WEATHER_TABLE !== 'undefined') {
-      const _w = WEATHER_TABLE[game.stageWeather.id];
-      if (_w) {
-        ctx.save();
-        ctx.globalAlpha = 0.75;
-        drawRetroText('W:' + _w.label, BASE_W - 5, 38, 4, _w.col, 'right');
-        ctx.restore();
-        _weatherChipShown = true;
-      }
-    }
     // STAGE BIOME LIVE CHIP — current biome label always visible. Pairs with weather
     // chip directly above for a complete "where am I" HUD column. Hidden in stages 1-7
     // where biomeForStage returns null.
-    if (!minimalHud && typeof biomeForStage === 'function' && typeof BIOME_NAMES !== 'undefined') {
-      const _bId = biomeForStage(game.stage);
-      if (_bId && BIOME_NAMES[_bId]) {
-        const _bInfo = BIOME_NAMES[_bId];
-        ctx.save();
-        ctx.globalAlpha = 0.70;
-        drawRetroText('B:' + _bInfo.label, BASE_W - 5, 44, 4, _bInfo.col, 'right');
-        ctx.restore();
-      }
-    }
     // (GUI-simplify DELETE: the top-left S/N/P power chip — exact duplicate of the
     // bottom-right power gems, which are the canonical build display.)
     // GUARDIAN STATUS CHIP — active escort drone remaining seconds + variant color.
@@ -21454,35 +20791,11 @@ function drawHUD() {
   // (GUI-simplify DELETE: the mini combo x-badge + 12px decay bar next to the
   // score — duplicate of the main combo box bottom-centre.)
 
-  // High score (replaced by boss title during BOSS_STAGE so they don't fight for
-  // the same row). Boss title computed HERE read-only (no game.* writes in draw);
-  // detail view only — the simple view keeps the standard score row.
-  const _btAlive = (game.state === STATE.BOSS_STAGE && !minimalHud)
-    ? (game.megaBosses || []).filter(mb => mb.alive) : null;
-  if (_btAlive && _btAlive.length > 0) {
-    const _btSuper = _btAlive.some(mb => mb.super);
-    const _btTxt = _btSuper ? '!! SUPER BOSS !!' : _btAlive.length > 1 ? '!! DOUBLE BOSS !!' : '!! BOSS !!';
-    const _btSize = _btSuper ? 9 : _btAlive.length > 1 ? 7 : 8;
-    ctx.save();
-    ctx.globalAlpha = Math.sin(game.animFrame * 0.08) * 0.4 + 0.6;
-    drawRetroText(_btTxt, BASE_W/2, 12, _btSize, COL.red);
-    ctx.restore();
-  } else if (minimalHud) {
-    // SIMPLE VIEW (user: "even simpler — too many texts/icons confuse"): the two-line
-    // 'HIGH SCORE' header collapses to one compact 'HI <value>' line.
-    drawRetroText('HI ' + fmtScore(game.highScore), BASE_W/2, 10, 5, COL.gray, 'center');
-  } else {
-    drawRetroText('HIGH SCORE', BASE_W/2, 8, 7, COL.red, 'center');
-    drawRetroText(fmtScore(game.highScore), BASE_W/2 + 25, 17, 7, COL.white, 'right');
-    // HIGH SCORE CALLSIGN — show holder of the top score for the active mode.
-    if (typeof loadTopScores === 'function') {
-      const mode = game.dailyMode ? 'daily' : game.challengeMode ? 'challenge' : 'normal';
-      const top1 = (loadTopScores(mode)[0]) || null;
-      if (top1 && top1.callsign && top1.callsign !== '???' && top1.score > 0) {
-        drawRetroText('[' + top1.callsign + ']', BASE_W/2 + 25, 24, 5, '#fc4', 'right');
-      }
-    }
-  }
+  // High score — one compact line. This used to be a three-way chain: a
+  // BOSS_STAGE title bar and a two-line 'HIGH SCORE' header, both detail-view
+  // only, plus this simple line. With the detail tier gone the other two were
+  // unreachable, so only the line that actually rendered survives.
+  drawRetroText('HI ' + fmtScore(game.highScore), BASE_W/2, 10, 5, COL.gray, 'center');
 
   // Stage number — 5-tier color escalation reflecting depth into the run.
   // 1-10 white (rookie) → 11-30 cyan → 31-50 gold → 51-80 magenta → 81+ rainbow cycle.
@@ -21512,11 +20825,6 @@ function drawHUD() {
   // Hidden during ACT I (stages 1-10, implicit). Color matches act accent.
   {
     let _actCur = null;
-    if (!minimalHud && typeof ACT_TITLES !== 'undefined' && ACT_TITLES) {
-      for (let i = ACT_TITLES.length - 1; i >= 0; i--) {
-        if (game.stage >= ACT_TITLES[i].startStage) { _actCur = ACT_TITLES[i]; break; }
-      }
-    }
     if (_actCur) {
       ctx.save();
       ctx.globalAlpha = 0.65;
@@ -21540,16 +20848,7 @@ function drawHUD() {
     const iconX = BASE_W - 5 - ('STAGE ' + game.stage).length * 5 - 8;
     const iconY = 5;
     ctx.save();
-    if (!minimalHud && isSuperBoss) {
-      // Double-skull (×2 stacked) — gold/red blink
-      const blink = blinkPhase(3) ? '#fc4' : '#f44';
-      ctx.fillStyle = blink;
-      ctx.fillRect(iconX, iconY, 5, 5);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(iconX + 1, iconY + 1, 1, 1);
-      ctx.fillRect(iconX + 3, iconY + 1, 1, 1);
-      ctx.fillRect(iconX + 2, iconY + 3, 1, 1);
-    } else if (isBossSt) {
+if (isBossSt) {
       // Skull — red
       ctx.fillStyle = '#f44';
       ctx.fillRect(iconX, iconY, 5, 5);
@@ -21578,25 +20877,6 @@ function drawHUD() {
   // STAGE PB PROGRESS BAR — 1px-tall bar showing current stage vs lifetime
   // best across both modes. Hidden when not yet exceeded stage 3. Visible
   // throughout gameplay so the chase is continuously felt.
-  if (!minimalHud
-      && (isCombatState())) {
-    try {
-      const _csN3 = loadCumStats(false);
-      const _csC3 = loadCumStats(true);
-      const _pbBest = Math.max(_csN3.bestStage || 0, _csC3.bestStage || 0, 5);
-      if (game.stage >= 3 && _pbBest > 0) {
-        const _ratio = Math.min(1.2, (game.stage || 1) / _pbBest);
-        const _barX = BASE_W - 30, _barY = 53, _barW = 25;
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(_barX, _barY, _barW, 1);
-        ctx.fillStyle = _ratio >= 1 ? '#fc4' : _ratio >= 0.7 ? '#0ff' : '#0f8';
-        ctx.globalAlpha = 0.85;
-        ctx.fillRect(_barX, _barY, Math.round(Math.min(_barW, _barW * _ratio)), 1);
-        ctx.restore();
-      }
-    } catch (e) {}
-  }
   // (LIVE PB PACE INDICATOR at y=58 removed — it duplicated the PB delta the
   // STAGE TIME CLOCK below already shows at y=22. One PB read, not two.
   // LIVE STAGE CLOCK / NEXT EXTRA LIFE bar / BUFF TIMER BARS also removed in
@@ -21605,32 +20885,6 @@ function drawHUD() {
   // WORLD CORRUPTION HUD INDICATOR — small "CORR XX%" label when stage 30+ enters
   // the corrupted-territory band. Pulses faster as corruption climbs. Score neutral,
   // pure context cue for late-game depth.
-  if (game.stage >= 30
-      && (isCombatState())
-      && !minimalHud) {
-    let _corr = 0;
-    if (game.stage >= 80)      _corr = 1.0;
-    else if (game.stage >= 70) _corr = 0.8;
-    else if (game.stage >= 60) _corr = 0.65;
-    else if (game.stage >= 50) _corr = 0.45;
-    else if (game.stage >= 40) _corr = 0.25;
-    else if (game.stage >= 30) _corr = 0.10;
-    const _pct = Math.round(_corr * 100);
-    const _shift = _corr >= 0.8 ? 1 : _corr >= 0.5 ? 2 : 3;
-    const _blink = (game.animFrame >> _shift) % 2 === 0 ? '#f48' : '#fff';
-    // CORRUPTION READOUT — percent + (stage 50+) tier name on ONE right-aligned
-    // line at y=34 (below the clock at y=22 and its PB bar at y=28). Previously
-    // the % sat at y=14/16 where it overlapped the ACT chip, and was split far
-    // from its tier name at y=34. Unified here: no ACT collision, % beside tier.
-    let _corrTxt = 'CORR ' + _pct + '%';
-    if (_corr >= 0.45) {
-      _corrTxt += '  ' + (_corr >= 0.95 ? 'OBLIVION'
-                        : _corr >= 0.75 ? 'NULL'
-                        : _corr >= 0.60 ? 'VOID'
-                        : 'DEEP');
-    }
-    drawRetroText(_corrTxt, BASE_W - 5, 34, 4, _blink, 'right');
-  }
   // STAGE TIME CLOCK — real-time mm:ss.t timer + PB delta indicator. Only renders
   // during active gameplay states (no TITLE/INTRO/GAME_OVER pollution). Color shifts
   // green when ahead of PB, red when behind. PB compare requires existing record.
@@ -21638,73 +20892,9 @@ function drawHUD() {
   // ~5s (the clock reads ~0:00 then and PB compare is meaningless that early), so
   // the two stop overprinting; the full clock cluster returns the moment it fades.
   const _mutIntro = game.stageMutation && game.stageMutation.desc && (game.stageFrames || 0) < 300;
-  if (!minimalHud && (isCombatState())
-      && (game.stageFrames || 0) > 0 && !_mutIntro) {
-    const timeStr = fmtFrameTime(game.stageFrames || 0);
-    let clockCol = '#aaa';
-    const pb = stagePBs && stagePBs[String(game.stage)];
-    let pbAlarm = false;
-    if (typeof pb === 'number' && pb > 0) {
-      // Ahead = green, projected to miss = red (once past PB)
-      clockCol = game.stageFrames < pb ? '#0f8' : '#f88';
-      // PB ALARM — when within 90-100% of PB, pulse the clock urgent yellow
-      // to signal "hurry, you can still beat your record".
-      if (game.stageFrames >= pb * 0.9 && game.stageFrames < pb) {
-        pbAlarm = blinkPhase(2);
-        if (pbAlarm) clockCol = '#ff4';
-      }
-    }
-    // PB ALARM glow — 90-100% PB urgency tier picks up a yellow shadowBlur on
-    // the clock so the emergency speedrun beat reads beyond just the color flip.
-    ctx.save();
-    if (pbAlarm) {
-      ctx.shadowColor = clockCol;
-      ctx.shadowBlur = 5;
-    }
-    drawRetroText(timeStr, BASE_W - 5, 22, 5, clockCol, 'right');
-    ctx.restore();
-    // PB DELTA NUMBER — small "(-0.8s)" / "(+1.2s)" relative to PB so the
-    // speedrunner sees exact pace, not just ahead/behind color.
-    if (typeof pb === 'number' && pb > 0) {
-      const deltaFrames = game.stageFrames - pb;
-      const deltaSec = (deltaFrames / 60).toFixed(1);
-      const sign = deltaFrames >= 0 ? '+' : '';
-      const deltaCol = deltaFrames < 0 ? '#0f8' : '#f88';
-      // Position to the left of the clock so it reads naturally
-      drawRetroText('(' + sign + deltaSec + 's)', BASE_W - 5 - (timeStr.length * 5) - 2, 22, 4, deltaCol, 'right');
-      // STAGE TIMER PB BAR — 30px bar under clock showing frames / PB ratio
-      const _pbR = Math.min(1.2, game.stageFrames / pb);
-      ctx.save();
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillRect(BASE_W - 33, 28, 28, 1);
-      ctx.fillStyle = _pbR < 0.7 ? '#0f8' : _pbR < 1 ? '#fc4' : '#f88';
-      ctx.globalAlpha = 0.8;
-      ctx.fillRect(BASE_W - 33, 28, Math.round(Math.min(28, 28 * _pbR)), 1);
-      ctx.restore();
-    }
-    // (Run time is shown once, prominently, as the mm:ss endurance clock at y16 —
-    // the old redundant "R <time>" readout at y28 was removed. The extra-life bar
-    // and difficulty badge that used to nest here moved to top level below.)
-    // (PB-alarm tick SFX moved to update() at sim rate so it doesn't double on
-    // high-refresh monitors; pbAlarm still drives the clock's urgent-yellow glow here.)
-  }
   // EXTRA LIFE PROGRESS — 30px green bar (right rail, y39) toward the next 30K
   // extra-life threshold. Top-level so it no longer blinks out during dive surges
   // or mutation-intros (it used to be nested under the run-timer/stage-clock).
-  if (isCombatState() && !minimalHud && !game.challengeMode) {
-    const intoNext = (game.score || 0) % EXTRA_LIFE_SCORE;
-    const elRatio = intoNext / EXTRA_LIFE_SCORE;
-    const barW = 30;
-    const bx = BASE_W - 5 - barW;
-    const by = 39;
-    ctx.save();
-    ctx.fillStyle = '#020';
-    ctx.fillRect(bx, by, barW, 2);
-    ctx.fillStyle = elRatio >= 0.9 ? '#0f8' : '#0a4';
-    if (elRatio >= 0.9) ctx.globalAlpha = 0.5 + 0.5 * Math.sin(game.animFrame * 0.3);
-    ctx.fillRect(bx, by, Math.round(barW * elRatio), 2);
-    ctx.restore();
-  }
   // HUD DIFFICULTY — single HARD/EASY label (right rail, y56) on non-default runs.
   // (Previously duplicated: a left-side y30 copy overlapped the combo box; removed.)
   if (isCombatState() && (difficultyMode === 'hard' || difficultyMode === 'easy')) {
@@ -21753,70 +20943,8 @@ function drawHUD() {
     ctx.fillRect(BASE_W - 2, 54, 2, 52);
 
     // ── PATTERN NAME BANNER (Phases A + B) ──────────────────────────────────
-    if (!minimalHud || cwT < 8) {
-      ctx.save();
-      ctx.globalAlpha = env;
-      ctx.shadowColor = pCol; ctx.shadowBlur = 8;
-      drawRetroText(pLabel, BASE_W / 2, 66, 9, pCol);
-      ctx.restore();
-
-      const subLabel = isFinal ? 'FINAL WAVE !'
-                                : 'INCOMING · WAVE ' + nextW + ' / ' + totW;
-      const subCol   = isFinal ? '#f55' : '#777';
-      ctx.globalAlpha = 0.72 * env;
-      drawRetroText(subLabel, BASE_W / 2, 76, 4, subCol);
-
-      ctx.globalAlpha = 0.28 * env;
-      ctx.fillStyle = pCol;
-      ctx.fillRect(40, 81, BASE_W - 80, 1);
-    }
 
     // ── PHASE B INFO PANEL (age ≥ 8) ────────────────────────────────────────
-    if (age >= 8 && !minimalHud) {
-      const infoAlpha = Math.min(1, (age - 8) / 6) * fadeOut;
-
-      // Enemy composition dots: 2 boss (red), 6 butterfly (blue), 8 bee (cyan)
-      const _DOTS = [{ n: 2, col: '#f88' }, { n: 6, col: '#88f' }, { n: 8, col: '#0cf' }];
-      let dotX = BASE_W / 2 - 24;
-      ctx.save();
-      for (const dg of _DOTS) {
-        ctx.globalAlpha = 0.78 * infoAlpha;
-        ctx.fillStyle = dg.col;
-        for (let d = 0; d < Math.min(dg.n, 5); d++) ctx.fillRect(dotX + d * 3, 87, 2, 2);
-        if (dg.n > 5) ctx.fillRect(dotX + 15, 88, 1, 1); // '+' overflow dot
-        dotX += (Math.min(dg.n, 5)) * 3 + 5;
-      }
-      ctx.restore();
-
-      // Last-wave grade (only for waves 2+)
-      if (nextW > 1) {
-        ctx.save();
-        ctx.globalAlpha = 0.85 * infoAlpha;
-        if (lastPerfect) {
-          ctx.shadowColor = '#fc4'; ctx.shadowBlur = 5;
-          drawRetroText('LAST: PERFECT ★', BASE_W / 2, 95, 4, '#fc4');
-        } else {
-          drawRetroText('LAST: CLEARED', BASE_W / 2, 95, 4, COL.faint);
-        }
-        ctx.restore();
-      }
-
-      // Wave pip row — centered, one pip per wave
-      const pipSpacing  = 5;
-      const pipTotalPx  = (totW - 1) * pipSpacing;
-      const pipStartX   = Math.round(BASE_W / 2 - pipTotalPx / 2);
-      ctx.save();
-      for (let pi = 0; pi < totW; pi++) {
-        const px       = pipStartX + pi * pipSpacing;
-        const isDone   = pi < nextW - 1;   // completed waves
-        const isActive = pi === nextW - 1; // current (about to start)
-        ctx.globalAlpha = (isDone ? 0.60 : isActive ? 0.95 : 0.22) * infoAlpha;
-        ctx.fillStyle = isDone ? pCol : isActive ? '#fff' : '#333';
-        const sz = isActive ? 3 : 2;
-        ctx.fillRect(px - Math.floor(sz / 2), 102 - Math.floor(sz / 2), sz, sz);
-      }
-      ctx.restore();
-    }
 
     // ── PHASE C: urgent pulse on final frames (cwT < 8) ─────────────────────
     if (cwT < 8) {
@@ -21897,13 +21025,6 @@ function drawHUD() {
   }
   // SECONDARY OBJECTIVE mini-badge — small two-line under stage label (or below
   // mutation if both active). Soft green so it doesn't shout for attention.
-  if (!minimalHud && game.stageObjective && (isCombatState())) {
-    const obj = game.stageObjective;
-    const baseY = game.stageMutation ? 22 : 16;
-    const met = obj.met(game);
-    drawRetroText(obj.label, BASE_W - 5, baseY, 5, met ? '#0f8' : '#cfc', 'right');
-    drawRetroText(String(obj.progress(game)), BASE_W - 5, baseY + 6, 5, met ? '#0f8' : COL.gray, 'right');
-  }
 
   // Run timer (mm:ss) — color shifts after 5/15 min
   const totalSec = Math.floor((game.runFrames || 0) / 60);
@@ -21923,66 +21044,13 @@ function drawHUD() {
   else if (totalSec >= 300)    tCol = '#0cf';
   else if (totalSec >= 180)    tCol = '#cef';
   else                          tCol = COL.gray;
-  if (!minimalHud) drawRetroText(mm + ':' + ss, BASE_W - 5, 16, 6, tCol, 'right'); // detail view (simple: one less top-row number)
+// detail view (simple: one less top-row number)
   // STAGE PB GHOST — show personal best for current stage during play, color-tinted
   // by current pace. Gold if ahead of PB, gray if behind. Only when PB exists.
-  if (!minimalHud && typeof stagePBs !== 'undefined' && stagePBs
-      && (game.state === STATE.PLAYING || game.state === STATE.CHALLENGING)) {
-    const _pbF = stagePBs[String(game.stage)];
-    if (typeof _pbF === 'number' && _pbF > 0) {
-      const _pbSec = Math.floor(_pbF / 60);
-      const _pbMm = Math.floor(_pbSec / 60);
-      const _pbSs = String(_pbSec % 60).padStart(2, '0');
-      const _stageSec = Math.floor((game.stageFrames || 0) / 60);
-      const _pbDelta = (game.stageFrames || 0) - _pbF;
-      // Ahead of PB (current < PB): gold. Behind (current > PB): gray. Neutral early.
-      let _pbCol = '#888';
-      if (_stageSec > 2) {
-        _pbCol = _pbDelta < 0 ? '#fc4' : _pbDelta < 60 ? '#cf8' : '#888';
-      }
-      drawRetroText('PB ' + _pbMm + ':' + _pbSs, BASE_W - 5, 23, 4, _pbCol, 'right');
-    }
-  }
 
   // (GUI-simplify DELETE: top dashed HUD separator — pure chrome.)
 
   // Stage progression bar — rolls over every 30 stages. Detail view only.
-  if (!minimalHud) {
-    const PROG_MAX = 30;
-    const cycle = Math.floor((game.stage - 1) / PROG_MAX);   // 0,1,2... shown as label
-    const localStage = ((game.stage - 1) % PROG_MAX) + 1;     // 1..30 within current cycle
-    const px0 = 4, px1 = BASE_W - 4;
-    const ratio = Math.min(1, (localStage - 1) / (PROG_MAX - 1));
-    const fillEnd = px0 + Math.round((px1 - px0) * ratio);
-    // Track + tick marks every 5 stages
-    ctx.fillStyle = '#022';
-    ctx.fillRect(px0, 25, px1 - px0, 1);
-    ctx.fillStyle = '#444';
-    for (let s = 5; s <= 25; s += 5) {
-      const tx = px0 + Math.round((px1 - px0) * (s - 1) / (PROG_MAX - 1));
-      ctx.fillRect(tx, 24, 1, 3);
-    }
-    // Fill — color tier matches absolute stage range
-    const tier = Math.floor((game.stage - 1) / 4);
-    const tierCol = ['#0ff', '#0cf', '#0af', '#08f', '#06f', '#04f', '#02c', '#019'][Math.min(7, tier)] || '#0ff';
-    ctx.fillStyle = tierCol;
-    ctx.fillRect(px0, 25, fillEnd - px0, 1);
-    // Milestone notches: 5/10/20/30 in cycle 0; in higher cycles, mark every 10
-    const notches = cycle === 0 ? [5, 10, 20, 30] : [10, 20, 30];
-    for (const ms of notches) {
-      const mx = px0 + Math.round((px1 - px0) * (ms - 1) / (PROG_MAX - 1));
-      ctx.fillStyle = ms <= localStage ? '#fc4' : '#666';
-      ctx.fillRect(mx, 24, 1, 3);
-    }
-    // Current position indicator (small triangle blip)
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(fillEnd - 1, 24, 3, 1);
-    ctx.fillRect(fillEnd, 26, 1, 1);
-    // Cycle indicator past 30 (e.g. "x2" beneath the bar at left)
-    if (cycle > 0) {
-      drawRetroText('x' + (cycle + 1), 4, 22, 5, COL.yellow, 'left');
-    }
-  }
 
   // (GUI-simplify DELETE: bottom dashed HUD separator — pure chrome.)
 
@@ -21990,9 +21058,6 @@ function drawHUD() {
   if (!game.challengeMode && game.score > 0 && (game.state === STATE.PLAYING || game.state === STATE.BOSS_STAGE || game.state === STATE.CHALLENGING)) {
     const next = Math.ceil(game.score / EXTRA_LIFE_SCORE) * EXTRA_LIFE_SCORE;
     const diff = next - game.score;
-    if (!minimalHud && diff < 5000) {
-      drawRetroText('+1UP IN ' + diff, BASE_W/2, 35, 5, COL.green);
-    }
   }
   // Lives — pulse red and add LAST LIFE warning when down to one
   const dangerLives = game.lives === 1;
@@ -22081,89 +21146,23 @@ function drawHUD() {
   // gained THIS stage. Helps player gauge per-stage performance. Hidden when
   // minimal HUD, stage just started (delta < 100), or while the high-score chase
   // readout owns the y=25 row (the PB chase is the more urgent cue there).
-  if (!minimalHud && !_highChaseShown
-      && (isCombatState())) {
-    const _stgScore = (game.score || 0) - (game.stageScoreStart || 0);
-    if (_stgScore >= 100) {
-      drawRetroText('+' + fmtScore(_stgScore), 50, 25, 4, '#888', 'right');
-    }
-  }
   // HIGH SCORE PROGRESS BAR — 1px bar at upper-center showing fraction of
   // current score toward the live high threshold. Hidden under minimal HUD
   // or when no high score is set yet.
-  if (!minimalHud
-      && (isCombatState())
-      && (game.liveHighThreshold || 0) > 0) {
-    const _hsRatio = Math.min(1, (game.score || 0) / game.liveHighThreshold);
-    const _hsBarX = 12, _hsBarY = 21, _hsBarW = 36;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(_hsBarX, _hsBarY, _hsBarW, 1);
-    ctx.fillStyle = _hsRatio >= 1 ? '#fc4' : _hsRatio >= 0.9 ? '#ff4' : _hsRatio >= 0.5 ? '#0ff' : '#0f8';
-    ctx.globalAlpha = 0.8;
-    ctx.fillRect(_hsBarX, _hsBarY, Math.round(_hsBarW * _hsRatio), 1);
-    ctx.restore();
-  }
   // HUD PICKUP STREAK — small "P×N" cyan counter when consecutive no-death
   // pickups reach 2+. Hides on death (streak resets). Visible in normal HUD only.
   // Yields the y=38 slot to the weather chip (stage context wins); the streak's
   // milestone bonuses (x5/x10/x15) still pop via floatText regardless.
-  if (!minimalHud && !_weatherChipShown && (game.pickupStreak || 0) >= 2
-      && (isCombatState())) {
-    const psStr = 'PU×' + game.pickupStreak;
-    const psCol = game.pickupStreak >= 10 ? '#fc4' : '#0ff';
-    drawRetroText(psStr, BASE_W - 5, 38, 4, psCol, 'right');
-  }
   // HUD STAGE PICKUP COUNTER — stage-level pickup count for thrifty awareness
-  if (!minimalHud && (game.stagePowerUpsPicked || 0) >= 1
-      && (isCombatState())) {
-    drawRetroText('S:' + game.stagePowerUpsPicked, BASE_W - 5, 46, 4, '#fc8', 'right');
-  }
   // ENEMY BULLET COUNT — 'B N' when bullet density is meaningful (>=10).
-  if (!minimalHud
-      && (isCombatState())
-      && (game.enemyBullets || []).length >= 10) {
-    const _bN = game.enemyBullets.length;
-    const _bCol = _bN >= 40 ? '#f44' : _bN >= 25 ? '#f88' : '#fa8';
-    drawRetroText('B ' + _bN, BASE_W - 5, 60, 4, _bCol, 'right');
-  }
 
   // PICKUP HISTORY TICKER — last 5 drop types as small colored letter chips at
   // top-right (under S:N stage counter). Newest at right, oldest at left. Fades
   // older entries (alpha drop). Surfaces only mid-stage when there's data.
-  if (!minimalHud && game.pickupHistory && game.pickupHistory.length > 0
-      && (isCombatState())) {
-    const _pColors = { S:'#f44', N:'#0ff', P:'#f6f', T:'#8ff', R:'#fc4',
-                       W:'#6cf', H:'#0f8', L:'#f6c', B:'#fff', E:'#0f8' };
-    const _phHist = game.pickupHistory;
-    const _phY = 54;
-    for (let i = 0; i < _phHist.length; i++) {
-      const tp = _phHist[i];
-      const col = _pColors[tp] || '#aaa';
-      ctx.save();
-      ctx.globalAlpha = Math.max(0.3, 1 - i * 0.18);
-      drawRetroText(tp, BASE_W - 5 - i * 6, _phY, 4, col, 'right');
-      ctx.restore();
-    }
-  }
 
   // POWER UP PITY INDICATOR — small 15-dot row near top-left showing pity progress
   // (kills without a drop). Filled dots = kills accumulated; empty = headroom.
   // Drops invisibly when 0 — only surfaces when there's something to communicate.
-  if (!minimalHud && (game.killsSincePowerUp || 0) >= 4
-      && (isCombatState())) {
-    const pityCount = Math.min(15, game.killsSincePowerUp || 0);
-    const py = BASE_H - 30;
-    ctx.save();
-    const dotsX = BASE_W - 5 - 15 * 3;
-    for (let i = 0; i < 15; i++) {
-      const filled = i < pityCount;
-      ctx.globalAlpha = filled ? 0.85 : 0.20;
-      ctx.fillStyle = pityCount >= 12 ? '#fc4' : '#0f8';
-      ctx.fillRect(dotsX + i * 3, py, 2, 2);
-    }
-    ctx.restore();
-  }
 
   // Power-up levels (bottom right) — color-coded with mini gems + progression pip bar
   const lv = game.lvl || {S: 1, N: 1, P: 1};
@@ -22275,10 +21274,6 @@ function drawHUD() {
   // no longer renders on top of the arsenal progress bar. The band y56+ at x=4 is
   // otherwise clear in combat (challenge-telegraph backdrop draws under it; the
   // debug FPS panel is dev-only).
-  if (!minimalHud && game.activePerk && PERKS[game.activePerk]) {
-    const p = PERKS[game.activePerk];
-    drawRetroText('PERK: ' + p.name, 4, 59, 5, p.col, 'left');
-  }
 
   // Demo mode banner
   if (game.isDemo) {
@@ -22334,73 +21329,6 @@ function drawHUD() {
     // secondary meta-progression detail, so it yields to MINIMAL HUD for cleaner
     // play — matching how accuracy/kills/pity hide. The combo multiplier core
     // above always stays. Bar at y=45, 60px wide.
-    if (!minimalHud) {
-    const arsenalTiers = [25, 50, 75, 100];
-    const arsenalColors = ['#fc4', '#f8a', '#0ef', '#fff'];
-    let nextTier = null, nextCol = '#fff', prevTier = 0;
-    for (let i = 0; i < arsenalTiers.length; i++) {
-      if (!game.comboArsenalClaimed[arsenalTiers[i]]) {
-        nextTier = arsenalTiers[i];
-        nextCol = arsenalColors[i];
-        prevTier = i === 0 ? 0 : arsenalTiers[i - 1];
-        break;
-      }
-    }
-    if (nextTier !== null && game.combo > 0) {
-      const span = nextTier - prevTier;
-      const into = Math.max(0, Math.min(span, game.combo - prevTier));
-      const ratio = into / span;
-      ctx.save();
-      // Track
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fillRect(4, 45, 60, 3);
-      // Fill
-      ctx.fillStyle = nextCol;
-      ctx.globalAlpha = 0.85;
-      ctx.fillRect(4, 45, Math.round(60 * ratio), 3);
-      // Pulse glow when ≥90% to next tier
-      if (ratio >= 0.9) {
-        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(game.animFrame * 0.4);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(4, 45, Math.round(60 * ratio), 1);
-      }
-      ctx.restore();
-      drawRetroText('→' + nextTier, 66, 45, 5, nextCol, 'left');
-      // ARSENAL TIER IMMINENT — within 3 combo of next tier, blink gold tag
-      if ((nextTier - game.combo) <= 3 && (nextTier - game.combo) > 0) {
-        const _aiB = blinkPhase(2);
-        if (_aiB) drawRetroText('IMMINENT', 4, 53, 4, '#fc4', 'left');
-      }
-    }
-    // COMBO ARSENAL PROGRESS DOTS — 4-tier overview row (just below bar)
-    // Claimed: filled gold/pink/cyan/white. Next-target: pulsing. Future: dim outline.
-    {
-      const dotY = 50;
-      for (let i = 0; i < arsenalTiers.length; i++) {
-        const dx = 4 + i * 5;
-        const claimed = !!game.comboArsenalClaimed[arsenalTiers[i]];
-        const isNext = !claimed && nextTier === arsenalTiers[i];
-        ctx.save();
-        if (claimed) {
-          ctx.fillStyle = arsenalColors[i];
-          ctx.globalAlpha = 0.95;
-          ctx.fillRect(dx, dotY, 3, 3);
-        } else if (isNext) {
-          ctx.fillStyle = arsenalColors[i];
-          ctx.globalAlpha = 0.5 + 0.5 * Math.sin(game.animFrame * 0.3);
-          ctx.fillRect(dx, dotY, 3, 3);
-        } else {
-          ctx.fillStyle = arsenalColors[i];
-          ctx.globalAlpha = 0.25;
-          ctx.fillRect(dx, dotY, 3, 1);
-          ctx.fillRect(dx, dotY + 2, 3, 1);
-          ctx.fillRect(dx, dotY, 1, 3);
-          ctx.fillRect(dx + 2, dotY, 1, 3);
-        }
-        ctx.restore();
-      }
-    }
-    } // end !minimalHud arsenal-progress detail
     // Tier transition flash — within 12 frames of hitting tier-up combo (5/10/15/30)
     if ([5, 10, 15, 30, 60, 100].some(t => game.combo === t)) {
       ctx.save();
@@ -22412,32 +21340,10 @@ function drawHUD() {
   }
 
   // Real-time stage accuracy (top-left, second row) — only after some shots fired
-  if (!minimalHud && (game.stageShotsFired || 0) >= 4) {
-    const acc = computeStageAccuracy();
-    const accCol = acc >= 90 ? '#0f8' : acc >= 70 ? COL.cyan : acc >= 40 ? COL.yellow : '#f88';
-    drawRetroText('ACC ' + acc + '%', 6, game.combo >= 3 ? 41 : 30, 6, accCol, 'left');
-  }
 
   // RUN KILL COUNTER — small "K: N" near accuracy showing cumulative kills this run.
   // Activates only after the player has actually killed something (≥ 10 kills) so
   // the HUD stays clean for the opening stage.
-  if (!minimalHud && (game.stats && game.stats.kills) >= 10
-      && (isCombatState())) {
-    const kY = game.combo >= 3
-              ? ((game.stageShotsFired || 0) >= 4 ? 49 : 41)
-              : ((game.stageShotsFired || 0) >= 4 ? 38 : 30);
-    const k = game.stats.kills;
-    const kCol = k >= 1000 ? '#fc4' : k >= 500 ? '#0ff' : '#aaa';
-    drawRetroText('K ' + k, 6, kY, 5, kCol, 'left');
-    // HUD KILLS PER MINUTE — after 60s of run, show K/M rate metric below kill
-    // counter. Useful speedrun / efficiency feedback.
-    if ((game.runFrames || 0) >= 3600) {
-      const minutes = (game.runFrames || 0) / 3600;
-      const kpm = Math.round(k / minutes);
-      const kpmCol = kpm >= 60 ? '#fc4' : kpm >= 30 ? '#0ff' : '#888';
-      drawRetroText(kpm + ' K/M', 6, kY + 6, 4, kpmCol, 'left');
-    }
-  }
 
   // "ENEMIES LEFT" mini-counter when the stage is nearly done (≤ 6 alive in PLAYING)
   if (game.state === STATE.PLAYING && game.allEntered) {
@@ -22453,7 +21359,7 @@ function drawHUD() {
   // with the PB readout at y23, so it was removed.)
   // Boss HP bar moved to drawBossStage() combined bar — no duplicate needed here.
 
-  if (!minimalHud) drawMiniRadar(); // detail view only (threat arrows cover off-screen danger)
+// detail view only (threat arrows cover off-screen danger)
 
   // Dash cooldown bar (bottom-right, above the power-up gems)
   if (game.dashCooldown > 0 || game.dashTimer > 0) {
@@ -23550,7 +22456,6 @@ function drawHelpOverlay() {
   kvRow('H / I',        'HELP / STATS');
   kvRow('TAB',          'STATS PAGE NEXT');
   kvRow('F',            'FULLSCREEN');
-  kvRow('M',            'HUD SIMPLE/DETAILED');
   kvRow('T',            'MUTE ALL');
   kvRow('B / N',        'BGM / SFX TOGGLE');
   kvRow('[ / ]',        'VOLUME');
