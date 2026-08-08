@@ -176,6 +176,43 @@ Drops are 20% per kill / 35% for elites **at normal difficulty**, plus a guarant
 
 Visual: ship sprite changes with S/N/P levels via `drawPlayer(x, y, color, levels)` 4th param — engine flame size, winglet extensions, cockpit ring glow.
 
+### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
+
+Difficulty has `curve-audit.js`; fairness now has its own instrument:
+
+```bash
+node test/telegraph-audit.js   # report: warning frames per threat, vs the baseline
+```
+
+`DIVE_PREVIEW = 30` (a lone dive's preview, ~500ms) is **the readable baseline**, and
+every threat is measured against it. The rule: **a threat that takes MORE from the
+player must not warn LESS.**
+
+| threat | costs | warning |
+|---|---|---|
+| formation dive | a hit | 30f — `DIVE_PREVIEW`, the baseline |
+| coordinated dive (WING) | a hit | 36f — `WING_PREVIEW` |
+| boss signature | a hit | 30f — `SIG_LOCK_FRAMES` (crosshair + tick) |
+| weather strike | a hit | 42f — `STRIKE_TELEGRAPH` |
+| capture beam | **a life** | 60f — `CAPTURE_BEAM_START` |
+| enemy bullet | a hit | ~74f of travel — no telegraph, bought with a **speed cap** |
+
+The audit **measures from driven play** rather than restating the constants — restating
+them would just re-encode the bug. It found the budget inverted in two places at once:
+the capture cost a life and warned for **0 frames**, and the boss signature warned for
+**18** (300ms — enough to begin reacting, not to finish an evasion) on an attack that
+repeats every 2s once `sigInterval` floors at depth. Both were invisible in the code and
+obvious the moment the numbers sat in one column.
+
+`logic.test.js` pins the ordering plus an **absolute floor** (`>= 30f`), so the guard
+survives "shrink everything together" — a purely relative guard passes that happily.
+`DIVE_PREVIEW` is wired to its call sites, not merely declared; a constant the game
+doesn't read makes the guard lie.
+
+**When adding a threat**: give it a telegraph at or above the baseline, scaled by what it
+costs, and add it to the audit. Never buy difficulty by shortening a warning — that is
+the same mistake as raising the speed caps (see DEEP PRESSURE LADDER).
+
 ### Capture / rescue (the Galaga signature loop)
 
 A formation `boss` chosen as a diver has a 20% chance to enter `state = 'capturing'`

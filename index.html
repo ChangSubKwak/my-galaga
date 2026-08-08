@@ -3633,6 +3633,14 @@ const DIVE_TACTICS = [
 ];
 const WING_LEAD_FRAMES = 40; // how far ahead a pincer predicts the player (clamped to playfield)
 const WING_PREVIEW = 36;     // coordinated maneuvers telegraph 6f longer than a lone dive (30)
+// THE READABLE BASELINE — a lone dive's preview. Every threat that costs the
+// player something is measured against it (test/telegraph-audit.js), and the
+// rule the audit exists to keep honest is simple: a threat that takes MORE
+// must not warn LESS.
+const DIVE_PREVIEW = 30;
+// Boss signature lock-on window. Held at the baseline: it used to be 18f, the
+// tightest warning in the game, on an attack that repeats every 2s at depth.
+const SIG_LOCK_FRAMES = DIVE_PREVIEW;
 const WING_COOLDOWN = 60;    // extra diveTimer delay after a maneuver so tactics never stack
 
 // Pure: pick a coordinated tactic (or null). Deterministic given roll∈[0,1). Panic → null,
@@ -8123,10 +8131,19 @@ function updateOneMegaBoss(mb) {
     // (one signature ~ every 4-5 seconds at stage 10, faster as stage scales).
     mb.sigTimer = (mb.sigTimer || 0) + 1;
     const sigInterval = rampedInterval(120, 240, 4, game.stage);
-    // MISSILE LOCK INDICATOR — within the final 18 frames before a signature fires,
-    // mark the boss as locking on. drawHUD reads this to render a crosshair on the
-    // player. One-shot lock-on tick: play 'tick' sfx when entering the lock window.
-    if (!frozen && mb.sigTimer >= sigInterval - 18 && mb.sigTimer < sigInterval) {
+    // MISSILE LOCK INDICATOR — within the final SIG_LOCK_FRAMES before a signature
+    // fires, mark the boss as locking on. drawHUD reads this to render a crosshair
+    // on the player. One-shot lock-on tick: play 'tick' sfx when entering the window.
+    //
+    // The window was 18 frames (300ms) — the tightest warning in the game and 40%
+    // under the game's own readable baseline, the 30-frame dive preview. A signature
+    // fires every 2 seconds once sigInterval hits its floor at deep stages, from a
+    // boss that crosses the arena in about 25 frames; 300ms is enough to start
+    // reacting and not enough to finish an evasion. Widening it costs nothing in
+    // difficulty (the lock only draws a crosshair and ticks — the attack itself is
+    // unchanged), and it buys back the one place the fairness budget was inverted.
+    // test/telegraph-audit.js measures this against every other threat.
+    if (!frozen && mb.sigTimer >= sigInterval - SIG_LOCK_FRAMES && mb.sigTimer < sigInterval) {
       if (!mb.sigLocking) {
         mb.sigLocking = true;
         playSound('tick', mb.x);
@@ -12938,8 +12955,8 @@ function updateEnemies() {
           && Math.random() < extraDiverChance(game.stage)) {
         const _x = candidates[randInt(candidates.length)];
         if (_x && _x.state === 'formation' && !_x.previewTimer && _x.type !== 'boss') {
-          _x.previewTimer = 30;
-          _x.previewMax = 30;
+          _x.previewTimer = DIVE_PREVIEW;
+          _x.previewMax = DIVE_PREVIEW;
           _x._wingTactic = null;
           _x._wingSide = 0;
           _x.previewPath = createLoopPath(_x.x, _x.y, _x.x < BASE_W / 2 ? 1 : -1);
@@ -12957,8 +12974,8 @@ function updateEnemies() {
           setTimeout(() => playSound('capture'), 250);
         } else {
           // Telegraph the dive: 30-frame preview where the path is visible but the enemy stays put.
-          e.previewTimer = 30;
-          e.previewMax = 30;
+          e.previewTimer = DIVE_PREVIEW;
+          e.previewMax = DIVE_PREVIEW;
           e._wingTactic = null; // lone dive — clear any stale coordinated-maneuver tag
           e._wingSide = 0;
           e.previewPath = createLoopPath(e.x, e.y, e.x < BASE_W/2 ? 1 : -1);
@@ -12978,8 +12995,8 @@ function updateEnemies() {
             escorts.forEach((es, idx) => {
               setTimeout(() => {
                 if (es.alive && es.state === 'formation' && !es.previewTimer) {
-                  es.previewTimer = 30;
-                  es.previewMax = 30;
+                  es.previewTimer = DIVE_PREVIEW;
+                  es.previewMax = DIVE_PREVIEW;
                   es._wingTactic = null;
                   es.previewPath = createLoopPath(es.x, es.y, idx === 0 ? 1 : -1);
                 }

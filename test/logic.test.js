@@ -158,6 +158,13 @@ const shim = `
 ;try { globalThis.__getShips = function () { return (typeof SHIPS !== 'undefined') ? SHIPS : null; }; } catch (e) {}
 ;try { globalThis.__getShipOrder = function () { return (typeof SHIP_ORDER !== 'undefined') ? SHIP_ORDER : null; }; } catch (e) {}
 ;try { globalThis.__getKeys = function () { return (typeof keys !== 'undefined') ? keys : null; }; } catch (e) {}
+;try { globalThis.__getTelegraphs = function () { return {
+  dive:    (typeof DIVE_PREVIEW !== 'undefined') ? DIVE_PREVIEW : null,
+  wing:    (typeof WING_PREVIEW !== 'undefined') ? WING_PREVIEW : null,
+  sig:     (typeof SIG_LOCK_FRAMES !== 'undefined') ? SIG_LOCK_FRAMES : null,
+  strike:  (typeof STRIKE_TELEGRAPH !== 'undefined') ? STRIKE_TELEGRAPH : null,
+  capture: (typeof CAPTURE_BEAM_START !== 'undefined') ? CAPTURE_BEAM_START : null,
+}; }; } catch (e) {}
 ;try { globalThis.__getDailyMissions = function () { return (typeof DAILY_MISSIONS !== 'undefined') ? DAILY_MISSIONS : null; }; } catch (e) {}
 ;try { globalThis.__setDifficulty = function (m) { if (typeof difficultyMode !== 'undefined') difficultyMode = m; }; } catch (e) {}
 ;try { globalThis.__getSfxVary = function () { return (typeof SFX_VARY !== 'undefined') ? SFX_VARY : null; }; } catch (e) {}
@@ -3904,6 +3911,39 @@ if (ST && typeof G.checkStageComplete === 'function' && G.__getGame && G.__getGa
   ok(g4.stageDied, 'the stage is still marked as not clean');
   G.resetGame();
 } else { console.log('  (skipped — core loop not drivable)'); }
+
+section('FAIRNESS BUDGET — a threat that takes more must not warn less');
+// The rule test/telegraph-audit.js exists to keep honest, pinned here so it
+// cannot drift. It was inverted twice at once before this: the capture cost a
+// whole life and warned for 0 frames, and the boss signature warned for 18 —
+// the tightest window in the game — on an attack that repeats every 2 seconds
+// at depth. Both were invisible in the code and obvious in one column.
+if (typeof G.__getTelegraphs === 'function') {
+  const T = G.__getTelegraphs();
+  ok(T.dive > 0, 'the dive preview is the stated baseline (' + T.dive + 'f)');
+  // 30f = 500ms. Below ~300ms a player can start reacting but not finish an
+  // evasion, so the baseline is a floor, not a target.
+  ok(T.dive >= 30, 'and the baseline itself stays readable (>= 30f)');
+
+  const HIT_COSTING = [
+    ['boss signature', T.sig],
+    ['weather strike', T.strike],
+    ['coordinated dive', T.wing],
+  ];
+  for (const [name, f] of HIT_COSTING) {
+    ok(f !== null && f >= T.dive,
+       name + ' warns at least as long as a lone dive (' + f + 'f vs ' + T.dive + 'f)');
+  }
+
+  // The ordering rule itself: the only threat that costs a whole life must
+  // out-warn every threat that costs a hit.
+  const worstHit = Math.min(...HIT_COSTING.map(x => x[1]).filter(f => f !== null), T.dive);
+  ok(T.capture !== null && T.capture >= worstHit,
+     'the LIFE-costing capture out-warns every hit-costing threat ('
+     + T.capture + 'f vs ' + worstHit + 'f)');
+  ok(T.capture > T.dive,
+     'and costs strictly more warning than the cheapest threat, not merely equal');
+} else { console.log('  (skipped — telegraph constants not reachable)'); }
 
 section('BONUS GAME — the whole mode driven end to end (was never run)');
 // evalBonusResult and bonusSkillStop were unit-tested as pure functions, but
