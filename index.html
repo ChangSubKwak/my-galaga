@@ -299,11 +299,6 @@ let colorBlindMode = localStorage.getItem('galagaColorBlind') === '1';
 // (The minimalHud DETAIL tier was deleted in the simplification pass. It was a
 // second, denser HUD hidden behind M and off by default — ~50 gated widgets
 // nobody saw. There is now one HUD, so there is nothing to toggle.)
-// GUI-simplify: INFO-tier floatTexts (score chatter, stat banners, meta callouts)
-// render only in the detail view — one shared gate instead of 35 inline ifs.
-// VITAL cues (buff expiry, LAST LIFE, SHIELD, boss phase…) keep pushing directly.
-function pushInfoText(ft) {
-}
 // NIGHT-DIMMER CACHE — preference + in-window flag refreshed at most once per
 // minute (the 22:00/06:00 boundary moves slowly); the J toggle flips the cached
 // boolean directly. Avoids per-frame localStorage + Date churn in draw().
@@ -5075,8 +5070,14 @@ function coachFire(id) {
   if (typeof directorStrikePhase === 'function' && directorStrikePhase() === 'telegraph') return false;
   coachLearned.add(id);
   try { localStorage.setItem(COACH_KEY, JSON.stringify([...coachLearned])); } catch (e) {}
-  if (typeof pushInfoText === 'function') {
-    pushInfoText({
+  // Pushed DIRECTLY, not through pushInfoText. That helper is the INFO-tier
+  // sink — it only ever rendered in the detail HUD, and once that tier was
+  // deleted it became a no-op. A lesson routed through it fired, marked itself
+  // learned FOREVER (it persists), and displayed nothing: the player lost the
+  // teaching moment without ever seeing it. A lesson is a VITAL cue, not
+  // chatter, so it goes straight to floatTexts.
+  if (game.floatTexts) {
+    game.floatTexts.push({
       x: BASE_W / 2, y: BASE_H - 54, text: COACH_LESSONS[id],
       color: '#9cf', life: 130, maxLife: 130, size: 6
     });
@@ -8238,10 +8239,6 @@ function updateOneMegaBoss(mb) {
       const dmgDealt = b.dmg || 1;
       // CRIT hit feedback at boss hit site (text = detail view; ring/sparks stay)
       if (b.crit) {
-        pushInfoText({
-          x: b.x + (Math.random() * 4 - 2), y: b.y - 8,
-          text: 'CRIT!', color: '#fc4', life: 30, maxLife: 30, size: 7
-        });
         // CRIT GOLD RING — small expanding shockwave + 6 gold sparks. Makes
         // crit hits feel substantively heavier even on bosses where the
         // damage gets absorbed without a kill.
@@ -8278,13 +8275,6 @@ function updateOneMegaBoss(mb) {
         // BIG HIT TEXT — size scales with damage. 3+ = big bold, 2 = normal+,
         // 1 = compact. Makes heavy-hit moments read at a glance.
         const _dmgSize = dmgDealt >= 3 ? 9 : dmgDealt >= 2 ? 7 : 5;
-        pushInfoText({ // detail-view only (per-hit damage chatter)
-          x: b.x + (Math.random() * 6 - 3),
-          y: b.y - 4,
-          text: '-' + dmgDealt,
-          color: dmgCol, life: dmgDealt >= 3 ? 40 : 28, maxLife: dmgDealt >= 3 ? 40 : 28,
-          size: _dmgSize
-        });
         game._dmgNumThisFrame++;
       }
       if (mb.hp <= 0) {
@@ -8740,11 +8730,6 @@ function startStage() {
   // 'MISSION START' float text + tick SFX. Helps mark the new-run beat
   // alongside score reset etc.
   if (game.stage === 1 && (game.stats && (game.stats.kills || 0) === 0)) {
-    pushInfoText({
-      x: BASE_W/2, y: BASE_H/2 - 60,
-      text: 'MISSION START',
-      color: '#0cf', life: 90, maxLife: 90, size: 8
-    });
     if (typeof playSound === 'function') playSound('tick');
     // RUN MODE LABEL — under MISSION START, surface active mode flags
     // (hard/easy / challenge / daily). Helps the player remember the session
@@ -8827,11 +8812,6 @@ function startStage() {
   if ((game.combo || 0) >= 5) {
     // TIER NAME — same scale as HUD combo tier label (shared helper)
     const _ctN = comboTierName(game.combo);
-    pushInfoText({
-      x: BASE_W/2, y: BASE_H/2 + 50,
-      text: 'COMBO CARRIES x' + game.combo + ' (' + _ctN + ')',
-      color: '#0ff', life: 80, maxLife: 80, size: 7
-    });
   }
   // MARATHON BANNER — when zenStreak >= 10, push big gold banner so the elite
   // no-death streak feels weighty alongside the existing MARATHON x5/10/20 award.
@@ -8846,10 +8826,6 @@ function startStage() {
       const _bestEver = Math.max(_csN.bestStage || 0, _csC.bestStage || 0);
       if (_bestEver > 0 && game.stage > _bestEver) {
         game._stagePbFired = true;
-        pushInfoText({
-          x: BASE_W/2, y: BASE_H/2 - 64, text: 'NEW DEEPEST STAGE',
-          color: '#fc4', life: 120, maxLife: 120, size: 8
-        });
         // Name the depth — a record-setting peak deserves its number, and the
         // margin over the old best ("+N") frames the achievement.
         game.floatTexts.push({
@@ -8879,14 +8855,6 @@ function startStage() {
           && game.runBiomesSeen.size >= 2) {
         const _bn = BIOME_NAMES[_bid].name || _bid.toUpperCase();
         const _bc = BIOME_NAMES[_bid].col || '#0cf';
-        pushInfoText({
-          x: BASE_W/2, y: BASE_H/2 - 50, text: 'BIOME SHIFT',
-          color: '#fff', life: 90, maxLife: 90, size: 6
-        });
-        pushInfoText({
-          x: BASE_W/2, y: BASE_H/2 - 38, text: _bn,
-          color: _bc, life: 100, maxLife: 100, size: 12
-        });
         game.flashTimer = Math.max(game.flashTimer || 0, 6);
         game.flashColor = _bc;
       }
@@ -8987,10 +8955,6 @@ function startStage() {
   if (game.stageWeather && typeof WEATHER_TABLE !== 'undefined'
       && WEATHER_TABLE[game.stageWeather.id] && game.floatTexts) {
     const _w = WEATHER_TABLE[game.stageWeather.id];
-    pushInfoText({
-      x: BASE_W/2, y: 60, text: '— ' + _w.label + ' —',
-      color: _w.col, life: 90, maxLife: 90, size: 7
-    });
   }
   // SUPPLY CRATE — 30% chance per normal stage 5+. Spawns mid-stage when ~50% kills.
   game.supplyCrate = null;
@@ -9837,10 +9801,6 @@ function addScore(pts) {
     if (mission && mission.check(game)) {
       game._dailyMissionFired = true;
       markDailyMissionDone();
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 36, text: 'DAILY MISSION!',
-        color: '#fc4', life: 120, maxLife: 120, size: 14
-      });
       game.floatTexts.push({
         x: BASE_W/2, y: BASE_H/2 - 20, text: mission.label,
         color: '#fff', life: 120, maxLife: 120, size: 8
@@ -9885,10 +9845,6 @@ function addScore(pts) {
     if (old < ms && game.score >= ms) {
       const label = ms >= 100000 ? (ms / 1000) + 'K!' : (ms / 1000) + 'K';
       const col = ms >= 100000 ? '#f6f' : ms >= 50000 ? COL.yellow : COL.cyan;
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 40, text: label,
-        color: col, life: 70, maxLife: 70, size: ms >= 100000 ? 14 : 11
-      });
       playSound('milestone');
       break;
     }
@@ -10138,11 +10094,6 @@ function updatePlayer() {
       color: synergy === 'OVERLOAD' ? '#fc4' : synergy === 'BLINK' ? '#0ff' : '#f8a',
       life: 80, maxLife: 80, size: 14
     });
-    pushInfoText({
-      x: BASE_W/2, y: BASE_H/2 - 18,
-      text: 'WEAPON SYNERGY',
-      color: '#fff', life: 80, maxLife: 80, size: 6
-    });
     playSound('powerUp');
     spawnConfetti(6);
     // PEAK BUILD ANNOUNCEMENT — when synergy + activePerk both active, surface
@@ -10339,11 +10290,6 @@ function updateBullets() {
       // LASER PIERCE COUNT — when a laser bullet exits, if it pierced 3+
       // enemies, emit a magenta "PIERCE xN" text at its final position.
       if (b.kind === 'laser' && b.pierced && b.pierced.size >= 3) {
-        pushInfoText({
-          x: b.x, y: Math.max(20, b.y),
-          text: 'PIERCE x' + b.pierced.size,
-          color: '#f6c', life: 50, maxLife: 50, size: 8
-        });
         game.laserPierceBest = Math.max(game.laserPierceBest || 0, b.pierced.size);
       }
       game.bullets.splice(i, 1);
@@ -10404,10 +10350,6 @@ function updateBullets() {
         const lcol = close ? '#ff4' : '#0ff';
         addScore(bonus);
         game.grazeCount = (game.grazeCount || 0) + 1;
-        pushInfoText({ // detail-view only (per-graze score chatter; spark stays)
-          x: b.x, y: b.y - 6, text: label,
-          color: lcol, life: 28, maxLife: 28, size: 5
-        });
         game.hitSparks.push({ x: b.x, y: b.y, life: 0 });
         playSound('graze', b.x);
       }
@@ -10692,10 +10634,6 @@ function unlockDex(type) {
   try { localStorage.setItem(DEX_KEY, JSON.stringify([...dexUnlocked])); } catch (e) {}
   if (game && game.state !== STATE.TITLE && game.state !== STATE.GAME_OVER) {
     const info = ENEMY_INFO[type];
-    pushInfoText({
-      x: BASE_W/2, y: 60, text: 'FIRST CONTACT',
-      color: info.col, life: 90, maxLife: 90, size: 9
-    });
     game.floatTexts.push({
       x: BASE_W/2, y: 70, text: info.name,
       color: '#fff', life: 90, maxLife: 90, size: 11
@@ -10846,16 +10784,6 @@ function recordMilestoneTime() {
     // CHECKPOINT UNLOCK BANNER — first time reaching this milestone across
     // all runs. Future runs can start from this stage via TITLE R selector.
     // Gold banner + confetti so the progression beat is unmissable.
-    if (game.floatTexts) {
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 60, text: 'CHECKPOINT UNLOCKED',
-        color: '#fc4', life: 110, maxLife: 110, size: 8, glow: 6
-      });
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 48, text: 'STAGE ' + justCleared,
-        color: '#ff8', life: 100, maxLife: 100, size: 6, glow: 4
-      });
-    }
     if (typeof spawnConfetti === 'function') spawnConfetti(12);
   }
   const best = loadBestTimes();
@@ -11746,10 +11674,6 @@ function updatePowerUps() {
           for (const en of cw) if (en.alive) bombKill(en);
         }
         game.shockwaves.push({ x: BASE_W/2, y: BASE_H/2, life: 0, maxLife: 24, maxR: 90, color });
-        pushInfoText({
-          x: BASE_W/2, y: BASE_H/2 - 14, text: 'BOMB!',
-          color, life: 70, maxLife: 70, size: 14
-        });
         if (bombKills > 0) {
           game.floatTexts.push({
             x: BASE_W/2, y: BASE_H/2, text: bombKills + (bombKills === 1 ? ' KILL' : ' KILLS'),
@@ -11780,10 +11704,6 @@ function updatePowerUps() {
         }
         game.flashTimer = Math.max(game.flashTimer || 0, 6);
         game.flashColor = '#0ff';
-        pushInfoText({
-          x: BASE_W/2, y: BASE_H/2 - 14, text: 'DASH READY',
-          color: '#0ff', life: 60, maxLife: 60, size: 9
-        });
         playSound('graze');
         rumble(180, 0.5, 0.3);
       } else if (game.lvl[p.type] < MAX_POWER_LVL[p.type]) {
@@ -11811,10 +11731,6 @@ function updatePowerUps() {
           // Big "MAX POWER!" banner + flash + brief invincibility + persistent counter.
           if (!game.maxPowerRevealed) {
             game.maxPowerRevealed = true;
-            pushInfoText({
-              x: BASE_W/2, y: BASE_H/2 - 20, text: 'MAX POWER!',
-              color: '#fc4', life: 120, maxLife: 120, size: 16, glow: 10
-            });
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 - 4, text: 'BUILD COMPLETE',
               color: '#fff', life: 120, maxLife: 120, size: 7
@@ -11952,14 +11868,6 @@ function updatePilotTitleCache() {
       game._titlePromoFired = true;
       const _newCol = (typeof pilotTitleColor === 'function')
         ? pilotTitleColor(_newTitle) : '#fc4';
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 50, text: 'PROMOTED',
-        color: '#fff', life: 100, maxLife: 100, size: 7, glow: 5
-      });
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 38, text: _newTitle,
-        color: _newCol, life: 110, maxLife: 110, size: 11
-      });
     }
     localStorage.setItem('galagaTitleSeen', _newTitle);
   } catch (e) {}
@@ -12166,11 +12074,6 @@ function bumpCombo() {
         life: 0, maxLife: _is100 ? 32 : 24, maxR: _is100 ? 50 : 32, color: _ringCol
       });
     }
-    pushInfoText({
-      x: BASE_W / 2, y: BASE_H / 2 - 50,
-      text: _is100 ? 'MASTER COMBO!' : 'DEEP COMBO!',
-      color: _ringCol, life: 90, maxLife: 90, size: _is100 ? 13 : 11
-    });
     game.flashTimer = Math.max(game.flashTimer || 0, _is100 ? 10 : 6);
     game.flashColor = _ringCol;
     game.shakeTimer = Math.max(game.shakeTimer || 0, _is100 ? 8 : 4);
@@ -12194,11 +12097,6 @@ function bumpCombo() {
                    : game._mkCount >= 5  ? '#fc4'
                    : '#0ff';
       const _mkSize = game._mkCount >= 10 ? 11 : 8;
-      pushInfoText({
-        x: game.playerX, y: game.playerY - 26,
-        text: _mkLabel + (game._mkCount >= 5 ? ' x' + game._mkCount : ''),
-        color: _mkCol, life: 60, maxLife: 60, size: _mkSize
-      });
       const _confettiN = game._mkCount >= 12 ? 16
                        : game._mkCount >= 10 ? 10
                        : game._mkCount >= 5  ? 4
@@ -12225,10 +12123,6 @@ function bumpCombo() {
       if (game.combo > prevBest) {
         game._comboPbFired = true;
         localStorage.setItem('galagaMaxComboEver', String(game.combo));
-        pushInfoText({
-          x: BASE_W/2, y: BASE_H/2 - 40, text: 'NEW COMBO RECORD!',
-          color: '#fc4', life: 100, maxLife: 100, size: 11
-        });
         game.floatTexts.push({
           x: BASE_W/2, y: BASE_H/2 - 26, text: 'COMBO ' + game.combo,
           color: '#fff', life: 100, maxLife: 100, size: 7
@@ -12271,10 +12165,6 @@ function bumpCombo() {
       x: BASE_W/2, y: BASE_H/2 - 36, text: label,
       color: game.flashColor, life: 90, maxLife: 90, size: 14
     });
-    pushInfoText({ // detail-view only (subtitle; the COMBO N primary stays)
-      x: BASE_W/2, y: BASE_H/2 - 22, text: subtitle,
-      color: '#ff4', life: 90, maxLife: 90, size: 9
-    });
     rumble(300 + megaTier * 60, 0.85, 0.5);
   }
   // COMBO ARSENAL — trigger any unlocks now reachable. Using `>=` so a missed exact
@@ -12309,10 +12199,6 @@ function bumpCombo() {
     // x3.0) per run gets a banner + milestone SFX. Once per run via flag.
     if (!game._maxComboTierFired) {
       game._maxComboTierFired = true;
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 30, text: 'MAX MULTIPLIER',
-        color: '#fc4', life: 80, maxLife: 80, size: 10
-      });
       game.floatTexts.push({
         x: BASE_W/2, y: BASE_H/2 - 18, text: 'x3.0 ACTIVE',
         color: '#fff', life: 70, maxLife: 70, size: 6
@@ -12410,13 +12296,6 @@ function updateCombo() {
           game.flashColor = '#666';
           game.comboLostVignette = huge ? 60 : 40;
         }
-        pushInfoText({
-          x: BASE_W / 2, y: BASE_H / 2 - 8,
-          text: huge ? 'BIG COMBO LOST!!' : (big ? 'COMBO BROKEN!' : 'COMBO LOST'),
-          color: huge ? '#f44' : (big ? '#f80' : '#888'),
-          life: 60, maxLife: 60,
-          size: huge ? 14 : (big ? 11 : 8)
-        });
         if (totalPts > 0) {
           game.floatTexts.push({
             x: BASE_W / 2, y: BASE_H / 2 + (big ? 14 : 4),
@@ -12663,10 +12542,6 @@ function updateEnemies() {
     const aliveCount = game.enemies.filter(en => en.alive).length;
     if (aliveCount === 1) {
       game.lastStandAnnounced = true;
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 30, text: 'LAST ONE!',
-        color: '#fc4', life: 60, maxLife: 60, size: 10
-      });
       playSound('milestone');
     }
   }
@@ -13271,11 +13146,6 @@ function updateChallengeEnemies() {
       if (typeof playSound === 'function') playSound('milestone');
       // RUN PERFECT WAVE MILESTONES — gold banner at 5/10/20 lifetime-of-run
       if (game.perfectWavesRun === 5 || game.perfectWavesRun === 10 || game.perfectWavesRun === 20) {
-        pushInfoText({
-          x: BASE_W/2, y: BASE_H/2 - 18,
-          text: 'PERFECT WAVES x' + game.perfectWavesRun,
-          color: '#fc4', life: 90, maxLife: 90, size: 9
-        });
         if (typeof spawnConfetti === 'function') spawnConfetti(10);
       }
       // ALL-PERFECT STAGE BANNER — all waves in this stage perfect (final wave).
@@ -13446,12 +13316,6 @@ function updateCollisions() {
         if (e.hp > 0 && e.maxHp > 1) {
           const _dn = b.dmg || 1;
           const _dCol = b.crit ? '#f44' : _dn >= 3 ? '#fc4' : _dn >= 2 ? '#0ff' : '#fff';
-          pushInfoText({ // detail-view only (per-hit damage chatter)
-            x: e.x + (Math.random() * 4 - 2),
-            y: e.y - 8,
-            text: '-' + _dn,
-            color: _dCol, life: 24, maxLife: 24, size: 4
-          });
         }
         // CRIT NON-KILL FLAIR — even if crit didn't finish the enemy, mark
         // the moment with a small gold spark trio + 'CRIT' text so the player
@@ -13465,10 +13329,6 @@ function updateCollisions() {
               life: -k, color: '#fc4'
             });
           }
-          pushInfoText({ // detail-view only (sparks carry the crit in simple view)
-            x: e.x, y: e.y - 10, text: 'CRIT',
-            color: '#fc4', life: 28, maxLife: 28, size: 5
-          });
         }
         // GHOST REVEAL — first hit on a ghost variant reveals it (full alpha).
         // Cinematic beat: purple shockwave + 'REVEALED' floattext + graze SFX
@@ -13481,10 +13341,6 @@ function updateCollisions() {
               x: e.x, y: e.y, life: 0, maxLife: 18, maxR: 14, color: '#a8f'
             });
           }
-          pushInfoText({ // detail-view only (the purple shockwave stays always)
-            x: e.x, y: e.y - 10, text: 'REVEALED',
-            color: '#a8f', life: 32, maxLife: 32, size: 5
-          });
           if (typeof playSound === 'function') playSound('graze', e.x);
         }
         // Shield-break feedback (only when not killed in same hit)
@@ -13508,10 +13364,6 @@ function updateCollisions() {
                 life: -k, color: '#fc4'
               });
             }
-            pushInfoText({
-              x: e.x, y: e.y - 14, text: 'CRIT KILL!',
-              color: '#fc4', life: 42, maxLife: 42, size: 7
-            });
             try {
               const ck = parseInt(localStorage.getItem('galagaCritKills') || '0', 10) || 0;
               localStorage.setItem('galagaCritKills', String(ck + 1));
@@ -13554,10 +13406,6 @@ function updateCollisions() {
           if (game.activePerk === 'vampire' && game.stats.kills > 0 && game.stats.kills % 10 === 0
               && (game.shieldCharges || 0) < SHIELD_MAX) {
             game.shieldCharges = (game.shieldCharges || 0) + 1;
-            pushInfoText({
-              x: game.playerX, y: game.playerY - 12, text: 'VAMPIRE +SHIELD',
-              color: '#f6f', life: 50, maxLife: 50, size: 6
-            });
             playSound('powerUp');
           }
           bumpCombo();
@@ -13596,10 +13444,6 @@ function updateCollisions() {
                 && !game._openingSalvoFired) {
               game._openingSalvoFired = true;
               addScore(500);
-              pushInfoText({
-                x: BASE_W/2, y: BASE_H/2 - 20, text: 'OPENING SALVO',
-                color: '#ff4', life: 70, maxLife: 70, size: 11, glow: 7
-              });
               game.floatTexts.push({
                 x: BASE_W/2, y: BASE_H/2 - 8, text: '+500',
                 color: '#fff', life: 70, maxLife: 70, size: 6
@@ -13617,21 +13461,9 @@ function updateCollisions() {
           // screen readable during normal play.
           if (pts >= 200) {
             const ksCol = pts >= 1000 ? '#ff4' : pts >= 500 ? '#fc4' : '#fff';
-            pushInfoText({ // detail-view only (GUI-simplify: per-kill score chatter)
-              x: e.x + (Math.random() * 4 - 2),
-              y: e.y - 6,
-              text: '+' + fmtScore(pts),
-              color: ksCol, life: 22, maxLife: 22,
-              size: pts >= 1000 ? 7 : 5,
-              glow: pts >= 1000 ? 4 : 0
-            });
           }
           if (e.ghost) {
             // GHOST KILL CELEBRATION — purple sparkle burst + banner + persistent counter
-            pushInfoText({
-              x: e.x, y: e.y - 12, text: 'GHOST KILL!',
-              color: '#a8f', life: 50, maxLife: 50, size: 8
-            });
             // SIGNAL INTERCEPT — confused enemy chatter when invisible variant is killed
             // GHOST CHAIN — per-stage tally. 2nd+ ghost in same stage adds
             // a +100 bonus and a "GHOST CHAIN x N" callout.
@@ -13672,10 +13504,6 @@ function updateCollisions() {
               localStorage.setItem('galagaEliteKills', String(_eT + 1));
             } catch (_e) {}
             // Brief floating "ELITE!" tag so the kill reads as more meaningful
-            pushInfoText({
-              x: e.x, y: e.y - 10, text: 'ELITE!',
-              color: '#f44', life: 32, maxLife: 32, size: 6
-            });
             // ELITE KILL FLASH — extra cinematic: red shockwave + 8 radial sparks.
             // Purely visual (no AoE damage); differentiates elite kills from base.
             if (game.shockwaves) {
@@ -13763,10 +13591,6 @@ function updateCollisions() {
                 _fe.panicOffY = 0;
               }
               // Announcement
-              pushInfoText({
-                x: BASE_W / 2, y: BASE_H / 2 - 20,
-                text: 'FORMATION BREAK', color: '#f84', life: 60, maxLife: 60, size: 9
-              });
               game.floatTexts.push({
                 x: BASE_W / 2, y: BASE_H / 2 - 8,
                 text: 'SURVIVORS SCATTER', color: '#fc4', life: 60, maxLife: 60, size: 6
@@ -14175,10 +13999,6 @@ function updateCollisions() {
                 });
               }
             }
-            pushInfoText({
-              x: e.x, y: e.y - 10, text: 'SPLIT',
-              color: '#fa0', life: 24, maxLife: 24, size: 5
-            });
           }
 
           // Self-rescue bonus — killing a boss MID-CAPTURE before it grabs your ship
@@ -14429,14 +14249,6 @@ function updateCollisions() {
             }
           } catch (_eL) {}
         }
-        if (game.nearMissChain >= 3) {
-          pushInfoText({
-            x: game.playerX, y: game.playerY - 18,
-            text: 'GRAZE x' + game.nearMissChain,
-            color: '#0ff', life: 36, maxLife: 36, size: 7,
-            glow: game.nearMissChain >= 5 ? 5 : 3
-          });
-        }
         // NARRATIVE FUSION — a deep graze chain (sustained bullet-weaving) makes the
         // enemy comms note the "ghost in the barrage" (once/run at chain 8).
         if (game.nearMissChain >= 8 && !game._grazeChainInterceptFired
@@ -14453,12 +14265,6 @@ function updateCollisions() {
           game.comboTimer = Math.min(COMBO_DECAY, (game.comboTimer || 0) + 20);
           // Legibility — only surface "COMBO HELD" when the graze actually rescued
           // a combo that was about to expire (timer < 40). Avoids spam on safe grazes.
-          if (_wasDanger) {
-            pushInfoText({
-              x: 34, y: 42, text: 'COMBO HELD',
-              color: '#0ff', life: 30, maxLife: 30, size: 5
-            });
-          }
         }
         // NEAR MISS LIFETIME — accumulate across runs in localStorage. Mirrors
         // parry lifetime pattern (try/catch, non-fatal on corrupt storage).
@@ -15120,12 +14926,6 @@ function checkPbHalfMark() {
   if (typeof pb !== 'number' || pb <= 0) return;
   if (game.stageFrames >= pb * 0.5 && game.stageFrames < pb * 0.7) {
     game._pbHalfMarkFired = true;
-    if (game.floatTexts) {
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H - 70, text: 'HALF MARK',
-        color: '#0cf', life: 40, maxLife: 40, size: 6
-      });
-    }
   }
 }
 
@@ -15152,15 +14952,7 @@ function updateEnduranceTiers() {
       game._enduranceFired[tier.frames] = true;
       const minutes = Math.floor(tier.frames / 3600);
       // Big banner
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 24, text: tier.label,
-        color: tier.col, life: 100, maxLife: 100, size: tier.size
-      });
       // Subtitle showing time + bonus
-      pushInfoText({
-        x: BASE_W/2, y: BASE_H/2 - 12, text: minutes + ' MIN · +' + tier.bonus,
-        color: '#cfc', life: 100, maxLife: 100, size: 6
-      });
       if (typeof addScore === 'function') addScore(tier.bonus);
       if (typeof spawnConfetti === 'function') spawnConfetti(8 + Math.floor(tier.bonus / 1000));
       game.flashTimer = Math.max(game.flashTimer || 0, 6);
@@ -15325,10 +15117,6 @@ function spawnStageClear(label, sub) {
   // (e.g., instant boss-down doesn't deserve trophy).
   if ((game.stageHitTaken || 0) === 0 && (game.stageShotsFired || 0) >= 5) {
     addScore(300);
-    pushInfoText({
-      x: BASE_W/2, y: BASE_H/2 + 50, text: 'UNTOUCHED +300',
-      color: '#0ff', life: 100, maxLife: 100, size: 11
-    });
     if (game.shockwaves) {
       game.shockwaves.push({
         x: game.playerX, y: game.playerY,
@@ -15366,10 +15154,6 @@ function spawnStageClear(label, sub) {
   // Adds drama to the win + small score bonus + lifetime counter.
   if ((game.lives || 0) === 1 && !game.stageDied) {
     addScore(200);
-    pushInfoText({
-      x: BASE_W/2, y: BASE_H/2 + 24, text: 'LAST STAND +200',
-      color: '#f44', life: 100, maxLife: 100, size: 11
-    });
     game.flashTimer = Math.max(game.flashTimer || 0, 6);
     game.flashColor = '#f44';
     if (typeof rumble === 'function') rumble(320, 0.85, 0.5);
@@ -15422,18 +15206,7 @@ function checkStageComplete() {
         if (game.stageObjective) {
           if (game.stageObjective.met(game)) {
             game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
-            pushInfoText({
-              x: BASE_W/2, y: BASE_H/2 + 32,
-              text: 'OBJECTIVE COMPLETE!',
-              color: '#0f8', life: 100, maxLife: 100, size: 10
-            });
             spawnConfetti(8);
-          } else {
-            pushInfoText({
-              x: BASE_W/2, y: BASE_H/2 + 32,
-              text: 'MISSED: ' + game.stageObjective.label,
-              color: '#fa8', life: 80, maxLife: 80, size: 6
-            });
           }
         }
         const pbResult = recordStagePB(game.stage, game.stageFrames);
@@ -15459,10 +15232,6 @@ function checkStageComplete() {
           const txt = sPbR.prev != null
             ? 'SCORE PB! +' + fmtScore(sGained) + ' (+' + fmtScore(sGained - sPbR.prev) + ')'
             : 'SCORE PB! +' + fmtScore(sGained);
-          pushInfoText({
-            x: BASE_W/2, y: BASE_H/2 + 24, text: txt,
-            color: '#ff4', life: 90, maxLife: 90, size: 7
-          });
         }
       }
       if (game.stageEndGraceTimer < STAGE_END_GRACE) {
@@ -15494,18 +15263,7 @@ function checkStageComplete() {
       if (game.stageObjective) {
         if (game.stageObjective.met(game)) {
           game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
-          pushInfoText({
-            x: BASE_W/2, y: BASE_H/2 + 40,
-            text: 'OBJECTIVE COMPLETE!',
-            color: '#0f8', life: 100, maxLife: 100, size: 10
-          });
           spawnConfetti(8);
-        } else {
-          pushInfoText({
-            x: BASE_W/2, y: BASE_H/2 + 40,
-            text: 'MISSED: ' + game.stageObjective.label,
-            color: '#fa8', life: 80, maxLife: 80, size: 6
-          });
         }
       }
       // STAGE PB for challenging stage too
@@ -15533,10 +15291,6 @@ function checkStageComplete() {
           const txt = sPbR.prev != null
             ? 'SCORE PB! +' + fmtScore(sGained) + ' (+' + fmtScore(sGained - sPbR.prev) + ')'
             : 'SCORE PB! +' + fmtScore(sGained);
-          pushInfoText({
-            x: BASE_W/2, y: BASE_H/2 + 32, text: txt,
-            color: '#ff4', life: 90, maxLife: 90, size: 7
-          });
         }
       }
       game.stage++;
@@ -15570,11 +15324,6 @@ function checkStageComplete() {
           // SECONDARY OBJECTIVE check (visual reward when met, miss hint when not)
           if (game.stageObjective && game.stageObjective.met(game)) {
             game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
-            pushInfoText({
-              x: BASE_W/2, y: BASE_H/2 + 32,
-              text: 'OBJECTIVE COMPLETE!',
-              color: '#0f8', life: 100, maxLife: 100, size: 10
-            });
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 + 42,
               text: game.stageObjective.label,
@@ -15642,10 +15391,6 @@ function checkStageComplete() {
             if (game.zenStreak === 10) unlockAchievement('perfectRun');
             // MARATHON BANNER — gold banner at no-death streak milestones
             if (game.zenStreak === 5 || game.zenStreak === 10 || game.zenStreak === 20) {
-              pushInfoText({
-                x: BASE_W/2, y: BASE_H/2 - 6, text: 'MARATHON x' + game.zenStreak,
-                color: '#fc4', life: 110, maxLife: 110, size: 12
-              });
               spawnConfetti(10);
               playSound('milestone');
             }
@@ -15690,23 +15435,7 @@ function checkStageComplete() {
           if (total > 0) addScore(total);
           const cy = BASE_H / 2 + 22;
           // Each bonus animates from 0 → final over 30 frames so they feel like a tally rolling up
-          if (timeBonus > 0) pushInfoText({
-            x: BASE_W/2, y: cy, text: '', countTo: timeBonus, prefix: 'TIME +', countDuration: 30,
-            color: '#0ff', life: 80, maxLife: 80, size: 7
-          });
-          if (noDeathBonus > 0) pushInfoText({
-            x: BASE_W/2, y: cy + 9, text: '', countTo: noDeathBonus, prefix: 'NO HIT +', countDuration: 30,
-            color: '#0f8', life: 80, maxLife: 80, size: 7
-          });
-          if (accBonus > 0) pushInfoText({
-            x: BASE_W/2, y: cy + 18, text: '', countTo: accBonus, prefix: 'ACCURACY +', countDuration: 30,
-            color: '#f6f', life: 80, maxLife: 80, size: 7
-          });
-          if (challengeBonus > 0) pushInfoText({
-            x: BASE_W/2, y: cy + 27, text: '', countTo: challengeBonus, prefix: 'CHALLENGE +', countDuration: 30,
-            color: '#f44', life: 80, maxLife: 80, size: 7
-          });
-          if (total > 0) game.floatTexts.push({
+          if (timeBonus > 0)          if (noDeathBonus > 0)          if (accBonus > 0)          if (challengeBonus > 0)          if (total > 0) game.floatTexts.push({
             x: BASE_W/2, y: cy + 39, text: '', countTo: total, prefix: 'TOTAL +', countDuration: 50,
             color: '#ff4', life: 80, maxLife: 80, size: 9
           });
@@ -15739,11 +15468,6 @@ function checkStageComplete() {
               game.aceStreak = (game.aceStreak || 0) + 1;
               if (game.aceStreak > (game.aceStreakBest || 0)) game.aceStreakBest = game.aceStreak;
               if (game.aceStreak === 3 || game.aceStreak === 5 || game.aceStreak === 10 || game.aceStreak === 15) {
-                pushInfoText({
-                  x: BASE_W/2, y: BASE_H/2 + 40,
-                  text: 'ACE STREAK x' + game.aceStreak,
-                  color: '#fc4', life: 100, maxLife: 100, size: 10
-                });
                 if (typeof spawnConfetti === 'function') spawnConfetti(8);
                 if (typeof playSound === 'function') playSound('milestone');
               }
@@ -15792,10 +15516,6 @@ function checkStageComplete() {
           {
             const accStage = computeStageAccuracy();
             if (!game.stageDied && accStage >= 85 && game.stageShotsFired >= 10) {
-              pushInfoText({
-                x: BASE_W/2, y: cy - 12, text: 'PERFECT CLEAR!',
-                color: '#ff4', life: 120, maxLife: 120, size: 11
-              });
               spawnConfetti(18);
               playSound('extraLife');
               try {
@@ -15810,10 +15530,6 @@ function checkStageComplete() {
                 game.floatTexts.push({
                   x: BASE_W/2, y: cy - 32, text: '★ GOLDEN CLEAR ★',
                   color: '#fc4', life: 140, maxLife: 140, size: 13
-                });
-                pushInfoText({
-                  x: BASE_W/2, y: cy - 20, text: 'PERFECT + PB! +1500',
-                  color: '#fff', life: 140, maxLife: 140, size: 7
                 });
                 spawnConfetti(24);
                 playSound('extraLife');
