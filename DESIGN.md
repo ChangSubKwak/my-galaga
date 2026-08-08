@@ -297,6 +297,46 @@ gaps remained:
   viewport height on a normal landscape display, so a bezel has no room without shrinking
   the play area. That is a legibility trade-off the player should choose, not a blind edit.
 
+## Item language (2026-08-08) — SPINNING VECTOR CORE
+User verdict on the pickups: *"아이템 디자인이 너무 멋이 없습니다"* (the item design has
+no style). The diagnosis was not taste, it was that the items broke rules this document
+already states:
+
+- **They fought the bloom.** The gem carried a full **white outline** while the direction
+  above says, in as many words, *don't fight the bloom with heavy outlines on bright
+  shapes — let the bloom be the outline.* An outlined gem reads as a flat sticker pasted
+  on the void instead of something emitting light.
+- **They were the only static object** in a game whose entire look is moving neon.
+- **Identity was illegible** — twelve bespoke 6×7px glyphs (lightning bolt, hourglass with
+  falling sand, sine ripple) at an internal resolution giving each about five pixels of ink.
+- **All twelve shared one cross-beam halo**, so at a glance every pickup looked the same.
+- The supply crate was **flat grey** — the one colour that cannot bloom — and encoded its
+  damage state as a **tint only**, which the colorblind rule forbids.
+
+**The language every collectible now shares** (power-up, supply crate, the magpie's
+carried loot; salvage shards already fit it):
+
+| layer | rule |
+|---|---|
+| additive flare | rotating, in the object's semantic colour — the object *throws* light so the full-frame bloom spreads it |
+| dark inner well | small; keeps the mark readable on the bright daylight biomes (same trick as the HUD backing) |
+| vector housing | thin rotating outline, **stroked and never filled** — the bloom supplies the glow |
+| emissive core | additive, pulsing |
+| the mark | **the letter**, upright, white, never rotated — it is the canonical identity (the help panel names every pickup by letter) *and* the colorblind redundancy, in one legible glyph |
+
+**Rules that fall out of this, for anything new:**
+1. A collectible is never grey and never outlined in white. If it should feel valuable, it
+   emits; the bloom does the rest.
+2. Damage/charge state must be readable as **shape** (the crate sheds a frame corner per
+   hit), not as tint alone.
+3. Wherever the same item is drawn a second time — carried by an enemy, shown in a HUD
+   chip — it is drawn as a **miniature of the real thing**, not its own shape.
+4. Rotation slows under `reduceMotion`.
+
+Side effect: `drawPowerUp` went 281 → 161 lines, since one letter replaced twelve glyph
+routines. **Verify by eye** — the layout audit proves text fits and nothing throws, but it
+cannot judge whether the result looks good.
+
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|

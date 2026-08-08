@@ -5946,13 +5946,30 @@ function drawMagpie() {
   // Greedy red eye
   ctx.fillStyle = '#f44';
   ctx.fillRect(px, py - 1, 1, 1);
-  // Carried loot dangles below — the theft is always visible.
+  // Carried loot dangles below — the theft is always visible. Drawn as a
+  // MINIATURE of the real pickup (dark well + type-coloured diamond + white
+  // letter), not as its own shape: the player has to recognise at a glance
+  // that the thing being carried off is the thing they wanted. It used to be
+  // a filled square with a BLACK letter, which matched nothing and went muddy
+  // at 4px.
   if (m.carry) {
     if (m.carry.kind === 'powerup') {
       const col = (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[m.carry.type]) || '#0df';
-      ctx.fillStyle = col;
-      ctx.fillRect(px - 2, py + 5, 5, 5);
-      drawRetroText(m.carry.type, px + 0.5, py + 8, 4, '#000');
+      const cy2 = py + 8;
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#08060a';
+      ctx.beginPath();
+      ctx.moveTo(px + 0.5, cy2 - 4); ctx.lineTo(px + 4.5, cy2);
+      ctx.lineTo(px + 0.5, cy2 + 4); ctx.lineTo(px - 3.5, cy2);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px + 0.5, cy2 - 4.5); ctx.lineTo(px + 5, cy2);
+      ctx.lineTo(px + 0.5, cy2 + 4.5); ctx.lineTo(px - 4, cy2);
+      ctx.closePath(); ctx.stroke();
+      drawRetroText(m.carry.type, px + 0.5, cy2, 4, '#fff');
     } else {
       const col = (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[m.carry.axis]) || '#0df';
       ctx.fillStyle = col;
