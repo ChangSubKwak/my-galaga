@@ -127,6 +127,36 @@ layers; **gameplay-functional colors stay** (optionally muted later).
   power-up/grade color-coding), `POWERUP_COL`, `GRADE_COL`, biome identity tints,
   shield green, dash/witch-time cyan, elite red, ghost. These encode game state.
 
+## Legibility floor (2026-08-08) — the dim end of the palette has a hard bottom
+A measured WCAG 2.1 §1.4.3 audit (every `drawRetroText` colour vs the pure-black
+void) found ~15 chrome labels sitting at **2.2–3.7:1** — `#333`/`#444`/`#446`/
+`#555`/`#666` on AAR panel labels, the ACH readout, the radar idle count, the
+bestiary hint, the PILOT LOG empty state. Fine on a bright editor; invisible on a
+dim laptop at arm's length.
+
+The fix deliberately did **not** flatten everything to white — the dim/bright split
+is real visual hierarchy (labels recede so values pop). Instead the *floor* rose and
+the hierarchy stayed:
+
+- `COL.label` `#8a8a8a` — **6.08:1** — de-emphasized labels/captions that carry info.
+- `COL.faint` `#777`    — **4.69:1** — the dimmest text the game is allowed to draw.
+
+Anything dimmer is reserved for genuinely **inactive** state (a locked bestiary row,
+a disabled BGM toggle), which WCAG exempts and where the dimness *is* the message.
+Dark-on-bright text (a power-up letter on its filled chip) is correct and exempt.
+Locked bestiary rows were still lifted `#444 → #666` — "undiscovered" should read as
+locked, not as absent.
+
+**Locked by test**: the logic suite asserts `COL.label`/`COL.faint`/`COL.gray` and every
+bright semantic colour clear 4.5:1 on the void, and that `label` stays brighter than
+`faint`. Re-introducing a sub-floor chrome colour now fails the build.
+
+Validated against the `ui-ux-pro-max` design skill, whose recommendation for this
+product type (retro arcade / entertainment / dark neon) independently returns **Pixel
+Art on a dark ground with neon accents** — i.e. it endorses the existing NEON VECTOR
+BLOOM direction and flags exactly one risk: *"Accessibility: Good **if contrast ok**"*
+and *"Avoid: poor contrast ratios."* That is the gap this section closes.
+
 ## Applied so far (pass 1 — ambient field)
 - Page background gradient → noir. Canvas frame glow: blue → crimson + white inset.
 - `STAR_COLORS` → monochrome white/gray (dropped cyan/pink/yellow tints).

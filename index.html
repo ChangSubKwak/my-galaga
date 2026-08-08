@@ -220,7 +220,19 @@ function isCombatState() {
 const COL = {
   red: '#e44', cyan: '#0ff', yellow: '#ff0', white: '#fff', green: '#0f0',
   blue: '#44f', magenta: '#f4f', orange: '#f80', pink: '#f8a',
-  darkBlue: '#228', gray: '#888'
+  darkBlue: '#228', gray: '#888',
+  // LEGIBILITY FLOOR — the two de-emphasis tokens for text that still carries
+  // information. A contrast audit (WCAG 2.1 §1.4.3, measured against the pure
+  // black void) found ~15 chrome labels sitting at 2.2–3.7:1 — readable on a
+  // bright editor, invisible on a dim laptop at arm's length. The fix is NOT to
+  // flatten everything to white: the dim/bright split is real visual hierarchy
+  // (labels recede so values pop). Instead the FLOOR is raised, hierarchy intact.
+  //   label — de-emphasized labels/captions        #8a8a8a → 6.08:1  PASS
+  //   faint — the dimmest text still allowed       #777777 → 4.69:1  PASS
+  // Anything dimmer is reserved for genuinely INACTIVE state (locked bestiary
+  // rows, a disabled BGM toggle), which WCAG exempts and where the dimness is
+  // itself the message.
+  label: '#8a8a8a', faint: '#777'
 };
 
 // --- Audio engine ---
@@ -18217,7 +18229,7 @@ function drawTitleScreen() {
   if (!minimalHud) { // detail view only (GUI-simplify: meta counter)
     const ach = unlockedAchievements ? unlockedAchievements.size : 0;
     const total = Object.keys(ACHIEVEMENTS).length;
-    drawRetroText('ACH ' + ach + '/' + total, 4, BASE_H - 22, 5, '#446', 'left');
+    drawRetroText('ACH ' + ach + '/' + total, 4, BASE_H - 22, 5, COL.faint, 'left');
   }
   // Setting-change toasts (DIFFICULTY / SHAKE / RUMBLE / COLORBLIND / etc.) — visible feedback
   // when the player toggles a global setting from the title screen.
@@ -20476,18 +20488,18 @@ function drawGameplay() {
       ctx.globalAlpha = Math.min(1, fadeIn * 1.4) * 0.85;
 
       // Cause row (prominent)
-      drawRetroText('CAUSE', panX + 12, panY + 23, 5, '#666', 'left');
+      drawRetroText('CAUSE', panX + 12, panY + 23, 5, COL.label, 'left');
       drawRetroText(_dcLabel, panX + panW - 12, panY + 23, 5, _dcCol, 'right');
 
       // Stage + kills row
-      drawRetroText('STAGE', panX + 12, panY + 33, 5, '#555', 'left');
+      drawRetroText('STAGE', panX + 12, panY + 33, 5, COL.label, 'left');
       drawRetroText(String(game.stage || 1), panX + panW - 12, panY + 33, 5, '#0cf', 'right');
 
-      drawRetroText('KILLS', panX + 12, panY + 43, 5, '#555', 'left');
+      drawRetroText('KILLS', panX + 12, panY + 43, 5, COL.label, 'left');
       drawRetroText(String(_kills), panX + panW - 12, panY + 43, 5, '#0cf', 'right');
 
       // Accuracy + combo row
-      drawRetroText('ACC', panX + 12, panY + 53, 5, '#555', 'left');
+      drawRetroText('ACC', panX + 12, panY + 53, 5, COL.label, 'left');
       drawRetroText(_acc, panX + 70, panY + 53, 5,
         _sf >= 5 && parseInt(_acc) >= 80 ? '#0f8' : _sf >= 5 && parseInt(_acc) >= 60 ? '#fc4' : '#888', 'right');
       drawRetroText('PEAK×' + _best, panX + panW - 12, panY + 53, 5,
@@ -20573,7 +20585,7 @@ function drawGameplay() {
         const _pFade = Math.min(1, (prog - 0.50) / 0.25);
         ctx.save();
         ctx.globalAlpha = _pFade * 0.75;
-        drawRetroText('PWR  S1  N1  P1', BASE_W/2, _ry + 20, 5, '#666');
+        drawRetroText('PWR  S1  N1  P1', BASE_W/2, _ry + 20, 5, COL.label);
         ctx.restore();
       }
 
@@ -21128,7 +21140,7 @@ function drawHUD() {
       drawRetroText('ACC ' + _sacc + '%', _irx, _rY1, 5, _acCol, 'left');
     }
     if (_sTime) {
-      drawRetroText('TIME ' + _sTime, _irx + 70, _rY1, 5, '#666', 'left');
+      drawRetroText('TIME ' + _sTime, _irx + 70, _rY1, 5, COL.label, 'left');
     }
     if (_sEarned > 0) {
       const _ptCol = _sEarned >= 10000 ? '#fc4' : _sEarned >= 3000 ? '#0cf' : '#888';
@@ -21686,7 +21698,7 @@ function drawHUD() {
           ctx.shadowColor = '#fc4'; ctx.shadowBlur = 5;
           drawRetroText('LAST: PERFECT ★', BASE_W / 2, 95, 4, '#fc4');
         } else {
-          drawRetroText('LAST: CLEARED', BASE_W / 2, 95, 4, '#555');
+          drawRetroText('LAST: CLEARED', BASE_W / 2, 95, 4, COL.faint);
         }
         ctx.restore();
       }
@@ -22632,7 +22644,7 @@ function drawGameOverScreen() {
     if (game.animFrame % 60 < 40) {
       drawRetroText('SPACE TITLE   R RETRY', BASE_W/2, cy + 126, 6, COL.cyan);
     }
-    drawRetroText('TITLE → TAB PROFILE', BASE_W/2, cy + 134, 4, '#666');
+    drawRetroText('TITLE → TAB PROFILE', BASE_W/2, cy + 134, 4, COL.faint);
     // CHEAT-USED honor flag
     if (game._cheatUsedAtAnyTime) {
       drawRetroText('(GOD MODE USED)', BASE_W/2, cy + 141, 4, '#a88');
@@ -22945,7 +22957,7 @@ function drawBossStage() {
         ctx.save();
         if (isDead) {
           ctx.globalAlpha = 0.25;
-          drawRetroText('---', segCX, barY - 7, 4, '#555', 'center');
+          drawRetroText('---', segCX, barY - 7, 4, COL.faint, 'center');
         } else {
           const labelText = isP2 ? (aLabel + '!!') : aLabel;
           const lCol = isP2 ? (_t % 10 < 5 ? '#f44' : aCol) : aCol;
@@ -23322,7 +23334,7 @@ function drawPauseScreen() {
     ctx.globalAlpha = 0.48;
     drawRetroText('RADAR', _mapX + 3, _mapY + 3, 4, '#0af', 'left');
     ctx.globalAlpha = _nTargets > 0 ? 0.68 : 0.32;
-    drawRetroText(_nTargets + ' TGT', _mapX + _mapW - 3, _mapY + 3, 4, _nTargets > 0 ? '#f88' : '#555', 'right');
+    drawRetroText(_nTargets + ' TGT', _mapX + _mapW - 3, _mapY + 3, 4, _nTargets > 0 ? '#f88' : COL.faint, 'right');
     ctx.restore();
   }
 }
@@ -23902,8 +23914,8 @@ function drawStatsOverlay() {
       drawRetroText(_fl.length + ' SORTIES ON RECORD', px + 8, y, 5, COL.gray, 'left');
       y += 8;
       if (!_fl.length) {
-        drawRetroText('NO SORTIES LOGGED YET', px + 8, y + 6, 6, '#555', 'left');
-        drawRetroText('FLY. THE LOG REMEMBERS.', px + 8, y + 16, 5, '#444', 'left');
+        drawRetroText('NO SORTIES LOGGED YET', px + 8, y + 6, 6, COL.label, 'left');
+        drawRetroText('FLY. THE LOG REMEMBERS.', px + 8, y + 16, 5, COL.faint, 'left');
       }
       for (let i = 0; i < _fl.length; i++) {
         const e = _fl[i];
@@ -23947,9 +23959,9 @@ function drawStatsOverlay() {
         const got = dexUnlocked.has(t);
         ctx.fillStyle = got ? 'rgba(0,255,136,0.10)' : 'rgba(40,40,40,0.40)';
         ctx.fillRect(px + 6, y - 1, panelW - 12, 8);
-        drawRetroText(got ? info.name : '???', px + 8, y + 1, 6, got ? info.col : '#444', 'left');
+        drawRetroText(got ? info.name : '???', px + 8, y + 1, 6, got ? info.col : '#666', 'left');
         drawRetroText(got ? info.trait : 'DEFEAT TO REVEAL',
-                      px + panelW - 8, y + 1, 5, got ? '#fff' : '#333', 'right');
+                      px + panelW - 8, y + 1, 5, got ? '#fff' : COL.faint, 'right');
         y += 9;
       }
       // Codex completion bar — anchored above the footer, mirroring the achievement
@@ -24138,7 +24150,7 @@ function drawStatsOverlay() {
     for (const [_lab, _val, _pg] of _dir) {
       drawRetroText(_lab, px + 10, y, 5, COL.cyan, 'left');
       if (_val) drawRetroText(_val, px + panelW - 26, y, 5, '#fff', 'right');
-      drawRetroText(_pg, px + panelW - 8, y, 4, '#667', 'right');
+      drawRetroText(_pg, px + panelW - 8, y, 4, COL.faint, 'right');
       y += 9;
     }
   }

@@ -177,6 +177,7 @@ const shim = `
 ;try { globalThis.__getRivalLines = function () { return (typeof RIVAL_LINES !== 'undefined') ? RIVAL_LINES : null; }; } catch (e) {}
 ;try { globalThis.__getEchoLines = function () { return (typeof ECHO_LINES !== 'undefined') ? ECHO_LINES : null; }; } catch (e) {}
 ;try { globalThis.__getArchetypeMotifs = function () { return (typeof ARCHETYPE_MOTIFS !== 'undefined') ? ARCHETYPE_MOTIFS : null; }; } catch (e) {}
+;try { globalThis.__getCol = function () { return (typeof COL !== 'undefined') ? COL : null; }; } catch (e) {}
 ;try { globalThis.__getRespawnWhispers = function () { return (typeof RESPAWN_WHISPERS !== 'undefined') ? RESPAWN_WHISPERS : null; }; } catch (e) {}
 `;
 
@@ -3296,6 +3297,44 @@ if (typeof G.directorBudget === 'function' && typeof G.directorAdmit === 'functi
     g.guardian = sv.gu; g.deathEcho = sv.de; g.stageWeather = sv.w;
   }
 } else { console.log('  (skipped — DIRECTOR not exposed)'); }
+
+section('LEGIBILITY FLOOR — WCAG contrast contract for de-emphasized chrome text');
+if (G.__getCol && G.__getCol()) {
+  // Relative luminance + contrast ratio per WCAG 2.1. The game's void is pure
+  // black, so measuring against #000 is the true worst case for chrome text.
+  const _lum = (hex) => {
+    let h = String(hex).replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    const v = [0, 2, 4].map(i => {
+      const c = parseInt(h.substr(i, 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  };
+  const _ratio = (fg, bg) => {
+    const a = _lum(fg), b = _lum(bg);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  // Sanity-check the metric itself before trusting it on the palette.
+  ok(Math.abs(_ratio('#fff', '#000') - 21) < 0.01, 'contrast metric: white on black = 21:1');
+  ok(Math.abs(_ratio('#000', '#000') - 1) < 0.001, 'contrast metric: black on black = 1:1');
+
+  const COL = G.__getCol();
+  ok(typeof COL.label === 'string' && typeof COL.faint === 'string',
+     'COL exposes the two legibility-floor tokens (label / faint)');
+  ok(_ratio(COL.faint, '#000') >= 4.5,
+     'COL.faint — the dimmest allowed informational text — clears WCAG 4.5:1 on the void');
+  ok(_ratio(COL.label, '#000') >= 4.5,
+     'COL.label clears WCAG 4.5:1 on the void');
+  ok(_ratio(COL.label, '#000') > _ratio(COL.faint, '#000'),
+     'label is brighter than faint (the de-emphasis hierarchy survives the floor)');
+  ok(_ratio(COL.gray, '#000') >= 4.5, 'COL.gray (the workhorse chrome gray) also clears 4.5:1');
+  // The bright semantic colors carry gameplay meaning on the dark void — they
+  // must stay readable too, or colorblind shape-redundancy is doing all the work.
+  for (const key of ['white', 'cyan', 'yellow', 'green', 'magenta', 'orange', 'pink']) {
+    ok(_ratio(COL[key], '#000') >= 4.5, 'COL.' + key + ' clears 4.5:1 on the void');
+  }
+} else { console.log('  (skipped — COL not exposed)'); }
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
