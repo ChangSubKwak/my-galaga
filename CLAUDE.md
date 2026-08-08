@@ -187,6 +187,17 @@ FAIRNESS limits — past them bullets stop being readable and dives stop being d
 which is unfair, not hard. Escalate density and composition instead, and keep every
 threat's telegraph intact (the extra diver still gets the full 30-frame preview).
 
+**The boss track got the same treatment.** It had both failure modes at once: boss
+horizontal speed was *uncapped* (`1.7 + stage*0.10`, then ×1.5 at phase 2 and ×1.2 at
+phase 3 → 21 px/frame at stage 100, **8.4× `PLAYER_SPEED`**, crossing the arena in 9
+frames), while fire cadence / dash cadence / volley width were all flat from ~stage 30,
+so all eight SUPER bosses were the same fight and only HP grew (a bullet sponge).
+`clampBossVx` now caps the base at `BOSS_VX_BASE_MAX = 5.0` (set *above* stage 30's 4.70
+so the first SUPER boss is untouched) and the post-rage magnitude at `BOSS_VX_MAX = 9.0`
+(= 5.0 × 1.5 × 1.2 — rage still reads, capped at 3.6× player speed). The removed speed is
+paid back by `bossSpreadForStage` ramping the volley 7 → 9. Tests pin the ceiling, prove
+stage 30 was not nerfed, and require the deep fight to differ in *kind*, not just length.
+
 The test suite guards the **curve shape** across stages 1–100: no inversion, no >12%
 single-stage wall, never 10+ flat stages, stage 100 materially harder than stage 32 —
 and it pins the three fairness caps so they cannot quietly drift up.
