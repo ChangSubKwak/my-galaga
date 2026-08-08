@@ -712,9 +712,6 @@ function markDailyMissionDone() {
     const total = parseInt(localStorage.getItem('galagaDailyMissionTotal') || '0', 10) || 0;
     localStorage.setItem('galagaDailyMissionTotal', String(total + 1));
     if (typeof unlockAchievement === 'function') {
-      if (total + 1 >= 10)  unlockAchievement('dailyTen');
-      if (total + 1 >= 30)  unlockAchievement('dailyMonth');
-      if (total + 1 >= 100) unlockAchievement('dailyCentury');
     }
     // DAILY MISSION MASTERY — record this mission type to a Set; unlock master
     // achievement when all 11 mission types have been completed at least once.
@@ -744,7 +741,6 @@ function markDailyMissionDone() {
     }
     // 30-day streak achievement
     if (newStreak >= 30 && typeof unlockAchievement === 'function') {
-      unlockAchievement('dailyStreak30');
     }
     // Streak milestone celebrations: 3/7/30 days (game.floatTexts trigger)
     if (game && (newStreak === 3 || newStreak === 7 || newStreak === 30)) {
@@ -801,7 +797,6 @@ const CINEMATIC_END = 420; // 7 seconds at 60fps
 function endCinematic() {
   // PATIENT achievement: only unlocked when the cinematic plays through (not skipped early)
   if (introCinematic && cinematicFrame >= CINEMATIC_END - 1 && typeof unlockAchievement === 'function') {
-    unlockAchievement('patientWatch');
   }
   introCinematic = false;
   try { localStorage.setItem('galagaIntroSeen', '1'); } catch (e) {}
@@ -5617,7 +5612,6 @@ function resolveRivalDepleted(r) {
   try {
     const rw = (parseInt(localStorage.getItem('galagaRivalWins') || '0', 10) || 0) + 1;
     localStorage.setItem('galagaRivalWins', String(rw));
-    if (rw >= 3) unlockAchievement('rivalHunter');
   } catch (e) {}
   game.rivalDefeats = (game.rivalDefeats || 0) + 1;
   playSound('killFormationBoss', r.x);
@@ -5821,7 +5815,6 @@ function updateSalvageShards() {
       try {
         const sv = (parseInt(localStorage.getItem('galagaSalvageTotal') || '0', 10) || 0) + 1;
         localStorage.setItem('galagaSalvageTotal', String(sv));
-        if (sv >= 5) unlockAchievement('salvager');
       } catch (e) {}
       game.salvageShards.splice(i, 1);
     }
@@ -5973,7 +5966,6 @@ function updateDeathEcho() {
       });
     }
     playSound('rescue');
-    unlockAchievement('echoBound');
   }
 }
 
@@ -6159,7 +6151,6 @@ function updateMagpie() {
       try {
         const mk = (parseInt(localStorage.getItem('galagaMagpieKills') || '0', 10) || 0) + 1;
         localStorage.setItem('galagaMagpieKills', String(mk));
-        if (mk >= 5) unlockAchievement('thiefTaker');
       } catch (e) {}
       playSound('explode', m.x);
       game.magpie = null;
@@ -7472,9 +7463,6 @@ function resetGame() {
         if (days.length > 365) days.shift();
         localStorage.setItem('galagaDailyDays', JSON.stringify(days));
       }
-      if (days.length >= 7) unlockAchievement('dailyDevotee');
-      if (days.length >= 14) unlockAchievement('globetrotter');
-      if (days.length >= 30) unlockAchievement('starGazer');
     } catch (e) {}
   }
   // Track ships used across sessions for the TRIPLE PILOT achievement
@@ -7482,24 +7470,18 @@ function resetGame() {
     const used = new Set(JSON.parse(localStorage.getItem('galagaShipsUsed') || '[]'));
     used.add(selectedShip);
     localStorage.setItem('galagaShipsUsed', JSON.stringify([...used]));
-    if (used.size >= 3) unlockAchievement('triplePilot');
   } catch (e) {}
   // CHECKPOINT achievement: starting from a milestone above 1
-  if ((startStageRequested || 1) > 1) unlockAchievement('checkpointUser');
   // NO SHAKE achievement: shake mode set to OFF
-  if (shakeMode === 'off') unlockAchievement('noShake');
   // WORLD TRIP — used all 3 difficulty modes (track in localStorage)
   try {
     const difs = new Set(JSON.parse(localStorage.getItem('galagaDifficultiesUsed') || '[]'));
     difs.add(difficultyMode);
     localStorage.setItem('galagaDifficultiesUsed', JSON.stringify([...difs]));
-    if (difs.size >= 3) unlockAchievement('worldTrip');
   } catch (e) {}
   // NIGHT OWL — playing between 22:00 and 06:00 local time
   {
     const hr = new Date().getHours();
-    if (hr >= 22 || hr < 6) unlockAchievement('nightOwl');
-    if (hr >= 6 && hr < 9) unlockAchievement('earlyBird');
   }
   game = {
     state: STATE.TITLE,
@@ -8539,10 +8521,8 @@ function updateOneMegaBoss(mb) {
         if (mb.super) {
           unlockAchievement('superSlayer');
           const accTotal = computeAccuracy(game.stats);
-          if (accTotal >= 80) unlockAchievement('superBeat');
         }
         if (game.megaBosses && game.megaBosses.length === 2 && game.megaBosses.every(b => !b.alive)) {
-          unlockAchievement('doubleBeat');
           // DOUBLE KO BANNER — both bosses cleared. Surface as gold banner +
           // confetti + milestone SFX for the rare double-stage moment.
           if (!game._doubleKoFired) {
@@ -8771,7 +8751,6 @@ function updateOneMegaBoss(mb) {
             const blitzBonus = Math.round(3000 + speedFactor * 7000);
             addScore(blitzBonus);
             // Achievement: under 5 seconds (300 frames)
-            if (elapsed <= 300) unlockAchievement('blitzKiller');
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 - 20, text: 'BLITZ KILL!',
               color: '#ff4', life: 110, maxLife: 110, size: 14
@@ -10123,10 +10102,7 @@ function addScore(pts) {
     }
   }
   if (old < 1000000 && game.score >= 1000000) unlockAchievement('millionaire');
-  if (old < 5000000 && game.score >= 5000000) unlockAchievement('rich');
-  if (old < 10000000 && game.score >= 10000000) unlockAchievement('zenith');
   // Score-cap milestone — fires exactly once when the player crosses into the MAX! display range.
-  if (old < SCORE_CAP && game.score >= SCORE_CAP) unlockAchievement('zenithMax');
   // Score milestone toasts (10K / 50K / 100K / 500K)
   for (const ms of SCORE_MILESTONES) {
     if (old < ms && game.score >= ms) {
@@ -10170,7 +10146,6 @@ function addScore(pts) {
       && old <= game.liveHighThreshold && game.score > game.liveHighThreshold) {
     game.crossedHighOnce = true;
     game.highScoreGlow = 240; // 4 seconds
-    unlockAchievement('recordBreaker');
     game.floatTexts.push({
       x: BASE_W/2, y: BASE_H/2 - 30, text: 'NEW HIGH SCORE!',
       color: '#ff4', life: 120, maxLife: 120, size: 14, glow: 10
@@ -10611,7 +10586,6 @@ function updateBullets() {
                 : (lastStandActive ? 0.65
                 : (slowMutation ? 0.7 : 1)));
   // Track peak bullet density for BARRAGE achievement
-  if (game.enemyBullets.length >= 30) unlockAchievement('barrage');
   for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
     const b = game.enemyBullets[i];
     b.x += b.vx * slowMul; b.y += b.vy * slowMul;
@@ -10656,8 +10630,6 @@ function updateBullets() {
         const lcol = close ? '#ff4' : '#0ff';
         addScore(bonus);
         game.grazeCount = (game.grazeCount || 0) + 1;
-        if (game.grazeCount === 50) unlockAchievement('ghostPilot');
-        if (game.grazeCount === 100) unlockAchievement('phantom');
         pushInfoText({ // detail-view only (per-graze score chatter; spark stays)
           x: b.x, y: b.y - 6, text: label,
           color: lcol, life: 28, maxLife: 28, size: 5
@@ -10670,7 +10642,6 @@ function updateBullets() {
       // Track bullets that left the screen without hitting — counted toward SURVIVOR achievement
       if (!b.grazed && b.vy > 0) {
         game.dodgedBullets = (game.dodgedBullets || 0) + 1;
-        if (game.dodgedBullets === 1000) unlockAchievement('survivor');
       }
       game.enemyBullets.splice(i, 1);
     }
@@ -10982,120 +10953,37 @@ function unlockDex(type) {
 // --- Achievements ---
 const ACHIEVEMENTS = {
   firstBlood:    { name: 'FIRST BLOOD',  desc: 'Score your first kill' },
-  perfectionist: { name: 'PERFECTIONIST', desc: 'Clear a stage no-death' },
   comboMaster:   { name: 'COMBO MASTER',  desc: 'Reach combo 30' },
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
-  parryChain:    { name: 'PARRY CHAIN',     desc: 'Parry streak ×5 in a row' },
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
-  marathonMaster:{ name: 'MARATHON MASTER',  desc: '20 no-death stages in a row' },
-  ghost5:        { name: 'GHOST HUNTER',    desc: 'Defeat 5 ghost variants' },
   ghost25:       { name: 'GHOST SLAYER',    desc: 'Defeat 25 ghost variants' },
-  parry200:      { name: 'PARRY 200',       desc: '200 parries lifetime' },
   parry500:      { name: 'PARRY 500',       desc: '500 parries lifetime' },
-  dailyTen:      { name: 'DAILY DEVOTED',   desc: 'Complete 10 daily missions' },
-  dailyMonth:    { name: 'DAILY MONTH',     desc: 'Complete 30 daily missions' },
-  dailyCentury:  { name: 'DAILY CENTURY',   desc: 'Complete 100 daily missions' },
-  dailyStreak30: { name: 'MOON CYCLE',      desc: '30-day daily mission streak' },
   dailyMaster:   { name: 'DAILY MASTER',    desc: 'Complete all 12 mission types' },
-  wishHunter:    { name: 'WISH HUNTER',     desc: 'Shoot 10 golden shooting stars' },
-  perfectChain:  { name: 'PERFECT CHAIN',   desc: 'Perfect stage streak ×5' },
-  maxPowerThrice:{ name: 'POWER TRIAD',     desc: 'Reach MAX POWER 3 times total' },
   bossSlayer:    { name: 'BOSS SLAYER',   desc: 'Defeat the mega-boss' },
   deadEye:       { name: 'DEAD-EYE',      desc: 'Finish run at 80%+ acc' },
   veteran:       { name: 'VETERAN',       desc: 'Reach stage 10' },
   goldenTouch:   { name: 'GOLDEN TOUCH',  desc: 'Hit a golden bee' },
   dashMaster:    { name: 'DASH MASTER',   desc: 'Use dash 30 times' },
   superSlayer:   { name: 'SUPER SLAYER',  desc: 'Defeat the super boss' },
-  speedrun:      { name: 'SPEEDRUN',      desc: 'Reach stage 10 under 3 min' },
-  ironPilot:     { name: 'IRON PILOT',    desc: 'No-hit + 90% acc stage' },
-  luckySlot:     { name: 'LUCKY SLOT',    desc: 'Hit MEGA JACKPOT' },
-  blitzKiller:   { name: 'BLITZ KILLER',  desc: 'Boss down under 5s' },
-  overkillMaster:{ name: 'OVERKILL MAS.', desc: 'Trigger GODLIKE' },
-  spiralDodger:  { name: 'SPIRAL DODGER', desc: 'No-hit a spiral stage' },
-  checkpointUser:{ name: 'CHECKPOINT',    desc: 'Start a run from S5+' },
-  recordBreaker: { name: 'RECORD BREAK.', desc: 'Beat your high score live' },
-  triplePilot:   { name: 'TRIPLE PILOT',  desc: 'Fly all 3 ship loadouts' },
   millionaire:   { name: 'MILLIONAIRE',   desc: 'Reach 1,000,000 points' },
-  streakMaster:  { name: 'STREAK MASTER', desc: 'Reach combo 60' },
-  ghostPilot:    { name: 'GHOST PILOT',   desc: 'Graze 50 bullets in run' },
-  dailyDevotee:  { name: 'DAILY DEVOTEE', desc: 'Play daily mode 7 days' },
-  thrifty:       { name: 'THRIFTY',       desc: 'Clear stage without pickup' },
-  ironMan:       { name: 'IRON MAN',      desc: '30 min cumulative play' },
-  nightOwl:      { name: 'NIGHT OWL',     desc: 'Play between 22-06' },
-  butterflyHunt: { name: 'BUTTERFLY',     desc: 'Kill 100 butterflies in run' },
-  beeBlitz:      { name: 'BEE BLITZ',     desc: 'Kill 200 bees in a run' },
-  bossHunter:    { name: 'BOSS HUNTER',   desc: 'Kill 50 bosses in a run' },
-  mirrorBreaker: { name: 'MIRROR BREAK',  desc: 'Kill 5 mirror clones' },
-  patientWatch:  { name: 'PATIENT',       desc: 'Watch full intro cinematic' },
-  dualPilot:     { name: 'DUAL PILOT',    desc: 'Rescue captured ship' },
   savior:        { name: 'SAVIOR',        desc: 'Self-rescue 5 times' },
-  phantom:       { name: 'PHANTOM',       desc: 'Graze 100 bullets in run' },
-  survivor:      { name: 'SURVIVOR',      desc: 'Dodge 1000 enemy bullets' },
-  barrage:       { name: 'BARRAGE',       desc: 'Survive 30+ bullets at once' },
   marathon:      { name: 'MARATHON',      desc: 'Reach stage 25' },
-  splitterPro:   { name: 'SPLITTER PRO',  desc: 'Kill 20 splitters in run' },
-  shieldBreaker: { name: 'SHIELD BREAKER',desc: 'Kill 10 shielded enemies' },
   ufoChaser:     { name: 'UFO CHASER',    desc: 'Catch 3 UFOs in a run' },
-  hovererSlay:   { name: 'HOVERER SLAY',  desc: 'Kill 10 hoverers in run' },
-  kamikazeStop:  { name: 'KAMIKAZE STOP', desc: 'Kill 30 kamikazes in run' },
-  goldRush:      { name: 'GOLD RUSH',     desc: 'Hit 5 golden bees in run' },
   perfectStage:  { name: 'PERFECT STAGE', desc: 'Stage clear 100% accuracy' },
   closeCall:     { name: 'CLOSE CALL',    desc: '10 close-grazes in stage' },
-  bonusKing:     { name: 'BONUS KING',    desc: 'Win 5 bonus games' },
   comboGod:      { name: 'COMBO GOD',     desc: 'Reach combo 100' },
-  rich:          { name: 'RICH',          desc: 'Score 5,000,000' },
-  miniBuster:    { name: 'MINI BUSTER',   desc: 'Kill 50 minibees in run' },
-  zenMaster:     { name: 'ZEN MASTER',    desc: 'No-hit any 5 stages' },
-  comeback:      { name: 'COMEBACK',      desc: 'Live with 1 life left' },
   invincible:    { name: 'INVINCIBLE',    desc: 'Stage clear no power-up + no death' },
-  trickShot:     { name: 'TRICK SHOT',    desc: 'Kill 2+ enemies with one bullet'},
-  flagWaver:     { name: 'FLAG WAVER',    desc: 'Reach stage 30' },
   finalBoss:     { name: 'FINAL BOSS',    desc: 'Reach stage 40' },
-  legend:        { name: 'LEGEND',        desc: 'Reach stage 50' },
-  noShake:       { name: 'NO SHAKE',      desc: 'Play with shake OFF' },
-  insomniac:     { name: 'INSOMNIAC',     desc: 'Play 1+ hour cumulative' },
-  worldTrip:     { name: 'WORLD TRIP',    desc: 'Use all difficulties' },
-  hardcoreFan:   { name: 'HARDCORE FAN',  desc: 'Clear stage 10 on HARD' },
-  earlyBird:     { name: 'EARLY BIRD',    desc: 'Play before 9am' },
-  globetrotter:  { name: 'GLOBETROTTER',  desc: 'Play 14+ daily days' },
-  ufoFleet:      { name: 'UFO FLEET',     desc: 'Catch 10 UFOs in run' },
   perfectRun:    { name: 'PERFECT RUN',   desc: '10 stages no-death in row' },
-  speedRunner:   { name: 'SPEEDRUNNER',   desc: 'Stage 5 under 90s' },
-  marathoner:    { name: 'MARATHONER',    desc: '20 stages in single run' },
-  killStreak3:   { name: 'KILL STREAK',   desc: 'Combo 30 with no death' },
-  recklessAce:   { name: 'RECKLESS ACE',  desc: 'No-hit on HARD' },
-  freshStart:    { name: 'FRESH START',   desc: 'Complete first session' },
-  doubleBeat:    { name: 'DOUBLE BEAT',   desc: 'Defeat double boss' },
-  superBeat:     { name: 'SUPER BEAT',    desc: 'Defeat SUPER boss + 80% acc' },
-  longRun:       { name: 'LONG RUN',      desc: 'Single run 10+ minutes' },
-  starGazer:     { name: 'STAR GAZER',    desc: 'Daily 30+ days' },
-  highRoller:    { name: 'HIGH ROLLER',   desc: '50K+ from one stage clear' },
-  collector:     { name: 'COLLECTOR',     desc: 'Pick 30 power-ups in run' },
   noDie3:        { name: 'TRIPLE PERF',   desc: '3 stages no-death in row' },
   bigShot:       { name: 'BIG SHOT',      desc: 'Power lvl 3 + N lvl 3 + S lvl 5' },
-  pacifist10:    { name: 'PACIFIST 10',   desc: 'Stage 10 acc 100%' },
-  hardWired:     { name: 'HARD WIRED',    desc: 'Stage 20 on HARD' },
-  marathon100:   { name: 'MARATHON 100',  desc: '100K kills cumulative' },
-  achHunter:     { name: 'ACH HUNTER',    desc: 'Unlock 30 achievements' },
-  achLegend:     { name: 'ACH LEGEND',    desc: 'Unlock 50 achievements' },
+  achHunter:     { name: 'ACH HUNTER',    desc: 'Unlock half the achievements' },
   achGod:        { name: 'ACH GOD',       desc: 'Unlock all achievements' },
-  earlyAdopter:  { name: 'EARLY ADOPTER', desc: 'Unlock first 5 achievements' },
   challengeKing: { name: 'CHAL KING',     desc: 'Reach S15 in challenge' },
-  zenith:        { name: 'ZENITH',        desc: 'Score 10M' },
   apex:          { name: 'APEX',          desc: 'Reach S60' },
-  zenithMax:     { name: 'ZENITH MAX',    desc: 'Hit 999M cap (MAX!)' },
-  ultraStreak:   { name: 'ULTRA STREAK',  desc: 'Combo 80' },
   finalForm:     { name: 'FINAL FORM',    desc: 'Reach S100' },
-  combo15:       { name: 'COMBO 15',      desc: 'First combo 15' },
-  combo45:       { name: 'COMBO 45',      desc: 'First combo 45' },
-  combo75:       { name: 'COMBO 75',      desc: 'First combo 75' },
-  pillarsOf:     { name: 'PILLARS OF',    desc: 'Stage 100 reached' },
-  rivalDown:     { name: 'NEMESIS DOWN',  desc: 'Destroy the rival ace' },
-  rivalHunter:   { name: 'ACE HUNTER',    desc: 'Destroy 3 rival aces' },
-  salvager:      { name: 'SALVAGER',      desc: 'Recover 5 power shards' },
-  echoBound:     { name: 'GHOST OF ME',   desc: 'Commune with your last wreck' },
-  thiefTaker:    { name: 'THIEF TAKER',   desc: 'Shoot down 5 magpie looters' },
+  rivalDown:     { name: 'NEMESIS DOWN',  desc: 'Destroy the rival ace' }
 };
 // Stats overlay page model — single source of truth for Tab navigation so the
 // keydown handler and the four draw branches can't desync. Pages, in order:
@@ -11132,17 +11020,15 @@ function unlockAchievement(id) {
   if (unlockedAchievements.has(id) || !ACHIEVEMENTS[id]) return;
   unlockedAchievements.add(id);
   saveAchievements();
-  // Meta achievements — deferred to avoid recursion
-  if (id !== 'achHunter' && unlockedAchievements.size >= 30) {
+  // Meta achievements — deferred to avoid recursion. Thresholds are derived from
+  // the registry size, not hardcoded: the list was cut 109 -> 30, which made a
+  // literal ">= 50" permanently unreachable. Deriving them means the halfway and
+  // completion badges stay meaningful whatever the list size becomes.
+  const _achTotal = Object.keys(ACHIEVEMENTS).length;
+  if (id !== 'achHunter' && unlockedAchievements.size >= Math.ceil(_achTotal / 2)) {
     setTimeout(() => unlockAchievement('achHunter'), 50);
   }
-  if (id !== 'earlyAdopter' && unlockedAchievements.size >= 5) {
-    setTimeout(() => unlockAchievement('earlyAdopter'), 25);
-  }
-  if (id !== 'achLegend' && unlockedAchievements.size >= 50) {
-    setTimeout(() => unlockAchievement('achLegend'), 100);
-  }
-  if (id !== 'achGod' && unlockedAchievements.size >= Object.keys(ACHIEVEMENTS).length - 1) {
+  if (id !== 'achGod' && unlockedAchievements.size >= _achTotal - 1) {
     setTimeout(() => unlockAchievement('achGod'), 150);
   }
   if (game) {
@@ -11278,14 +11164,12 @@ function evalBonusResult() {
     try {
       const bw = parseInt(localStorage.getItem('galagaBonusWins') || '0', 10) + 1;
       localStorage.setItem('galagaBonusWins', String(bw));
-      if (bw >= 5) unlockAchievement('bonusKing');
     } catch (e) {}
   }
   addScore(bonus);
   spawnConfetti(bonus >= 5000 ? 30 : bonus >= 1000 ? 18 : 8);
   // Result-specific cue
   if (bonus >= 10000) {
-    unlockAchievement('luckySlot');
     playSound('extraLife');
     setTimeout(() => playSound('dualFighter'), 220);
     setTimeout(() => playSound('dualFighter'), 480);
@@ -11777,7 +11661,6 @@ function commitGameToCumStats() {
   recordFlightLog();
   // First commit ever — FRESH START achievement
   if ((loadCumStats(false).sessions || 0) + (loadCumStats(true).sessions || 0) === 0) {
-    unlockAchievement('freshStart');
   }
   const challenge = !!game.challengeMode;
   const s = loadCumStats(challenge);
@@ -11846,15 +11729,11 @@ function commitGameToCumStats() {
     localStorage.setItem('galagaShipMastery', JSON.stringify(mastery));
   } catch (e) {}
   // LONG RUN: any single run reaches 10 minutes
-  if ((game.runFrames || 0) >= 36000) unlockAchievement('longRun');
   // MARATHON 100: cumulative kills 100K
   const totalKills = (loadCumStats(false).kills || 0) + (loadCumStats(true).kills || 0);
-  if (totalKills >= 100000) unlockAchievement('marathon100');
   // IRON MAN — total cumulative play time across both modes ≥ 30 minutes (108000 frames)
   const totalFrames = (loadCumStats(false).runFrames || 0) + (loadCumStats(true).runFrames || 0);
-  if (totalFrames >= 108000) unlockAchievement('ironMan');
   // INSOMNIAC — 60+ minutes (216000 frames)
-  if (totalFrames >= 216000) unlockAchievement('insomniac');
 }
 
 // --- Top scores persistence ---
@@ -12250,7 +12129,6 @@ function updatePowerUps() {
               const cur = parseInt(localStorage.getItem('galagaMaxPowerReached') || '0', 10) || 0;
               const nc = cur + 1;
               localStorage.setItem('galagaMaxPowerReached', String(nc));
-              if (nc >= 3) unlockAchievement('maxPowerThrice');
             } catch (e) {}
           }
         }
@@ -12301,7 +12179,6 @@ function updatePowerUps() {
       if (!game.pickupHistory) game.pickupHistory = [];
       game.pickupHistory.unshift(p.type);
       if (game.pickupHistory.length > 5) game.pickupHistory.length = 5;
-      if (game.runPowerUps === 30) unlockAchievement('collector');
       // PICKUP TYPE TOTALS — track lifetime collection counts per pickup type
       try {
         const raw = localStorage.getItem('galagaPickupTotals') || '{}';
@@ -12734,7 +12611,6 @@ function bumpCombo() {
       triggerWeaponCallout(a.color);
     }
   }
-  if (game.combo === 15) unlockAchievement('combo15');
   if (game.combo === 30) {
     unlockAchievement('comboMaster');
     // MAX COMBO TIER FANFARE — first time hitting combo 30 (max multiplier tier
@@ -12761,11 +12637,6 @@ function bumpCombo() {
       game.flashColor = '#fc4';
     }
   }
-  if (game.combo === 30 && !game.stageDied) unlockAchievement('killStreak3');
-  if (game.combo === 45) unlockAchievement('combo45');
-  if (game.combo === 60) unlockAchievement('streakMaster');
-  if (game.combo === 75) unlockAchievement('combo75');
-  if (game.combo === 80) unlockAchievement('ultraStreak');
   if (game.combo === 100) unlockAchievement('comboGod');
   // Combo step sound at multiplier-tier transitions, escalating haptic + tiny shake.
   // Tiers: c≥3 (1.25×), c≥5 (1.5×), c≥10 (2×), c≥15 (2.5×), c≥20 (3×, max).
@@ -13817,7 +13688,6 @@ function updateCollisions() {
             const wt = parseInt(localStorage.getItem('galagaWishCount') || '0', 10) || 0;
             const nw = wt + 1;
             localStorage.setItem('galagaWishCount', String(nw));
-            if (nw >= 10) unlockAchievement('wishHunter');
           } catch (e) {}
           game.shootingStars.splice(si, 1);
           game.bullets.splice(bi, 1);
@@ -14110,7 +13980,6 @@ function updateCollisions() {
               const gk = parseInt(localStorage.getItem('galagaGhostKills') || '0', 10) || 0;
               const ngk = gk + 1;
               localStorage.setItem('galagaGhostKills', String(ngk));
-              if (ngk >= 5 && typeof unlockAchievement === 'function')  unlockAchievement('ghost5');
               if (ngk >= 25 && typeof unlockAchievement === 'function') unlockAchievement('ghost25');
             } catch (e) {}
           }
@@ -14354,7 +14223,6 @@ function updateCollisions() {
 
           // TRICK SHOT — 2+ kills in the same frame (typically chained off explosions/splitter chain)
           if (game.lastKillFrame === game.animFrame) {
-            unlockAchievement('trickShot');
           }
           // MULTI-KILL BONUS — track kills per animFrame; award tiered bonus
           // on the 3rd, 5th, and 10th kill of the same frame (laser pierce or
@@ -14382,48 +14250,37 @@ function updateCollisions() {
           // Per-run kill-by-type counters for various achievements
           if (e.type === 'butterfly') {
             game.butterflyKills = (game.butterflyKills || 0) + 1;
-            if (game.butterflyKills === 100) unlockAchievement('butterflyHunt');
           }
           if (e.type === 'bee') {
             game.beeKills = (game.beeKills || 0) + 1;
-            if (game.beeKills === 200) unlockAchievement('beeBlitz');
           }
           if (e.type === 'boss') {
             game.bossKills = (game.bossKills || 0) + 1;
-            if (game.bossKills === 50) unlockAchievement('bossHunter');
           }
           if (e.type === 'mirror') {
             game.mirrorKills = (game.mirrorKills || 0) + 1;
-            if (game.mirrorKills === 5) unlockAchievement('mirrorBreaker');
           }
           if (e.type === 'splitter') {
             game.splitterKills = (game.splitterKills || 0) + 1;
-            if (game.splitterKills === 20) unlockAchievement('splitterPro');
           }
           if (e.type === 'shielded') {
             game.shieldedKills = (game.shieldedKills || 0) + 1;
-            if (game.shieldedKills === 10) unlockAchievement('shieldBreaker');
           }
           if (e.type === 'ufo') {
             game.ufoKills = (game.ufoKills || 0) + 1;
             if (game.ufoKills === 3) unlockAchievement('ufoChaser');
-            if (game.ufoKills === 10) unlockAchievement('ufoFleet');
           }
           if (e.type === 'hoverer') {
             game.hovererKills = (game.hovererKills || 0) + 1;
-            if (game.hovererKills === 10) unlockAchievement('hovererSlay');
           }
           if (e.type === 'kamikaze') {
             game.kamikazeKills = (game.kamikazeKills || 0) + 1;
-            if (game.kamikazeKills === 30) unlockAchievement('kamikazeStop');
           }
           if (e.type === 'goldenBee') {
             game.goldenKills = (game.goldenKills || 0) + 1;
-            if (game.goldenKills === 5) unlockAchievement('goldRush');
           }
           if (e.type === 'minibee') {
             game.minibeeKills = (game.minibeeKills || 0) + 1;
-            if (game.minibeeKills === 50) unlockAchievement('miniBuster');
             // SIGNAL INTERCEPT — per-stage swarm chatter at 5th minibee kill (one-shot)
             game.stageMinibeeKills = (game.stageMinibeeKills || 0) + 1;
             if (game.stageMinibeeKills === 5 && typeof pushIntercept === 'function') {
@@ -14459,7 +14316,7 @@ function updateCollisions() {
               let shake = 0;
               // Halved from 5000/2500/1000 — these stack with comboMul (up to 3×) and DAILY
               // 1.25×, so the original values inflated late-stage runs heavily.
-              if (n >= 12)      { label = 'GODLIKE!';  bonus = 3000; col = '#f6f'; size = 16; shake = 14; unlockAchievement('overkillMaster'); }
+              if (n >= 12)      { label = 'GODLIKE!';  bonus = 3000; col = '#f6f'; size = 16; shake = 14; }
               else if (n >= 8)  { label = 'MASSACRE!'; bonus = 1500; col = '#f80'; size = 14; shake = 10; }
               else if (n >= 5)  { label = 'OVERKILL!'; bonus = 500;  col = '#ff4'; size = 12; shake = 6; }
               if (label) {
@@ -14671,7 +14528,6 @@ function updateCollisions() {
           if (e.type === 'boss' && e.capturedShip && game.capturedShipEnemy === e) {
             game.dualFighter = true;
             game.capturedShipEnemy = null;
-            unlockAchievement('dualPilot');
             playSound('rescue');
             playSound('dualFighter');
             // Celebration banner (GUI-simplify: single line — the 'RESCUED'/'FORMATION!'
@@ -14760,7 +14616,6 @@ function updateCollisions() {
         game.parryStreak = streakActive ? (game.parryStreak || 0) + 1 : 1;
         game.parryStreakTimer = 90;
         if ((game.parryStreak || 0) > (game.parryStreakBest || 0)) game.parryStreakBest = game.parryStreak;
-        if ((game.parryStreak || 0) >= 5) unlockAchievement('parryChain');
         // Streak tier ramps the BASE SCORE 50 → 75 → 100 → 150 → 250 (cap at 10+).
         // CEO subtraction: the escalating tier COLORS and the center "ULTRA PARRY"
         // fanfare banner were removed — the scoring stays, the feedback is now the
@@ -14822,7 +14677,6 @@ function updateCollisions() {
           const npt = pt + 1;
           localStorage.setItem('galagaParryTotal', String(npt));
           if (npt >= 50)  unlockAchievement('parry50');
-          if (npt >= 200) unlockAchievement('parry200');
           if (npt >= 500) unlockAchievement('parry500');
         } catch (e) {}
         // Visual + audio feedback at parry site
@@ -16127,13 +15981,10 @@ function checkStageComplete() {
             if (typeof spawnConfetti === 'function') spawnConfetti(6);
           }
           if (!game.stageDied) {
-            unlockAchievement('perfectionist');
             game.zenStages = (game.zenStages || 0) + 1;
             game.zenStreak = (game.zenStreak || 0) + 1;
-            if (game.zenStages === 5) unlockAchievement('zenMaster');
             if (game.zenStreak === 3) unlockAchievement('noDie3');
             if (game.zenStreak === 10) unlockAchievement('perfectRun');
-            if (game.lives === 1) unlockAchievement('comeback');
             // MARATHON BANNER — gold banner at no-death streak milestones
             if (game.zenStreak === 5 || game.zenStreak === 10 || game.zenStreak === 20) {
               pushInfoText({
@@ -16144,18 +15995,14 @@ function checkStageComplete() {
               playSound('milestone');
             }
             // MARATHON MASTER trophy at 20-stage no-death streak
-            if (game.zenStreak >= 20) unlockAchievement('marathonMaster');
           } else {
             game.zenStreak = 0;
           }
-          if (!game.stageDied && game.entrySpiral) unlockAchievement('spiralDodger');
           if ((game.stagePowerUpsPicked || 0) === 0 && !game.stageDied) {
-            unlockAchievement('thrifty');
             unlockAchievement('invincible');
           }
           if (game.stageShotsFired >= 10 && game.stageShotsHit === game.stageShotsFired && !game.stageDied) {
             unlockAchievement('perfectStage');
-            if (game.stage + 1 >= 10) unlockAchievement('pacifist10');
             // PERFECT ACCURACY BANNER — 100% hit rate (10+ shots) recognition
             game.floatTexts.push({
               x: BASE_W/2, y: BASE_H/2 + 80,
@@ -16166,27 +16013,17 @@ function checkStageComplete() {
             if (typeof playSound === 'function') playSound('milestone');
           }
           if (game.stage + 1 >= 10) unlockAchievement('veteran');
-          if (game.stage + 1 >= 10 && difficultyMode === 'hard') unlockAchievement('hardcoreFan');
-          if (game.stage + 1 >= 20 && difficultyMode === 'hard') unlockAchievement('hardWired');
-          if (!game.stageDied && difficultyMode === 'hard') unlockAchievement('recklessAce');
           if (game.stage + 1 >= 25) unlockAchievement('marathon');
-          if (game.stage + 1 >= 30) unlockAchievement('flagWaver');
           if (game.stage + 1 >= 15 && game.challengeMode) unlockAchievement('challengeKing');
           if (game.stage + 1 >= 40) unlockAchievement('finalBoss');
-          if (game.stage + 1 >= 50) unlockAchievement('legend');
           if (game.stage + 1 >= 60) unlockAchievement('apex');
-          if (game.stage + 1 >= 100) unlockAchievement('pillarsOf');
           if (game.stage + 1 >= 100) unlockAchievement('finalForm');
           // Speedrun: reach stage 10 in under 3 minutes (10800 frames)
-          if (game.stage + 1 >= 10 && (game.runFrames || 0) <= 10800) unlockAchievement('speedrun');
           // Speedrunner: clear stage 5 in under 90s
-          if (game.stage + 1 >= 5 && (game.runFrames || 0) <= 5400) unlockAchievement('speedRunner');
           // Marathoner: 20 stages in single run
-          if (game.stage + 1 >= 20) unlockAchievement('marathoner');
           // Iron pilot: no death + 90%+ accuracy this stage
           {
             const accStage = computeStageAccuracy();
-            if (!game.stageDied && accStage >= 90 && game.stageShotsFired >= 10) unlockAchievement('ironPilot');
           }
           // Performance bonuses
           const timeBonus = Math.max(0, 5000 - game.stageFrames * 6);
@@ -16196,7 +16033,6 @@ function checkStageComplete() {
           const challengeBonus = game.challengeMode ? 5000 : 0;
           const total = timeBonus + noDeathBonus + accBonus + challengeBonus;
           if (total > 0) addScore(total);
-          if (total >= 50000) unlockAchievement('highRoller');
           const cy = BASE_H / 2 + 22;
           // Each bonus animates from 0 → final over 30 frames so they feel like a tally rolling up
           if (timeBonus > 0) pushInfoText({
@@ -16368,7 +16204,6 @@ function checkStageComplete() {
                 game.flashColor = '#fc4';
                 rumble(220, 0.8, 0.5);
               }
-              if (game.perfectStreak >= 5) unlockAchievement('perfectChain');
               try {
                 const best = parseInt(localStorage.getItem('galagaPerfectStreakBest') || '0', 10) || 0;
                 if (game.perfectStreak > best) {

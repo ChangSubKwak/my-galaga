@@ -1218,7 +1218,11 @@ if (typeof G.__getAchievements === 'function' && G.__getAchievements()) {
      (unreachable.length ? ' (unreachable: ' + unreachable.join(', ') + ')' : ''));
   ok(dead.length === 0, 'every unlockAchievement() targets a defined key' +
      (dead.length ? ' (dead: ' + dead.join(', ') + ')' : ''));
-  ok(defined.size >= 50, 'achievement registry is populated (' + defined.size + ' defined)');
+  // Cut 109 -> 30 in the simplification pass. The old floor of 50 encoded the
+  // bloat as a REQUIREMENT; this is a band with an upper bound so the list
+  // cannot silently refill with per-enemy-type and changed-a-setting badges.
+  ok(defined.size >= 20, 'achievement registry is populated (' + defined.size + ' defined)');
+  ok(defined.size <= 40, 'achievement list stays curated (<= 40, got ' + defined.size + ')');
 } else { console.log('  (skipped — ACHIEVEMENTS not exposed)'); }
 
 // ============================================================
@@ -1947,7 +1951,7 @@ section('ACHIEVEMENTS: every defined achievement is unlockable & no unlock is un
   }
   ok(foundBlock, 'ACHIEVEMENTS object found + closed in source');
   {
-    ok(defined.size >= 50, 'ACHIEVEMENTS defines >= 50 (got ' + defined.size + ')');
+    ok(defined.size >= 20, 'ACHIEVEMENTS is populated (got ' + defined.size + ')');
     const refs = new Set((scriptSrc.match(/unlockAchievement\('([a-zA-Z0-9]+)'\)/g) || [])
       .map(s => s.match(/'([a-zA-Z0-9]+)'/)[1]));
     // every referenced id must be defined (no silent no-op unlocks)
