@@ -93,7 +93,11 @@ The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
   vector rims on enemy bodies (`drawBee`/`drawButterfly`/`drawMegaBoss`… — shadowBlur
   rims, hot-path cost, preserve elite-outline/ghost-stealth/hit-flash at the
   dispatcher), optional shared `COL` palette neon-lift (touches all UI — do carefully),
-  and a bloom on/off options-menu toggle (`galagaBloomOff` already persists).
+  and — **done 2026-08-08** — a bloom on/off toggle, now on **E** (`galagaBloomOff`
+  had been read at startup for a long time with nothing ever writing it, so the
+  headline visual system had no off switch; only the automatic perf valve could
+  disable it. Bloom is a full-frame additive glow, so "too bright / too hazy" is a
+  real comfort complaint and now has a remedy).
 
 ## SIMPLE-BY-DEFAULT GUI (2026-07-03)
 User directive: "make the overall GUI VERY simple." The default view now shows only

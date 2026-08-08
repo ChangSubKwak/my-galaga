@@ -9492,6 +9492,20 @@ function initInput() {
         color: COL.cyan, life: 50, maxLife: 50, size: 8
       });
     }
+    // BLOOM toggle — E. `galagaBloomOff` has always been READ at startup but
+    // nothing ever wrote it, so the headline visual system had no off switch:
+    // the only thing that could disable it was the automatic perf valve. Bloom
+    // is a full-frame additive glow, so "too bright / too hazy" is a real
+    // comfort complaint with no remedy. Now it has one, and the key that was
+    // already persisting finally has a writer.
+    if (k === 'e') {
+      bloomEnabled = !bloomEnabled;
+      try { localStorage.setItem('galagaBloomOff', bloomEnabled ? '0' : '1'); } catch (err) {}
+      if (game) game.floatTexts.push({
+        x: BASE_W/2, y: 50, text: 'BLOOM: ' + (bloomEnabled ? 'ON' : 'OFF'),
+        color: COL.cyan, life: 50, maxLife: 50, size: 8
+      });
+    }
     if (e.key === '[') {
       audioVolume = Math.max(0, Math.round((audioVolume - 0.1) * 10) / 10);
       ensureAudio();
@@ -21725,6 +21739,7 @@ function drawHelpOverlay() {
   kvRow('K / L',        'SHAKE / RUMBLE');
   kvRow('J',            'NIGHT DIM ON/OFF');
   kvRow('X',            'COLORBLIND ON/OFF');
+  kvRow('E',            'BLOOM GLOW ON/OFF');
   kvRow('Y',            'PIXEL FONT ON/OFF');
 
   y += 2;
