@@ -261,7 +261,15 @@ capture('STAGE_INTRO challenge', g => { baseStage(g, 96); g.state = S.STAGE_INTR
 // 300 frames: longer than the 240-frame achievement toast, so transients are
 // observed through their full slide-in / hold / slide-out life.
 capture('PLAYING s1', g => { baseStage(g, 1); g.state = S.PLAYING; }, 300);
-capture('PLAYING s100', g => { baseStage(g, 100); g.state = S.PLAYING; g.score = 999999999; g.combo = 99; }, 300);
+// Power-ups never drop here (the capture does not fire), so the pickup
+// sprite went unrendered and unaudited. Seed one of every type.
+capture('PLAYING s100', g => {
+  baseStage(g, 100); g.state = S.PLAYING; g.score = 999999999; g.combo = 99;
+  const types = ['S','N','P','T','R','W','H','L','B','E','F','D'];
+  g.powerUps = types.map((ty, i) => ({
+    x: 16 + (i % 6) * 38, y: 80 + Math.floor(i / 6) * 40, vy: 0, type: ty
+  }));
+}, 300);
 capture('CHALLENGING', g => { baseStage(g, 96); g.state = S.CHALLENGING; });
 capture('BOSS_STAGE', g => { baseStage(g, 100); g.state = S.BOSS_STAGE; });
 capture('RESPAWN', g => { baseStage(g, 50); g.state = S.RESPAWN; g.playerAlive = false; });
@@ -438,7 +446,7 @@ if (process.env.OVERLAP) {
     }
   }
   const bad = [...seen.entries()].sort((x, y) => y[1].frac - x[1].frac);
-    console.log('-- text overlap --');
+      console.log('-- text overlap --');
   if (!bad.length) {
     console.log('   ok  no two strings collide\n');
   } else {
