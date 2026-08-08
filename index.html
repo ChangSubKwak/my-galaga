@@ -304,7 +304,6 @@ let colorBlindMode = localStorage.getItem('galagaColorBlind') === '1';
 // boolean directly. Avoids per-frame localStorage + Date churn in draw().
 let _nightDimOff = (() => { try { return localStorage.getItem('galagaNightOff') === '1'; } catch (e) { return false; } })();
 let _nightDimHourly = (() => { const h = new Date().getHours(); return h >= 22 || h < 6; })();
-let _nightDimLastCheck = 0;
 setInterval(() => { const h = new Date().getHours(); _nightDimHourly = (h >= 22 || h < 6); }, 60000);
 
 // ACCESSIBILITY — respect the OS "reduce motion" preference (WCAG): when set,
@@ -4900,7 +4899,6 @@ function spawnGuardian(variant) {
   // GUARDIAN MASTER milestone — track unique variants summoned this run; fire once
   // at 4 (all variants experienced). Deep run mastery narrative.
   if (game._guardianVariants && typeof pushIntercept === 'function') {
-    const _wasNewG = !game._guardianVariants.has(variantId);
     game._guardianVariants.add(variantId);
   }
   // GUARDIAN ARRIVAL LABEL — variant chip ('ALLY: BASE/ATK/SPT/RAP') in
@@ -6320,7 +6318,6 @@ function drawVectorGrid() {
     && game.megaBosses && game.megaBosses.some && game.megaBosses.some(b => b && b.phase2);
   const danger = _phase2 || (game.lives === 1 && isCombatState());
   const baseRGB = danger ? '190,64,84' : '60,104,196';
-  const hotR = danger ? 255 : 150, hotG = danger ? 150 : 224, hotB = danger ? 170 : 255;
   // BASE_A kept low: the grid spans the WHOLE screen and is additive, so it sets the
   // bloom's brightness FLOOR — too high and combat brightness tips the frame to white.
   const BASE_A = 0.17;
@@ -8136,7 +8133,6 @@ function updateOneMegaBoss(mb) {
       } else if (mb.archetype === 'crystal') {
         // FRAGMENT BURST — 6-shot quick fan all aimed at player (denser than base aimed spread)
         const dx0 = game.playerX - mb.x, dy0 = game.playerY - mb.y;
-        const len0 = magnitude(dx0, dy0) || 1;
         const sp = cappedStageSpeed(2.0, 1.2, 0.02, game.stage, diffSpeedMul());
         const baseAng = Math.atan2(dy0, dx0);
         for (let k = -2; k <= 3; k++) {
@@ -8274,7 +8270,6 @@ function updateOneMegaBoss(mb) {
         else if (dmgDealt >= 2) dmgCol = '#fc4';
         // BIG HIT TEXT — size scales with damage. 3+ = big bold, 2 = normal+,
         // 1 = compact. Makes heavy-hit moments read at a glance.
-        const _dmgSize = dmgDealt >= 3 ? 9 : dmgDealt >= 2 ? 7 : 5;
         game._dmgNumThisFrame++;
       }
       if (mb.hp <= 0) {
@@ -8290,7 +8285,6 @@ function updateOneMegaBoss(mb) {
         unlockAchievement('bossSlayer');
         if (mb.super) {
           unlockAchievement('superSlayer');
-          const accTotal = computeAccuracy(game.stats);
         }
         if (game.megaBosses && game.megaBosses.length === 2 && game.megaBosses.every(b => !b.alive)) {
           // DOUBLE KO BANNER — both bosses cleared. Surface as gold banner +
@@ -8811,7 +8805,6 @@ function startStage() {
   // Reminds the player to keep killing fast to preserve the multiplier.
   if ((game.combo || 0) >= 5) {
     // TIER NAME — same scale as HUD combo tier label (shared helper)
-    const _ctN = comboTierName(game.combo);
   }
   // MARATHON BANNER — when zenStreak >= 10, push big gold banner so the elite
   // no-death streak feels weighty alongside the existing MARATHON x5/10/20 award.
@@ -8853,7 +8846,6 @@ function startStage() {
       if (_firstBiomeThisRun
           && BIOME_NAMES && BIOME_NAMES[_bid]
           && game.runBiomesSeen.size >= 2) {
-        const _bn = BIOME_NAMES[_bid].name || _bid.toUpperCase();
         const _bc = BIOME_NAMES[_bid].col || '#0cf';
         game.flashTimer = Math.max(game.flashTimer || 0, 6);
         game.flashColor = _bc;
@@ -8978,7 +8970,6 @@ function startStage() {
       // BIOME COMPLETION MILESTONE — track unique biomes seen this run; fire once
       // when all 12 are visited. Deep-run exploration achievement narrative.
       if (game._biomesSeen) {
-        const _wasNewB = !game._biomesSeen.has(_curBiome);
         game._biomesSeen.add(_curBiome);
       }
     }
@@ -10347,7 +10338,6 @@ function updateBullets() {
         }
         const bonus = grazeScore(close, game.activePerk === 'ghostWake');
         const label = (close ? 'CLOSE +' : 'GRAZE +') + bonus;
-        const lcol = close ? '#ff4' : '#0ff';
         addScore(bonus);
         game.grazeCount = (game.grazeCount || 0) + 1;
         game.hitSparks.push({ x: b.x, y: b.y, life: 0 });
@@ -11364,7 +11354,6 @@ function commitGameToCumStats() {
   // MARATHON 100: cumulative kills 100K
   const totalKills = (loadCumStats(false).kills || 0) + (loadCumStats(true).kills || 0);
   // IRON MAN — total cumulative play time across both modes ≥ 30 minutes (108000 frames)
-  const totalFrames = (loadCumStats(false).runFrames || 0) + (loadCumStats(true).runFrames || 0);
   // INSOMNIAC — 60+ minutes (216000 frames)
 }
 
@@ -11810,7 +11799,6 @@ function updatePowerUps() {
       game.stagePickups = (game.stagePickups || 0) + 1;
       // SIGNAL INTERCEPT — unique pickup type diversity milestone (6 distinct types)
       if (game._pickupTypes) {
-        const _wasNew = !game._pickupTypes.has(p.type);
         game._pickupTypes.add(p.type);
       }
       if (game.pickupStreak > (game.pickupStreakBest || 0)) game.pickupStreakBest = game.pickupStreak;
@@ -11953,7 +11941,6 @@ function drawAchievementToast(t) {
 
   // Outer glow (animated, fades during hold)
   const holdT = Math.min(1, Math.max(0, (t.life - 22) / 30));
-  const glowAmp = (t.life < 80 ? 1 - t.life / 80 : 0) * 0.5;
   ctx.save();
   ctx.globalAlpha = (0.35 + 0.30 * Math.sin(t.life * 0.3)) * holdT;
   ctx.fillStyle = COL.yellow;
@@ -12096,7 +12083,6 @@ function bumpCombo() {
                    : game._mkCount >= 10 ? '#f6f'
                    : game._mkCount >= 5  ? '#fc4'
                    : '#0ff';
-      const _mkSize = game._mkCount >= 10 ? 11 : 8;
       const _confettiN = game._mkCount >= 12 ? 16
                        : game._mkCount >= 10 ? 10
                        : game._mkCount >= 5  ? 4
@@ -13460,7 +13446,6 @@ function updateCollisions() {
           // big combo kills stand out. Skipped on tiny base kills to keep the
           // screen readable during normal play.
           if (pts >= 200) {
-            const ksCol = pts >= 1000 ? '#ff4' : pts >= 500 ? '#fc4' : '#fff';
           }
           if (e.ghost) {
             // GHOST KILL CELEBRATION — purple sparkle burst + banner + persistent counter
@@ -17153,7 +17138,6 @@ function drawTitleScreen() {
   ctx.restore();
 
   // Demo enemy flyby across the band between borders — detail view only
-  const flybyTypes = [drawBee, drawButterfly, drawBoss];
 
   // Score legend — detail view only (GUI-simplify)
 
@@ -18255,7 +18239,6 @@ function drawStageIntro() {
   const totalFlags = Math.min(game.stage, 30);
   const flagW = 8;
   const flagSpacing = 9;
-  const rowW = Math.min(totalFlags, flagsPerRow) * flagSpacing;
   const baseY = BASE_H - 38;
   for (let i = 0; i < totalFlags; i++) {
     const row = Math.floor(i / flagsPerRow);
@@ -19877,10 +19860,7 @@ function drawHUD() {
     const _PCOL = { sweep_lr: '#0ff',  sweep_rl: '#0cf',
                     pincer: '#f44',    top_down: '#fc4',
                     diagonal: '#f8a',  double_row: '#0f8' };
-    const pLabel = _PLBL[pattern] || pattern.toUpperCase();
     const pCol   = _PCOL[pattern] || '#fff';
-    const lastPerfect = (game.stagePerfectWaves || 0) > 0;
-    const isFinal = nextW === totW;
 
     const TOTAL   = 35;
     const age     = TOTAL - cwT;                          // 0→34 (increases with time)
@@ -19982,7 +19962,6 @@ function drawHUD() {
   // Extra-life threshold indicator — small note showing distance to next 30K extra life
   if (!game.challengeMode && game.score > 0 && (game.state === STATE.PLAYING || game.state === STATE.BOSS_STAGE || game.state === STATE.CHALLENGING)) {
     const next = Math.ceil(game.score / EXTRA_LIFE_SCORE) * EXTRA_LIFE_SCORE;
-    const diff = next - game.score;
   }
   // Lives — pulse red and add LAST LIFE warning when down to one
   const dangerLives = game.lives === 1;
