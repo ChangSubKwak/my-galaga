@@ -27,8 +27,23 @@ The entire game is a single static file. To play:
 There is no build step, no package manager, and no lint config. All game code goes into `index.html`. After every meaningful change, run the full verification (JS parse + logic tests) in one command:
 
 ```bash
-bash test/run.sh        # JS parse check + logic tests; exit 0 only if both pass
+bash test/run.sh        # JS parse + logic tests + layout audit; exit 0 only if all pass
 ```
+
+`test/layout-audit.js` (step 3) catches **text that renders permanently off-screen** —
+the failure mode a canvas game with no layout engine cannot otherwise detect without a
+browser. It runs the real `draw()` across all 21 screens/overlay pages, records every
+text draw through a transform-tracking stub, and computes true pixel widths from the
+measured font advances, under **both** font configurations (the monospace fallback shown
+before the pixel faces load, and the loaded pixel pair). Three properties make it
+trustworthy, each added after it produced a false result:
+- it tracks the **full transform stack** (without it, everything drawn inside a
+  `translate()` is reported as wildly off-screen);
+- it judges a string by its **minimum overflow across the whole run, keyed by the string
+  not the screen** — banners and toasts deliberately slide in from outside, so the real
+  question is "was this ever fully visible?";
+- it runs on a **seeded PRNG**, because an unseeded run samples different frames each
+  time and can miss a real overflow (it did exactly that once).
 
 Or run either half on its own:
 

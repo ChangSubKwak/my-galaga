@@ -2,14 +2,18 @@
 # run.sh — full local verification for galaga_clone in one command.
 # 1) JS parse check on the inline <script> in index.html
 # 2) logic test harness (test/logic.test.js)
-# Exit 0 only if both pass. Usage:  bash test/run.sh   (or ./test/run.sh)
+# 3) layout audit — no permanently off-screen text (test/layout-audit.js)
+# Exit 0 only if all three pass. Usage:  bash test/run.sh   (or ./test/run.sh)
+#
+# NOT run here: test/curve-audit.js. That one is a REPORT (difficulty + score
+# economy shape), not a pass/fail gate — run it by hand when tuning balance.
 set -uo pipefail
 
 # Resolve repo root relative to this script so it works from any cwd.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "== [1/2] JS parse check =="
+echo "== [1/3] JS parse check =="
 node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=h.match(/<script>([\s\S]*?)<\/script>/);if(!m){console.error('no <script> block');process.exit(1);}new Function(m[1]);const lines=h.split('\n').length;console.log('  JS parse OK ('+lines+' lines)');"
 PARSE=$?
 if [ "$PARSE" -ne 0 ]; then
@@ -17,15 +21,24 @@ if [ "$PARSE" -ne 0 ]; then
   exit 1
 fi
 
-echo "== [2/2] logic tests =="
+echo "== [2/3] logic tests =="
 node test/logic.test.js
 TESTS=$?
+if [ "$TESTS" -ne 0 ]; then
+  echo "========================================"
+  echo "LOGIC TESTS FAILED"
+  exit 1
+fi
+
+echo "== [3/3] layout audit =="
+node test/layout-audit.js | tail -n 6
+LAYOUT=${PIPESTATUS[0]}
 
 echo "========================================"
-if [ "$TESTS" -eq 0 ]; then
+if [ "$LAYOUT" -eq 0 ]; then
   echo "ALL CHECKS PASSED"
   exit 0
 else
-  echo "LOGIC TESTS FAILED"
+  echo "LAYOUT AUDIT FAILED (text renders permanently off-screen)"
   exit 1
 fi
