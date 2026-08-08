@@ -8026,13 +8026,47 @@ function archetypeFor(stage) {
   return ['standard', 'horned', 'tendril', 'crystal', 'phantom', 'rune'][idx % 6];
 }
 
+// ===================== BOSS TRACK — speed cap + density ====================
+// The boss track (every 10th stage) had BOTH failure modes at once, and the
+// audit that found the normal-stage plateau found these too:
+//
+//   RUNAWAY  horizontal speed was UNCAPPED: vx = 1.7 + stage*0.10, then x1.5 at
+//            phase 2 and x1.2 again at phase 3. At stage 100 that is 21.1
+//            px/frame — 8.4x PLAYER_SPEED — crossing the 184px arena in 9
+//            frames. Not hard: unreadable and undodgeable.
+//   PLATEAU  fire cadence (20f), dash cadence (70f) and spread (7) are all
+//            floored/flat from stage ~30, so every SUPER boss from 30 to 100 is
+//            the same fight. The only thing that grew was HP (275 -> 800), which
+//            makes the fight LONGER, not harder — a bullet sponge.
+//
+// Same doctrine as the DEEP PRESSURE ladder: cap the unfair scalar, escalate on
+// density instead. BASE is capped at 5.0 so stage 30's 4.70 is untouched and the
+// phase multipliers still have full room to read as rage; the FINAL magnitude is
+// capped at 9.0 (= 5.0 x 1.5 x 1.2), so a fully enraged boss tops out at 3.6x the
+// player's speed instead of 8.4x. The difficulty that removes is paid back as
+// pattern density via bossSpreadForStage.
+const BOSS_VX_BASE_MAX = 5.0; // pre-rage ceiling
+const BOSS_VX_MAX      = 9.0; // absolute ceiling after phase-2/3 multipliers
+function clampBossVx(vx, cap) {
+  const lim = (typeof cap === 'number' ? cap : BOSS_VX_MAX);
+  const v = Number(vx) || 0;
+  return Math.max(-lim, Math.min(lim, v));
+}
+
+// SUPER-boss volley width: 7 bullets at stage 30 -> 9 at stage 80+. More bullets
+// per volley at the SAME bullet speed is denser but still readable — the boss
+// analogue of the formation's elite/diver density ramp.
+function bossSpreadForStage(stage) {
+  return 7 + Math.round((typeof deepPressure === 'function' ? deepPressure(stage) : 0) * 2);
+}
+
 function makeMegaBoss(s, opts) {
   opts = opts || {};
   const baseHp = 20 + s * 3;
   return {
     x: opts.x != null ? opts.x : BASE_W / 2,
     y: 35,
-    vx: (opts.vx != null ? opts.vx : (1.5 + s * 0.12)),
+    vx: clampBossVx(opts.vx != null ? opts.vx : (1.5 + s * 0.12), BOSS_VX_BASE_MAX),
     maxHp: opts.hpScale ? Math.round(baseHp * opts.hpScale) : baseHp,
     hp:    opts.hpScale ? Math.round(baseHp * opts.hpScale) : baseHp,
     frame: 0,
@@ -8041,7 +8075,7 @@ function makeMegaBoss(s, opts) {
     shootInterval: opts.super
       ? Math.max(20, Math.floor((90 - s * 4) * 0.55))
       : Math.max(28, 90 - s * 4),
-    spreadCount: opts.super ? 7 : (s >= 4 ? 5 : 3),
+    spreadCount: opts.super ? bossSpreadForStage(s) : (s >= 4 ? 5 : 3),
     alive: true,
     hitFlash: 0,
     dashTimer: opts.dashOffset || 0,
@@ -8108,7 +8142,7 @@ function updateOneMegaBoss(mb) {
   // means new color, new decorations, and a new signature pattern (split/sweep/fragment).
   if (!frozen && !mb.phase2 && mb.hp <= mb.maxHp * 0.4) {
     mb.phase2 = true;
-    mb.vx *= 1.5;
+    mb.vx = clampBossVx(mb.vx * 1.5);
     mb.shootInterval = Math.max(18, Math.floor(mb.shootInterval * 0.6));
     // Full 6-archetype morph cycle so phantom/rune bosses metamorphose into the
     // next class instead of falling back to horned (the old 4-key map dead-ended).
@@ -8165,7 +8199,7 @@ function updateOneMegaBoss(mb) {
   // FINAL STAND taunt. Tracks 'rageColor' for renderer to apply pulsing red outline.
   if (!frozen && mb.alive && !mb.phase3 && mb.phase2 && mb.hp <= mb.maxHp * 0.15) {
     mb.phase3 = true;
-    mb.vx *= 1.2;
+    mb.vx = clampBossVx(mb.vx * 1.2);
     mb.shootInterval = Math.max(14, Math.floor(mb.shootInterval * 0.8));
     mb.telegraphFrames = 18; // brief pause before rage attacks land
     // FINAL-STAND grid heave — second shock as the boss enters rage (kept sub-full-screen

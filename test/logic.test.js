@@ -3427,6 +3427,53 @@ if (typeof G.deepPressure === 'function' && typeof G.ghostRateForStage === 'func
   ok(p[99] > p[49] && p[49] > p[31], 'pressure keeps climbing across the whole deep game');
 } else { console.log('  (skipped — deep pressure ladder not exposed)'); }
 
+section('BOSS TRACK — speed ceiling + density ramp (the other difficulty track)');
+if (typeof G.clampBossVx === 'function' && typeof G.bossSpreadForStage === 'function'
+    && typeof G.makeMegaBoss === 'function') {
+  const PLAYER_SPEED = 2.5, ARENA = 224 - 40;
+  // --- clampBossVx: a symmetric magnitude clamp that preserves direction ---
+  eq(G.clampBossVx(3, 5), 3, 'a speed under the cap is untouched');
+  eq(G.clampBossVx(50, 5), 5, 'over the cap clamps down');
+  eq(G.clampBossVx(-50, 5), -5, 'and clamps symmetrically for a left-moving boss');
+  eq(G.clampBossVx(-3, 5), -3, 'direction is preserved');
+  eq(G.clampBossVx(NaN, 5), 0, 'NaN → 0 (a boss can never inherit a NaN position)');
+  ok(Math.abs(G.clampBossVx(999)) <= 9.0, 'the default cap is the absolute ceiling');
+
+  // --- the runaway is gone ---
+  // Base speed used to be 1.7 + stage*0.10 with NO cap: 11.7 px/frame at stage
+  // 100, then x1.5 (phase 2) and x1.2 (phase 3) on top = 21.1 = 8.4x the player.
+  const bossAt = s => G.makeMegaBoss(s, { super: true, hpScale: 2.5, vx: 1.7 + s * 0.10 });
+  const enraged = s => {
+    const b = bossAt(s);
+    return Math.abs(G.clampBossVx(G.clampBossVx(b.vx * 1.5) * 1.2));
+  };
+  ok(bossAt(100).vx <= 5.0 + 1e-9, 'base boss speed is capped (was 11.7 at stage 100)');
+  ok(enraged(100) <= 9.0 + 1e-9, 'a fully enraged deep boss is capped (was 21.1)');
+  ok(enraged(100) / PLAYER_SPEED <= 3.7,
+     'even enraged, a boss never exceeds ~3.6x the player speed (was 8.4x)');
+  ok(ARENA / enraged(100) >= 20,
+     'it always takes 20+ frames to cross the arena — long enough to read and dodge');
+  eq(enraged(1000), enraged(100), 'the ceiling holds at any stage (no runaway ever)');
+  // Stage 30 — the first SUPER boss — must NOT have been nerfed by the cap.
+  ok(bossAt(30).vx > 4.6, 'the stage-30 boss keeps its original speed (cap set above it)');
+  ok(enraged(40) >= enraged(30), 'deeper bosses are still faster, just bounded');
+
+  // --- density replaces the speed that was removed ---
+  eq(G.bossSpreadForStage(30), 7, 'the first SUPER boss keeps the historical 7-shot volley');
+  ok(G.bossSpreadForStage(80) > G.bossSpreadForStage(30), 'deep bosses fire a wider volley');
+  eq(G.bossSpreadForStage(80), 9, 'the volley tops out at 9');
+  eq(G.bossSpreadForStage(1000), 9, 'and is capped there (no runaway bullet count)');
+  ok(bossAt(80).spreadCount > bossAt(30).spreadCount, 'the ramp reaches the real boss object');
+  // Non-super bosses are untouched by the deep ladder.
+  eq(G.makeMegaBoss(12).spreadCount, 5, 'a normal boss still fires 5 (deep ladder is SUPER-only)');
+
+  // --- the deep boss fight is no longer pure bullet sponge ---
+  // HP still grows (fights get longer) but something about the FIGHT now changes
+  // too, which was the defect: 30..100 were eight identical encounters.
+  const shape = s => bossAt(s).spreadCount;
+  ok(shape(100) > shape(30), 'the deep boss fight differs in kind, not only in length');
+} else { console.log('  (skipped — boss track helpers not exposed)'); }
+
 section('RIVAL ACE — full duel lifecycle (phase machine, not just the helpers)');
 if (ST && typeof G.updateRivalAce === 'function' && G.__getGame && G.__getGame()) {
   const g = freshStage(G.__getGame(), {
