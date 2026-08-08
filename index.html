@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#000814">
+<meta name="theme-color" content="#0a0507">
 <title>GALAGA</title>
 <style>
 /* Embedded pixel fonts (base64 woff2, latin subset) — keeps the game a
@@ -26,14 +26,17 @@ canvas {
     0 0 24px rgba(255, 59, 59, 0.22),
     0 0 60px rgba(255, 59, 59, 0.08),
     inset 0 0 0 1px rgba(240, 240, 240, 0.14);
-  border-radius: 2px;
+  border-radius: 0;
 }
 /* Subtle scanline overlay across the whole viewport for CRT vibe */
 body::before {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 5;
   background: repeating-linear-gradient(
-    to bottom, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px,
-    transparent 1px, transparent 3px);
+    to bottom,
+    rgba(255,255,255,0.04) 0,
+    rgba(255,255,255,0.04) calc(var(--scan, 3px) / 3),
+    transparent calc(var(--scan, 3px) / 3),
+    transparent var(--scan, 3px));
   mix-blend-mode: overlay;
 }
 #touchControls {
@@ -9858,6 +9861,18 @@ function resize() {
   canvas.height = Math.floor(BASE_H * SCALE);
   canvas.style.marginTop = Math.floor((h - canvas.height) / 2) + 'px';
   ctx.imageSmoothingEnabled = false;
+  // CRT SCANLINE PIXEL LOCK — publish the upscale factor so the body::before
+  // scanline overlay can use ONE game pixel as its period. It was a fixed 3px
+  // while SCALE is usually fractional (3.75x at 1080p), so the lines beat
+  // against the pixel rows instead of sitting on them. Clamped to >=2px so a
+  // tiny window can't produce a 1px strobe. Guarded: the test harness's stub
+  // documentElement has a plain object for .style with no setProperty.
+  try {
+    const de = document.documentElement;
+    if (de && de.style && typeof de.style.setProperty === 'function') {
+      de.style.setProperty('--scan', Math.max(2, SCALE).toFixed(2) + 'px');
+    }
+  } catch (e) {}
 }
 window.addEventListener('resize', resize);
 

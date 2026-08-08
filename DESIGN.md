@@ -270,6 +270,33 @@ monospace. Tests assert both payloads decode with the `wOF2` magic number, that 
 Google Fonts URL or remote `@import` returns, and that both stacks keep a monospace
 fallback.
 
+## Page chrome audit vs the ui-ux-pro-max Pixel Art checklist (2026-08-08)
+Ran the skill's Pixel Art checklist against the shipped file. **Most of it was already
+satisfied** — `image-rendering: pixelated` + `ctx.imageSmoothingEnabled = false` (the
+bloom deliberately keeps smoothing ON, which is correct), CRT scanline overlay, retro
+palette, and — as of today — pixelated fonts and a contrast-clean palette. Three real
+gaps remained:
+
+- **`theme-color` was still `#000814`** — a leftover from the pre-noir BLUE palette. The
+  page ground moved to crimson-warm noir long ago; the mobile URL-bar colour never did.
+  Now `#0a0507`.
+- **`border-radius: 2px` on the canvas** → `0`. Sharp edges is the whole doctrine; a
+  rounded corner softens the one hard rectangle the aesthetic is built on.
+- **Scanlines were not on the pixel grid.** The overlay used a fixed 3px period while the
+  game upscales by a usually-fractional `SCALE` (3.75× at 1080p), so the lines *beat*
+  against the pixel rows — the classic CRT-shader moiré mistake. `resize()` now publishes
+  `--scan` (= `SCALE`, floored at 2px) and the gradient uses one **game pixel** as its
+  period. Coverage stays 1/3, so overall darkness is unchanged — only the alignment.
+
+**Deliberately NOT changed:**
+- **Touch-button font stays `sans-serif`.** Switching it to the pixel face was checked
+  against the embedded cmaps first: `●` (U+25CF) and `❙` (U+2759) are absent from *both*
+  faces, so two of the three buttons would have silently fallen back — a mixed, worse
+  result. Verified, not assumed.
+- **No arcade bezel.** `SCALE = min(w/224, h/288)` means the canvas fills the full
+  viewport height on a normal landscape display, so a bezel has no room without shrinking
+  the play area. That is a legibility trade-off the player should choose, not a blind edit.
+
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
