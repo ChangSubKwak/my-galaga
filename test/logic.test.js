@@ -1567,6 +1567,22 @@ if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'f
   const usesCurrent = indicators.filter(x => /\+\s*1\s*\)/.test(x) || /'\s*1\//.test(x));
   eq(usesCurrent.length, indicators.length,
      'every Tab indicator derives its number from the current page');
+
+  // The summary page carries a Tab-page DIRECTORY whose stated job is to make
+  // the dedicated pages discoverable. PILOT LOG was added to the page model
+  // without being listed there, so the one surface that advertises the pages
+  // silently omitted it. Rows = total pages - grid pages (the grids collapse
+  // into a single "ACHIEVEMENTS P2-N" row, and the summary lists everything
+  // except itself... which works out to exactly that count).
+  const dirBlock = scriptSrc.match(/const _dir = \[([\s\S]*?)\n\s*\];/);
+  ok(!!dirBlock, 'found the Tab-page directory in source');
+  if (dirBlock) {
+    const rows = (dirBlock[1].match(/\n\s*\[/g) || []).length;
+    eq(rows, tp - gp, 'the directory lists every dedicated Tab page (rows = total - grids)');
+    for (const name of ['BESTIARY', 'PILOT PROFILE', 'PILOT LOG', 'ACHIEVEMENTS']) {
+      ok(dirBlock[1].indexOf(name) !== -1, 'directory advertises ' + name);
+    }
+  }
 } else { console.log('  (skipped — stats page helpers not exposed)'); }
 
 // ============================================================

@@ -24493,10 +24493,17 @@ function drawStatsOverlay() {
     y += 12;
     drawRetroText('— TAB FOR MORE —', BASE_W / 2, y, 5, '#9ab', 'center');
     y += 11;
+    // EVERY dedicated Tab page must appear here — that is this block's entire
+    // job. PILOT LOG was added to the page model without being listed, so the
+    // one surface that advertises the pages silently omitted it. Pinned by a
+    // test that counts these rows against the page model.
+    let _flCount = 0;
+    try { _flCount = loadFlightLog().length; } catch (e) {}
     const _dir = [
       ['ACHIEVEMENTS', ach + '/' + totalAch, _gP === 1 ? 'P2' : 'P2-' + (1 + _gP)],
       ['BESTIARY', (typeof dexUnlocked !== 'undefined' ? dexUnlocked.size : 0) + '/' + Object.keys(ENEMY_INFO).length, 'P' + (_gP + 2)],
-      ['PILOT PROFILE', '', 'P' + (_gP + 3)]
+      ['PILOT PROFILE', '', 'P' + (_gP + 3)],
+      ['PILOT LOG', _flCount ? _flCount + ' RUNS' : '', 'P' + (_gP + 4)]
     ];
     for (const [_lab, _val, _pg] of _dir) {
       drawRetroText(_lab, px + 10, y, 5, COL.cyan, 'left');
