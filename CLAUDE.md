@@ -211,9 +211,26 @@ All three tracks are now audited and guarded. The test suite pins the **curve sh
 across stages 1–100 (no inversion, no >12% single-stage wall, never 10+ flat stages,
 stage 100 materially harder than stage 32), the three formation fairness caps, the boss
 speed ceiling, and the challenge opportunity floor — so none of them can quietly drift.
-**When adding difficulty anywhere, measure the curve first** (the audit is a ~40-line
-vm harness that drives the real scaling functions); every defect found so far was
-invisible in the code and obvious in the plot.
+**When adding difficulty anywhere, measure the curve first:**
+
+```bash
+node test/curve-audit.js     # report: all three tracks + the score economy
+```
+
+`test/curve-audit.js` drives the real scaling functions with the exact parameters from
+their call sites, so it cannot drift from what the game does (if you change a call site,
+change it there too). It is a **report**, not a pass/fail test — the hard invariants live
+in `logic.test.js`. Every difficulty defect found so far — a 69-stage plateau, two
+uncapped speed runaways, a reward inversion — was invisible in the code and obvious the
+moment it was plotted.
+
+It also reports the **score economy**, because elite (1.5×) and ghost (2×) are score
+multipliers: raising their spawn rates for difficulty raises income as a side effect.
+Score efficiency (points per unit of danger) falls ×1.000 → ×0.116 from stage 1 to 100.
+That is **intended, not a defect** — `getEnemyPoints()` takes no stage argument by
+design, exactly as in real Galaga, and depth is meant to pay in combo multipliers, boss
+bounty and rank rather than inflated per-kill values. The number is reported so any new
+score source is added with its effect known rather than by feel.
 
 ### FLIGHT SCHOOL — teach every new verb once (read this when adding a mechanic)
 
