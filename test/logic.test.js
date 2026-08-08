@@ -3336,6 +3336,36 @@ if (G.__getCol && G.__getCol()) {
   }
 } else { console.log('  (skipped — COL not exposed)'); }
 
+section('PIXEL TYPEFACE — embedded base64 woff2 payloads (single-file contract)');
+{
+  // The fonts are the ONLY binary assets in the project and they are what keeps
+  // it a single self-contained file. Guard the payloads themselves: a stripped,
+  // truncated, or externalised font must fail the build, not fail silently in a
+  // browser as a fallback-metrics layout.
+  const faces = [...html.matchAll(/font-family:'([^']+)'[^}]*?base64,([A-Za-z0-9+/=]+)\)/g)];
+  eq(faces.length, 2, 'exactly two @font-face payloads are embedded');
+  const names = faces.map(f => f[1]).sort();
+  eq(names.join(','), 'PressStart2P,VT323', 'the display + body pair are both present');
+  for (const [, fam, b64] of faces) {
+    const buf = Buffer.from(b64, 'base64');
+    ok(buf.length > 4000, fam + ': payload decodes to a plausible font size (' + buf.length + 'B)');
+    // woff2 magic number 'wOF2' — proves it is a real font, not truncated base64
+    eq(buf.slice(0, 4).toString('latin1'), 'wOF2', fam + ': payload carries the woff2 magic number');
+  }
+  // No network font may sneak back in — that would break offline/file:// play.
+  ok(!/@import\s+url\(https?:/i.test(html), 'no remote @import (offline play preserved)');
+  ok(!/fonts\.googleapis\.com|fonts\.gstatic\.com/.test(html), 'no Google Fonts URL remains in the shipped file');
+  // The font stack must always keep a generic fallback, so a face that fails to
+  // decode degrades to monospace instead of to an unpredictable default.
+  // (The document.fonts.load("16px 'VT323'") probes deliberately carry no
+  // fallback — they ask about one specific face — so assert on the two real
+  // font-stack strings instead of on every occurrence of a family name.)
+  ok(/px '(?:VT323)', monospace/.test(html), 'body font stack falls back to monospace');
+  ok(/px '(?:PressStart2P)', monospace/.test(html), 'display font stack falls back to monospace');
+  // The escape hatch must exist and persist, like every other visual toggle.
+  ok(/galagaPixelFontOff/.test(html), 'pixel font toggle persists to localStorage');
+}
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);

@@ -222,6 +222,54 @@ space(dark)↔ground(bright) environmental contrast that reuses the existing bio
 - **Sprite muting (optional):** slightly reduce saturation on decorative (non-
   functional) sprite detail.
 
+## Pixel typeface (2026-08-08) — embedded, paired, size-gated
+The game rendered every glyph in the browser's **default monospace** — the one
+un-designed surface left in a procedurally-drawn arcade game. Two pixel faces are
+now embedded as **base64 woff2 inside `<style>`** (+40KB), so the single-file /
+offline-from-`file://` contract holds — no Google Fonts request, ever.
+
+- **PressStart2P** — display face, blocky arcade. Used at **size ≥ 12 only**.
+- **VT323** — body face, narrow terminal. Everything else.
+- Both **SIL OFL 1.1**, unmodified, attributed in the CSS comment.
+
+**Why a pairing, not one face.** A census of all 213 `drawRetroText` sites found
+**194 at size ≤ 7**. PressStart2P advances a full **1.0em** per glyph vs the default
+monospace's ~0.6em — using it everywhere would blow every HUD panel and stats row
+~67% wider. VT323 advances **0.40em**, *narrower* than what it replaces, so the body
+face cannot overflow a layout that already fits.
+
+**Metrics were measured, not assumed** (parsed out of the shipped base64):
+
+| face | advance | cap height |
+|---|---|---|
+| PressStart2P | 1.000em | 0.875em |
+| VT323 | 0.400em | 0.560em |
+| Courier New (Windows default, the one replaced) | ~0.600em | 0.571em |
+| DejaVu Sans Mono / Menlo | ~0.600em | 0.72–0.73em |
+
+VT323's cap height matches Courier New within **2%**, so on the reference platform the
+swap changes the *typeface* without changing the optical size — one variable, not two.
+Hence `PIXEL_BODY_SCALE = 1.0`; it exists only to re-tune if the reference platform
+changes (mac/Linux monospace runs ~20% taller, so ~1.2 would match those).
+
+**Overflow safety is exact, not hoped-for.** Both faces are monospaced, so a line is
+precisely `chars × advance`; the advance is measured once per font string and cached,
+so the fit test costs a multiply — no `measureText` in a function that runs dozens of
+times a frame. A display line that would not fit **falls back to the body face**. All
+nine worst-case display strings (incl. `TWIN SOVEREIGNS` at 210px) were verified to fit.
+
+**Known, accepted:** neither face ships `★ → ✓` (nor `↑` in VT323). Those fall back
+per-glyph to the `monospace` in the stack — they still render, in the fallback face.
+This also keeps the fit test conservative: a fallback glyph is narrower than the 1.0em
+the test assumes, so a mixed line can only come out *shorter* than predicted.
+
+**Escape hatch + guards.** `Y` toggles the typeface (persisted `galagaPixelFontOff`),
+matching bloom/shake/colorblind. Loading is gated on `document.fonts.load` for BOTH
+faces, so a blocked or slow font never draws a frame with wrong metrics — it just stays
+monospace. Tests assert both payloads decode with the `wOF2` magic number, that no
+Google Fonts URL or remote `@import` returns, and that both stacks keep a monospace
+fallback.
+
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
