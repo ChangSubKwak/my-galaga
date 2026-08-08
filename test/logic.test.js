@@ -3427,6 +3427,50 @@ if (typeof G.deepPressure === 'function' && typeof G.ghostRateForStage === 'func
   ok(p[99] > p[49] && p[49] > p[31], 'pressure keeps climbing across the whole deep game');
 } else { console.log('  (skipped — deep pressure ladder not exposed)'); }
 
+section('CHALLENGE TRACK — opportunity curve (a reward round must not pay less with depth)');
+if (typeof G.challengeSpeedForStage === 'function' && typeof G.challengeGroupSize === 'function') {
+  const SPAN = 224 + 30;            // off-screen entry to off-screen exit
+  const dwell = s => SPAN / G.challengeSpeedForStage(s);        // frames on screen
+  const total = s => G.challengeGroupSize(s) * 2 * 8;           // 2 sub-groups x 8 waves
+  // OPPORTUNITY = how much shootable enemy-time the round actually offers.
+  const opp = s => total(s) * dwell(s);
+
+  // --- speed: capped, but early stages untouched ---
+  ok(Math.abs(G.challengeSpeedForStage(4) - 1.70) < 1e-9, 'stage 4 keeps its original speed');
+  ok(Math.abs(G.challengeSpeedForStage(32) - 3.10) < 1e-9, 'stage 32 keeps its original speed');
+  ok(G.challengeSpeedForStage(96) <= 4.0 + 1e-9, 'deep speed is capped (was 6.30 and climbing)');
+  eq(G.challengeSpeedForStage(1000), G.challengeSpeedForStage(96), 'the cap holds at any stage');
+  ok(G.challengeSpeedForStage(48) > G.challengeSpeedForStage(16), 'speed still ramps below the cap');
+  ok(dwell(96) / 60 >= 1.0, 'every enemy stays on screen at least a second (was 0.67s)');
+  ok(dwell(96) / 6 >= 10, 'at least 10 landable shots per pass at 6f fire cooldown (was 6.7)');
+
+  // --- count: keeps growing where speed can no longer ---
+  eq(G.challengeGroupSize(4), 8, 'the early group size is unchanged');
+  eq(G.challengeGroupSize(24), 9, 'the stage-20 bump is unchanged');
+  ok(G.challengeGroupSize(96) > G.challengeGroupSize(44),
+     'deep waves add TARGETS where they can no longer add speed');
+  eq(G.challengeGroupSize(1000), G.challengeGroupSize(80), 'target count is capped too');
+
+  // --- the inversion is gone ---
+  // Before: opportunity at the deepest challenge stage was 34% of the first —
+  // most of the wave escaped, perfect clears were unreachable, and the bonus
+  // shrank the further you got. A reward round is allowed to get harder; it is
+  // not allowed to collapse.
+  ok(opp(96) / opp(4) > 0.55,
+     'the deepest challenge round still offers >55% of the opening round (was 34%)');
+  ok(opp(96) > opp(4) * 0.55 && opp(96) < opp(4),
+     'it is harder than the opening round, but has not collapsed');
+  // Past the speed cap only the count moves, so opportunity must never fall.
+  let falls = 0;
+  for (let s = 52; s <= 100; s++) {
+    if (G.stageModeFor(s) !== 'challenge') continue;
+    const prev = [...Array(s - 52).keys()].map(i => i + 52)
+      .filter(x => G.stageModeFor(x) === 'challenge').pop();
+    if (prev && opp(s) < opp(prev) - 1e-9) falls++;
+  }
+  eq(falls, 0, 'past the speed cap the round never gets stingier than the one before it');
+} else { console.log('  (skipped — challenge track helpers not exposed)'); }
+
 section('BOSS TRACK — speed ceiling + density ramp (the other difficulty track)');
 if (typeof G.clampBossVx === 'function' && typeof G.bossSpreadForStage === 'function'
     && typeof G.makeMegaBoss === 'function') {

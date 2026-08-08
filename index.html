@@ -7906,6 +7906,36 @@ function setupEntryAnimation() {
   });
 }
 
+// ================== CHALLENGE TRACK — opportunity, not danger =================
+// The third difficulty track (every 4th non-boss stage) had the same two defects
+// as the other two, plus one unique to a REWARD round.
+//
+//   RUNAWAY   baseSpeed = 1.5 + stage*0.05 was UNCAPPED: 1.70 px/f at stage 4,
+//             6.30 at stage 96. Each enemy's on-screen dwell fell from 2.49s to
+//             0.67s — the hittable window shrank 3.71x.
+//   PLATEAU   enemies/wave stopped growing at stage 44 (20/wave) forever.
+//   INVERSION Challenge enemies do not shoot, so speed is not danger — it is
+//             OPPORTUNITY. A shorter window means fewer landable shots (24.9 ->
+//             6.7 per pass), so most of the wave escapes, perfect-wave clears
+//             become unreachable, and the bonus SHRINKS with depth. A reward
+//             track that pays less the deeper you get is backwards.
+//
+// Same doctrine as the formation and boss tracks: cap the scalar that destroys
+// readability/opportunity, and escalate on density instead. Speed caps at 4.0
+// (a ~1.06s window, ~10 landable shots per pass) which is only reached at stage
+// 50, so every earlier challenge stage is untouched; depth then adds TARGETS
+// rather than taking away time, so the round pays more the deeper you go.
+const CHALLENGE_SPEED_MAX = 4.0;
+function challengeSpeedForStage(stage) {
+  return Math.min(CHALLENGE_SPEED_MAX, 1.5 + (Math.floor(stage) || 0) * 0.05);
+}
+function challengeGroupSize(stage) {
+  const s = Math.floor(stage) || 0;
+  const legacy = 8 + (s >= 40 ? 2 : s >= 20 ? 1 : 0);
+  const deep = Math.round((typeof deepPressure === 'function' ? deepPressure(s) : 0) * 2);
+  return legacy + deep;
+}
+
 function setupChallengingStage() {
   game.challengeHits = 0;
   game.challengeTotal = 0;
@@ -7929,10 +7959,12 @@ function setupChallengingStage() {
     patternOrder.push(...shuffled.slice().sort(() => Math.random() - 0.5));
   }
 
-  const baseSpeed = 1.5 + game.stage * 0.05;
-  // CHALLENGE DEPTH SCALING — base group size 8 enemies, +1 at stage 20+,
-  // +2 at stage 40+. Adds 16 → 18-20 enemies per wave at deeper stages.
-  const GROUP_SIZE = 8 + (game.stage >= 40 ? 2 : game.stage >= 20 ? 1 : 0);
+  // Capped so the hittable window can never collapse (see the block above).
+  const baseSpeed = challengeSpeedForStage(game.stage);
+  // CHALLENGE DEPTH SCALING — 8 base, +1 at stage 20+, +2 at 40+, then the
+  // DEEP PRESSURE ladder adds up to +2 more. 16 -> 24 enemies per wave, so
+  // depth adds TARGETS instead of taking away time to shoot them.
+  const GROUP_SIZE = challengeGroupSize(game.stage);
 
   for (let w = 0; w < numWaves; w++) {
     const pattern = patternOrder[w];
