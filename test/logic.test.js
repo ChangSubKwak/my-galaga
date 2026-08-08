@@ -1552,6 +1552,21 @@ if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'f
     if (kinds === 1) covered++;
   }
   eq(covered, tp, 'every Tab page maps to exactly one kind (no gaps/overlaps)');
+  // Every page indicator must render the CURRENT page, never a hardcoded "last
+  // page". The profile page used to print `total/total` because it WAS last;
+  // adding PILOT LOG after it left the label claiming to be the final page,
+  // which tells the player there is nothing further and hides the page that
+  // follows. A stale self-label is invisible in play, so pin it at the source.
+  const indicators = [...scriptSrc.matchAll(/drawRetroText\(([^;]{0,80}?)\+\s*'\s*TAB'/g)].map(m => m[1]);
+  ok(indicators.length >= 4, 'found the Tab page indicators in source (' + indicators.length + ')');
+  const stale = indicators.filter(x => /(\w+)\s*\+\s*'\/'\s*\+\s*\1\b/.test(x));
+  eq(stale.length, 0, 'no page indicator hardcodes itself as the last page (total/total)');
+  // "Derives from the current page" means either `<pageVar> + 1` (stats pages
+  // use game.statsAchPage, the help overlay uses its own _hp) or the literal
+  // '1/' on the page-0 footer, which is page 0 by construction.
+  const usesCurrent = indicators.filter(x => /\+\s*1\s*\)/.test(x) || /'\s*1\//.test(x));
+  eq(usesCurrent.length, indicators.length,
+     'every Tab indicator derives its number from the current page');
 } else { console.log('  (skipped — stats page helpers not exposed)'); }
 
 // ============================================================

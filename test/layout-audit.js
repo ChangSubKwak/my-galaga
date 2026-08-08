@@ -82,6 +82,7 @@ function makeCtx() {
         screen: currentScreen,
         text: String(t),
         x: a * lx + c * ly + e,          // device-space anchor
+        y: b * lx + d * ly + m[5],      // device-space baseline
         xScale: Math.hypot(a, b) || 1,   // how much the matrix stretches width
         rotated: Math.abs(b) > 1e-6 || Math.abs(c) > 1e-6,
         size: fm ? parseFloat(fm[1]) : 5,
@@ -174,6 +175,37 @@ sandbox.window.matchMedia = () => ({ matches: false, addEventListener: noop, add
 // resolution makes SCALE == 1, so device space IS game space and the 224px
 // bound below is directly comparable.
 sandbox.window.innerWidth = BASE_W; sandbox.window.innerHeight = BASE_H; sandbox.window.devicePixelRatio = 1;
+// FULL-PROGRESS FIXTURE — most overlay rows are CONDITIONAL on a lifetime
+// stat existing, so a virgin profile renders the SHORTEST possible panels and
+// the audit measures the easy case. Seeding a maxed profile forces every
+// conditional row, tier label and badge to draw, which is the layout that can
+// actually overflow. (Verified: without this the stats summary page rendered
+// 3 fewer rows than a real veteran profile does.)
+Object.assign(store, {
+  galagaHigh: '999999999', galagaParryTotal: '1234', galagaNearMissTotal: '4321',
+  galagaGrazeChainBest: '22', galagaCleanStreakBest: '17', galagaRevengeTotal: '88',
+  galagaFlawlessBosses: '19', galagaWitchSaves: '77', galagaPBBeats: '41',
+  galagaEliteKills: '2500', galagaRivalWins: '23', galagaSalvageTotal: '450',
+  galagaMagpieKills: '61', galagaGhostKills: '140', galagaPerfectParries: '310',
+  galagaCritKills: '900', galagaBossesDefeated: '75', galagaMaxComboEver: '150',
+  galagaMaxPowerReached: '12', galagaPerfectClears: '48', galagaLastStands: '30',
+  galagaUntouchedStages: '55', galagaGoldenClears: '14', galagaBonusWins: '26',
+  galagaGameCompleteCount: '5', galagaWishCount: '9', galagaPerfectStreakBest: '11',
+  galagaDailyMissionTotal: '95', galagaDailyMissionStreak: '13',
+  galagaDailyMissionStreakBest: '31', galagaCallsign: 'KWK',
+  galagaStageGrades: '{"S":140,"A":120,"B":90,"C":60,"D":30}',
+  galagaKillsByType: '{"bee":9000,"butterfly":6000,"boss":900,"mirror":500,"splitter":400,"shielded":350,"ufo":120,"hoverer":300,"kamikaze":450,"goldenBee":90,"minibee":800,"warper":260}',
+  galagaPickupTotals: '{"S":700,"N":600,"P":500,"T":300,"R":320,"W":280,"H":260,"L":150,"B":190,"E":240,"F":170,"D":130}',
+  galagaBiomeVisits: '{"planet":30,"ruins":28,"dawn":26,"asteroid":24,"desert":22,"ice":20,"gasGiant":18,"corona":16,"canyon":14,"blackhole":12,"nebula":10,"starfield":8}',
+  galagaDeathCauses: '{"bullet":140,"collision":90,"weather":40,"unknown":12}',
+  galagaShipsUsed: '["arrow","tank","scout","witch","firebrand"]',
+  galagaDifficultiesUsed: '["easy","normal","hard"]',
+  galagaBiomesSeen: '["planet","ruins","dawn","asteroid","desert","ice","gasGiant","corona","canyon","blackhole","nebula","starfield"]',
+  galagaDailyDays: '["20260801","20260802","20260803","20260804","20260805"]',
+  galagaLastRun: '{"stage":97,"score":987654321,"combo":142,"wasPb":true}',
+  galagaFlightLog: '[{"d":"08-01","sc":987654321,"st":100,"gr":"S","ca":"BULLET","cs":"KWK","md":"N"},{"d":"08-02","sc":987643210,"st":97,"gr":"A","ca":"COLLISION","cs":"KWK","md":"C"},{"d":"08-03","sc":987632099,"st":94,"gr":"B","ca":"WEATHER","cs":"KWK","md":"D"},{"d":"08-04","sc":987620988,"st":91,"gr":"C","ca":"UNKNOWN","cs":"KWK","md":"N"},{"d":"08-05","sc":987609877,"st":88,"gr":"D","ca":"ABORT","cs":"KWK","md":"C"},{"d":"08-06","sc":987598766,"st":85,"gr":"S","ca":"BULLET","cs":"KWK","md":"D"},{"d":"08-07","sc":987587655,"st":82,"gr":"A","ca":"COLLISION","cs":"KWK","md":"N"},{"d":"08-08","sc":987576544,"st":79,"gr":"B","ca":"WEATHER","cs":"KWK","md":"C"},{"d":"08-09","sc":987565433,"st":76,"gr":"C","ca":"UNKNOWN","cs":"KWK","md":"D"},{"d":"08-10","sc":987554322,"st":73,"gr":"D","ca":"ABORT","cs":"KWK","md":"N"}]',
+});
+
 vm.createContext(sandbox);
 vm.runInContext(src + `
 ;globalThis.__g = function(){ return typeof game !== 'undefined' ? game : null; };
@@ -270,6 +302,16 @@ if (process.env.LAYOUT_DEBUG) {
       + ' xScale=' + u[0].xScale.toFixed(3) + ' rotated=' + u[0].rotated);
   }
 }
+if (process.env.VDUMP) {
+  const scr = process.env.VDUMP;
+  const rows = draws.filter(d => d.screen === scr && !d.rotated);
+  const ys = rows.map(d => d.y);
+  console.log('VDUMP ' + scr + ': ' + rows.length + ' draws, y '
+    + Math.min(...ys).toFixed(1) + '..' + Math.max(...ys).toFixed(1) + ' (playfield 0..288)');
+  const deep = [...new Set(rows.filter(d => d.y > 250).map(d => d.y.toFixed(0) + '  ' + JSON.stringify(d.text)))];
+  deep.sort();
+  for (const t of deep) console.log('   y=' + t);
+}
 console.log('\n' + '='.repeat(72));
 console.log('LAYOUT AUDIT — text overflow across every screen and overlay page');
 console.log('='.repeat(72));
@@ -322,8 +364,37 @@ for (const cfg of ['mono', 'pixel']) {
   }
 }
 
+// VERTICAL BOUNDS — the horizontal check above cannot see a panel whose rows
+// have grown past the bottom of the screen. Same 'ever fully visible' rule.
+{
+  const bestV = new Map();
+  for (const d of draws) {
+    if (!d.text.length || d.rotated) continue;
+    // textBaseline is 'middle' throughout this game, so the glyph box is
+    // centred on y with height approximately the font size.
+    const half = d.size * 0.5 * (d.xScale || 1);
+    const over = Math.max(-2 - (d.y - half), (d.y + half) - (BASE_H + 2), 0);
+    const key = d.text + ' ' + d.size;
+    const prev = bestV.get(key);
+    if (!prev || over < prev.over) bestV.set(key, { d, over });
+  }
+  const badV = [...bestV.values()].filter(b => b.over > 0).sort((a, b) => b.over - a.over);
+  console.log('-- vertical bounds (0..' + BASE_H + 'px) --');
+  if (!badV.length) {
+    console.log('   ok  every string sits inside the playfield vertically\n');
+  } else {
+    totalBad += badV.length;
+    console.log('   ' + badV.length + ' string(s) never vertically visible:');
+    for (const b of badV.slice(0, 20)) {
+      console.log('     +' + b.over.toFixed(1) + 'px  [' + b.d.screen + '] y='
+        + b.d.y.toFixed(0) + ' size ' + b.d.size + '  ' + JSON.stringify(b.d.text.slice(0, 40)));
+    }
+    console.log('');
+  }
+}
+
 if (totalBad) {
-  console.log('RESULT: ' + totalBad + ' overflowing text draw(s) — see above.\n');
+  console.log('RESULT: ' + totalBad + ' string(s) never fully visible - see above.\n');
   process.exit(1);
 }
 console.log('RESULT: no text overflows in any font configuration.\n');

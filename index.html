@@ -24240,7 +24240,12 @@ function drawStatsOverlay() {
           }
         }
       } catch(e){}
-      drawRetroText(_ppNp + '/' + _ppNp + '  TAB', px + panelW - 8, py + panelH - 8, 5, COL.gray, 'right');
+      // Page number must be the CURRENT page, not a hardcoded "last page". This
+      // read `_ppNp + '/' + _ppNp` back when PROFILE genuinely was the last Tab
+      // page; adding PILOT LOG after it left the label claiming 8/8 while
+      // sitting on page 7, which tells the player there is nothing further and
+      // hides the page that follows. Guarded by a test.
+      drawRetroText((game.statsAchPage + 1) + '/' + _ppNp + '  TAB', px + panelW - 8, py + panelH - 8, 5, COL.gray, 'right');
       drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
       return;
     }
