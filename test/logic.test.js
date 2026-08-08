@@ -544,6 +544,19 @@ if (typeof G.getEnemyPoints === 'function' && G.__getEnemyInfo()) {
     if (!info[type].name || !info[type].col || !info[type].trait) { metaOk = false; badMeta = type; }
   }
   ok(metaOk, 'every ENEMY_INFO entry has name + col + trait' + (badMeta ? ' (bad: ' + badMeta + ')' : ''));
+  // BESPOKE HOSTILES must opt into the codex. Formation enemies are registered
+  // by the shared kill path (`unlockDex(e.type)`), but a one-off entity like the
+  // rival or the magpie has its own kill site and has to call unlockDex itself
+  // — which is precisely the wiring that was missed when they shipped.
+  for (const t of ['rival', 'magpie']) {
+    ok(!!info[t], t + ' has a bestiary entry (it is an enemy the player destroys)');
+    ok(G.getEnemyPoints(t, false) > 50,
+       t + ' has a truthful point value, not the switch default');
+    ok(new RegExp("unlockDex\\('" + t + "'\\)").test(scriptSrc),
+       t + " calls unlockDex('" + t + "') at its kill site");
+    ok(new RegExp('killsByTypeRun\\.' + t).test(scriptSrc),
+       t + ' increments the lifetime kills-by-type tally');
+  }
 } else { console.log('  (skipped — ENEMY_INFO/getEnemyPoints not exposed)'); }
 
 // ============================================================

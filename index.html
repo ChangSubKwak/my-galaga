@@ -5649,6 +5649,13 @@ function resolveRivalDepleted(r) {
   game.powerUps.push({ x: r.x, y: r.y, vy: 0.6, type: pool[randInt(pool.length)] });
   if (typeof pushIntercept === 'function') pushIntercept('rivalDown');
   unlockAchievement('rivalDown');
+  // BESTIARY + LIFETIME KILL TALLY — the rival is an enemy the player destroys,
+  // so it belongs in the codex and in the kills-by-type breakdown like any
+  // other. Formation enemies get these from the shared kill path; a bespoke
+  // entity has to opt in, which is exactly what was missed.
+  if (typeof unlockDex === 'function') unlockDex('rival');
+  game.killsByTypeRun = game.killsByTypeRun || {};
+  game.killsByTypeRun.rival = (game.killsByTypeRun.rival || 0) + 1;
   // REVENGE payback — if the rival was the last thing that killed the player.
   if (game._revengeType === 'rival') {
     game._revengeType = null;
@@ -6196,6 +6203,10 @@ function updateMagpie() {
       addScore(300);
       bumpCombo();
       if (typeof pushIntercept === 'function') pushIntercept('magpieDown');
+      // BESTIARY + LIFETIME KILL TALLY (see the rival kill site).
+      if (typeof unlockDex === 'function') unlockDex('magpie');
+      game.killsByTypeRun = game.killsByTypeRun || {};
+      game.killsByTypeRun.magpie = (game.killsByTypeRun.magpie || 0) + 1;
       try {
         const mk = (parseInt(localStorage.getItem('galagaMagpieKills') || '0', 10) || 0) + 1;
         localStorage.setItem('galagaMagpieKills', String(mk));
@@ -10024,6 +10035,8 @@ function getEnemyPoints(type, inFormation) {
     case 'shielded': return inFormation ? 120 : 240;
     case 'ufo': return 1000;
     case 'goldenBee': return 3000;
+    case 'rival': return 2000;
+    case 'magpie': return 300;
     case 'mirror': return 800;
     case 'hoverer': return 600;
     default: return 50;
@@ -10980,7 +10993,9 @@ const ENEMY_INFO = {
   kamikaze:   { name: 'KAMIKAZE',    trait: 'NO PATTERN — RAMS PLAYER',       col: '#f44' },
   warper:     { name: 'WARPER',      trait: 'TELEPORTS WHILE DIVING — 350 PTS', col: '#a0f' },
   goldenBee:  { name: 'GOLDEN BEE',  trait: 'RARE — METEOR SHOWER ON KILL',   col: '#fc4' },
-  minibee:    { name: 'MINIBEE',     trait: 'SPLITTER FRAGMENT — WEAK',       col: '#fa0' }
+  minibee:    { name: 'MINIBEE',     trait: 'SPLITTER FRAGMENT — WEAK',       col: '#fa0' },
+  rival:      { name: 'RIVAL ACE',   trait: 'MIRROR DUELIST — DODGES, 2000 PTS', col: '#ff3b3b' },
+  magpie:     { name: 'MAGPIE',      trait: 'LOOT THIEF — SHOOT TO RECOVER',  col: '#fc4' }
 };
 const DEX_KEY = 'galagaDexUnlocked';
 let dexUnlocked = (() => {
