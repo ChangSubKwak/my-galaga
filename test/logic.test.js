@@ -1332,7 +1332,7 @@ if (typeof G.submitTopScore === 'function' && typeof G.loadTopScores === 'functi
 // ============================================================
 section('commitGameToCumStats — cumulative stats: demo guard + accumulation + last-run');
 if (typeof G.commitGameToCumStats === 'function' && typeof G.loadCumStats === 'function') {
-  const keys = ['galagaCumStats', 'galagaCumStatsChallenge', 'galagaLastRun'];
+  const keys = ['galagaCumStats', 'galagaCumStatsChallenge'];
   const savedKV = keys.map(k => [k, sandbox.localStorage.getItem(k)]);
   keys.forEach(k => sandbox.localStorage.removeItem(k));
 
@@ -1341,7 +1341,6 @@ if (typeof G.commitGameToCumStats === 'function' && typeof G.loadCumStats === 'f
   g.stats = { kills: 99, shotsFired: 0, shotsHit: 0, maxStage: 9 }; g.score = 99999;
   G.commitGameToCumStats();
   eq((G.loadCumStats(false).sessions || 0), 0, 'demo run → not committed (0 sessions)');
-  eq(sandbox.localStorage.getItem('galagaLastRun'), null, 'demo run → no last-run snapshot');
 
   // Real run → accumulates + saves last-run snapshot.
   g = fresh(); g.isDemo = false; g.challengeMode = false;
@@ -1353,8 +1352,6 @@ if (typeof G.commitGameToCumStats === 'function' && typeof G.loadCumStats === 'f
   eq(cs.kills, 10, 'kills accumulated');
   eq(cs.scoreTotal, 5000, 'scoreTotal accumulated');
   eq(cs.bestStage, 7, 'bestStage recorded');
-  const lr = JSON.parse(sandbox.localStorage.getItem('galagaLastRun') || '{}');
-  eq(lr.stage, 7, 'last-run snapshot: stage'); eq(lr.score, 5000, 'last-run snapshot: score');
 
   // Second run accumulates on top (sessions 2, kills 10+3, bestStage stays max).
   g = fresh(); g.isDemo = false; g.challengeMode = false;
@@ -2236,11 +2233,6 @@ if (typeof G.dailySeed === 'function') {
     ok(G.dailySeedYesterday() < s, "yesterday's seed strictly precedes today's");
   }
 } else { console.log('  (skipped — dailySeed not exposed)'); }
-if (typeof G.dailySeedCode === 'function') {
-  const c1 = G.dailySeedCode(), c2 = G.dailySeedCode();
-  ok(/^[0-9A-Z]{4}$/.test(c1), 'dailySeedCode → 4 uppercase base36 chars');
-  eq(c1, c2, 'dailySeedCode stable within a day (deterministic from seed)');
-}
 if (typeof G.todayShort === 'function') {
   ok(/^\d{6}$/.test(G.todayShort()), 'todayShort → 6 digits (YYMMDD)');
 }

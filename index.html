@@ -751,19 +751,6 @@ function markDailyMissionDone() {
 }
 // DAILY SEED CODE — 4-char alphanumeric hash of today's date for community
 // sharing ("hey, what's your daily AX9F run?"). Deterministic per UTC date.
-function dailySeedCode() {
-  const s = dailySeed();
-  // Simple FNV-1a-ish mixing → 4 base36 chars uppercase
-  let h = 2166136261 >>> 0;
-  const str = String(s);
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  // 4 base36 chars from low bits (~20.7 bits of entropy from 26^4 / 36^4)
-  const code = h.toString(36).toUpperCase().padStart(4, '0').slice(-4);
-  return code;
-}
 
 // Milestone checkpoint — the highest stage milestone the player has ever cleared.
 // Title screen lets the user start a fresh run from any unlocked milestone.
@@ -11395,23 +11382,6 @@ function saveCumStats(s, challenge) {
 }
 function commitGameToCumStats() {
   if (!game || game.isDemo) return;
-  // LAST RUN SUMMARY — save quick last-run snapshot for TITLE display.
-  // Includes wasPb flag computed against cumStats BEFORE this run is committed.
-  try {
-    const _csNl = loadCumStats(false);
-    const _csCl = loadCumStats(true);
-    const _priorBest = Math.max(_csNl.bestStage || 0, _csCl.bestStage || 0);
-    const _thisStage = (game.stats && game.stats.maxStage) || game.stage || 1;
-    localStorage.setItem('galagaLastRun', JSON.stringify({
-      stage: _thisStage,
-      score: game.score || 0,
-      combo: game.comboBest || 0,
-      wasPb: _thisStage > _priorBest && _priorBest > 0
-    }));
-  } catch (e) {}
-  // First commit ever — FRESH START achievement
-  if ((loadCumStats(false).sessions || 0) + (loadCumStats(true).sessions || 0) === 0) {
-  }
   const challenge = !!game.challengeMode;
   const s = loadCumStats(challenge);
   const gs = game.stats || {};
@@ -19942,46 +19912,6 @@ function drawMiniGem(x, y, color) {
 }
 
 // Mini-radar (29×20) at top-right under the stage progression bar — only during normal play.
-function drawMiniRadar() {
-  if (game.state !== STATE.PLAYING && game.state !== STATE.CHALLENGING) return;
-  const enemies = game.state === STATE.CHALLENGING
-    ? (game.challengeWaves && game.challengeWaves[game.challengeWaveIdx] || [])
-    : game.enemies;
-  if (!enemies) return;
-  const rw = 30, rh = 22;
-  const rx = BASE_W - rw - 2;
-  const ry = 28;
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,30,60,0.55)';
-  ctx.fillRect(rx, ry, rw, rh);
-  ctx.fillStyle = 'rgba(0,200,255,0.40)';
-  ctx.fillRect(rx, ry, rw, 1);
-  ctx.fillRect(rx, ry + rh - 1, rw, 1);
-  ctx.fillRect(rx, ry, 1, rh);
-  ctx.fillRect(rx + rw - 1, ry, 1, rh);
-  // Player marker (yellow)
-  if (game.playerAlive) {
-    const px = rx + Math.round((game.playerX / BASE_W) * (rw - 2)) + 1;
-    const py = ry + Math.round((game.playerY / BASE_H) * (rh - 2)) + 1;
-    ctx.fillStyle = '#ff4';
-    ctx.fillRect(px, py, 1, 1);
-  }
-  // Enemy markers — color by state/type for readability
-  for (const e of enemies) {
-    if (!e.alive) continue;
-    const px = rx + Math.round((e.x / BASE_W) * (rw - 2)) + 1;
-    const py = ry + Math.round((e.y / BASE_H) * (rh - 2)) + 1;
-    if (px < rx + 1 || px > rx + rw - 2 || py < ry + 1 || py > ry + rh - 2) continue;
-    ctx.fillStyle = e.state === 'diving' ? COL.red
-                  : e.type === 'goldenBee' ? '#fc4'
-                  : e.type === 'boss' || e.type === 'shielded' ? '#f6f'
-                  : '#0ff';
-    // Diving and below mid-screen: 2-pixel dot (more visible threat)
-    const sz = (e.state === 'diving' && e.y > BASE_H * 0.5) ? 2 : 1;
-    ctx.fillRect(px, py, sz, sz);
-  }
-  ctx.restore();
-}
 
 // Tiny pixel crown — denotes #1 score (yellow normal, red challenge)
 function drawCrown(x, y, color) {
