@@ -7387,12 +7387,63 @@ function getFormationPos(col, row) {
 // scaled by difficulty so hard runs face more elites (more threat + more loot) and
 // easy runs face fewer. Extracted from createEnemy for testability + reuse. The
 // difficulty multiplier is skipped when the base is 0 so pre-stage-5 stays elite-free.
+// ========================== DEEP PRESSURE LADDER ===========================
+// A curve audit of the real scaling functions found every difficulty scalar
+// SATURATED by stage 32: bullet speed caps (3.40), dive fire cadence floors
+// (14f), dive trigger floors (80f), elite rate caps (5%, absurdly early at
+// stage 10). Stages 32-100+ were therefore mechanically IDENTICAL — a 69-stage
+// plateau — while the game keeps PROMISING escalation there (transmission logs
+// at 40/50/60/70/80, APEX at S60, FINAL FORM at S100, world corruption ramping
+// 30->80). Narrative escalation over a flat mechanical curve is a broken promise.
+//
+// The fix deliberately does NOT raise the speed/cadence caps. Those caps are
+// FAIRNESS limits: past them, bullets stop being readable and dives stop being
+// dodgeable, and the game gets unfair rather than harder. Instead deep stages
+// escalate on DENSITY and COMPOSITION — more elites, more ghosts, more
+// simultaneous divers — where every individual threat keeps its full telegraph
+// and stays exactly as readable as it was at stage 32.
+//
+// One scalar drives all of it so there is a single place to tune, and the whole
+// ladder is pure + logic-tested (monotonic, bounded, no wall, no inversion,
+// and the three fairness caps are locked by test so they cannot drift up).
+const DEEP_START = 32;  // where the last legacy scalar saturates
+const DEEP_FULL  = 80;  // where the deep ladder tops out
+function deepPressure(stage) {
+  const s = Math.floor(stage) || 0;
+  if (s <= DEEP_START) return 0;
+  return Math.min(1, (s - DEEP_START) / (DEEP_FULL - DEEP_START));
+}
+
+// GHOST DENSITY — ghosts (invisible until first hit, 2x score) begin at stage
+// 60 and thicken with depth: 3% at 60 -> 8% at 100. Ramped from the stage-60
+// gate itself rather than from deepPressure, so crossing 60 stays the same
+// gentle step it always was instead of becoming a wall. Carries the curve past
+// stage 80, where the elite ramp tops out.
+function ghostRateForStage(stage) {
+  const s = Math.floor(stage) || 0;
+  if (s < 60) return 0;
+  return Math.min(0.08, 0.03 + (s - 60) * 0.00125);
+}
+
+// DIVE CONCURRENCY — the attention axis. Rather than shortening the dive
+// interval (a rate, i.e. the thing the fairness caps protect), a deep-stage
+// trigger may launch ONE extra lone diver. Probabilistic so it ramps smoothly
+// instead of stepping, capped at +1 so it can never become the mass-dive
+// slowdown that WING_COOLDOWN exists to prevent. Each extra diver still gets
+// the full 30-frame preview telegraph.
+function extraDiverChance(stage) {
+  return deepPressure(stage) * 0.6;
+}
+
 function eliteRateForStage(stage, mode) {
   const base = stage >= 10 ? 0.05 : stage >= 5 ? 0.03 : 0;
   if (base === 0) return 0;
+  // Deep stages keep thickening the formation: 5% -> 12% across stages 32..80.
+  const deep = deepPressure(stage) * 0.07;
   const dm = mode || ((typeof difficultyMode === 'string') ? difficultyMode : 'normal');
   const mul = dm === 'hard' ? 1.5 : dm === 'easy' ? 0.5 : 1;
-  return base * mul;
+  // Hard-capped so no difficulty multiplier can run the formation away.
+  return Math.min(0.22, (base + deep) * mul);
 }
 
 // POWER-UP DROP RATE — base chance per kill (20% normal, 35% elite), shifted by
@@ -7417,9 +7468,10 @@ function createEnemy(type, col, row, overrideX, overrideY) {
   const stage = (game && game.stage) || 0;
   const eliteRate = eliteRateForStage(stage);
   const isElite = eliteCandidate && Math.random() < eliteRate;
-  // GHOST VARIANT — stage 60+ only, 3% chance. Invisible (alpha 0.15) until first
-  // hit reveals it. Awards 2× score on kill. Mutex with elite (one variant max).
-  const isGhost = !isElite && stage >= 60 && Math.random() < 0.03;
+  // GHOST VARIANT — stage 60+ only. Invisible (alpha 0.15) until first hit
+  // reveals it. Awards 2× score on kill. Mutex with elite (one variant max).
+  // Rate thickens with depth (3% at 60 -> 8% at 100) via the DEEP PRESSURE ladder.
+  const isGhost = !isElite && Math.random() < ghostRateForStage(stage);
   const baseHp = (type === 'boss' || type === 'shielded') ? 2 : 1;
   const _maxHp = baseHp + (isElite ? 1 : 0);
   return {
@@ -13425,6 +13477,22 @@ function updateEnemies() {
         if (_tactic && launchDiveTactic(_tactic, candidates)) {
           _wingLaunched = true;
           game.diveTimer = -WING_COOLDOWN; // extend the gap before the next dive trigger
+        }
+      }
+      // DEEP PRESSURE — at deep stages a trigger can send a SECOND lone diver.
+      // Density, not speed: the extra diver gets the same 30-frame preview, so
+      // the threat stays as readable as it was at stage 32. Skipped when a wing
+      // maneuver already committed (that path is its own multi-diver event) and
+      // capped at one extra, so this can never become a mass dive.
+      if (!_wingLaunched && candidates.length > 1
+          && Math.random() < extraDiverChance(game.stage)) {
+        const _x = candidates[randInt(candidates.length)];
+        if (_x && _x.state === 'formation' && !_x.previewTimer && _x.type !== 'boss') {
+          _x.previewTimer = 30;
+          _x.previewMax = 30;
+          _x._wingTactic = null;
+          _x._wingSide = 0;
+          _x.previewPath = createLoopPath(_x.x, _x.y, _x.x < BASE_W / 2 ? 1 : -1);
         }
       }
       if (!_wingLaunched && candidates.length > 0) {

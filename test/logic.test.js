@@ -667,7 +667,13 @@ if (typeof G.eliteRateForStage === 'function') {
   eq(G.eliteRateForStage(5, 'normal'), 0.03, 'stage 5 = 3%');
   eq(G.eliteRateForStage(9, 'normal'), 0.03, 'stage 9 = 3%');
   eq(G.eliteRateForStage(10, 'normal'), 0.05,'stage 10 = 5%');
-  eq(G.eliteRateForStage(50, 'normal'), 0.05,'stage 50 = 5%');
+  eq(G.eliteRateForStage(32, 'normal'), 0.05,'stage 32 = 5% (deep ladder has not opened yet)');
+  // Past stage 32 the DEEP PRESSURE ladder keeps thickening the formation —
+  // this used to sit flat at 5% forever, which was the 69-stage plateau.
+  ok(G.eliteRateForStage(50, 'normal') > 0.05, 'stage 50 > 5% (deep ladder engaged)');
+  ok(Math.abs(G.eliteRateForStage(80, 'normal') - 0.12) < 1e-9, 'stage 80 tops out at 12%');
+  eq(G.eliteRateForStage(100, 'normal'), G.eliteRateForStage(80, 'normal'),
+     'the elite ramp itself stops at 80 (ghosts carry the curve past it)');
   // difficulty scaling
   ok(Math.abs(G.eliteRateForStage(10, 'hard') - 0.075) < 1e-9, 'hard = base ×1.5 (7.5%)');
   ok(Math.abs(G.eliteRateForStage(10, 'easy') - 0.025) < 1e-9, 'easy = base ×0.5 (2.5%)');
@@ -3364,6 +3370,62 @@ function freshStage(g, over) {
   Object.assign(g, over || {});
   return g;
 }
+
+section('DIFFICULTY CURVE — shape guard across stages 1..100 (no plateau/wall/inversion)');
+if (typeof G.deepPressure === 'function' && typeof G.ghostRateForStage === 'function'
+    && typeof G.extraDiverChance === 'function' && typeof G.cappedStageSpeed === 'function') {
+  // --- the deep ladder itself ---
+  eq(G.deepPressure(1), 0, 'no deep pressure in the early game');
+  eq(G.deepPressure(32), 0, 'deep pressure opens strictly AFTER the legacy saturation point');
+  ok(G.deepPressure(33) > 0, 'stage 33 is the first stage with deep pressure');
+  ok(G.deepPressure(56) > G.deepPressure(40), 'deep pressure is monotonic');
+  eq(G.deepPressure(80), 1, 'it tops out at stage 80');
+  eq(G.deepPressure(500), 1, 'and is clamped beyond it (never runs away)');
+  eq(G.deepPressure(-10), 0, 'negative stage → 0 (never negative pressure)');
+
+  eq(G.ghostRateForStage(59), 0, 'no ghosts before stage 60');
+  ok(Math.abs(G.ghostRateForStage(60) - 0.03) < 1e-9, 'ghosts open at the historical 3%');
+  ok(G.ghostRateForStage(100) > G.ghostRateForStage(60), 'ghost density thickens with depth');
+  ok(G.ghostRateForStage(1000) <= 0.08, 'ghost rate is hard-capped at 8%');
+
+  eq(G.extraDiverChance(20), 0, 'no extra divers before the deep ladder');
+  ok(G.extraDiverChance(100) <= 0.6, 'extra-diver chance is capped (never a mass dive)');
+  ok(G.extraDiverChance(80) > G.extraDiverChance(50), 'extra-diver chance ramps with depth');
+
+  // --- FAIRNESS CAPS MUST NOT MOVE ---
+  // The deep ladder escalates density/composition ONLY. If a future tuning pass
+  // ever raises the speed or cadence caps, bullets stop being readable and dives
+  // stop being dodgeable — the game gets unfair, not harder. Lock them here.
+  const spd = s => G.cappedStageSpeed(3.4, 2.0, 0.045, s, 1);
+  const fire = s => G.rampedFireInterval(14, 42, 1.0, s, 1);
+  const dive = s => G.rampedInterval(80, 200, 10, s);
+  ok(Math.abs(spd(100) - spd(40)) < 1e-9, 'bullet speed stays capped through the deep game');
+  eq(fire(100), fire(40), 'enemy fire cadence stays floored through the deep game');
+  eq(dive(100), dive(40), 'dive trigger cadence stays floored through the deep game');
+  ok(spd(100) <= 3.4 && fire(100) >= 14 && dive(100) >= 80, 'the three fairness caps hold');
+
+  // --- composite curve shape over the whole advertised range ---
+  // Modelled from the REAL call-site parameters. Guards the three failure modes
+  // that kill an arcade curve. The 69-stage plateau this suite now forbids is
+  // exactly the defect the deep ladder was written to fix.
+  const pressure = s => (60 / fire(s)) * spd(s)
+    * (1 + (60 / dive(s)) * (1 + G.extraDiverChance(s)))
+    * (1 + G.eliteRateForStage(s, 'normal'))
+    * (1 + G.ghostRateForStage(s));
+  const p = []; for (let s = 1; s <= 100; s++) p.push(pressure(s));
+  let inversions = 0, walls = 0, longestFlat = 0, flat = 0;
+  for (let i = 1; i < p.length; i++) {
+    const d = p[i] - p[i - 1];
+    if (d < -1e-9) inversions++;
+    if (p[i - 1] > 0 && d / p[i - 1] > 0.12) walls++;
+    if (Math.abs(d) < 1e-9) { flat++; longestFlat = Math.max(longestFlat, flat); } else flat = 0;
+  }
+  eq(inversions, 0, 'no INVERSION: no stage is ever easier than the one before it');
+  eq(walls, 0, 'no WALL: no single stage jumps more than 12% in pressure');
+  ok(longestFlat < 10, 'no PLATEAU: never 10+ consecutive stages with zero change (was 69)');
+  ok(p[99] > p[31] * 1.2, 'stage 100 is materially harder than stage 32 (the promise is kept)');
+  ok(p[99] > p[49] && p[49] > p[31], 'pressure keeps climbing across the whole deep game');
+} else { console.log('  (skipped — deep pressure ladder not exposed)'); }
 
 section('RIVAL ACE — full duel lifecycle (phase machine, not just the helpers)');
 if (ST && typeof G.updateRivalAce === 'function' && G.__getGame && G.__getGame()) {
