@@ -5656,6 +5656,12 @@ function resolveRivalDepleted(r) {
   if (typeof unlockDex === 'function') unlockDex('rival');
   game.killsByTypeRun = game.killsByTypeRun || {};
   game.killsByTypeRun.rival = (game.killsByTypeRun.rival || 0) + 1;
+  // A destroyed hostile is a KILL. The shared formation/boss kill paths do
+  // this centrally; a bespoke entity has to, and without it stats.kills
+  // disagrees with the kills-by-type tally wired just above, and the pilot
+  // rank / daily missions / cumulative stats all under-report.
+  if (game.stats) game.stats.kills = (game.stats.kills || 0) + 1;
+  game.stageKills = (game.stageKills || 0) + 1;
   // REVENGE payback — if the rival was the last thing that killed the player.
   if (game._revengeType === 'rival') {
     game._revengeType = null;
@@ -6207,6 +6213,8 @@ function updateMagpie() {
       if (typeof unlockDex === 'function') unlockDex('magpie');
       game.killsByTypeRun = game.killsByTypeRun || {};
       game.killsByTypeRun.magpie = (game.killsByTypeRun.magpie || 0) + 1;
+      if (game.stats) game.stats.kills = (game.stats.kills || 0) + 1;
+      game.stageKills = (game.stageKills || 0) + 1;
       try {
         const mk = (parseInt(localStorage.getItem('galagaMagpieKills') || '0', 10) || 0) + 1;
         localStorage.setItem('galagaMagpieKills', String(mk));

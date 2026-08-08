@@ -3613,6 +3613,9 @@ if (ST && typeof G.updateRivalAce === 'function' && G.__getGame && G.__getGame()
 
   const scoreBefore = g.score;
   freshStage(g, { rivalNextStage: 999, rivalEjected: true, rivalDefeats: 0, score: scoreBefore });
+  g.stats = g.stats || {}; g.stats.kills = g.stats.kills || 0;
+  g.killsByTypeRun = {}; g.stageKills = 0;
+  const killsBefore = g.stats.kills, stageKillsBefore = g.stageKills;
   g.rival = { phase: 'duel', x: 112, y: 56, vy: 0, level: 0, hp: 1, maxHp: 20,
               fireCd: 999, burstLeft: 0, burstGap: 0, dodgeCd: 99, dodgeTimer: 0,
               dodgeDir: 0, duelTimer: 900, mockTimer: 0, flash: 0, tauntText: null,
@@ -3623,6 +3626,12 @@ if (ST && typeof G.updateRivalAce === 'function' && G.__getGame && G.__getGame()
   ok(!g.rival, 'the killed rival clears its slot immediately');
   ok(g.score > scoreBefore, 'the kill pays out');
   ok(g.powerUps.length === 1, 'the kill drops exactly one trophy power-up');
+  // A destroyed hostile must count as a kill everywhere, or stats.kills silently
+  // disagrees with the kills-by-type tally and the pilot rank under-reports.
+  // Asserted behaviourally (drive the real kill) rather than by grepping source.
+  eq((g.killsByTypeRun || {}).rival, 1, 'the kill lands in the kills-by-type tally');
+  eq(g.stats.kills, killsBefore + 1, 'and in the run kill counter');
+  eq(g.stageKills, stageKillsBefore + 1, 'and in the stage kill counter');
 
   // Intangibility must actually protect: a dodging rival cannot be hit.
   freshStage(g, { rivalNextStage: 999 });
@@ -3642,6 +3651,8 @@ if (ST && typeof G.updateMagpie === 'function' && G.__getGame && G.__getGame()) 
   // Seed one aged, stealable pickup and hand the magpie that exact target.
   const loot = { x: 60, y: 120, vy: 0.6, type: 'R', _mAge: 999 };
   g.powerUps = [loot];
+  g.stats = g.stats || {}; g.stats.kills = 0;
+  g.killsByTypeRun = {}; g.stageKills = 0;
   g.magpie = { phase: 'seek', target: { kind: 'powerup', obj: loot },
                x: 60, y: 100, hp: 2, maxHp: 2, speed: 1.5,
                carry: null, flash: 0, vx: 0, vy: 0 };
@@ -3656,6 +3667,9 @@ if (ST && typeof G.updateMagpie === 'function' && G.__getGame && G.__getGame()) 
   const sBefore = g.score;
   G.updateMagpie();
   ok(!g.magpie, 'the killed magpie clears its slot');
+  eq((g.killsByTypeRun || {}).magpie, 1, 'the thief counts in the kills-by-type tally');
+  ok(g.stats.kills > 0, 'and in the run kill counter');
+  ok((g.stageKills || 0) > 0, 'and in the stage kill counter');
   eq(g.powerUps.length, 1, 'the cargo is returned to the field');
   eq(g.powerUps[0] && g.powerUps[0].type, 'R', 'and it is the SAME pickup type that was stolen');
   ok(g.score > sBefore, 'downing the thief pays out');
