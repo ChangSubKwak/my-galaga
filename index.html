@@ -15626,6 +15626,14 @@ function bulletCap() {
   if (game.itemBursts && game.itemBursts.length > 100) {
     game.itemBursts.splice(0, game.itemBursts.length - 100);
   }
+  // Debris cap — the one particle pool that had no ceiling. Every other
+  // high-volume array here is bounded; debris was spawned in bursts (8 per ship
+  // death, 10 per boss death, more per splitter cascade) and relied purely on
+  // its updater draining faster than the pushes. A cascade could spike it
+  // arbitrarily. Same oldest-first trim as its siblings.
+  if (game.debris && game.debris.length > 120) {
+    game.debris.splice(0, game.debris.length - 120);
+  }
 }
 
 const DEBRIS_PROFILE = {

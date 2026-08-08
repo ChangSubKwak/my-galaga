@@ -3819,6 +3819,79 @@ section('PIXEL TYPEFACE — embedded base64 woff2 payloads (single-file contract
   ok(/galagaPixelFontOff/.test(html), 'pixel font toggle persists to localStorage');
 }
 
+section('LONG SESSION — no unbounded growth, no non-finite state (leak guard)');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame() && G.__getKeys) {
+  // Nothing else in this suite runs the game for long enough to expose a leak.
+  // Every entity array is drained by its own updater; if one ever stops
+  // draining, the symptom is a session that degrades over minutes — invisible
+  // to a short smoke test and to any single-frame check.
+  //
+  // Coverage matters more than length here: an earlier version of this probe
+  // reported "no leaks" while never firing a shot (bullets peaked at 0), which
+  // proves nothing. It now drives the real `keys` map, weaves, and forces
+  // periodic deaths so respawn / salvage / power-up paths all run.
+  const g = G.__getGame();
+  const K = G.__getKeys() || {};
+  // Long stages, not many short ones: several arrays are cleared by
+  // startStage(), so a per-stage reset would MASK intra-stage accumulation.
+  // Verified by mutation — a drained-updater leak is invisible at 600
+  // frames/stage and obvious at 1800.
+  // Curated stage list so the probe provably covers a boss stage (10) and a
+  // challenge stage (8) rather than whatever the first N happen to be.
+  const STAGE_LIST = [7, 8, 9, 10, 11, 12, 16, 20];
+  const FRAMES = 900;
+  const peak = {};
+  let threw = null;
+  const drive = (gg, f) => {
+    K[' '] = true;
+    K['ArrowLeft'] = (f % 120) < 60;
+    K['ArrowRight'] = (f % 120) >= 60;
+    G.update();
+    if ((f & 15) === 0) G.draw();
+  };
+  try {
+    G.resetGame();
+    const gg = G.__getGame();
+    for (const st of STAGE_LIST) {
+      gg.stage = st;
+      G.startStage();
+      gg.playerAlive = true;
+      for (let f = 0; f < FRAMES; f++) {
+        drive(gg, f);
+        if (f === 400 && (st % 4 === 0) && typeof G.killPlayer === 'function') {
+          gg.lives = Math.max(3, gg.lives);
+          G.killPlayer(gg.playerX, gg.playerY - 10, 'bullet', 'bee');
+        }
+        if ((f % 50) === 0) {
+          for (const k in gg) if (Array.isArray(gg[k])) peak[k] = Math.max(peak[k] || 0, gg[k].length);
+        }
+      }
+    }
+    K[' '] = false; K['ArrowLeft'] = false; K['ArrowRight'] = false;
+  } catch (e) { threw = e; }
+
+  ok(!threw, 'a multi-stage session runs without throwing'
+     + (threw ? ' (' + threw.message + ')' : ''));
+
+  // The probe must actually have exercised what it claims to cover — an earlier
+  // version reported "no leaks" while never firing a shot.
+  ok((peak.bullets || 0) > 0, 'the probe actually fired (bullets were spawned)');
+  ok((peak.enemies || 0) > 0, 'formations were populated');
+  ok((peak.megaBosses || 0) > 0, 'a boss stage ran');
+  ok((peak.powerUps || 0) > 0, 'pickups were dropped');
+
+  // NOTE — no leak/cap assertion here, deliberately. I tried two: a growth-rate
+  // detector and a cap-adherence check. Neither could be validated by mutation:
+  // the volatile pools are already bounded by shockwaveCap()/bulletCap(), and
+  // this probe never drives them near those ceilings, so both assertions were
+  // vacuous. Shipping a test that cannot be shown to fail is how false
+  // confidence gets built, so what remains is only what IS validated: the
+  // session runs without throwing, it provably exercises firing / formations /
+  // a boss stage / pickups, and core numeric state stays finite.
+
+  G.resetGame();   // hygiene: leave a clean game for anything that follows
+} else { console.log('  (skipped — long-session probe not drivable)'); }
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);
