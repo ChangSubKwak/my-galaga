@@ -20921,9 +20921,35 @@ function drawBossStage() {
     }
     // (GUI-simplify DELETE: the FIRE READY dot — pulsed near-constantly at the
     // 6f cooldown and existed inconsistently only on boss stages.)
-    // (DASH and WITCH cooldown bars under the ship removed — they sat in the
-    // player's line of sight and contributed to visual noise. The dash icon
-    // glow on the ship body still signals dash-ready state.)
+    //
+    // DASH AVAILABLE — a steady cue, which the game was missing. There IS a
+    // DASH READY ring, but it fires for 30 frames at the moment the cooldown
+    // recharges and then goes; if the player does not spend the dash right
+    // then, nothing tells them they still hold it. The cooldown BARS that used
+    // to answer that were removed for sitting in the line of sight, and the
+    // note left behind claimed "the dash icon glow on the ship body still
+    // signals dash-ready state" — no such glow existed. So the verb FLIGHT
+    // SCHOOL teaches as the highest-value play in the game had no steady
+    // readiness signal at all.
+    //
+    // This is it, put where the player is already looking and costing no HUD
+    // space: a small additive cyan mote at the engine. Lit = you hold a dash,
+    // dark = charging. It complements the ring rather than repeating it —
+    // the ring is the event, this is the state.
+    if (game.playerAlive && (game.dashCooldown || 0) === 0 && (game.dashTimer || 0) === 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.34 + 0.16 * Math.sin(game.animFrame * 0.18);
+      ctx.fillStyle = '#0ff';
+      const _ey = Math.round(_drawPY) + 6;
+      if (game.dualFighter) {
+        ctx.fillRect(Math.round(game.playerX) - 9, _ey, 3, 1);
+        ctx.fillRect(Math.round(game.playerX) + 7, _ey, 3, 1);
+      } else {
+        ctx.fillRect(Math.round(game.playerX) - 1, _ey, 3, 1);
+      }
+      ctx.restore();
+    }
   }
 
   // Explosions
