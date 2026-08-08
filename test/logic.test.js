@@ -3818,6 +3818,93 @@ section('PIXEL TYPEFACE — embedded base64 woff2 payloads (single-file contract
   ok(/galagaPixelFontOff/.test(html), 'pixel font toggle persists to localStorage');
 }
 
+section('CORE LOOP — stage clear advances, death spends a life, last life ends the run');
+if (ST && typeof G.checkStageComplete === 'function' && G.__getGame && G.__getGame()) {
+  // checkStageComplete is the spine of the game: clear the formation -> grace
+  // window -> next stage. It had ZERO coverage. The smoke tests only prove
+  // update()/draw() do not throw, which says nothing about whether the game
+  // actually progresses. A regression here is invisible until a human plays.
+  const g = G.__getGame();
+
+  // --- a cleared formation advances the stage ---
+  G.resetGame();
+  const gg = G.__getGame();
+  gg.stage = 3;
+  G.startStage();
+  gg.state = ST.PLAYING;
+  gg.playerAlive = true;
+  gg.allEntered = true;
+  gg.enemies.forEach(e => { e.alive = false; });
+  gg.explosions.length = 0;
+  gg.entryQueue = [];
+  const stageBefore = gg.stage;
+  // The advance is PACED: the climax gets a grace window, so the very first
+  // call must not jump the stage. (Asserted, not assumed — an instant advance
+  // would cut every stage-clear beat short and no other test would notice.)
+  G.checkStageComplete();
+  eq(gg.stage, stageBefore, 'the clearing frame itself does not advance');
+  let advanced = false, frames = 1;
+  for (let f = 0; f < 400; f++) {
+    frames++;
+    G.checkStageComplete();
+    if (gg.stage > stageBefore) { advanced = true; break; }
+  }
+  ok(advanced, 'clearing every enemy advances the stage (' + stageBefore + ' -> ' + gg.stage + ')');
+  eq(gg.stage, stageBefore + 1, 'it advances by exactly one');
+  ok(frames > 60, 'the advance waits out a grace window (' + frames + ' frames)');
+
+  // --- the new stage is set up in the mode the dispatcher says it should be ---
+  if (typeof G.stageModeFor === 'function') {
+    const mode = G.stageModeFor(gg.stage);
+    ok(['normal', 'challenge', 'boss'].indexOf(mode) !== -1,
+       'the stage the game advanced into has a valid mode (' + mode + ')');
+  }
+
+  // --- a death spends a life and goes to RESPAWN, not GAME_OVER ---
+  G.resetGame();
+  const g2 = G.__getGame();
+  g2.stage = 5;
+  G.startStage();
+  g2.state = ST.PLAYING;
+  g2.playerAlive = true;
+  g2.lives = 3;
+  g2.dualFighter = false;
+  G.killPlayer(g2.playerX, g2.playerY - 8, 'bullet', 'bee');
+  eq(g2.lives, 2, 'a death spends exactly one life');
+  eq(g2.state, ST.RESPAWN, 'and routes to RESPAWN while lives remain');
+  ok(!g2.playerAlive, 'the player is flagged dead');
+  eq(g2.lvl.S, 1, 'the S/N/P build resets on death');
+
+  // --- the LAST life ends the run ---
+  G.resetGame();
+  const g3 = G.__getGame();
+  g3.stage = 5;
+  G.startStage();
+  g3.state = ST.PLAYING;
+  g3.playerAlive = true;
+  g3.lives = 1;
+  g3.dualFighter = false;
+  g3.isDemo = false;
+  G.killPlayer(g3.playerX, g3.playerY - 8, 'bullet', 'bee');
+  eq(g3.lives, 0, 'the last life is spent');
+  eq(g3.state, ST.GAME_OVER, 'and the run ends');
+
+  // --- the dual fighter absorbs a death instead of spending a life ---
+  G.resetGame();
+  const g4 = G.__getGame();
+  g4.stage = 5;
+  G.startStage();
+  g4.state = ST.PLAYING;
+  g4.playerAlive = true;
+  g4.lives = 2;
+  g4.dualFighter = true;
+  G.killPlayer(g4.playerX, g4.playerY - 8, 'bullet', 'bee');
+  eq(g4.lives, 2, 'the wingman pays instead of a life');
+  ok(!g4.dualFighter, 'and the wingman is gone');
+  ok(g4.stageDied, 'the stage is still marked as not clean');
+  G.resetGame();
+} else { console.log('  (skipped — core loop not drivable)'); }
+
 section('LONG SESSION — no unbounded growth, no non-finite state (leak guard)');
 if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame() && G.__getKeys) {
   // Nothing else in this suite runs the game for long enough to expose a leak.

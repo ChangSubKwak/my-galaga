@@ -708,8 +708,6 @@ function markDailyMissionDone() {
     }
     const total = parseInt(localStorage.getItem('galagaDailyMissionTotal') || '0', 10) || 0;
     localStorage.setItem('galagaDailyMissionTotal', String(total + 1));
-    if (typeof unlockAchievement === 'function') {
-    }
     // DAILY MISSION MASTERY — record this mission type to a Set; unlock master
     // achievement when all 11 mission types have been completed at least once.
     const m = (typeof dailyMission === 'function') ? dailyMission() : null;
@@ -735,9 +733,6 @@ function markDailyMissionDone() {
     const bestStreak = parseInt(localStorage.getItem('galagaDailyMissionStreakBest') || '0', 10) || 0;
     if (newStreak > bestStreak) {
       localStorage.setItem('galagaDailyMissionStreakBest', String(newStreak));
-    }
-    // 30-day streak achievement
-    if (newStreak >= 30 && typeof unlockAchievement === 'function') {
     }
     // Streak milestone celebrations: 3/7/30 days (game.floatTexts trigger)
     if (game && (newStreak === 3 || newStreak === 7 || newStreak === 30)) {
@@ -779,9 +774,6 @@ function markTutorialDone() {
 let cinematicFrame = 0;
 const CINEMATIC_END = 420; // 7 seconds at 60fps
 function endCinematic() {
-  // PATIENT achievement: only unlocked when the cinematic plays through (not skipped early)
-  if (introCinematic && cinematicFrame >= CINEMATIC_END - 1 && typeof unlockAchievement === 'function') {
-  }
   introCinematic = false;
   try { localStorage.setItem('galagaIntroSeen', '1'); } catch (e) {}
 }
@@ -4915,8 +4907,6 @@ function spawnGuardian(variant) {
   if (game._guardianVariants && typeof pushIntercept === 'function') {
     const _wasNewG = !game._guardianVariants.has(variantId);
     game._guardianVariants.add(variantId);
-    if (_wasNewG && game._guardianVariants.size === 4) {
-    }
   }
   // GUARDIAN ARRIVAL LABEL — variant chip ('ALLY: BASE/ATK/SPT/RAP') in
   // variant color so the player reads which drone joined without studying the
@@ -8306,15 +8296,6 @@ function updateOneMegaBoss(mb) {
         if (game.stats.kills === 1 && typeof pushIntercept === 'function') {
           pushIntercept('firstBlood');
         }
-        // SIGNAL INTERCEPT — first boss kill of run (== 1 exact match)
-        if (game.bossesKilledThisRun === 1 && typeof pushIntercept === 'function') {
-        }
-        // SIGNAL INTERCEPT — 100 kill milestone — also fires here if boss is the 100th kill
-        if (game.stats.kills === 100 && typeof pushIntercept === 'function') {
-        }
-        // SIGNAL INTERCEPT — 500 kill milestone — also fires here if boss is the 500th kill
-        if (game.stats.kills === 500 && typeof pushIntercept === 'function') {
-        }
         bumpCombo();
         unlockAchievement('bossSlayer');
         if (mb.super) {
@@ -9015,10 +8996,6 @@ function startStage() {
   game.supplyCrate = null;
   game.supplyCrateSpawned = false;
   game.supplyCrateRolled = pickSupplyCrate();
-  // ACT TRANSITION — queue "new sector" intercept message when this stage opens an act
-  if (typeof actStartFor === 'function' && actStartFor(game.stage)
-      && typeof pushIntercept === 'function') {
-  }
   // BIOME SHIFT — detect biome change and broadcast intercept. Compares vs prevBiome
   // tracked at run scope. Null on stages 1-7 (no biome) means first biome triggers.
   // Special dramatic biomes (blackhole/nebula/corona) also push a tailored entry
@@ -9039,8 +9016,6 @@ function startStage() {
       if (game._biomesSeen) {
         const _wasNewB = !game._biomesSeen.has(_curBiome);
         game._biomesSeen.add(_curBiome);
-        if (_wasNewB && game._biomesSeen.size === 12) {
-        }
       }
     }
     game.prevBiome = _curBiome;
@@ -9835,8 +9810,6 @@ function addScore(pts) {
         }
         if (_t.shake > 0) game.shakeTimer = Math.max(game.shakeTimer || 0, _t.shake);
         if (_t.bars > 0) game.cinematicBars = Math.max(game.cinematicBars || 0, _t.bars);
-        if (_t.intercept && typeof pushIntercept === 'function') {
-        }
         // Big-milestone shockwave at player position (100K+)
         if (_t.th >= 100000 && game.shockwaves && game.playerAlive) {
           game.shockwaves.push({
@@ -9965,9 +9938,6 @@ function addScore(pts) {
     if (game.lives >= 2) game._lastLifeAlertFired = false;
     game.lifeGainPulseTimer = 30;
     game.extraShipsRun = (game.extraShipsRun || 0) + 1;
-    // SIGNAL INTERCEPT — first extra life of the run is a score-milestone beat.
-    if (game.extraShipsRun === 1 && typeof pushIntercept === 'function') {
-    }
     playSound('extraLife');
     // EXTRA LIFE BANNER — celebrate threshold crossing with banner + confetti
     if (game && game.floatTexts) {
@@ -11698,9 +11668,6 @@ function updatePowerUps() {
         // before life loss; gives 60 frames of iframes when broken.
         const wasMax = game.shieldCharges >= SHIELD_MAX;
         game.shieldCharges = Math.min(SHIELD_MAX, (game.shieldCharges || 0) + 1);
-        // SIGNAL INTERCEPT — first reach to SHIELD_MAX (transition from non-max → max)
-        if (!wasMax && game.shieldCharges >= SHIELD_MAX && typeof pushIntercept === 'function') {
-        }
         game.floatTexts.push({
           x: p.x, y: p.y, text: wasMax ? 'SHIELD MAX' : 'SHIELD +1',
           color, life: 60, maxLife: 60, size: 9
@@ -11925,15 +11892,10 @@ function updatePowerUps() {
       game.pickupStreak = (game.pickupStreak || 0) + 1;
       // STAGE-SCOPE PICKUP COUNTER — track within-stage pickups for spree intercept
       game.stagePickups = (game.stagePickups || 0) + 1;
-      if (game.stagePickups === 5 && typeof pushIntercept === 'function') {
-      }
       // SIGNAL INTERCEPT — unique pickup type diversity milestone (6 distinct types)
       if (game._pickupTypes) {
         const _wasNew = !game._pickupTypes.has(p.type);
         game._pickupTypes.add(p.type);
-        if (_wasNew && game._pickupTypes.size === 6
-            && typeof pushIntercept === 'function') {
-        }
       }
       if (game.pickupStreak > (game.pickupStreakBest || 0)) game.pickupStreakBest = game.pickupStreak;
       const _streakBonus = game.pickupStreak === 5  ? 200
@@ -12246,9 +12208,6 @@ function bumpCombo() {
         game.flashTimer = Math.max(game.flashTimer || 0, 6);
         game.flashColor = _mkCol;
         if (typeof playSound === 'function') playSound('milestone');
-        // SIGNAL INTERCEPT — RAMPAGE tier (10+ same-frame kills) triggers narrative
-        if (game._mkCount === 10 && typeof pushIntercept === 'function') {
-        }
       }
       game.multiKillsRun = (game.multiKillsRun || 0) + 1;
       if (game._mkCount > (game.multiKillBest || 0)) game.multiKillBest = game._mkCount;
@@ -12416,9 +12375,6 @@ function bumpCombo() {
     game.flashTimer = 6;
     game.flashColor = '#ff4';
     rumble(200, 0.5, 0.3);
-    // SIGNAL INTERCEPT — combo-driven extra life triggers enemy panic
-    if (!game.challengeMode && typeof pushIntercept === 'function') {
-    }
   }
 }
 
@@ -12439,9 +12395,6 @@ function updateCombo() {
       game.comboBonusAccum = 0;
       game.comboLostFlashTimer = 30; // brief gray score flash
       resetComboMilestone();
-      // SIGNAL INTERCEPT — high combo break (100+) triggers adversary relief beat
-      if (lostCount >= 100 && typeof pushIntercept === 'function') {
-      }
       // Feedback scales with how big the combo was
       if (lostCount >= 3) {
         playSound('comboBreak');
@@ -13572,12 +13525,6 @@ function updateCollisions() {
           if (game.stats.kills === 1 && typeof pushIntercept === 'function') {
             pushIntercept('firstBlood');
           }
-          // SIGNAL INTERCEPT — 100 kill milestone — adversary attrition warning
-          if (game.stats.kills === 100 && typeof pushIntercept === 'function') {
-          }
-          // SIGNAL INTERCEPT — 500 kill milestone — extinction-level threat
-          if (game.stats.kills === 500 && typeof pushIntercept === 'function') {
-          }
           // SAME-TYPE KILL STREAK — track consecutive kills of same enemy type
           if (game._lastKillType === e.type) {
             game._sameTypeStreak = (game._sameTypeStreak || 1) + 1;
@@ -13724,9 +13671,6 @@ function updateCollisions() {
               const _eT = parseInt(localStorage.getItem('galagaEliteKills') || '0', 10) || 0;
               localStorage.setItem('galagaEliteKills', String(_eT + 1));
             } catch (_e) {}
-            // SIGNAL INTERCEPT — first elite kill of the run = ace-pilot milestone.
-            if (game.eliteKills === 1 && typeof pushIntercept === 'function') {
-            }
             // Brief floating "ELITE!" tag so the kill reads as more meaningful
             pushInfoText({
               x: e.x, y: e.y - 10, text: 'ELITE!',
@@ -13766,8 +13710,6 @@ function updateCollisions() {
             // SIGNAL INTERCEPT — broadcast elite loss to enemy comms terminal
             // SIGNAL INTERCEPT — 3 elite kills in same stage = elite spree milestone
             game.stageEliteKills = (game.stageEliteKills || 0) + 1;
-            if (game.stageEliteKills === 3 && typeof pushIntercept === 'function') {
-            }
           }
           // FORMATION COMMANDER KILL — triggers 360-frame DIVE SURGE enrage.
           if (e.isCommander) {
@@ -13955,8 +13897,6 @@ function updateCollisions() {
           }
 
           // TRICK SHOT — 2+ kills in the same frame (typically chained off explosions/splitter chain)
-          if (game.lastKillFrame === game.animFrame) {
-          }
           // MULTI-KILL BONUS — track kills per animFrame; award tiered bonus
           // on the 3rd, 5th, and 10th kill of the same frame (laser pierce or
           // splitter chain reactions). One bonus per tier per frame.
@@ -14016,8 +13956,6 @@ function updateCollisions() {
             game.minibeeKills = (game.minibeeKills || 0) + 1;
             // SIGNAL INTERCEPT — per-stage swarm chatter at 5th minibee kill (one-shot)
             game.stageMinibeeKills = (game.stageMinibeeKills || 0) + 1;
-            if (game.stageMinibeeKills === 5 && typeof pushIntercept === 'function') {
-            }
           }
           // Achievement: shooting a golden bee
           if (e.type === 'goldenBee') {
@@ -14398,12 +14336,6 @@ function updateCollisions() {
           }
         }
         game.parryCount = (game.parryCount || 0) + 1;
-        // SIGNAL INTERCEPT — first parry of run announces the dash-deflect read.
-        if (game.parryCount === 1 && typeof pushIntercept === 'function') {
-        }
-        // SIGNAL INTERCEPT — 10 parries in run = deflection mastery milestone
-        if (game.parryCount === 10 && typeof pushIntercept === 'function') {
-        }
         // PARRY LIFETIME TROPHIES — accumulate to localStorage for cross-run trophies
         try {
           const pt = parseInt(localStorage.getItem('galagaParryTotal') || '0', 10) || 0;
@@ -14537,8 +14469,6 @@ function updateCollisions() {
         // RUN MILESTONE — 25 near misses in a run fires the EVASION SPECIALIST
         // intercept. Threshold higher than parry (10) since near misses are
         // passive (just survive) rather than active (dash timing).
-        if (game.nearMissCount === 25 && typeof pushIntercept === 'function') {
-        }
         // Quiet visual — 3 small white ring puffs at the bullet position
         if (game.itemBursts) {
           for (let _r = 0; _r < 3; _r++) {
@@ -15487,11 +15417,7 @@ function checkStageComplete() {
         if (typeof checkPerfectStageBonus === 'function') checkPerfectStageBonus();
         // CLEAN RUN streak — 5 consecutive no-death clears triggers intercept
         game._stagesCleanStreak = game.stageDied ? 0 : ((game._stagesCleanStreak || 0) + 1);
-        if (game._stagesCleanStreak === 5 && typeof pushIntercept === 'function') {
-        }
         // SUSTAINED SKILL — sustained combo 10+ through stage clear
-        if ((game.combo || 0) >= 10 && typeof pushIntercept === 'function') {
-        }
         // OBJECTIVE check on boss stage clear (Turn 183 extension)
         if (game.stageObjective) {
           if (game.stageObjective.met(game)) {
@@ -15640,11 +15566,7 @@ function checkStageComplete() {
           if (typeof checkPerfectStageBonus === 'function') checkPerfectStageBonus();
           // CLEAN RUN streak — 5 consecutive no-death clears triggers intercept
           game._stagesCleanStreak = game.stageDied ? 0 : ((game._stagesCleanStreak || 0) + 1);
-          if (game._stagesCleanStreak === 5 && typeof pushIntercept === 'function') {
-          }
           // SUSTAINED SKILL — sustained combo 10+ through stage clear (PLAYING variant)
-          if ((game.combo || 0) >= 10 && typeof pushIntercept === 'function') {
-          }
           // SECONDARY OBJECTIVE check (visual reward when met, miss hint when not)
           if (game.stageObjective && game.stageObjective.met(game)) {
             game.objectivesMetRun = (game.objectivesMetRun || 0) + 1;
@@ -15824,9 +15746,6 @@ function checkStageComplete() {
                 });
                 if (typeof spawnConfetti === 'function') spawnConfetti(8);
                 if (typeof playSound === 'function') playSound('milestone');
-                // SIGNAL INTERCEPT — sustained S/A grade excellence at streak 5+
-                if (game.aceStreak === 5 && typeof pushIntercept === 'function') {
-                }
               }
             } else {
               game.aceStreak = 0;
@@ -16207,12 +16126,6 @@ function update() {
         game.battleScars = Math.min(5, (game.battleScars || 0) + 1);
         // SIGNAL INTERCEPT — confused enemy chatter after impossible evasion
         if (typeof pushIntercept === 'function') pushIntercept('witchSave');
-        // SIGNAL INTERCEPT — 2nd witch save in same run escalates enemy terror
-        if (game.witchSaves === 2 && typeof pushIntercept === 'function') {
-        }
-        // SIGNAL INTERCEPT — 5th witch save: adversary acknowledges legend status
-        if (game.witchSaves === 5 && typeof pushIntercept === 'function') {
-        }
         // PLAYER GUARDIAN — witch save grants a temporary AI escort drone (10s)
         if (typeof spawnGuardian === 'function') spawnGuardian();
         // LIFETIME WITCH SAVES — persist for PROFILE medal
