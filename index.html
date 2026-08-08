@@ -14804,8 +14804,13 @@ function killPlayer(srcX, srcY, cause, srcType) {
     // Dramatic red banner + flash + rumble. Re-arms when lives goes back up.
     if (game.lives === 1 && !game._lastLifeAlertFired) {
       game._lastLifeAlertFired = true;
+      // Spawned BELOW the casualty panel (which occupies y 60..106), not above
+      // it. Float texts rise as they live, so at the old y = BASE_H/2 - 30 this
+      // banner drifted from y 114 up to ~100 and swept straight across the
+      // panel's rows — it collided with the lives row AND the cause row on the
+      // way. Starting lower keeps the whole climb clear of the panel.
       game.floatTexts.push({
-        x: BASE_W/2, y: BASE_H/2 - 30, text: 'LAST LIFE',
+        x: BASE_W/2, y: BASE_H/2 + 14, text: 'LAST LIFE',
         color: '#f44', life: 100, maxLife: 100, size: 14
       });
       // (GUI-simplify DELETE: the 'MAKE IT COUNT' subtitle — one line per event.)
@@ -19606,7 +19611,14 @@ function drawGameplay() {
       ctx.globalAlpha = Math.min(1, fadeIn * 1.4);
       const _lvLeft = Math.max(0, game.lives || 0);
       const _lvCol2 = _lvLeft <= 1 ? '#f44' : _lvLeft <= 2 ? '#fa8' : '#f88';
-      drawRetroText('LIVES REMAINING  ' + _lvLeft, BASE_W/2, panY + panH - 8, 5, _lvCol2);
+      // On the LAST life this row is suppressed: killPlayer has already thrown a
+      // size-14 'LAST LIFE' banner, which drifts upward straight across this row
+      // (measured: banner y 104->100, this row y 98). Two renderings of one fact,
+      // physically overlapping. The banner is louder and it fires exactly once,
+      // so it owns the moment; the row keeps the count for 2+ lives.
+      if (_lvLeft > 1) {
+        drawRetroText('LIVES REMAINING  ' + _lvLeft, BASE_W/2, panY + panH - 8, 5, _lvCol2);
+      }
 
       ctx.restore();
 

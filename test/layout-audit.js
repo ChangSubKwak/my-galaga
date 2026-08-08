@@ -449,7 +449,7 @@ if (process.env.OVERLAP) {
     }
   }
   const bad = [...seen.entries()].sort((x, y) => y[1].frac - x[1].frac);
-      console.log('-- text overlap --');
+        console.log('-- text overlap --');
   if (!bad.length) {
     console.log('   ok  no two strings collide\n');
   } else {
