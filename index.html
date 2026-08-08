@@ -19642,7 +19642,7 @@ function drawGameplay() {
       ctx.restore();
 
       // TACTICAL CASUALTY REPORT panel — slides up with fadeIn
-      const panW = 168, panH = 76;
+      const panW = 168, panH = 46;   // was 76: three stat rows removed
       const panX = Math.round((BASE_W - panW) / 2);
       const panY = 60;
       ctx.save();
@@ -19677,19 +19677,10 @@ function drawGameplay() {
       drawRetroText('CAUSE', panX + 12, panY + 23, 5, COL.label, 'left');
       drawRetroText(_dcLabel, panX + panW - 12, panY + 23, 5, _dcCol, 'right');
 
-      // Stage + kills row
-      drawRetroText('STAGE', panX + 12, panY + 33, 5, COL.label, 'left');
-      drawRetroText(String(game.stage || 1), panX + panW - 12, panY + 33, 5, '#0cf', 'right');
-
-      drawRetroText('KILLS', panX + 12, panY + 43, 5, COL.label, 'left');
-      drawRetroText(String(_kills), panX + panW - 12, panY + 43, 5, '#0cf', 'right');
-
-      // Accuracy + combo row
-      drawRetroText('ACC', panX + 12, panY + 53, 5, COL.label, 'left');
-      drawRetroText(_acc, panX + 70, panY + 53, 5,
-        _sf >= 5 && parseInt(_acc) >= 80 ? '#0f8' : _sf >= 5 && parseInt(_acc) >= 60 ? '#fc4' : '#888', 'right');
-      drawRetroText('PEAK×' + _best, panX + panW - 12, panY + 53, 5,
-        _best >= 10 ? '#fc4' : _best >= 5 ? '#0cf' : '#888', 'right');
+      // (STAGE / KILLS / ACC / PEAK rows removed: this panel appears on EVERY
+      // death, and none of those four is something the player acts on while
+      // waiting to respawn. All four are on the HUD during play and on the
+      // GAME OVER summary at the end of the run — one rendering per fact.)
 
       // Lives remaining — bottom of panel
       ctx.globalAlpha = Math.min(1, fadeIn * 1.4) * 0.75;
