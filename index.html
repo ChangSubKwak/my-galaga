@@ -6087,28 +6087,62 @@ function drawSupplyCrate() {
       || game.state === STATE.TITLE || game.state === STATE.BONUS_GAME) return;
   const c = game.supplyCrate;
   const t = game.animFrame;
+  const hpRatio = c.hp / c.maxHp;
+  // Damage reads as COLOUR TEMPERATURE and as SHAPE (a shed corner per hit),
+  // never colour alone.
+  const baseCol = hpRatio > 0.66 ? '#fc4' : hpRatio > 0.33 ? '#f92' : '#f55';
+  const pulse = 0.55 + 0.45 * Math.sin(t * 0.2);
+
+  // Additive flare — it is treasure, so it throws warm light and blooms.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.translate(c.x, c.y);
+  ctx.globalAlpha = 0.22 + 0.16 * pulse;
+  ctx.fillStyle = baseCol;
+  ctx.fillRect(-10, -2, 21, 5);
+  ctx.fillRect(-2, -10, 5, 21);
+  ctx.globalAlpha = 0.14 + 0.10 * pulse;
+  ctx.fillRect(-7, -7, 15, 15);
+  ctx.restore();
+
+  // Dark well so the core reads on the bright daylight biomes.
   ctx.save();
   ctx.translate(c.x, c.y);
   ctx.rotate(c.rot);
-  // HP-based tint: intact gray → damaged amber → critical red
-  const hpRatio = c.hp / c.maxHp;
-  const baseCol = hpRatio > 0.66 ? '#888' : hpRatio > 0.33 ? '#a84' : '#c44';
-  ctx.fillStyle = baseCol;
-  ctx.fillRect(-4, -4, 8, 8);
-  ctx.fillStyle = '#bbb';
-  ctx.fillRect(-4, -4, 8, 1);
-  ctx.fillStyle = '#555';
-  ctx.fillRect(-4, 3, 8, 1);
-  // Center pulse — yellow inner glow signals it's shootable / valuable
-  const pulse = 0.55 + 0.45 * Math.sin(t * 0.2);
-  ctx.globalAlpha = pulse;
-  ctx.fillStyle = '#fc4';
-  ctx.fillRect(-2, -2, 4, 4);
-  ctx.globalAlpha = pulse * 0.5;
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(-1, -1, 2, 2);
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = '#0a0708';
+  ctx.fillRect(-5, -5, 10, 10);
+
+  // Vector housing — a stroked frame that SHEDS A CORNER per hit taken, so the
+  // damage state is legible as shape and not only as tint.
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = baseCol;
+  ctx.lineWidth = 1;
+  const _corners = [[-5, -5, 1, 1], [5, -5, -1, 1], [5, 5, -1, -1], [-5, 5, 1, -1]];
+  const _lost = Math.max(0, c.maxHp - c.hp);
+  for (let i = 0; i < _corners.length; i++) {
+    if (i < _lost) continue;                 // this corner has been shot away
+    const [cx, cy, dx, dy] = _corners[i];
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + dy * 3.5);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx + dx * 3.5, cy);
+    ctx.stroke();
+  }
   ctx.restore();
-  // HP pip row below crate — shows damage state at a glance
+
+  // Emissive core — additive, so the bloom carries it outward.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.55 + 0.35 * pulse;
+  ctx.fillStyle = baseCol;
+  ctx.fillRect(c.x - 3, c.y - 3, 6, 6);
+  ctx.globalAlpha = 0.75 * pulse;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(c.x - 1, c.y - 1, 3, 3);
+  ctx.restore();
+
+  // HP pip row below cratep row below crate — shows damage state at a glance
   if (c.hp < c.maxHp) {
     ctx.save();
     ctx.globalAlpha = 0.85;

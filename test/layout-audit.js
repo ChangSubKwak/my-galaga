@@ -269,6 +269,9 @@ capture('PLAYING s100', g => {
   g.powerUps = types.map((ty, i) => ({
     x: 16 + (i % 6) * 38, y: 80 + Math.floor(i / 6) * 40, vy: 0, type: ty
   }));
+  // The supply crate never spawns during a capture either (it needs a kill
+  // ratio), so its sprite went unrendered. Seed one mid-damage.
+  g.supplyCrate = { x: 112, y: 150, vy: 0, hp: 2, maxHp: 3, life: 40, rot: 0.4, rotSpeed: 0.025 };
 }, 300);
 capture('CHALLENGING', g => { baseStage(g, 96); g.state = S.CHALLENGING; });
 capture('BOSS_STAGE', g => { baseStage(g, 100); g.state = S.BOSS_STAGE; });
