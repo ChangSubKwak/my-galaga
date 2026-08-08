@@ -198,9 +198,22 @@ so the first SUPER boss is untouched) and the post-rage magnitude at `BOSS_VX_MA
 paid back by `bossSpreadForStage` ramping the volley 7 → 9. Tests pin the ceiling, prove
 stage 30 was not nerfed, and require the deep fight to differ in *kind*, not just length.
 
-The test suite guards the **curve shape** across stages 1–100: no inversion, no >12%
-single-stage wall, never 10+ flat stages, stage 100 materially harder than stage 32 —
-and it pins the three fairness caps so they cannot quietly drift up.
+**The challenge track had a third failure mode: reward inversion.** Challenge enemies
+don't shoot, so speed there is not danger, it is **opportunity**. `baseSpeed` was also
+uncapped (1.70 → 6.30 px/f), collapsing each enemy's on-screen dwell 2.49s → 0.67s and
+landable shots per pass 24.9 → 6.7 — most of the wave escaped, perfect clears became
+unreachable, and the bonus *shrank* with depth. `challengeSpeedForStage` caps at 4.0
+(only reached at stage 50, so earlier rounds are byte-identical) and
+`challengeGroupSize` ramps 8 → 12, growing waves 16 → 24 enemies: **depth adds targets
+instead of taking away time to shoot them.**
+
+All three tracks are now audited and guarded. The test suite pins the **curve shape**
+across stages 1–100 (no inversion, no >12% single-stage wall, never 10+ flat stages,
+stage 100 materially harder than stage 32), the three formation fairness caps, the boss
+speed ceiling, and the challenge opportunity floor — so none of them can quietly drift.
+**When adding difficulty anywhere, measure the curve first** (the audit is a ~40-line
+vm harness that drives the real scaling functions); every defect found so far was
+invisible in the code and obvious in the plot.
 
 ### FLIGHT SCHOOL — teach every new verb once (read this when adding a mechanic)
 
