@@ -170,6 +170,27 @@ DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are
 
 **GRAZE COMBO GRACE**: a near-miss (graze) while combo ≥ 5 refreshes `comboTimer` by +20f (capped at `COMBO_DECAY`) so skilled dodging bridges kill gaps without dropping the multiplier. Only extends, never grows the combo (kills do that), and the 24f near-miss cooldown prevents farming. Surfaces "COMBO HELD" only when the timer was actually in danger (< 40).
 
+### DEEP PRESSURE LADDER — deep-stage escalation (read before tuning difficulty)
+
+A curve audit found every difficulty scalar **saturated by stage 32** (bullet speed
+3.40, dive fire 14f, dive trigger 80f, elite rate 5% — that one as early as stage 10),
+so stages 32–100+ were mechanically identical: a **69-stage plateau** underneath
+narrative that keeps promising escalation (logs at 40–80, APEX at S60, FINAL FORM at
+S100). `deepPressure(stage)` (0 below 32, ramping to 1 at 80) now drives three
+**density/composition** knobs — `eliteRateForStage` (5%→12%), `ghostRateForStage`
+(3% at 60 → 8% at 100, carrying the curve past the elite top-out), and
+`extraDiverChance` (up to a 60% chance of one extra lone diver, hard-capped at +1).
+
+**The rule: never escalate deep stages by raising the speed or cadence caps.** Those
+caps (`cappedStageSpeed` 3.4 / `rampedFireInterval` 14f / `rampedInterval` 80f) are
+FAIRNESS limits — past them bullets stop being readable and dives stop being dodgeable,
+which is unfair, not hard. Escalate density and composition instead, and keep every
+threat's telegraph intact (the extra diver still gets the full 30-frame preview).
+
+The test suite guards the **curve shape** across stages 1–100: no inversion, no >12%
+single-stage wall, never 10+ flat stages, stage 100 materially harder than stage 32 —
+and it pins the three fairness caps so they cannot quietly drift up.
+
 ### FLIGHT SCHOOL — teach every new verb once (read this when adding a mechanic)
 
 Depth the player never discovers is depth that does not exist. The help panel's COMBAT
