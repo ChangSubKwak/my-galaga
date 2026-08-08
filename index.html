@@ -20722,7 +20722,12 @@ function drawHUD() {
     // COMBO TIER NAME — tier label by combo level. MAX tier (30+) adds a
     // soft glow so the peak threshold reads as a visual reward.
     {
-      const _tierN = comboTierName(game.combo);
+      // The decay countdown below shares this row (it draws at x=66, this at
+      // x=70, both left-aligned at y=33) and both conditions are true at the
+      // same time — a high combo about to expire is exactly when each wants to
+      // speak. The countdown is the urgent one, so the tier name yields to it.
+      const _decayShowing = game.comboTimer < 60 && game.comboTimer > 0;
+      const _tierN = _decayShowing ? null : comboTierName(game.combo);
       if (_tierN) {
         ctx.save();
         if (_tierN === 'MAX') {
@@ -20854,25 +20859,12 @@ function drawGameOverScreen() {
   const goSy = jitter(goShake);
   drawRetroText('GAME OVER', BASE_W/2 + goSx, cy - 35 + goSy, 16, COL.red);
   ctx.restore();
-  // PILOT TITLE LABEL — '[CSN] TITLE' below GAME OVER. Color picks up the
-  // pilot tier (pilotTitleColor) so GAME_OVER joins STAGE_INTRO / HUD / STATS
-  // overlay in the 4-location pilot-progression color cohesion.
-  if (playerCallsign && playerCallsign !== '???' && typeof computePilotTitle === 'function') {
-    const _ptl = computePilotTitle();
-    const _ptCol = (typeof pilotTitleColor === 'function')
-      ? pilotTitleColor(_ptl)
-      : ((typeof callsignColor === 'function') ? callsignColor() : '#888');
-    // ACE PILOT (peak tier, 80%+ achievements) picks up a white glow so the
-    // lifetime apex tier reads as a visual reward in GAME_OVER.
-    ctx.save();
-    if (_ptl === 'ACE PILOT') {
-      ctx.shadowColor = _ptCol;
-      ctx.shadowBlur = 4;
-    }
-    drawRetroText('[' + playerCallsign + ']  ' + _ptl,
-                  BASE_W/2, cy - 28, 5, _ptCol);
-    ctx.restore();
-  }
+  // (The '[CSN] TITLE' line that sat here was removed: at y = cy-28 it collided
+  // with the 16px GAME OVER title above it, whose glyph box reaches cy-27 — a
+  // 70% overlap on the smaller of the two. It was also the third place the
+  // callsign appeared on this screen, after the run-title header below and the
+  // highlights block. Found by an overlap probe over the layout audit's
+  // recorded draws.)
 
   // Ship + mode badge (between title and SCORE row)
   {

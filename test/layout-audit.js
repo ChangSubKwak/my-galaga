@@ -42,7 +42,7 @@ const src = fs.readFileSync(HTML, 'utf8').match(/<script>([\s\S]*?)<\/script>/)[
 // reported as wildly off-screen. A false positive is worse than no tool: it
 // trains people to ignore the output.
 const draws = [];
-let recording = false, currentScreen = '';
+let recording = false, currentScreen = '', frameNo = 0;
 function makeCtx() {
   const grad = { addColorStop() {} };
   const state = { font: 'bold 5px monospace', textAlign: 'center' };
@@ -79,6 +79,7 @@ function makeCtx() {
       const lx = Number(x) || 0, ly = Number(y) || 0;
       const [a, b, c, d, e] = m;
       draws.push({
+        frame: frameNo,
         screen: currentScreen,
         text: String(t),
         x: a * lx + c * ly + e,          // device-space anchor
@@ -230,6 +231,7 @@ function capture(label, setup, frames) {
   const n = frames || 90;
   for (let i = 0; i < n; i++) {
     recording = true;
+    frameNo++;
     try { G.draw(); } catch (e) {
       recording = false;
       console.log('  (draw threw on ' + label + ' frame ' + i + ': ' + e.message + ')');
@@ -388,6 +390,61 @@ for (const cfg of ['mono', 'pixel']) {
     for (const b of badV.slice(0, 20)) {
       console.log('     +' + b.over.toFixed(1) + 'px  [' + b.d.screen + '] y='
         + b.d.y.toFixed(0) + ' size ' + b.d.size + '  ' + JSON.stringify(b.d.text.slice(0, 40)));
+    }
+    console.log('');
+  }
+}
+
+// OVERLAP (opt-in: OVERLAP=1) - two different strings drawn on top of each
+// other in the same frame. NOT a gate: overlay panels legitimately cover the
+// HUD and full-width banners legitimately sweep across it, so the residual
+// false-positive rate is too high to fail a build on. It is kept because it
+// earns its keep as a probe - it found two real collisions (the GAME OVER
+// title against the pilot label, and the combo decay countdown against the
+// combo tier name), neither of which any other check can see.
+// Original note: two different strings drawn on top of each other in the same
+// frame. Identical text is skipped (glow/shadow passes redraw the same
+// string at the same spot) and a graze is not enough: the intersection has
+// to cover most of the smaller box before it counts as a collision.
+if (process.env.OVERLAP) {
+  const byFrame = new Map();
+  for (const d of draws) {
+    if (!d.text.trim() || d.rotated) continue;
+    if (!byFrame.has(d.frame)) byFrame.set(d.frame, []);
+    byFrame.get(d.frame).push(d);
+  }
+  const seen = new Map();
+  for (const [, list] of byFrame) {
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (a.text === b.text) continue;
+        const [al, ar] = bounds(a, 'pixel');
+        const [bl, br] = bounds(b, 'pixel');
+        const capOf = d => (d.size >= PIXEL_DISPLAY_MIN ? 0.875 : 0.560);
+        const ah = a.size * capOf(a) * 0.5 * (a.xScale || 1);
+        const bh = b.size * capOf(b) * 0.5 * (b.xScale || 1);
+        const ox = Math.min(ar, br) - Math.max(al, bl);
+        const oy = Math.min(a.y + ah, b.y + bh) - Math.max(a.y - ah, b.y - bh);
+        if (ox <= 0 || oy <= 0) continue;
+        const areaA = Math.max(1, (ar - al) * ah * 2);
+        const areaB = Math.max(1, (br - bl) * bh * 2);
+        const frac = (ox * oy) / Math.min(areaA, areaB);
+        if (frac < 0.55) continue;
+        const key = [a.text, b.text].sort().join(' | ');
+        const prev = seen.get(key);
+        if (!prev || frac > prev.frac) seen.set(key, { frac, screen: a.screen });
+      }
+    }
+  }
+  const bad = [...seen.entries()].sort((x, y) => y[1].frac - x[1].frac);
+    console.log('-- text overlap --');
+  if (!bad.length) {
+    console.log('   ok  no two strings collide\n');
+  } else {
+    console.log('   ' + bad.length + ' colliding pair(s) [informational]:');
+    for (const [k, v] of bad.slice(0, 15)) {
+      console.log('     ' + Math.round(v.frac * 100) + '%  [' + v.screen + ']  ' + k);
     }
     console.log('');
   }
