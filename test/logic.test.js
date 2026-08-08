@@ -179,6 +179,7 @@ const shim = `
 ;try { globalThis.__getArchetypeMotifs = function () { return (typeof ARCHETYPE_MOTIFS !== 'undefined') ? ARCHETYPE_MOTIFS : null; }; } catch (e) {}
 ;try { globalThis.__getCol = function () { return (typeof COL !== 'undefined') ? COL : null; }; } catch (e) {}
 ;try { globalThis.__getCoachLessons = function () { return (typeof COACH_LESSONS !== 'undefined') ? COACH_LESSONS : null; }; } catch (e) {}
+;try { globalThis.__getState = function () { return (typeof STATE !== 'undefined') ? STATE : null; }; } catch (e) {}
 ;try { globalThis.__getRespawnWhispers = function () { return (typeof RESPAWN_WHISPERS !== 'undefined') ? RESPAWN_WHISPERS : null; }; } catch (e) {}
 `;
 
@@ -3336,6 +3337,192 @@ if (G.__getCol && G.__getCol()) {
     ok(_ratio(COL[key], '#000') >= 4.5, 'COL.' + key + ' clears 4.5:1 on the void');
   }
 } else { console.log('  (skipped — COL not exposed)'); }
+
+// ============================================================
+// STATEFUL ACTOR LIFECYCLES
+// Every test above this point exercises PURE helpers. The six recent actor
+// systems are phase machines, and a phase machine is where the real bugs live:
+// a slot that never clears, cargo that vanishes on death, an actor that walks
+// off the playfield. These drive each machine through its whole life against
+// the live `game` object and assert the invariants that matter to a player.
+// ============================================================
+const ST = G.__getState && G.__getState();
+function freshStage(g, over) {
+  // A clean, quiet stage-6 playfield: no other actor, no weather, formation in.
+  g.state = ST.PLAYING;
+  g.playerAlive = true; g.allEntered = true;
+  g.stage = 6; g.stageFrames = 400; g.stageEndGraceTimer = 0;
+  g.playerX = 112; g.playerY = 250; g.playerVX = 0;
+  g.animFrame = 0; g.runFrames = 1000;
+  g.bullets = []; g.enemyBullets = []; g.megaBosses = [];
+  g.powerUps = []; g.salvageShards = []; g.explosions = [];
+  g.floatTexts = []; g.itemBursts = []; g.shockwaves = []; g.hitSparks = [];
+  g.rival = null; g.magpie = null; g.guardian = null;
+  g.supplyCrate = null; g.deathEcho = null; g.stageWeather = null;
+  g.interceptQueue = []; g._interceptLastT = {};
+  g.combo = 0; g.score = 0;
+  Object.assign(g, over || {});
+  return g;
+}
+
+section('RIVAL ACE — full duel lifecycle (phase machine, not just the helpers)');
+if (ST && typeof G.updateRivalAce === 'function' && G.__getGame && G.__getGame()) {
+  const g = freshStage(G.__getGame(), {
+    rivalNextStage: 6, rivalLevel: 0, rivalEncounters: 0,
+    rivalDefeats: 0, rivalEjected: false
+  });
+  const BW = 224;
+
+  G.updateRivalAce();
+  ok(!!g.rival, 'rival spawns on an eligible, uncontested stage');
+  eq(g.rival && g.rival.phase, 'warning', 'it opens on the telegraph phase, never mid-playfield');
+  ok(!!g.rival && g.rival.hp > 0 && g.rival.hp === g.rival.maxHp, 'spawns at full HP');
+  eq(g.rivalEncounters, 1, 'the encounter is counted');
+
+  // Drive warning -> enter -> duel, checking it never leaves the playfield.
+  let escaped = false, reachedDuel = false;
+  for (let i = 0; i < 400 && g.rival; i++) {
+    g.animFrame++;
+    G.updateRivalAce();
+    if (!g.rival) break;
+    if (g.rival.phase === 'duel') reachedDuel = true;
+    if (reachedDuel && (g.rival.x < 0 || g.rival.x > BW)) escaped = true;
+  }
+  ok(reachedDuel, 'the rival reaches the duel phase under normal conditions');
+  ok(!escaped, 'it stays inside the playfield for the whole duel (x clamped)');
+
+  // Duel timeout must ALWAYS end the encounter — a stuck actor would occupy
+  // THE DIRECTOR's threat slot forever and silently suppress every later spawn.
+  freshStage(g, { rivalNextStage: 999, rivalLevel: 0, rivalEjected: false });
+  g.rival = { phase: 'duel', x: 112, y: 56, vy: 0, level: 0, hp: 99, maxHp: 99,
+              fireCd: 999, burstLeft: 0, burstGap: 0, dodgeCd: 99, dodgeTimer: 0,
+              dodgeDir: 0, duelTimer: 3, mockTimer: 0, flash: 0, tauntText: null,
+              tauntLife: 0, tauntMax: 80, tauntCd: 0, callsign: 'XXX', after: [] };
+  for (let i = 0; i < 600 && g.rival; i++) { g.animFrame++; G.updateRivalAce(); }
+  ok(!g.rival, 'duel timeout always retires the rival (the threat slot is released)');
+  ok(g.rivalLevel > 0, 'disengaging escalates it for the next encounter');
+
+  // First HP depletion = EJECT (survives, escapes). Second = confirmed kill.
+  freshStage(g, { rivalNextStage: 999, rivalEjected: false, rivalDefeats: 0 });
+  g.rival = { phase: 'duel', x: 112, y: 56, vy: 0, level: 0, hp: 1, maxHp: 20,
+              fireCd: 999, burstLeft: 0, burstGap: 0, dodgeCd: 99, dodgeTimer: 0,
+              dodgeDir: 0, duelTimer: 900, mockTimer: 0, flash: 0, tauntText: null,
+              tauntLife: 0, tauntMax: 80, tauntCd: 0, callsign: 'XXX', after: [] };
+  g.bullets = [{ x: 112, y: 56, vy: -4, dmg: 5, lvl: 1 }];
+  G.updateRivalAce();
+  ok(g.rivalEjected, 'first depletion ejects the pilot rather than killing them');
+  eq(g.rivalDefeats, 0, 'an ejection is NOT scored as a defeat');
+  ok(g.rival && g.rival.phase === 'retreat', 'the ejecting rival leaves under its own power');
+
+  const scoreBefore = g.score;
+  freshStage(g, { rivalNextStage: 999, rivalEjected: true, rivalDefeats: 0, score: scoreBefore });
+  g.rival = { phase: 'duel', x: 112, y: 56, vy: 0, level: 0, hp: 1, maxHp: 20,
+              fireCd: 999, burstLeft: 0, burstGap: 0, dodgeCd: 99, dodgeTimer: 0,
+              dodgeDir: 0, duelTimer: 900, mockTimer: 0, flash: 0, tauntText: null,
+              tauntLife: 0, tauntMax: 80, tauntCd: 0, callsign: 'XXX', after: [] };
+  g.bullets = [{ x: 112, y: 56, vy: -4, dmg: 5, lvl: 1 }];
+  G.updateRivalAce();
+  eq(g.rivalDefeats, 1, 'a post-ejection depletion IS a confirmed kill');
+  ok(!g.rival, 'the killed rival clears its slot immediately');
+  ok(g.score > scoreBefore, 'the kill pays out');
+  ok(g.powerUps.length === 1, 'the kill drops exactly one trophy power-up');
+
+  // Intangibility must actually protect: a dodging rival cannot be hit.
+  freshStage(g, { rivalNextStage: 999 });
+  g.rival = { phase: 'duel', x: 112, y: 56, vy: 0, level: 0, hp: 10, maxHp: 10,
+              fireCd: 999, burstLeft: 0, burstGap: 0, dodgeCd: 99, dodgeTimer: 5,
+              dodgeDir: 1, duelTimer: 900, mockTimer: 0, flash: 0, tauntText: null,
+              tauntLife: 0, tauntMax: 80, tauntCd: 0, callsign: 'XXX', after: [] };
+  g.bullets = [{ x: 112, y: 56, vy: -4, dmg: 1, lvl: 1 }];
+  G.updateRivalAce();
+  eq(g.rival && g.rival.hp, 10, 'a mid-dodge rival is intangible (the dodge is real, not cosmetic)');
+  eq(g.bullets.length, 1, 'and the shot passes through rather than being consumed');
+} else { console.log('  (skipped — rival lifecycle not drivable)'); }
+
+section('THE MAGPIE — raid lifecycle (grab, flee, and cargo recovery on kill)');
+if (ST && typeof G.updateMagpie === 'function' && G.__getGame && G.__getGame()) {
+  const g = freshStage(G.__getGame(), { magpieCd: 0 });
+  // Seed one aged, stealable pickup and hand the magpie that exact target.
+  const loot = { x: 60, y: 120, vy: 0.6, type: 'R', _mAge: 999 };
+  g.powerUps = [loot];
+  g.magpie = { phase: 'seek', target: { kind: 'powerup', obj: loot },
+               x: 60, y: 100, hp: 2, maxHp: 2, speed: 1.5,
+               carry: null, flash: 0, vx: 0, vy: 0 };
+  for (let i = 0; i < 120 && g.magpie && !g.magpie.carry; i++) { g.animFrame++; G.updateMagpie(); }
+  ok(g.magpie && g.magpie.carry, 'the magpie reaches and grabs its target');
+  eq(g.powerUps.length, 0, 'the stolen pickup leaves the field (the loss is real)');
+  eq(g.magpie && g.magpie.phase, 'flee', 'it runs the moment it has the cargo');
+
+  // Shooting the thief must return the exact cargo it took.
+  if (g.magpie) { g.magpie.x = 112; g.magpie.y = 100; g.magpie.hp = 1; }
+  g.bullets = [{ x: 112, y: 100, vy: -4, dmg: 5, lvl: 1 }];
+  const sBefore = g.score;
+  G.updateMagpie();
+  ok(!g.magpie, 'the killed magpie clears its slot');
+  eq(g.powerUps.length, 1, 'the cargo is returned to the field');
+  eq(g.powerUps[0] && g.powerUps[0].type, 'R', 'and it is the SAME pickup type that was stolen');
+  ok(g.score > sBefore, 'downing the thief pays out');
+  ok(g.magpieCd > 0, 'a cooldown is armed so raids cannot chain');
+
+  // A thief that escapes must not leak its slot.
+  freshStage(g, { magpieCd: 0 });
+  g.magpie = { phase: 'flee', target: null, x: 60, y: 20, hp: 2, maxHp: 2,
+               speed: 1.5, carry: { kind: 'powerup', type: 'T' }, flash: 0, vx: 0, vy: 0.5 };
+  for (let i = 0; i < 200 && g.magpie; i++) { g.animFrame++; G.updateMagpie(); }
+  ok(!g.magpie, 'an escaping magpie clears its slot (no leaked threat budget)');
+
+  // Target stolen by the player mid-approach → flee empty-handed, never crash.
+  freshStage(g, { magpieCd: 0 });
+  const ghostLoot = { x: 60, y: 120, vy: 0.6, type: 'W', _mAge: 999 };
+  g.powerUps = [];  // player already collected it
+  g.magpie = { phase: 'seek', target: { kind: 'powerup', obj: ghostLoot },
+               x: 60, y: 100, hp: 2, maxHp: 2, speed: 1.5,
+               carry: null, flash: 0, vx: 0, vy: 0 };
+  G.updateMagpie();
+  ok(g.magpie && g.magpie.phase === 'flee' && !g.magpie.carry,
+     'a target collected first sends the thief home empty-handed');
+} else { console.log('  (skipped — magpie lifecycle not drivable)'); }
+
+section('DEATH ECHO / SALVAGE — pickup lifecycles (the two taught systems)');
+if (ST && typeof G.updateDeathEcho === 'function' && G.__getGame && G.__getGame()) {
+  const g = freshStage(G.__getGame(), { shieldCharges: 0 });
+  g.deathEchoDone = true; // suppress re-spawn; we are testing the live echo
+  g.deathEcho = { x: 112, y: 250, vy: 0.3, callsign: 'KWK', cause: 'bullet', fade: 0 };
+  G.updateDeathEcho();
+  eq(g.shieldCharges, 1, 'communing with your wreck arms one shield charge');
+  ok(g.deathEcho && g.deathEcho.fade > 0, 'the wreck begins fading once answered');
+  const chargesAfter = g.shieldCharges;
+  G.updateDeathEcho();
+  eq(g.shieldCharges, chargesAfter, 'it cannot be farmed — a fading wreck grants nothing more');
+  for (let i = 0; i < 120 && g.deathEcho; i++) G.updateDeathEcho();
+  ok(!g.deathEcho, 'the answered wreck eventually clears its slot');
+
+  // Drifting past unclaimed must also clear (missable, not leaked).
+  freshStage(g, {});
+  g.deathEchoDone = true;
+  g.deathEcho = { x: 10, y: 250, vy: 0.3, callsign: 'KWK', cause: 'bullet', fade: 0 };
+  g.playerX = 200; // far away — never communes
+  for (let i = 0; i < 400 && g.deathEcho; i++) G.updateDeathEcho();
+  ok(!g.deathEcho, 'an ignored wreck drifts away instead of lingering forever');
+}
+if (ST && typeof G.updateSalvageShards === 'function' && G.__getGame && G.__getGame()) {
+  const g = freshStage(G.__getGame(), {});
+  g.lvl = { S: 1, N: 1, P: 1 };
+  g._coachSalvagePending = false;
+  g.salvageShards = [{ x: 112, y: 250, axis: 'S', vx: 0, vy: 0, ttl: 200 }];
+  G.updateSalvageShards();
+  eq(g.lvl.S, 2, 'catching a shard restores that axis by one level');
+  eq(g.salvageShards.length, 0, 'the caught shard leaves the field');
+
+  // Expiry: an ignored shard must vanish, not accumulate forever.
+  freshStage(g, {});
+  g.lvl = { S: 1, N: 1, P: 1 };
+  g.salvageShards = [{ x: 10, y: 60, axis: 'N', vx: 0, vy: 0, ttl: 2 }];
+  g.playerX = 200;
+  for (let i = 0; i < 30 && g.salvageShards.length; i++) G.updateSalvageShards();
+  eq(g.salvageShards.length, 0, 'an uncaught shard expires (the loss is permanent)');
+  eq(g.lvl.N, 1, 'and it restores nothing');
+} else { console.log('  (skipped — salvage lifecycle not drivable)'); }
 
 section('FLIGHT SCHOOL — lifetime-once verb coaching (registry wired both sides)');
 if (G.__getCoachLessons && G.__getCoachLessons()) {
