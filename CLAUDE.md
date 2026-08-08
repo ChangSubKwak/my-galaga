@@ -170,6 +170,36 @@ DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are
 
 **GRAZE COMBO GRACE**: a near-miss (graze) while combo ≥ 5 refreshes `comboTimer` by +20f (capped at `COMBO_DECAY`) so skilled dodging bridges kill gaps without dropping the multiplier. Only extends, never grows the combo (kills do that), and the 24f near-miss cooldown prevents farming. Surfaces "COMBO HELD" only when the timer was actually in danger (< 40).
 
+### THE DIRECTOR — the attention budget (read this before adding any new actor)
+
+Six optional actor systems (rival ace, magpie, supply crate, guardian, death echo,
+weather strike) were each self-gated correctly but knew nothing about each other, so a
+stage-7 playfield could legally host all six at once on top of 40 formation enemies and
+a coordinated dive. `THE DIRECTOR` gives the *set* a budget — it is the arbiter that keeps
+the game honest to its own SIMPLE-BY-DEFAULT north star.
+
+- `directorBudget(mode)` — concurrent special-actor cap, scaled by difficulty like the
+  rest of the economy: **easy 1 / normal 2 / hard 3**.
+- `directorAdmit(cls, census, mode, strikeTelegraph)` — pure gate. Enforces the total cap,
+  a hard **one-threat-at-a-time** sub-cap (`rival` / `magpie` / live weather strike all
+  demand immediate reaction), and vetoes *everything* while a strike telegraph is up
+  (that 42-frame read is the longest telegraph in the game and stays sacred).
+- `directorCensus()` — live count of occupied attention (a *retreating* rival is excluded:
+  it is leaving, not demanding). `directorAllows(cls)` is the one call spawn sites make.
+
+**Rules for new work:**
+1. Any new ambient/optional actor MUST consult `directorAllows('threat'|'gift')` at its
+   spawn site, and its spawn check must be re-polled per frame so a denial is a **defer,
+   not a cancellation**.
+2. **Earned** rewards are never denied — a guardian bought with a combo milestone and the
+   salvage shards of your own wreck always spawn. They *count* toward the census (ambient
+   spawns yield to them) but never ask permission.
+3. Add new actors to `directorCensus()` so they occupy budget, or the arbiter silently
+   under-counts and the cap leaks.
+
+Pure parts logic-tested (budget ordering, threat sub-cap, telegraph veto, malformed-census
+robustness, retreating-rival exclusion).
+
 ### Dynamic systems (set per-stage, read per-frame)
 
 - **`stageMutation`** (`rapidFire | fastDives | slowBullets | denseFire`, 30% / normal stages only) — flips one rule for the whole stage. Read sites: `updatePlayer` (rapidFire fire cd), `updateEnemies` diving branch (fastDives pathSpeed), `updateBullets` enemy slowMul (slowBullets), `diffFireMul` (denseFire).

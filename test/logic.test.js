@@ -3238,6 +3238,65 @@ if (typeof G.archetypeMotif === 'function' && G.__getArchetypeMotifs && G.__getA
   }
 } else { console.log('  (skipped — ARCHETYPE_MOTIFS not exposed)'); }
 
+section('THE DIRECTOR — concurrent special-actor budget (attention arbiter)');
+if (typeof G.directorBudget === 'function' && typeof G.directorAdmit === 'function') {
+  const admit = (cls, t, g, mode, tel) => G.directorAdmit(cls, { threat: t, gift: g }, mode, tel);
+  // Budget scales with difficulty — same doctrine as drop/elite rates.
+  eq(G.directorBudget('easy'), 1, 'easy allows 1 concurrent special actor');
+  eq(G.directorBudget('normal'), 2, 'normal allows 2');
+  eq(G.directorBudget('hard'), 3, 'hard allows 3');
+  eq(G.directorBudget('nonsense'), 2, 'unknown mode falls back to normal');
+  eq(G.directorBudget(undefined), 2, 'undefined mode falls back to normal');
+  ok(G.directorBudget('easy') < G.directorBudget('normal')
+     && G.directorBudget('normal') < G.directorBudget('hard'),
+     'budget is strictly increasing with difficulty');
+
+  // Empty stage admits anything.
+  ok(admit('threat', 0, 0, 'normal', false), 'empty stage admits a threat');
+  ok(admit('gift',   0, 0, 'normal', false), 'empty stage admits a gift');
+
+  // THE core rule: never two simultaneous reactive demands.
+  ok(!admit('threat', 1, 0, 'normal', false), 'a live threat blocks a second threat');
+  ok(!admit('threat', 1, 0, 'hard', false), 'threat sub-cap holds even on hard (budget 3)');
+  ok(admit('gift', 1, 0, 'normal', false), 'a gift may join a single live threat');
+
+  // Total cap.
+  ok(!admit('gift', 1, 1, 'normal', false), 'normal cap 2 reached → gift denied');
+  ok(admit('gift', 1, 1, 'hard', false), 'hard cap 3 leaves room for a third actor');
+  ok(!admit('gift', 0, 1, 'easy', false), 'easy cap 1 → one actor at a time, period');
+  ok(!admit('threat', 0, 1, 'easy', false), 'easy: a live gift blocks a threat too');
+
+  // The sacred window — nothing spawns during a strike telegraph.
+  ok(!admit('threat', 0, 0, 'hard', true), 'strike telegraph blocks threats on an empty hard stage');
+  ok(!admit('gift', 0, 0, 'easy', true), 'strike telegraph blocks gifts too');
+  ok(!admit('gift', 0, 0, 'hard', true), 'the telegraph veto overrides all remaining budget');
+
+  // Robustness — a malformed census must never open the floodgates.
+  ok(G.directorAdmit('threat', null, 'normal', false), 'null census treated as empty stage');
+  ok(!G.directorAdmit('threat', { threat: 99 }, 'normal', false), 'partial census still enforces the threat cap');
+  ok(!G.directorAdmit('gift', { threat: -5, gift: 9 }, 'normal', false),
+     'negative counts are floored (cannot buy extra budget)');
+
+  // Live census — reads the real actor slots, excludes a retreating rival.
+  if (typeof G.directorCensus === 'function' && G.__getGame && G.__getGame()) {
+    const g = G.__getGame();
+    const sv = { r: g.rival, m: g.magpie, s: g.supplyCrate, gu: g.guardian, de: g.deathEcho, w: g.stageWeather };
+    g.rival = null; g.magpie = null; g.supplyCrate = null; g.guardian = null; g.deathEcho = null; g.stageWeather = null;
+    let c = G.directorCensus();
+    ok(c.threat === 0 && c.gift === 0, 'clear stage → empty census');
+    g.rival = { phase: 'duel' };
+    ok(G.directorCensus().threat === 1, 'a dueling rival counts as a threat');
+    g.rival = { phase: 'retreat' };
+    ok(G.directorCensus().threat === 0, 'a RETREATING rival is leaving — not counted');
+    g.rival = null;
+    g.guardian = {}; g.supplyCrate = {};
+    c = G.directorCensus();
+    ok(c.gift === 2 && c.threat === 0, 'guardian + crate count as two gifts');
+    g.rival = sv.r; g.magpie = sv.m; g.supplyCrate = sv.s;
+    g.guardian = sv.gu; g.deathEcho = sv.de; g.stageWeather = sv.w;
+  }
+} else { console.log('  (skipped — DIRECTOR not exposed)'); }
+
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);
 console.log(`PASSED: ${passed}   FAILED: ${failed}`);

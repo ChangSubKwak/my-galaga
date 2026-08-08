@@ -5215,6 +5215,78 @@ function drawGuardian() {
   ctx.restore();
 }
 
+// ============================== THE DIRECTOR ===============================
+// The attention arbiter. Six optional actor systems (rival, magpie, supply
+// crate, guardian, death echo, weather strike) each self-gated correctly but
+// knew NOTHING about each other — so a stage-7 playfield could legally host
+// all six at once on top of 40 formation enemies and a coordinated dive. That
+// violates this project's own north star (SIMPLE BY DEFAULT, one demand at a
+// time) and it is a systems bug, not a content problem: no single spawn site
+// was wrong, the set had no budget.
+//
+// THE DIRECTOR gives the set a budget. Two rules do the work:
+//   1. A concurrency cap, scaled by difficulty (the same "difficulty shapes
+//      the economy" doctrine drop/elite rates already follow): easy 1,
+//      normal 2, hard 3 simultaneous special actors.
+//   2. At most ONE 'threat' at a time. Rival, magpie, and a live weather
+//      strike all demand an immediate reaction; two at once on a 224px
+//      playfield is noise, not difficulty.
+// Plus one inviolable window: while a weather strike telegraph is up, nothing
+// new spawns. That 42-frame read is the longest telegraph in the game and it
+// stays sacred.
+//
+// EARNED rewards are never denied — a guardian bought with a combo milestone
+// and the shards of your own wreck always appear. They COUNT toward the
+// budget (ambient spawns yield to them) but never ask permission. Everything
+// the director does gate (rival / magpie / supply crate / death echo) polls
+// its spawn check every frame, so a denial is a DEFER, not a cancellation:
+// the actor arrives as soon as the stage has room for it.
+const DIRECTOR_CAP = { easy: 1, normal: 2, hard: 3 };
+
+// Pure: concurrent special-actor budget for a difficulty mode.
+function directorBudget(mode) {
+  return DIRECTOR_CAP[mode] || DIRECTOR_CAP.normal;
+}
+
+// Pure: may an actor of `cls` ('threat' | 'gift') join the stage right now?
+// `census` is { threat, gift } counts of what is already live.
+function directorAdmit(cls, census, mode, strikeTelegraph) {
+  if (strikeTelegraph) return false;               // the sacred read window
+  const c = census || {};
+  const threat = Math.max(0, c.threat || 0);
+  const gift   = Math.max(0, c.gift   || 0);
+  if (threat + gift >= directorBudget(mode)) return false;
+  if (cls === 'threat' && threat >= 1) return false; // one reactive demand at a time
+  return true;
+}
+
+// Live census of everything currently occupying the player's attention.
+// A retreating rival is excluded — it is leaving, not demanding.
+function directorCensus() {
+  let threat = 0, gift = 0;
+  if (!game) return { threat, gift };
+  if (game.rival && game.rival.phase !== 'retreat') threat++;
+  if (game.magpie) threat++;
+  if (directorStrikePhase() !== 'idle') threat++;
+  if (game.supplyCrate) gift++;
+  if (game.guardian) gift++;
+  if (game.deathEcho) gift++;
+  return { threat, gift };
+}
+
+// Current hazard-strike phase ('idle' when the stage has no live hazard).
+function directorStrikePhase() {
+  const w = game && game.stageWeather;
+  if (!w || typeof weatherIsHazard !== 'function' || !weatherIsHazard(w.id)) return 'idle';
+  if (game.state !== STATE.PLAYING || !game.playerAlive || !game.allEntered) return 'idle';
+  return strikePhase(w.strikeTimer, w.strikeInterval);
+}
+
+// The one call every gated spawn site makes.
+function directorAllows(cls) {
+  return directorAdmit(cls, directorCensus(), difficultyMode, directorStrikePhase() === 'telegraph');
+}
+
 // ============================== RIVAL ACE ==================================
 // THE MIRROR ACE — a recurring 1v1 nemesis duelist. A crimson INVERTED twin of
 // the player's own ship (same silhouette, flipped upside-down) wearing the
@@ -5328,6 +5400,9 @@ function updateRivalAce() {
     if ((game.stageEndGraceTimer || 0) !== 0) return;
     if (game.megaBosses && game.megaBosses.length) return;
     if (!rivalShouldSpawn(game.stage, game.rivalNextStage || RIVAL_FIRST_STAGE, stageModeFor(game.stage))) return;
+    // THE DIRECTOR — a duel is the loudest threat in the game; it waits for a
+    // clear stage rather than stacking onto another demand. Re-polled each frame.
+    if (!directorAllows('threat')) return;
     spawnRivalAce();
     return;
   }
@@ -5806,7 +5881,10 @@ function updateDeathEcho() {
     if (game.stage === rec.stage && isCombatState()) {
       const settled = game.state === STATE.PLAYING
         ? game.allEntered : (game.stageFrames || 0) > 120;
-      if (settled) {
+      // THE DIRECTOR — the wreck is a quiet gift, but communing with it means
+      // flying to it. It waits for a stage with room. (Once-per-run flag is
+      // set only on actual spawn, so a denial never burns the encounter.)
+      if (settled && directorAllows('gift')) {
         game.deathEcho = {
           x: Math.max(10, Math.min(BASE_W - 10, rec.x)), y: -12, vy: 0.3,
           callsign: rec.callsign, cause: rec.cause, fade: 0
@@ -5929,6 +6007,9 @@ function updateMagpie() {
     if (game.stage < 7 || !game.allEntered || !game.playerAlive) return;
     if ((game.magpieCd || 0) > 0) { game.magpieCd--; return; }
     if ((game.animFrame % 30) !== 0 || Math.random() >= 0.3) return;
+    // THE DIRECTOR — the raid is a threat; it never doubles up on the duel or
+    // a live strike. Denial is a defer: the roll comes around again.
+    if (!directorAllows('threat')) return;
     const target = magpiePickTarget(game.powerUps, game.salvageShards, MAGPIE_MIN_AGE);
     if (!target) return;
     const st = magpieStatsForStage(game.stage);
@@ -6098,6 +6179,9 @@ function updateSupplyCrate() {
     const _maxCount = game.formationMaxCount || 1;
     const killRatio = 1 - (_aliveNow / _maxCount);
     const stageF = game.stageFrames || 0;
+    // THE DIRECTOR — the crate is a gift, but it still pulls the eye off the
+    // formation. Deferred (not cancelled) while the stage is already busy.
+    if (!directorAllows('gift')) return;
     if (killRatio >= 0.50 || stageF >= 600) {
       game.supplyCrate = {
         x: 24 + Math.random() * (BASE_W - 48),
@@ -7460,6 +7544,7 @@ function resetGame() {
     stageShotsHit: 0,
     toasts: [],
     helpOverlay: false,
+    helpPage: 0,
     statsOverlay: false,
     debris: [],
     shockwaves: [],
@@ -9519,6 +9604,16 @@ function initInput() {
     if (e.key === 'Tab' && game.statsOverlay) {
       e.preventDefault();
       game.statsAchPage = ((game.statsAchPage || 0) + 1) % statsTotalPages();
+      playSound('tick');
+    }
+    // Cycle help pages — Tab. Page 0 is controls/pickups (the reference card);
+    // page 1 is COMBAT DEPTH, where the game's actual skill verbs live. They
+    // were previously undocumented anywhere, so the mechanics that carry the
+    // whole skill ceiling (parry / witch time / graze / combo arsenal) were
+    // discoverable only by accident.
+    if (e.key === 'Tab' && game.helpOverlay) {
+      e.preventDefault();
+      game.helpPage = ((game.helpPage || 0) + 1) % HELP_PAGES;
       playSound('tick');
     }
     // Quit to title from pause — commit the run as if it ended naturally so
@@ -23232,6 +23327,10 @@ function drawPauseScreen() {
   }
 }
 
+// Help overlay pages: 0 = controls/pickups reference card, 1 = COMBAT DEPTH
+// (the skill verbs). Cycled with Tab, mirroring the stats overlay.
+const HELP_PAGES = 2;
+
 function drawHelpOverlay() {
   // Heavy backdrop dim
   ctx.fillStyle = 'rgba(0,0,0,0.82)';
@@ -23250,13 +23349,16 @@ function drawHelpOverlay() {
   ctx.fillRect(px, py, 1, panelH);
   ctx.fillRect(px + panelW - 1, py, 1, panelH);
 
+  const _hp = (game.helpPage || 0) % HELP_PAGES;
+
   // Title with glow
   ctx.save();
   const glow = 0.6 + 0.4 * Math.sin(game.animFrame * 0.1);
   ctx.shadowColor = COL.cyan;
   ctx.shadowBlur = 8 * glow;
-  drawRetroText('HOW TO PLAY', BASE_W/2, py + 12, 10, COL.yellow);
+  drawRetroText(_hp === 1 ? 'COMBAT DEPTH' : 'HOW TO PLAY', BASE_W/2, py + 12, 10, COL.yellow);
   ctx.restore();
+  drawRetroText((_hp + 1) + '/' + HELP_PAGES + '  TAB', px + panelW - 8, py + 12, 5, COL.gray, 'right');
 
   // Three groups: play / title-only / settings
   let y = py + 22;
@@ -23269,6 +23371,57 @@ function drawHelpOverlay() {
     drawRetroText(v, px + panelW - 8, y, 5, COL.gray, 'right');
     y += 6;
   }
+
+  // ---- PAGE 1: COMBAT DEPTH — the skill verbs. These carry the entire skill
+  // ceiling and were undocumented: a player could log hours without learning
+  // that dashing INTO fire is the highest-value play in the game. Each entry
+  // is verb → how to trigger it → what it pays.
+  if (_hp === 1) {
+    function verb(name, col, how, pay) {
+      drawRetroText(name, px + 8, y, 6, col, 'left');
+      y += 6;
+      drawRetroText(how, px + 12, y, 5, COL.white, 'left');
+      y += 5;
+      drawRetroText(pay, px + 12, y, 5, COL.gray, 'left');
+      y += 7;
+    }
+    section('DEFENCE');
+    verb('DASH PARRY', '#0ff',
+         'DASH THROUGH ENEMY BULLETS',
+         'DEFLECTS THEM. SCORE RAMPS 50>250');
+    verb('CLUSTER PARRY', '#fc4',
+         '3+ BULLETS IN ONE DASH FRAME',
+         'BONUS + HIT-STOP. THE BIG PLAY');
+    verb('WITCH TIME', '#a8f',
+         'AUTO ON A FATAL HIT: 30F SLOW-MO',
+         'DASH IN THAT WINDOW = FULL SAVE');
+    verb('SHIELD', '#4f8',
+         'E PICKUP, STACKS TO 3',
+         'EATS ONE FATAL HIT EACH');
+    y += 1;
+    section('OFFENCE');
+    verb('COMBO', '#0ff',
+         'KILL AGAIN WITHIN 1.5S',
+         'x1.25 UP TO x3 SCORE');
+    verb('COMBO ARSENAL', '#f6f',
+         'REACH COMBO 25 / 50 / 75 / 100',
+         'FREE RAPID > WAVE > HOMING > LASER');
+    verb('GRAZE', '#0cf',
+         'LET A BULLET PASS CLOSE',
+         'HOLDS YOUR COMBO ALIVE');
+    y += 1;
+    drawRetroText('READ THE TELEGRAPHS', px + 8, y, 7, COL.cyan, 'left');
+    y += 8;
+    drawRetroText('DOTTED PATH = A DIVE IS COMING', px + 8, y, 5, COL.white, 'left');
+    y += 5;
+    drawRetroText('CHEVRON + COLUMN = STORM STRIKE', px + 8, y, 5, COL.white, 'left');
+    y += 5;
+    drawRetroText('DASH THROUGH IT TO PARRY IT', px + 8, y, 5, COL.gray, 'left');
+    drawRetroText('TAB  MORE', BASE_W/2, py + panelH - 16, 5, COL.gray);
+    drawRetroText('H  CLOSE', BASE_W/2, py + panelH - 8, 6, COL.gray);
+    return;
+  }
+
   section('PLAY');
   kvRow('ARROWS / A,D', 'MOVE');
   kvRow('SPACE',        'FIRE');
@@ -23334,7 +23487,7 @@ function drawHelpOverlay() {
   }
 
   // Footer (tip + close hint)
-  drawRetroText('STATS (I) FOR ACHIEVEMENTS / TIMES', BASE_W/2, py + panelH - 16, 5, COL.gray);
+  drawRetroText('TAB  COMBAT DEPTH — THE SKILL VERBS', BASE_W/2, py + panelH - 16, 5, COL.cyan);
   drawRetroText('H  CLOSE', BASE_W/2, py + panelH - 8, 6, COL.gray);
 }
 
