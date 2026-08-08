@@ -1541,8 +1541,8 @@ if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'f
   const gp = G.statsAchGridPages();
   const tp = G.statsTotalPages();
   ok(gp >= 1, 'at least one achievement grid page');
-  // summary(1) + grids(gp) + bestiary(1) + profile(1) + pilot log(1)
-  eq(tp, gp + 4, 'total pages = grid pages + 4 (summary/bestiary/profile/pilot log)');
+  // summary(1) + grids(gp) + bestiary(1) + profile(1)
+  eq(tp, gp + 3, 'total pages = grid pages + 3 (summary/bestiary/profile)');
   // The five draw branches key off these indices; assert they stay distinct and
   // ordered so a future ACHIEVEMENTS change can't collapse two pages onto one
   // index or push a page out of the Tab cycle.
@@ -1551,21 +1551,18 @@ if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'f
   const lastGridPg   = gp;
   const bestiaryPage = gp + 1;
   const profilePage  = gp + 2;
-  const pilotLogPage = gp + 3;
   ok(firstGridPg <= lastGridPg, 'grid page range is non-empty');
   ok(summaryPage < firstGridPg, 'summary precedes grids');
   ok(lastGridPg < bestiaryPage, 'grids precede bestiary');
   ok(bestiaryPage < profilePage, 'bestiary precedes profile');
-  ok(profilePage < pilotLogPage, 'profile precedes pilot log');
-  eq(pilotLogPage, tp - 1, 'pilot log is the last page (Tab wraps after it)');
-  // every page index in [0, tp) maps to exactly one of the five kinds
+  eq(profilePage, tp - 1, 'profile is the last page (Tab wraps after it)');
+  // every page index in [0, tp) maps to exactly one of the four kinds
   let covered = 0;
   for (let p = 0; p < tp; p++) {
     const kinds = (p === summaryPage ? 1 : 0)
                 + (p >= firstGridPg && p <= lastGridPg ? 1 : 0)
                 + (p === bestiaryPage ? 1 : 0)
-                + (p === profilePage ? 1 : 0)
-                + (p === pilotLogPage ? 1 : 0);
+                + (p === profilePage ? 1 : 0);
     if (kinds === 1) covered++;
   }
   eq(covered, tp, 'every Tab page maps to exactly one kind (no gaps/overlaps)');
@@ -1596,7 +1593,7 @@ if (typeof G.statsAchGridPages === 'function' && typeof G.statsTotalPages === 'f
   if (dirBlock) {
     const rows = (dirBlock[1].match(/\n\s*\[/g) || []).length;
     eq(rows, tp - gp, 'the directory lists every dedicated Tab page (rows = total - grids)');
-    for (const name of ['BESTIARY', 'PILOT PROFILE', 'PILOT LOG', 'ACHIEVEMENTS']) {
+    for (const name of ['BESTIARY', 'PILOT PROFILE', 'ACHIEVEMENTS']) {
       ok(dirBlock[1].indexOf(name) !== -1, 'directory advertises ' + name);
     }
   }
@@ -3763,9 +3760,10 @@ if (G.__getCoachLessons && G.__getCoachLessons()) {
   eq(unreachable.join(','), '', 'every defined lesson has a coachFire() trigger site');
   eq(undefinedFire.join(','), '', 'every coachFire() call names a defined lesson');
 
-  // The two systems that shipped unexplained are the reason this exists.
-  ok(fired.has('salvage') && fired.has('echo'),
-     'SALVAGE and DEATH ECHO — the two previously unexplained systems — are taught');
+  // SALVAGE ships with no in-world explanation of its own, which is why
+  // FLIGHT SCHOOL exists. (DEATH ECHO was the other such system; it was
+  // removed in the simplification pass.)
+  ok(fired.has('salvage'), 'SALVAGE — a system with no self-evident rule — is taught');
 
   // The loader must (a) tolerate any stored value and (b) filter ids that are
   // no longer defined, so a removed lesson can't hold a slot forever. Asserted

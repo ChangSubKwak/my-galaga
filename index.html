@@ -5194,7 +5194,6 @@ const COACH_LESSONS = {
   parry:   'DASH THROUGH FIRE — IT DEFLECTS',
   arsenal: 'COMBO 25 ARMS A FREE WEAPON',
   salvage: 'CATCH THE SHARDS — REBUILD YOUR SHIP',
-  echo:    'FLY INTO THE WRECK — IT ANSWERS',
   magpie:  'SHOOT THE THIEF — IT DROPS YOUR CARGO'
 };
 const COACH_KEY = 'galagaCoached';
@@ -5282,7 +5281,6 @@ function directorCensus() {
   if (directorStrikePhase() !== 'idle') threat++;
   if (game.supplyCrate) gift++;
   if (game.guardian) gift++;
-  if (game.deathEcho) gift++;
   return { threat, gift };
 }
 
@@ -5863,125 +5861,13 @@ function drawSalvageShards() {
 // RESPAWN whispers) and hands its successor one shield charge. Once per run,
 // score-free, cross-run persistence via galagaDeathEcho. Pure record/load/
 // validate helpers are logic-tested (the fifth persistence path).
-const ECHO_LINES = {
-  bullet:    'WATCH THE LANES, SUCCESSOR.',
-  weather:   'THE SKY ITSELF STRIKES. MOVE.',
-  collision: 'NEVER TRADE HULLS. SLIP ASIDE.',
-  unknown:   'FLY FARTHER THAN I DID.'
-};
-function deathEchoLine(cause) { return ECHO_LINES[cause] || ECHO_LINES.unknown; }
 
 // Pure: shape guard for the persisted record — a corrupt echo must never
 // spawn a wreck at NaN or wear a broken callsign.
-function deathEchoValid(rec) {
-  return !!(rec && typeof rec === 'object'
-    && Number.isInteger(rec.stage) && rec.stage >= 1
-    && typeof rec.x === 'number' && isFinite(rec.x) && rec.x >= 0 && rec.x <= BASE_W
-    && typeof rec.callsign === 'string' && rec.callsign.length === 3
-    && typeof rec.cause === 'string' && rec.cause.length > 0);
-}
 
-function recordDeathEcho(stage, x, callsign, cause) {
-  try {
-    const rec = {
-      stage,
-      x: Math.max(0, Math.min(BASE_W, x)),
-      callsign: (typeof callsign === 'string' && callsign.length === 3) ? callsign : 'ACE',
-      cause: (typeof cause === 'string' && cause.length) ? cause : 'unknown'
-    };
-    if (!deathEchoValid(rec)) return false;
-    localStorage.setItem('galagaDeathEcho', JSON.stringify(rec));
-    return true;
-  } catch (e) { return false; }
-}
 
-function loadDeathEcho() {
-  try {
-    const raw = localStorage.getItem('galagaDeathEcho');
-    if (!raw) return null;
-    const rec = JSON.parse(raw);
-    return deathEchoValid(rec) ? rec : null;
-  } catch (e) { return null; }
-}
 
-function updateDeathEcho() {
-  if (!game) return;
-  if (game.state === STATE.PAUSED) return;
-  // SPAWN — once per run, on the exact stage where the LAST run ended.
-  if (!game.deathEcho && !game.deathEchoDone && game.deathEchoRec) {
-    const rec = game.deathEchoRec;
-    if (game.stage === rec.stage && isCombatState()) {
-      const settled = game.state === STATE.PLAYING
-        ? game.allEntered : (game.stageFrames || 0) > 120;
-      // THE DIRECTOR — the wreck is a quiet gift, but communing with it means
-      // flying to it. It waits for a stage with room. (Once-per-run flag is
-      // set only on actual spawn, so a denial never burns the encounter.)
-      if (settled && directorAllows('gift')) {
-        game.deathEcho = {
-          x: Math.max(10, Math.min(BASE_W - 10, rec.x)), y: -12, vy: 0.3,
-          callsign: rec.callsign, cause: rec.cause, fade: 0
-        };
-        game.deathEchoDone = true;
-        // FLIGHT SCHOOL — a ghost drifting past reads as scenery unless the
-        // player is told it can be answered.
-        if (typeof coachFire === 'function') coachFire('echo');
-      }
-    }
-    if (!game.deathEcho) return;
-  }
-  const e = game.deathEcho;
-  if (!e) return;
-  if (!isCombatState() && game.state !== STATE.RESPAWN) { game.deathEcho = null; return; }
-  if (e.fade > 0) {
-    e.fade--;
-    if (e.fade === 0) game.deathEcho = null;
-    return;
-  }
-  e.y += e.vy;
-  e.x += Math.sin(game.animFrame * 0.02) * 0.15;
-  // Drifted past unclaimed — the echo is missed for this run.
-  if (e.y > BASE_H + 12) { game.deathEcho = null; return; }
-  // COMMUNE — fly close to your own wreck. It coaches, then arms you.
-  if (game.playerAlive && Math.abs(e.x - game.playerX) < 14 && Math.abs(e.y - game.playerY) < 14) {
-    e.fade = 50;
-    game.floatTexts.push({
-      x: e.x, y: e.y - 14, text: 'ECHO: ' + e.callsign,
-      color: '#9ab', life: 70, maxLife: 70, size: 7
-    });
-    if (typeof pushInfoText === 'function') {
-      pushInfoText({
-        x: BASE_W / 2, y: BASE_H / 2 + 30, text: deathEchoLine(e.cause),
-        color: '#9ab', life: 90, maxLife: 90, size: 6
-      });
-    }
-    if ((game.shieldCharges || 0) < SHIELD_MAX) {
-      game.shieldCharges = (game.shieldCharges || 0) + 1;
-      game.floatTexts.push({
-        x: e.x, y: e.y - 4, text: 'SHIELD +1',
-        color: '#4f8', life: 55, maxLife: 55, size: 6
-      });
-    }
-    playSound('rescue');
-  }
-}
 
-function drawDeathEcho() {
-  if (!game || !game.deathEcho) return;
-  if (game.state === STATE.TITLE || game.state === STATE.GAME_OVER
-      || game.state === STATE.STAGE_INTRO || game.state === STATE.BONUS_GAME) return;
-  const e = game.deathEcho;
-  const t = game.animFrame;
-  // Spectral flicker — two incommensurate sines so it never settles into a
-  // strobe (reduce-motion safe: slow drift, low amplitude, low alpha).
-  const flicker = 0.26 + 0.10 * Math.sin(t * 0.11) + 0.05 * Math.sin(t * 0.37);
-  const alpha = Math.max(0, e.fade > 0 ? flicker * (e.fade / 50) : flicker);
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  drawPlayer(e.x, e.y, '#9ab');
-  ctx.globalAlpha = Math.min(1, alpha * 1.6);
-  drawRetroText(e.callsign, e.x, e.y - 12, 4, '#9ab');
-  ctx.restore();
-}
 
 // ================================ THE MAGPIE ===============================
 // The loot economy's third act. Drops give (power-ups), SALVAGE recovers
@@ -7601,9 +7487,6 @@ function resetGame() {
     salvageShards: [],
     salvageCount: 0,
     _salvageSeen: false,
-    deathEchoRec: (typeof loadDeathEcho === 'function' ? loadDeathEcho() : null),
-    deathEcho: null,
-    deathEchoDone: false,
     magpie: null,
     magpieCd: 600,
     _magpieSeen: false,
@@ -10978,12 +10861,11 @@ const ACHIEVEMENTS = {
 //   1 .. G             ACHIEVEMENT grids   (G = statsAchGridPages())
 //   G + 1              BESTIARY
 //   G + 2              PROFILE
-//   G + 3              PILOT LOG (last 10 sorties — the run-history chronicle)
 const STATS_ACH_PER_PAGE = 30; // 10 rows × 3 cols
 function statsAchGridPages() {
   return Math.max(1, Math.ceil(Object.keys(ACHIEVEMENTS).length / STATS_ACH_PER_PAGE));
 }
-function statsTotalPages() { return statsAchGridPages() + 4; }
+function statsTotalPages() { return statsAchGridPages() + 3; }
 const ACH_KEY = 'galagaAchievements';
 let unlockedAchievements = (() => {
   try {
@@ -11550,65 +11432,15 @@ function runGradeLetter(t) {
   return 'D';
 }
 
-// ================================ PILOT LOG ================================
-// The run-history chronicle — the SIXTH persistence path. Aggregates
-// (cumStats), bests (top scores), and the single last-run snapshot all erase
-// individual histories; the PILOT LOG keeps the last 10 sorties as they were:
-// date, callsign worn, mode, final score, deepest stage, run grade, and what
-// ended it. Rendered as its own stats-overlay page (Tab), newest first —
-// the logbook the epitaphs and DEATH ECHO were always implying. Same
-// corrupt-storage-non-fatal contract as the other five paths; the pure
-// entry-validator and push/cap helpers are logic-tested.
-const FLIGHT_LOG_CAP = 10;
 
-function flightLogEntryValid(e) {
-  return !!(e && typeof e === 'object'
-    && typeof e.d === 'string' && e.d.length > 0
-    && typeof e.sc === 'number' && isFinite(e.sc) && e.sc >= 0
-    && Number.isInteger(e.st) && e.st >= 1
-    && typeof e.gr === 'string' && e.gr.length > 0
-    && typeof e.ca === 'string' && e.ca.length > 0);
-}
 
 // Pure: newest-first prepend with cap; silently drops malformed entries on
 // BOTH sides (a corrupt stored row can't crowd out real history, a corrupt
 // new entry can't poison the log).
-function flightLogPush(list, entry, cap) {
-  const c = (typeof cap === 'number' && cap > 0) ? cap : FLIGHT_LOG_CAP;
-  const base = Array.isArray(list) ? list.filter(flightLogEntryValid) : [];
-  if (!flightLogEntryValid(entry)) return base.slice(0, c);
-  return [entry].concat(base).slice(0, c);
-}
 
-function loadFlightLog() {
-  try {
-    const raw = localStorage.getItem('galagaFlightLog');
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.filter(flightLogEntryValid).slice(0, FLIGHT_LOG_CAP) : [];
-  } catch (e) { return []; }
-}
 
 // Reads the finished run off `game`; called from commitGameToCumStats so it
 // inherits the demo guard and covers every run-end path (game over + quit).
-function recordFlightLog() {
-  try {
-    const now = new Date();
-    const d = String(now.getMonth() + 1).padStart(2, '0') + '-'
-            + String(now.getDate()).padStart(2, '0');
-    const acc = computeAccuracy(game.stats);
-    const st = (game.stats && game.stats.maxStage) || game.stage || 1;
-    const entry = {
-      d,
-      sc: game.score || 0,
-      st,
-      gr: runGradeLetter(computeRunGradeScore(game.score || 0, acc, st)),
-      ca: String(game.lastDeathCause || 'abort').toUpperCase(),
-      cs: (typeof playerCallsign === 'string' && playerCallsign.length === 3) ? playerCallsign : '---',
-      md: game.challengeMode ? 'C' : (game.dailyMode ? 'D' : 'N')
-    };
-    localStorage.setItem('galagaFlightLog', JSON.stringify(flightLogPush(loadFlightLog(), entry)));
-  } catch (e) {}
-}
 
 // --- Cumulative lifetime stats (separate buckets per mode) ---
 const CUM_STATS_KEY = 'galagaCumStats';
@@ -11644,8 +11476,6 @@ function commitGameToCumStats() {
       wasPb: _thisStage > _priorBest && _priorBest > 0
     }));
   } catch (e) {}
-  // PILOT LOG — append this sortie to the run-history chronicle (cap 10).
-  recordFlightLog();
   // First commit ever — FRESH START achievement
   if ((loadCumStats(false).sessions || 0) + (loadCumStats(true).sessions || 0) === 0) {
   }
@@ -15095,11 +14925,6 @@ function killPlayer(srcX, srcY, cause, srcType) {
       }
       game.state = STATE.GAME_OVER;
       game.gameOverTimer = 180;
-      // DEATH ECHO — leave this run's wreck in the world for the NEXT run
-      // (Souls-bloodstain dialect). Demo runs returned above, never recorded.
-      recordDeathEcho(game.stage, game.playerX,
-        (typeof playerCallsign === 'string' ? playerCallsign : null),
-        game.lastDeathCause || 'unknown');
       // GAME OVER FANFARE TIER — SFX scaled by max stage reached so deeper
       // runs end with more triumphant tone even at game over.
       {
@@ -16567,7 +16392,6 @@ function update() {
     // SALVAGE PROTOCOL — power shards drift/expire/catch. Self-gates by state.
     updateSalvageShards();
     // DEATH ECHO — last run's wreck: spawn/drift/commune. Self-gates by state.
-    updateDeathEcho();
     // THE MAGPIE — loot-raider drone: age loot, raid, flee, drop cargo on kill.
     updateMagpie();
     // ENDURANCE TIERS — check run-frame thresholds, fire ceremony at crossings.
@@ -17177,7 +17001,6 @@ function draw() {
       // particles read clearly. Self-gates internally by state.
       drawStageWeather();
       drawSupplyCrate();
-      drawDeathEcho();
       drawSalvageShards();
       drawMagpie();
       drawGuardian();
@@ -17186,7 +17009,6 @@ function draw() {
       break;
     case STATE.BOSS_STAGE:
       drawBossStage();
-      drawDeathEcho();
       drawSalvageShards();
       drawGuardian();
       drawInterceptTerminal();
@@ -17202,7 +17024,6 @@ function draw() {
       drawGameplay();
       drawStageWeather();
       drawSupplyCrate();
-      drawDeathEcho();
       drawSalvageShards();
       drawMagpie();
       drawGuardian();
@@ -22495,55 +22316,14 @@ function drawStatsOverlay() {
       } catch(e){}
       // Page number must be the CURRENT page, not a hardcoded "last page". This
       // read `_ppNp + '/' + _ppNp` back when PROFILE genuinely was the last Tab
-      // page; adding PILOT LOG after it left the label claiming 8/8 while
-      // sitting on page 7, which tells the player there is nothing further and
-      // hides the page that follows. Guarded by a test.
+      // page; a later page was added after it and the label kept claiming to
+      // be last, hiding what followed. Guarded by a test.
       drawRetroText((game.statsAchPage + 1) + '/' + _ppNp + '  TAB', px + panelW - 8, py + panelH - 8, 5, COL.gray, 'right');
       drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
       return;
     }
   }
 
-  // PILOT LOG page — the last-10-sorties chronicle (dedicated full panel,
-  // mirrors the bestiary/profile early-return pattern). Newest first; the
-  // most recent sortie row is highlighted. Reads storage per frame like the
-  // profile page's lifetime-stat rows do (paused overlay — not the hot path).
-  {
-    if (game.statsAchPage === statsAchGridPages() + 3) {
-      drawRetroText('PILOT LOG', px + 8, y, 7, COL.white, 'left');
-      drawRetroText((game.statsAchPage + 1) + '/' + statsTotalPages() + '  TAB',
-                    px + panelW - 8, y, 5, COL.gray, 'right');
-      y += 9;
-      const _fl = loadFlightLog();
-      drawRetroText(_fl.length + ' SORTIES ON RECORD', px + 8, y, 5, COL.gray, 'left');
-      y += 8;
-      if (!_fl.length) {
-        drawRetroText('NO SORTIES LOGGED YET', px + 8, y + 6, 6, COL.label, 'left');
-        drawRetroText('FLY. THE LOG REMEMBERS.', px + 8, y + 16, 5, COL.faint, 'left');
-      }
-      for (let i = 0; i < _fl.length; i++) {
-        const e = _fl[i];
-        ctx.fillStyle = i === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(40,40,40,0.35)';
-        ctx.fillRect(px + 6, y - 1, panelW - 12, 9);
-        // date · callsign · what ended it (dim chronicle text)
-        drawRetroText(e.d + ' ' + (e.cs || '---') + ' ' + e.ca,
-                      px + 8, y + 2, 5, i === 0 ? '#ccc' : '#888', 'left');
-        // stage reached + run grade (grade in its semantic color)
-        drawRetroText('S' + e.st, px + 108, y + 2, 5, '#aaa', 'left');
-        drawRetroText(e.gr, px + 126, y + 2, 6,
-                      (typeof GRADE_COL !== 'undefined' && GRADE_COL[e.gr]) || '#fff', 'left');
-        // non-normal mode tag (C = challenge, D = daily)
-        if (e.md && e.md !== 'N') {
-          drawRetroText(e.md, px + 134, y + 2, 5, e.md === 'C' ? COL.magenta : '#fc4', 'left');
-        }
-        drawRetroText(fmtScore(e.sc), px + panelW - 8, y + 2, 5,
-                      i === 0 ? '#fff' : '#999', 'right');
-        y += 10;
-      }
-      drawRetroText('I  CLOSE', px + 8, py + panelH - 8, 6, COL.gray, 'left');
-      return;
-    }
-  }
 
   // BESTIARY page — dedicated full panel (mirrors the profile early-return). Drawn
   // on its own page rather than appended below the OVERALL/TOP SCORES/BEST TIMES
@@ -22747,16 +22527,13 @@ function drawStatsOverlay() {
     drawRetroText('— TAB FOR MORE —', BASE_W / 2, y, 5, '#9ab', 'center');
     y += 11;
     // EVERY dedicated Tab page must appear here — that is this block's entire
-    // job. PILOT LOG was added to the page model without being listed, so the
-    // one surface that advertises the pages silently omitted it. Pinned by a
-    // test that counts these rows against the page model.
-    let _flCount = 0;
-    try { _flCount = loadFlightLog().length; } catch (e) {}
+    // job. A page was once added to the model without being listed here, so
+    // the one surface that advertises the pages silently omitted it. Pinned
+    // by a test that counts these rows against the page model.
     const _dir = [
       ['ACHIEVEMENTS', ach + '/' + totalAch, _gP === 1 ? 'P2' : 'P2-' + (1 + _gP)],
       ['BESTIARY', (typeof dexUnlocked !== 'undefined' ? dexUnlocked.size : 0) + '/' + Object.keys(ENEMY_INFO).length, 'P' + (_gP + 2)],
-      ['PILOT PROFILE', '', 'P' + (_gP + 3)],
-      ['PILOT LOG', _flCount ? _flCount + ' RUNS' : '', 'P' + (_gP + 4)]
+      ['PILOT PROFILE', '', 'P' + (_gP + 3)]
     ];
     for (const [_lab, _val, _pg] of _dir) {
       drawRetroText(_lab, px + 10, y, 5, COL.cyan, 'left');
