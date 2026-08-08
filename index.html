@@ -11854,8 +11854,6 @@ function updatePilotTitleCache() {
     const _prevSeen = localStorage.getItem('galagaTitleSeen');
     if (_prevSeen != null && _prevSeen !== _newTitle && !game._titlePromoFired) {
       game._titlePromoFired = true;
-      const _newCol = (typeof pilotTitleColor === 'function')
-        ? pilotTitleColor(_newTitle) : '#fc4';
     }
     localStorage.setItem('galagaTitleSeen', _newTitle);
   } catch (e) {}
@@ -14246,7 +14244,6 @@ function updateCollisions() {
         // multiplier. The 24f near-miss cooldown + kill-only combo growth prevent
         // farming — this only extends, never grows, the combo.
         if ((game.combo || 0) >= 5) {
-          const _wasDanger = (game.comboTimer || 0) < 40;  // combo was near expiry
           game.comboTimer = Math.min(COMBO_DECAY, (game.comboTimer || 0) + 20);
           // Legibility — only surface "COMBO HELD" when the graze actually rescued
           // a combo that was about to expire (timer < 40). Avoids spam on safe grazes.
@@ -16493,9 +16490,6 @@ function draw() {
       if ((game.witchTimer || 0) > 0) {
         _mood = '#5cf';
       } else {
-        const _active = game.state === STATE.PLAYING
-                     || game.state === STATE.CHALLENGING
-                     || game.state === STATE.BOSS_STAGE;
         const _phase2 = game.state === STATE.BOSS_STAGE
                       && game.megaBosses
                       && game.megaBosses.some(mb => mb.alive && mb.phase2);
@@ -19849,14 +19843,9 @@ function drawHUD() {
       && (game.challengeWaveTimer || 0) > 0
       && game.challengeWaves && game.challengeWaveIdx < game.challengeWaves.length) {
     const cwT    = game.challengeWaveTimer;
-    const nextW  = (game.challengeWaveIdx || 0) + 1;
-    const totW   = (game.challengeWaves || []).length;
     const _nxtWv = game.challengeWaves[game.challengeWaveIdx];
     const pattern= _nxtWv && _nxtWv[0] ? _nxtWv[0].pattern : 'sweep_lr';
 
-    const _PLBL = { sweep_lr: 'SWEEP RIGHT', sweep_rl: 'SWEEP LEFT',
-                    pincer: 'PINCER',         top_down: 'RAIN ATTACK',
-                    diagonal: 'DIAGONAL CROSS', double_row: 'DOUBLE ROW' };
     const _PCOL = { sweep_lr: '#0ff',  sweep_rl: '#0cf',
                     pincer: '#f44',    top_down: '#fc4',
                     diagonal: '#f8a',  double_row: '#0f8' };
