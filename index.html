@@ -5029,9 +5029,8 @@ function drawGuardian() {
 // Depth the player never discovers is depth that does not exist. The help
 // panel's COMBAT DEPTH page documents the skill verbs, but a player who never
 // opens help still never learns that dashing INTO fire is the highest-value
-// play in the game — and two systems shipped with no in-world explanation at
-// all: SALVAGE (shards scatter from your wreck — are you meant to catch them?)
-// and DEATH ECHO (a ghost drifts past — are you meant to touch it?).
+// play in the game — and SALVAGE shipped with no in-world explanation at all
+// (shards scatter from your wreck — are you meant to catch them?).
 //
 // FLIGHT SCHOOL teaches each verb exactly ONCE PER LIFETIME, at the first
 // moment the player is actually in a position to use it — then retires itself
@@ -5068,12 +5067,10 @@ function coachFire(id) {
   if (typeof directorStrikePhase === 'function' && directorStrikePhase() === 'telegraph') return false;
   coachLearned.add(id);
   try { localStorage.setItem(COACH_KEY, JSON.stringify([...coachLearned])); } catch (e) {}
-  // Pushed DIRECTLY, not through pushInfoText. That helper is the INFO-tier
-  // sink — it only ever rendered in the detail HUD, and once that tier was
-  // deleted it became a no-op. A lesson routed through it fired, marked itself
-  // learned FOREVER (it persists), and displayed nothing: the player lost the
-  // teaching moment without ever seeing it. A lesson is a VITAL cue, not
-  // chatter, so it goes straight to floatTexts.
+  // Pushed straight to floatTexts. A lesson is a VITAL cue, not chatter — it
+  // marks itself learned FOREVER, so if it renders nothing the player loses the
+  // teaching moment permanently without ever seeing it. (That is exactly what
+  // happened while these went through the old INFO-tier sink.)
   if (game.floatTexts) {
     game.floatTexts.push({
       x: BASE_W / 2, y: BASE_H - 54, text: COACH_LESSONS[id],
@@ -5709,23 +5706,6 @@ function drawSalvageShards() {
   }
   ctx.restore();
 }
-
-// =============================== DEATH ECHO ================================
-// The Souls-bloodstain dialect, in Galaga grammar: when a run ENDS, the wreck
-// is left in the world. The NEXT run finds a ghostly, flickering copy of the
-// player's ship drifting down at the exact stage and x where the last run
-// died — wearing its callsign. Fly close to COMMUNE with it: the wreck
-// whispers a cause-specific last lesson (same coaching vocabulary as the
-// RESPAWN whispers) and hands its successor one shield charge. Once per run,
-// score-free, cross-run persistence via galagaDeathEcho. Pure record/load/
-// validate helpers are logic-tested (the fifth persistence path).
-
-// Pure: shape guard for the persisted record — a corrupt echo must never
-// spawn a wreck at NaN or wear a broken callsign.
-
-
-
-
 
 // ================================ THE MAGPIE ===============================
 // The loot economy's third act. Drops give (power-ups), SALVAGE recovers
@@ -8233,7 +8213,8 @@ function updateOneMegaBoss(mb) {
       game.stats.shotsHit++;
       game.stageShotsHit++;
       const dmgDealt = b.dmg || 1;
-      // CRIT hit feedback at boss hit site (text = detail view; ring/sparks stay)
+      // CRIT hit feedback at the boss hit site — ring + sparks (the damage
+      // number itself went with the detail HUD).
       if (b.crit) {
         // CRIT GOLD RING — small expanding shockwave + 6 gold sparks. Makes
         // crit hits feel substantively heavier even on bosses where the
@@ -11844,7 +11825,7 @@ function updatePowerUps() {
 
 // PILOT TITLE CACHE + PROMOTION DETECTION — ticked from update() once/sec (sim
 // rate). Moved out of drawHUD (draw-side localStorage writes + floatText pushes
-// violated the no-mutation-in-draw invariant). PROMOTED banner is detail-view only.
+// violated the no-mutation-in-draw invariant).
 function updatePilotTitleCache() {
   if (!game || typeof computePilotTitle !== 'function') return;
   if (game._titleCacheFrame && (game.animFrame - game._titleCacheFrame) <= 60) return;
@@ -15480,7 +15461,7 @@ function checkStageComplete() {
               game.flashTimer = Math.max(game.flashTimer || 0, 8);
               game.flashColor = '#fc4';
               rumble(220, 0.85, 0.5);
-              // S GRADE CINEMATIC — detail view only (the glowing S letter on the
+              // S GRADE CINEMATIC — removed with the detail HUD (the glowing S letter on the
               // AAR panel is the reward in the simple view).
             }
             // Persist grade-tier counters for PROFILE page display
@@ -15924,7 +15905,6 @@ function update() {
     updateRivalAce();
     // SALVAGE PROTOCOL — power shards drift/expire/catch. Self-gates by state.
     updateSalvageShards();
-    // DEATH ECHO — last run's wreck: spawn/drift/commune. Self-gates by state.
     // THE MAGPIE — loot-raider drone: age loot, raid, flee, drop cargo on kill.
     updateMagpie();
     // ENDURANCE TIERS — check run-frame thresholds, fire ceremony at crossings.
@@ -16620,7 +16600,7 @@ function draw() {
   // (GUI-simplify DELETE: the stage-50+ golden edge pulse — a PERMANENT decorative
   // border diluted the semantics of transient danger borders; the stage label's
   // tier colour already encodes depth.)
-  // High-combo edge glow — detail view only (edges mean DANGER in the simple view)
+  // High-combo edge glow — removed: edges mean DANGER, and a combo is not danger.
 
   // Slow-time cyan tint (subtle, full-screen) + radial vignette
   if ((game.slowTimer || 0) > 0) {
@@ -16691,7 +16671,7 @@ function draw() {
       ctx.fillRect(0, 0, BASE_W, 6);
       ctx.fillRect(0, BASE_H - 6, BASE_W, 6);
       // Corruption SUB-LAYERS (edge noise / RGB bleed / glitch bars / violet pulse /
-      // overscan) — detail view only; the base dark vignette above IS the corruption
+      // overscan) — removed with the detail HUD; the base dark vignette above IS the corruption
       // identity in the simple view.
       ctx.restore();
     }
@@ -17131,7 +17111,7 @@ function drawTitleScreen() {
   }
   ctx.restore();
 
-  // Demo enemy flyby across the band between borders — detail view only
+  // Demo enemy flyby across the band between borders — removed with the detail HUD.
 
   // Score legend — detail view only (GUI-simplify)
 
@@ -19543,7 +19523,7 @@ function drawMiniGem(x, y, color) {
   ctx.fillRect(x - 1, y - 1, 1, 1);
 }
 
-// Mini-radar (29×20) at top-right under the stage progression bar — only during normal play.
+// Mini-radar — removed with the detail HUD (threat arrows already cover off-screen danger).
 
 // Tiny pixel crown — denotes #1 score (yellow normal, red challenge)
 function drawCrown(x, y, color) {
@@ -19806,7 +19786,7 @@ function drawHUD() {
   // one canonical display, which is all the column was ever duplicating.)
 
   // High score — one compact line. This used to be a three-way chain: a
-  // BOSS_STAGE title bar and a two-line 'HIGH SCORE' header, both detail-view
+  // BOSS_STAGE title bar and a two-line 'HIGH SCORE' header, both of which were
   // only, plus this simple line. With the detail tier gone the other two were
   // unreachable, so only the line that actually rendered survives.
   drawRetroText('HI ' + fmtScore(game.highScore), BASE_W/2, 10, 5, COL.gray, 'center');
@@ -19938,7 +19918,7 @@ function drawHUD() {
   else if (totalSec >= 300)    tCol = '#0cf';
   else if (totalSec >= 180)    tCol = '#cef';
   else                          tCol = COL.gray;
-// detail view (simple: one less top-row number)
+// (one less number on the top row)
   // STAGE PB GHOST — show personal best for current stage during play, color-tinted
   // by current pace. Gold if ahead of PB, gray if behind. Only when PB exists.
 
@@ -20224,7 +20204,7 @@ function drawHUD() {
       drawRetroText(secs + 's', 66, 33, 5, '#f44', 'left');
     }
     // COMBO ARSENAL PROGRESS (milestone bar + "→N" + IMMINENT + 4-tier dots) is
-    // secondary meta-progression detail, so it yields to MINIMAL HUD for cleaner
+    // secondary meta-progression detail, removed with the detail HUD for cleaner
     // play — matching how accuracy/kills/pity hide. The combo multiplier core
     // above always stays. Bar at y=45, 60px wide.
     // Tier transition flash — within 12 frames of hitting tier-up combo (5/10/15/30)
@@ -20257,7 +20237,7 @@ function drawHUD() {
   // with the PB readout at y23, so it was removed.)
   // Boss HP bar moved to drawBossStage() combined bar — no duplicate needed here.
 
-// detail view only (threat arrows cover off-screen danger)
+// removed with the detail HUD (threat arrows cover off-screen danger)
 
   // Dash cooldown bar (bottom-right, above the power-up gems)
   if (game.dashCooldown > 0 || game.dashTimer > 0) {
