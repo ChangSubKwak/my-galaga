@@ -18469,15 +18469,6 @@ function drawStageIntro() {
     drawRetroText(stageLabel, BASE_W/2 + offX, BASE_H/2 - 10, 12, labelColor);
     ctx.restore();
   }
-  // STAGE GOAL FRACTION — small 'N / 80' or 'N / ENDLESS' below the stage label
-  // showing progress to canonical end. Cyan default; gold when past 80.
-  if (slide >= 1 && !isBoss) {
-    let _frac;
-    if (game.stage > 80) _frac = game.stage + ' / ENDLESS';
-    else _frac = game.stage + ' / 80';
-    const _fCol = game.stage > 80 ? '#fc4' : '#666';
-    drawRetroText(_frac, BASE_W/2 + offX, BASE_H/2 + 40, 4, _fCol);
-  }
   // STAGE BIOME NAME — biome-themed sub-title under the stage label gives
   // each stage a thematic identity beyond the number. Renders only when a
   // biome is active (stage 8+) and not on boss stages (boss name takes priority).
@@ -18488,105 +18479,11 @@ function drawStageIntro() {
       drawRetroText('— ' + bInfo.label + ' —', BASE_W/2 + offX, BASE_H/2 + 2, 5, bInfo.col);
       // DECLUTTER: the biome cycle-index "(N/8) · xVISITS" line was removed — it
       // was stat noise stacked under the biome name; the name + whisper suffice.
-      // BIOME WHISPER — atmospheric one-liner under biome label, last 75 frames of
-      // intro only (after the warp settles). Color softened from biome col.
-      if (typeof BIOME_WHISPERS !== 'undefined' && BIOME_WHISPERS[_biomeId] && introElapsed > 45) {
-        const variants = BIOME_WHISPERS[_biomeId];
-        const wText = variants[game.stage % variants.length];
-        ctx.save();
-        ctx.globalAlpha = Math.min(1, (introElapsed - 45) / 18) * 0.65;
-        drawRetroText(wText, BASE_W/2 + offX, BASE_H/2 + 12, 4, bInfo.col);
-        ctx.restore();
-      }
     }
-  }
-  // STAGE_INTRO STATUS PANEL — stat columns only on non-boss, non-challenge stages.
-  // Boss stages get a full cinematic intro below; challenge stages get mission brief.
-  // CHALLENGING STAGE MISSION BRIEF — for challenge intros, replace generic
-  // stat columns with a tactical briefing panel: wave count, unit total,
-  // objective line, and an 8-pip sequential wave preview.
-  if (slide >= 1 && isChallenge) {
-    const _gs = 8 + (game.stage >= 40 ? 2 : game.stage >= 20 ? 1 : 0);
-    const _totalUnits = _gs * 2 * 8;
-    const _numWaves = 8;
-    const _t = game.animFrame;
-    const briefW = 140, briefH = 82;
-    const bx = Math.round((BASE_W - briefW) / 2);
-    const by = Math.round(BASE_H / 2 + 18);
-    const fadeIn = Math.min(1, Math.max(0, (introElapsed - 28) / 22));
-    ctx.save();
-    ctx.globalAlpha = fadeIn;
-    // Panel background
-    ctx.fillStyle = 'rgba(16,0,32,0.82)';
-    ctx.fillRect(bx, by, briefW, briefH);
-    // Magenta corner accents
-    ctx.fillStyle = '#f6f';
-    const _co = 4;
-    ctx.fillRect(bx, by, _co, 1);          ctx.fillRect(bx, by, 1, _co);
-    ctx.fillRect(bx + briefW - _co, by, _co, 1); ctx.fillRect(bx + briefW - 1, by, 1, _co);
-    ctx.fillRect(bx, by + briefH - 1, _co, 1);   ctx.fillRect(bx, by + briefH - _co, 1, _co);
-    ctx.fillRect(bx + briefW - _co, by + briefH - 1, _co, 1);
-    ctx.fillRect(bx + briefW - 1, by + briefH - _co, 1, _co);
-    // Header
-    ctx.save();
-    ctx.shadowColor = '#f6f'; ctx.shadowBlur = 6;
-    drawRetroText('CHALLENGE BRIEF', BASE_W / 2, by + 9, 6, '#f6f');
-    ctx.restore();
-    // Separator
-    ctx.globalAlpha = 0.28 * fadeIn;
-    ctx.fillStyle = '#f6f';
-    ctx.fillRect(bx + 12, by + 15, briefW - 24, 1);
-    ctx.globalAlpha = fadeIn;
-    // Info rows
-    let _bry = by + 23;
-    const _bRowGap = 9;
-    const _bRow = (lbl, val, vCol) => {
-      drawRetroText(lbl, bx + 14, _bry, 5, '#777', 'left');
-      drawRetroText(val, bx + briefW - 14, _bry, 5, vCol || '#fff', 'right');
-      _bry += _bRowGap;
-    };
-    _bRow('WAVES',  String(_numWaves),        '#f6f');
-    _bRow('UNITS',  _totalUnits + ' TOTAL',   '#0cf');
-    _bRow('REWARD', 'PERFECT BONUS',          '#fc4');
-    // Mid separator
-    ctx.globalAlpha = 0.22 * fadeIn;
-    ctx.fillStyle = '#f6f';
-    ctx.fillRect(bx + 12, _bry - 3, briefW - 24, 1);
-    ctx.globalAlpha = fadeIn;
-    // Objective (blinking)
-    const _objBlink = ((_t >> 3) % 2 === 0);
-    ctx.globalAlpha = (_objBlink ? 0.92 : 0.48) * fadeIn;
-    drawRetroText('DESTROY ALL · ZERO ESCAPES', BASE_W / 2, _bry + 4, 4, '#f6f');
-    ctx.globalAlpha = fadeIn;
-    // 8-pip sequential reveal: lights up one pip every ~3 frames after fadeIn starts
-    const _pipY = by + briefH - 9;
-    const _pipSp = 6;
-    const _pipPX = Math.round(BASE_W / 2 - (_numWaves - 1) * _pipSp / 2);
-    for (let pi = 0; pi < _numWaves; pi++) {
-      const lit = pi <= Math.floor(Math.max(0, introElapsed - 28) * 0.32);
-      ctx.fillStyle = lit ? '#f6f' : '#333';
-      ctx.globalAlpha = (lit ? 0.75 : 0.22) * fadeIn;
-      ctx.fillRect(_pipPX + pi * _pipSp - 1, _pipY, 2, 2);
-    }
-    ctx.globalAlpha = 1;
-    ctx.restore();
   }
   // DECLUTTER: the centered "RUN C×N  NK PT  N%" quick-stats line was removed — it
   // duplicated the HI SCORE / ACC already in the right column and the combo readout,
   // and overlapped the biome whisper + adaptive tip at the same y. One less line.
-  // ADAPTIVE TIP — surface skill hint based on first matching weakness check
-  if (slide >= 1 && !isBoss && !isChallenge && typeof STAGE_TIPS !== 'undefined' && introElapsed > 60) {
-    let _tip = null;
-    for (const t of STAGE_TIPS) {
-      try { if (t.check(game)) { _tip = t.tip; break; } } catch (e) {}
-    }
-    if (_tip) {
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, (introElapsed - 60) / 18) * 0.85;
-      drawRetroText(_tip, BASE_W/2 + offX, BASE_H/2 + 22, 4, '#aaa');
-      ctx.restore();
-    }
-  }
 
   // BOSS INTRO CINEMATIC — full-screen dramatic reveal replacing the generic
   // stat panel. Dark vignette + large boss name + archetype class + intro taunt
@@ -18774,17 +18671,6 @@ function drawStageIntro() {
       ? (blink ? '#fc4' : '#f44')
       : (blink ? '#f44' : '#fff');
     drawRetroText('BOSS NEXT', BASE_W/2, BASE_H - 38, 6, _bnCol);
-    // BOSS NAME PREVIEW — surface upcoming boss name just below the BOSS NEXT
-    // tag so the player can mentally prep for the archetype/personality. Super
-    // boss tier (stage+1 >= 30) picks up a gold tint matching the BOSS NEXT
-    // gold/red alternation for paired super-boss tier visual cue.
-    if (typeof bossNameFor === 'function') {
-      const _bn = bossNameFor(game.stage + 1);
-      if (_bn) {
-        const _bnPCol = _isSuperNext ? '#fc4' : '#fc8';
-        drawRetroText(_bn, BASE_W/2, BASE_H - 30, 5, _bnPCol);
-      }
-    }
   } else if (slide >= 1 && !isBoss && !isChallenge
       && (game.stage + 1) % BOSS_STAGE_INTERVAL !== 0
       && (game.stage + 1) % 4 === 0) {
@@ -18809,72 +18695,9 @@ function drawStageIntro() {
   // pick opportunity). Useful for planning around expiring perks/build state.
   // (GUI-simplify DELETE: 'PERK IN N STAGES' — schedule text #3; CYCLE DOTS survives.)
 
-  // STAGE INTRO ACTIVE PERK — if a perk is currently active (from prior boss),
-  // surface it in the intro so the player knows their build going into the
-  // next stage. Reminder fades in with the rest of the intro content.
-  if (game.activePerk && PERKS[game.activePerk] && slide >= 1) {
-    const _activePerk = PERKS[game.activePerk];
-    drawRetroText('PERK: ' + _activePerk.name, BASE_W/2, BASE_H - 18, 4, _activePerk.col);
-    // PERK EFFECT DESCRIPTION — surface the perk's actual bonus so the player
-    // re-reads the active modifier each stage entry. Drawn smaller below name.
-    if (_activePerk.desc) {
-      ctx.save();
-      ctx.globalAlpha = 0.65;
-      drawRetroText(_activePerk.desc, BASE_W/2, BASE_H - 12, 3, '#aaa');
-      ctx.restore();
-    }
-  }
   // (GUI-simplify DELETE: the bottom 3/2/1+GO! mini countdown — it DISAGREED with
   // the center countdown (ceil/30 vs 20-frame digits); the GO! beat moved to the
   // center countdown below.)
-  // PREV DEATH WARNING — if any of last 3 memorial entries died on this stage,
-  // show small 'PREV DEATH HERE' red label. Encourages caution at danger stages.
-  if (slide >= 1) {
-    try {
-      const _memRaw = localStorage.getItem('galagaDeathMemorials') || '[]';
-      const _mem = JSON.parse(_memRaw);
-      if (Array.isArray(_mem)) {
-        const _recent = _mem.slice(0, 3);
-        if (_recent.some(m => m && m.stage === game.stage)) {
-          const _pdBl = blinkPhase(3);
-          drawRetroText('PREV DEATH HERE', BASE_W/2, BASE_H - 50, 5,
-                        _pdBl ? '#f44' : '#f88');
-        }
-      }
-    } catch (e) {}
-  }
-  // CYCLE DOTS — 10-dot row showing position within current boss cycle.
-  // Pos 0 = just-after-boss (stage 1/11/21...), pos 9 = next boss.
-  // Dot colors: current = bright stage type col, past = dim, future = ghost.
-  if (slide >= 1) {
-    const _cycPos = (game.stage - 1) % BOSS_STAGE_INTERVAL;
-    const _dotY = BASE_H - 28;
-    const _dotW = 5, _gap = 1;
-    const _totalW = BOSS_STAGE_INTERVAL * (_dotW + _gap) - _gap;
-    const _startX = BASE_W/2 - _totalW/2;
-    ctx.save();
-    for (let i = 0; i < BOSS_STAGE_INTERVAL; i++) {
-      const _x = _startX + i * (_dotW + _gap);
-      const _stg = game.stage - _cycPos + i;
-      const _isBoss = (i === BOSS_STAGE_INTERVAL - 1);
-      const _isChall = (i + 1) % 4 === 0 && !_isBoss;
-      const _isPast = i < _cycPos;
-      const _isCur = i === _cycPos;
-      let _col = '#444';
-      if (_isCur) _col = _isBoss ? '#f44' : _isChall ? '#f6f' : '#fff';
-      else if (_isPast) _col = '#666';
-      else if (_isBoss) _col = '#823';
-      else if (_isChall) _col = '#525';
-      // Current dot breathes (alpha pulse) so 'you are here' reads at a glance.
-      ctx.globalAlpha = _isCur
-        ? (0.85 + 0.15 * Math.sin(game.animFrame * 0.2))
-        : _isPast ? 0.55 : 0.40;
-      ctx.fillStyle = _col;
-      const _sz = _isCur ? 3 : 2;
-      ctx.fillRect(_x + (_dotW - _sz)/2, _dotY + (_dotW - _sz)/2, _sz, _sz);
-    }
-    ctx.restore();
-  }
 
   // STAGE INTRO MISSION REMINDER — daily mode shows today's mission status at the
   // very bottom so it reads as the last thing before the countdown. Only when a
