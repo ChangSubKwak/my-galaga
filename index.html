@@ -2523,6 +2523,60 @@ function drawBoss(x, y, frame, hit) {
   ctx.restore();
 }
 
+// CAPTURE BEAM timing — one source of truth for the four sites that used to
+// spell 60/180 inline (update gate, beam draw, aura draw).
+const CAPTURE_BEAM_START = 60;   // frames of wind-up before the beam goes live
+const CAPTURE_BEAM_END   = 180;  // beam ends, boss returns to formation
+
+// CAPTURE TELEGRAPH — the wind-up made visible.
+//
+// The capture is the most expensive threat in the game: it costs a whole life,
+// where a dive or a storm strike costs a hit. It was also the ONLY threat with
+// no visual warning — the boss descended for 60 frames drawn exactly like an
+// ordinary dive, and the beam first appeared on the same frame its grab check
+// went live. A headless probe measured the result: 87% of beams landed (34 of
+// 39 across 40 minutes of driven play). That is not a threat the player is
+// choosing to take, it is a tax. The siren sells it in audio, but audio can be
+// switched off (galagaSFXOff), which left the warning at literally zero.
+//
+// This brings it up to the standard every other threat here already meets —
+// dives telegraph 30-36f, storm strikes 42f — using the storm column's
+// vocabulary so it reads as the same kind of promise.
+//
+// Pure, so the timing is testable independently of the draw: 0..1 across the
+// wind-up, -1 once the beam is live (or before the state starts).
+function captureTelegraphProgress(timer) {
+  if (!(timer >= 0) || timer >= CAPTURE_BEAM_START) return -1;
+  return clamp01(timer / CAPTURE_BEAM_START);
+}
+
+function drawCaptureTelegraph(x, y, h, p) {
+  // Outline only, and GROWING — so it reads as a column forming, not a beam
+  // already firing. That distinction is the whole point: one says "move", the
+  // other says "too late".
+  ctx.save();
+  const w1 = 8 * p, w2 = 30 * p;
+  ctx.globalAlpha = (0.30 + 0.45 * p) * (0.65 + 0.35 * Math.sin(game.animFrame * 0.4));
+  ctx.strokeStyle = 'rgba(120,200,255,0.95)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.lineDashOffset = -(game.animFrame * 0.7) % 6;
+  ctx.beginPath();
+  ctx.moveTo(x - w1, y); ctx.lineTo(x - w2, y + h);
+  ctx.moveTo(x + w1, y); ctx.lineTo(x + w2, y + h);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Colorblind-safe SHAPE marker — a downward chevron at the beam mouth, the
+  // same marker vocabulary the storm strike telegraph uses. Carries the
+  // warning when the blue tint doesn't.
+  ctx.globalAlpha = 0.35 + 0.5 * p;
+  ctx.beginPath();
+  const cy = y + h - 6;
+  ctx.moveTo(x - 5, cy - 3); ctx.lineTo(x, cy + 2); ctx.lineTo(x + 5, cy - 3);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawTractorBeam(x, y, h) {
   ctx.save();
   const t = performance.now() / 50;
@@ -12777,9 +12831,9 @@ function updateEnemies() {
     if (e.state === 'capturing') {
       e.captureTimer++;
       // Boss flies down
-      if (e.captureTimer < 60) {
+      if (e.captureTimer < CAPTURE_BEAM_START) {
         e.y += 1.5;
-      } else if (e.captureTimer < 180) {
+      } else if (e.captureTimer < CAPTURE_BEAM_END) {
         // Tractor beam active — check if player is under
         if (game.playerAlive) {
           const dx = Math.abs(game.playerX - e.x);
@@ -18489,9 +18543,12 @@ function drawGameplay() {
           if (e.capturedShip && e.state !== 'capturing') {
             drawPlayer(e.x, e.y - 14, COL.red);
           }
-          // Draw tractor beam
-          if (e.state === 'capturing' && e.captureTimer >= 60 && e.captureTimer < 180) {
-            drawTractorBeam(e.x, e.y + 6, 80);
+          // Draw tractor beam — and, before it, the wind-up telegraph that
+          // gives the player the same warning every other threat gives.
+          if (e.state === 'capturing') {
+            const _ctp = captureTelegraphProgress(e.captureTimer);
+            if (_ctp >= 0) drawCaptureTelegraph(e.x, e.y + 6, 80, _ctp);
+            else if (e.captureTimer < CAPTURE_BEAM_END) drawTractorBeam(e.x, e.y + 6, 80);
           }
           break;
       }
@@ -19439,8 +19496,12 @@ function drawDivePreviewPaths() {
 // Pulsing red screen-edge warning when a tractor beam is overhead and the player is in danger
 function drawCaptureDanger() {
   if (!game.playerAlive) return;
+  // Starts HALFWAY THROUGH THE WIND-UP, not when the beam goes live. It used
+  // to fire only from CAPTURE_BEAM_START, which meant it narrated a grab that
+  // was already happening instead of warning about one. Half the wind-up is
+  // 30 frames of lead — the same reaction budget a dive preview gives.
   const beamBoss = (game.enemies || []).find(e => e.alive && e.state === 'capturing'
-    && e.captureTimer >= 60 && e.captureTimer < 180);
+    && e.captureTimer >= CAPTURE_BEAM_START / 2 && e.captureTimer < CAPTURE_BEAM_END);
   if (!beamBoss) return;
   // Only when player is under or near the beam
   if (Math.abs(beamBoss.x - game.playerX) > 28) return;

@@ -176,6 +176,32 @@ Drops are 20% per kill / 35% for elites **at normal difficulty**, plus a guarant
 
 Visual: ship sprite changes with S/N/P levels via `drawPlayer(x, y, color, levels)` 4th param — engine flame size, winglet extensions, cockpit ring glow.
 
+### Capture / rescue (the Galaga signature loop)
+
+A formation `boss` chosen as a diver has a 20% chance to enter `state = 'capturing'`
+instead (gated on `!game.dualFighter && game.capturedShipEnemy === null`). Timing is
+owned by two constants — **`CAPTURE_BEAM_START = 60`** (wind-up) and
+**`CAPTURE_BEAM_END = 180`** (beam ends) — use them, don't re-inline 60/180.
+
+- **frames 0–59, wind-up**: the boss descends. `captureTelegraphProgress(timer)` (pure,
+  logic-tested) returns `0→1` here and `-1` once the beam is live;
+  `drawCaptureTelegraph` renders a **growing dashed outline column + colorblind-safe
+  chevron** (STORM FRONT's vocabulary). `drawCaptureDanger`'s screen-edge pulse starts
+  at `CAPTURE_BEAM_START / 2` — 30 frames of lead, matching the dive preview.
+- **frames 60–179, live**: `drawTractorBeam`; a player within `dx < 20` and below the
+  boss is taken → `STATE.CAPTURED`, `e.capturedShip = true`, `game.capturedShipEnemy = e`.
+- **cutscene**: `game.captureTimer > 120` → **costs a life** → `STATE.RESPAWN`; the boss
+  returns to formation carrying your ship.
+- **rescue**: killing the holder sets `game.dualFighter = true` and clears
+  `capturedShipEnemy`.
+
+**Why the telegraph exists**: the wind-up used to draw nothing, so the beam's first
+*visible* frame was also its first *grabbing* frame — 0 frames of warning on the only
+threat that costs a whole life (dives warn 30–36f, storm strikes 42f). A headless probe
+measured 87% of beams landing. The siren alone wasn't a warning either, since SFX can be
+off (`galagaSFXOff`). The logic tests lock the window length, the growth direction, and
+the hand-off frame so it can't quietly collapse back to zero.
+
 ### Defensive layers
 
 Multiple save mechanisms applied in priority order on fatal hit (`tryTriggerWitchTime` checked at bullet/dive vs player collision):

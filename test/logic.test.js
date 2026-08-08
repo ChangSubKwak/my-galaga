@@ -3905,6 +3905,117 @@ if (ST && typeof G.checkStageComplete === 'function' && G.__getGame && G.__getGa
   G.resetGame();
 } else { console.log('  (skipped — core loop not drivable)'); }
 
+section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
+// A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of
+// driven play) because the beam's first visible frame WAS its first grabbing
+// frame. These lock the warning window so a future tweak cannot quietly
+// collapse it back to zero.
+if (typeof G.captureTelegraphProgress === 'function') {
+  const ctp = G.captureTelegraphProgress;
+  eq(ctp(0), 0, 'the wind-up starts at zero progress');
+  ok(ctp(30) > 0.4 && ctp(30) < 0.6, 'halfway through the wind-up reads ~0.5 (got ' + ctp(30) + ')');
+  ok(ctp(59) > 0.9 && ctp(59) < 1, 'the last wind-up frame is nearly full (got ' + ctp(59) + ')');
+  eq(ctp(60), -1, 'the telegraph ENDS exactly when the beam goes live');
+  eq(ctp(120), -1, 'and stays off while the beam is live');
+  eq(ctp(-1), -1, 'a negative timer is not a telegraph');
+  eq(ctp(undefined), -1, 'and neither is a missing one');
+  // The warning is only worth having if it is long enough to act on. The
+  // project telegraphs dives at 30-36f; the threat that costs a whole life
+  // must not warn for less than a threat that costs a hit.
+  let lead = 0;
+  for (let t = 0; t < 600; t++) if (ctp(t) >= 0) lead++;
+  ok(lead >= 30, 'the warning lasts at least as long as a dive preview ('
+     + lead + 'f, dive is 30f)');
+  // Monotonic — a warning that grows tells the player how much time is left.
+  let rising = true;
+  for (let t = 1; t < 60; t++) if (ctp(t) <= ctp(t - 1)) rising = false;
+  ok(rising, 'the telegraph grows steadily so it reads as a countdown');
+} else { console.log('  (skipped — captureTelegraphProgress not exported)'); }
+
+section('CAPTURE / RESCUE — the Galaga signature loop (was entirely unexercised)');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()) {
+  // STATE.CAPTURED appeared ZERO times in this suite and zero times in the
+  // layout audit. The whole signature mechanic - a boss tractor-beams your
+  // ship, you pay a life, you shoot the thief to get it back as a dual fighter
+  // - could have been broken end to end without anything noticing.
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.state = ST.PLAYING;
+  g.playerAlive = true;
+  g.allEntered = true;
+  g.lives = 3;
+  g.dualFighter = false;
+
+  // --- the tractor beam takes the ship ---
+  const boss = g.enemies.find(e => e.type === 'boss');
+  ok(!!boss, 'the formation contains a capturing-capable boss');
+  if (boss) {
+    // The wind-up's DRAW path — the telegraph itself — across its whole
+    // window, including the boundary frame where it hands off to the beam.
+    boss.state = 'capturing';
+    boss.x = g.playerX;
+    boss.y = 40;
+    let wErr = null;
+    for (const t of [0, 1, 15, 30, 45, 59, 60, 120]) {
+      boss.captureTimer = t;
+      try { G.draw(); } catch (e) { wErr = wErr || e; }
+    }
+    ok(!wErr, 'the capture telegraph renders across the whole wind-up'
+       + (wErr ? ' — ' + wErr.message : ''));
+
+    boss.state = 'capturing';
+    boss.captureTimer = 100;       // inside the live-beam window
+    boss.x = g.playerX;            // beam aligned over the player
+    boss.y = g.playerY - 40;
+    let captured = false;
+    for (let f = 0; f < 200 && !captured; f++) {
+      G.update();
+      if (g.state === ST.CAPTURED) captured = true;
+    }
+    // The cutscene's DRAW branch was unexercised too — the state was never
+    // rendered once, in this suite or the layout audit.
+    let drawErr = null;
+    try { G.draw(); } catch (e) { drawErr = e; }
+    ok(!drawErr, 'the capture cutscene renders'
+       + (drawErr ? ' — ' + drawErr.message : ''));
+    ok(captured, 'a beam over the player captures the ship');
+    ok(!g.playerAlive, 'the pilot is out while captured');
+    eq(g.capturedShipEnemy, boss, 'the capturing enemy is recorded as the holder');
+    ok(boss.capturedShip === true, 'and the enemy is flagged as holding a ship');
+
+    // --- the capture cutscene resolves and costs a life ---
+    const livesAtCapture = g.lives;
+    let resolved = false;
+    let cutsceneErr = null;
+    for (let f = 0; f < 400 && !resolved; f++) {
+      try { G.update(); G.draw(); } catch (e) { cutsceneErr = cutsceneErr || e; }
+      if (g.state !== ST.CAPTURED) resolved = true;
+    }
+    ok(!cutsceneErr, 'the whole cutscene runs clean'
+       + (cutsceneErr ? ' — ' + cutsceneErr.message : ''));
+    ok(resolved, 'the capture cutscene resolves instead of hanging');
+    ok(g.lives < livesAtCapture, 'a capture costs a life ('
+       + livesAtCapture + ' -> ' + g.lives + ')');
+
+    // --- shooting the holder returns the ship as a dual fighter ---
+    g.state = ST.PLAYING;
+    g.playerAlive = true;
+    g.dualFighter = false;
+    g.capturedShipEnemy = boss;
+    boss.capturedShip = true;
+    boss.alive = true;
+    boss.hp = 1;
+    boss.state = 'formation';
+    g.bullets = [{ x: boss.x, y: boss.y, vy: -4, dmg: 5, lvl: 1 }];
+    G.updateCollisions();
+    ok(g.dualFighter === true, 'killing the holder returns the ship as a DUAL FIGHTER');
+    eq(g.capturedShipEnemy, null, 'and the holder slot is cleared');
+  }
+  G.resetGame();
+} else { console.log('  (skipped — capture loop not drivable)'); }
+
 section('ALTERNATE STAGE MODES — challenge waves and boss stages actually run');
 if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()) {
   // Every existing challengeMode/dailyMode reference in this suite sets the flag
