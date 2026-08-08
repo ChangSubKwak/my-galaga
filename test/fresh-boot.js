@@ -154,6 +154,67 @@ if (g2) {
 // ---- 4. the first run writes a profile back ----
 ok(written.size > 0, 'a first session persists something (' + written.size + ' keys)');
 
+// ---- 5. a CORRUPTED profile still boots ----
+// The sibling failure of an empty profile, and worse: a player whose storage
+// got mangled (a partial write, another tab, a browser bug) is locked out
+// permanently — every reload hits the same throw. The existing corrupt-storage
+// test covers 5 keys through 2 functions; it cannot see the BOOT path, where
+// ~36 keys are read by module-level initialisers before any of that runs.
+// Every galaga* key in the source is filled with garbage of a different shape:
+// broken JSON, wrong type, empty string, and a huge string.
+{
+  const keys = [...new Set(src.match(/galaga[A-Za-z]+/g) || [])];
+  const junk = ['{not json[', '"a string"', '{"a":1}', '[1,2,3]', '', 'null',
+                'NaN', '-1', String('x').repeat(4096)];
+  const cstore = {};
+  keys.forEach((k, i) => { cstore[k] = junk[i % junk.length]; });
+
+  const cSandbox = Object.assign({}, sandbox, {
+    localStorage: {
+      getItem: k => (Object.prototype.hasOwnProperty.call(cstore, k) ? cstore[k] : null),
+      setItem: (k, v) => { cstore[k] = String(v); },
+      removeItem: k => { delete cstore[k]; },
+      clear: noop,
+    },
+  });
+  cSandbox.window = cSandbox;
+  cSandbox.globalThis = cSandbox;
+
+  let cErr = null;
+  try {
+    vm.createContext(cSandbox);
+    vm.runInContext(src + `
+;globalThis.__g = () => (typeof game !== 'undefined' ? game : null);
+;globalThis.__keys = () => (typeof keys !== 'undefined' ? keys : null);
+`, cSandbox, { filename: 'game-corrupt.js' });
+  } catch (e) { cErr = e; }
+  ok(!cErr, 'the game boots with EVERY stored key corrupted'
+     + (cErr ? ' — ' + cErr.message : ''));
+  ok(keys.length > 40, 'the corruption covered the real key set (' + keys.length + ' keys)');
+
+  if (!cErr) {
+    let cPlay = null;
+    try {
+      cSandbox.resetGame();
+      const cg = cSandbox.__g();
+      cg.stage = 1;
+      cSandbox.startStage();
+      cg.playerAlive = true;
+      const CK = cSandbox.__keys() || {};
+      for (let f = 0; f < 300; f++) {
+        CK[' '] = true;
+        cSandbox.update();
+        if ((f & 15) === 0) cSandbox.draw();
+      }
+      CK[' '] = false;
+    } catch (e) { cPlay = e; }
+    ok(!cPlay, 'and plays from a corrupted profile' + (cPlay ? ' — ' + cPlay.message : ''));
+    const cg2 = cSandbox.__g();
+    ok(!cg2 || (isFinite(cg2.score) && isFinite(cg2.playerX)),
+       'corrupt input did not poison the run with NaN');
+  }
+}
+
 function report() {
   console.log('read before ever written: ' + readsBeforeWrite.size + ' keys (all must have defaults)');
   console.log('\nPASSED: ' + passed + '   FAILED: ' + fails.length);

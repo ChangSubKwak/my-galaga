@@ -38,6 +38,14 @@ runs and the layout audit deliberately seeds a maxed profile, so the most common
 experience was the one path never exercised end to end. Mutation-verified: making a
 single default dereference its null read fails the boot immediately.
 
+It also boots a second sandbox with **every** `galaga*` key filled with garbage (broken
+JSON, wrong type, empty string, a 4KB string) and plays from it. A corrupted profile is
+the worse sibling of an empty one: the player is locked out *permanently*, since every
+reload hits the same throw. The older corrupt-storage test covers 5 keys through 2
+functions and cannot see the boot path, where ~36 keys are read by module-level
+initialisers before any of that runs. Mutation-verified too — one loader that trusts
+stored JSON is enough to fail it.
+
 `test/layout-audit.js` (step 3) catches **text that renders permanently off-screen** —
 the failure mode a canvas game with no layout engine cannot otherwise detect without a
 browser. It runs the real `draw()` across all 21 screens/overlay pages, records every
