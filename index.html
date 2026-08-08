@@ -5235,6 +5235,60 @@ function drawGuardian() {
   ctx.restore();
 }
 
+// ============================== FLIGHT SCHOOL ==============================
+// Depth the player never discovers is depth that does not exist. The help
+// panel's COMBAT DEPTH page documents the skill verbs, but a player who never
+// opens help still never learns that dashing INTO fire is the highest-value
+// play in the game — and two systems shipped with no in-world explanation at
+// all: SALVAGE (shards scatter from your wreck — are you meant to catch them?)
+// and DEATH ECHO (a ghost drifts past — are you meant to touch it?).
+//
+// FLIGHT SCHOOL teaches each verb exactly ONCE PER LIFETIME, at the first
+// moment the player is actually in a position to use it — then retires itself
+// forever. It is not a tutorial mode, it is five sentences spread across a
+// player's whole history with the game. No score, no gate, no popup to dismiss:
+// it speaks in the same coaching voice as RESPAWN_WHISPERS, in the same info
+// text the game already uses.
+//
+// It also honours THE DIRECTOR's rule: a lesson is a demand on attention, so it
+// never speaks while a strike telegraph is up or the player is dead.
+const COACH_LESSONS = {
+  parry:   'DASH THROUGH FIRE — IT DEFLECTS',
+  arsenal: 'COMBO 25 ARMS A FREE WEAPON',
+  salvage: 'CATCH THE SHARDS — REBUILD YOUR SHIP',
+  echo:    'FLY INTO THE WRECK — IT ANSWERS',
+  magpie:  'SHOOT THE THIEF — IT DROPS YOUR CARGO'
+};
+const COACH_KEY = 'galagaCoached';
+let coachLearned = (() => {
+  try {
+    const raw = localStorage.getItem(COACH_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    // Drop ids from lessons that no longer exist, so a removed lesson can't
+    // keep a slot forever (same hygiene as the achievements loader).
+    return new Set(Array.isArray(arr) ? arr.filter(id => COACH_LESSONS[id]) : []);
+  } catch (e) { return new Set(); }
+})();
+
+// Fire a lesson if it has never been taught. Returns true if it spoke.
+function coachFire(id) {
+  if (!game || game.isDemo) return false;
+  if (!COACH_LESSONS[id] || coachLearned.has(id)) return false;
+  if (!isCombatState() || !game.playerAlive) return false;
+  // Never speak over a hazard telegraph — that read window belongs to the storm.
+  if (typeof directorStrikePhase === 'function' && directorStrikePhase() === 'telegraph') return false;
+  coachLearned.add(id);
+  try { localStorage.setItem(COACH_KEY, JSON.stringify([...coachLearned])); } catch (e) {}
+  if (typeof pushInfoText === 'function') {
+    pushInfoText({
+      x: BASE_W / 2, y: BASE_H - 54, text: COACH_LESSONS[id],
+      color: '#9cf', life: 130, maxLife: 130, size: 6
+    });
+  }
+  playSound('tick');
+  return true;
+}
+
 // ============================== THE DIRECTOR ===============================
 // The attention arbiter. Six optional actor systems (rival, magpie, supply
 // crate, guardian, death echo, weather strike) each self-gated correctly but
@@ -5749,6 +5803,10 @@ function spawnSalvageShards(x, y) {
     game._salvageSeen = true;
     pushIntercept('salvageDrop');
   }
+  // FLIGHT SCHOOL — shards are worthless if the player doesn't know they are
+  // catchable. Deferred one frame: coachFire self-gates on playerAlive, and at
+  // this instant in killPlayer the player is already flagged dead.
+  game._coachSalvagePending = true;
 }
 
 function updateSalvageShards() {
@@ -5759,6 +5817,12 @@ function updateSalvageShards() {
   if (!isCombatState() && game.state !== STATE.RESPAWN && game.state !== STATE.CAPTURED) {
     game.salvageShards.length = 0;
     return;
+  }
+  // FLIGHT SCHOOL — teach the catch once the player is flying again and there
+  // is still something left to catch (the lesson is useless after they expire).
+  if (game._coachSalvagePending && game.playerAlive && game.salvageShards.length) {
+    game._coachSalvagePending = false;
+    if (typeof coachFire === 'function') coachFire('salvage');
   }
   for (let i = game.salvageShards.length - 1; i >= 0; i--) {
     const s = game.salvageShards[i];
@@ -5910,6 +5974,9 @@ function updateDeathEcho() {
           callsign: rec.callsign, cause: rec.cause, fade: 0
         };
         game.deathEchoDone = true;
+        // FLIGHT SCHOOL — a ghost drifting past reads as scenery unless the
+        // player is told it can be answered.
+        if (typeof coachFire === 'function') coachFire('echo');
       }
     }
     if (!game.deathEcho) return;
@@ -6070,6 +6137,9 @@ function updateMagpie() {
           ? { kind: 'powerup', type: t.type }
           : { kind: 'shard', axis: t.axis };
         m.phase = 'flee';
+        // FLIGHT SCHOOL — the raid only reads as a loss the player can CONTEST
+        // if they know the cargo comes back when the thief goes down.
+        if (typeof coachFire === 'function') coachFire('magpie');
         playSound('tick', m.x);
       }
     }
@@ -9192,6 +9262,9 @@ function tryStartDash() {
   game.dashCooldown = 60;
   game.invincibleTimer = Math.max(game.invincibleTimer, 14);
   game.dashCount = (game.dashCount || 0) + 1;
+  // FLIGHT SCHOOL — the first dash ever is the moment to reveal that dash is
+  // not just i-frames: it deflects. (Lifetime-once; self-retiring.)
+  if (typeof coachFire === 'function') coachFire('parry');
   if (game.dashCount === 30) unlockAchievement('dashMaster');
   if (game.shockwaves) {
     game.shockwaves.push({ x: game.playerX, y: game.playerY, life: 0, maxLife: 14, maxR: 16, color: '#0ff' });
@@ -12425,6 +12498,9 @@ function bumpCombo() {
   game.comboTimer = COMBO_DECAY;
   if (game.combo > game.comboBest) game.comboBest = game.combo;
   // SIGNAL INTERCEPT — enemy threat-level chatter when combo first crosses 10 this stage
+  // FLIGHT SCHOOL — signpost the arsenal payout while it is still reachable
+  // (combo 20, five kills short of the 25 threshold) rather than after.
+  if (game.combo === 20 && typeof coachFire === 'function') coachFire('arsenal');
   if (game.combo === 10 && !game._stageComboInterceptFired) {
     game._stageComboInterceptFired = true;
     if (typeof pushIntercept === 'function') pushIntercept('comboCritical');

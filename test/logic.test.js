@@ -178,6 +178,7 @@ const shim = `
 ;try { globalThis.__getEchoLines = function () { return (typeof ECHO_LINES !== 'undefined') ? ECHO_LINES : null; }; } catch (e) {}
 ;try { globalThis.__getArchetypeMotifs = function () { return (typeof ARCHETYPE_MOTIFS !== 'undefined') ? ARCHETYPE_MOTIFS : null; }; } catch (e) {}
 ;try { globalThis.__getCol = function () { return (typeof COL !== 'undefined') ? COL : null; }; } catch (e) {}
+;try { globalThis.__getCoachLessons = function () { return (typeof COACH_LESSONS !== 'undefined') ? COACH_LESSONS : null; }; } catch (e) {}
 ;try { globalThis.__getRespawnWhispers = function () { return (typeof RESPAWN_WHISPERS !== 'undefined') ? RESPAWN_WHISPERS : null; }; } catch (e) {}
 `;
 
@@ -3335,6 +3336,60 @@ if (G.__getCol && G.__getCol()) {
     ok(_ratio(COL[key], '#000') >= 4.5, 'COL.' + key + ' clears 4.5:1 on the void');
   }
 } else { console.log('  (skipped — COL not exposed)'); }
+
+section('FLIGHT SCHOOL — lifetime-once verb coaching (registry wired both sides)');
+if (G.__getCoachLessons && G.__getCoachLessons()) {
+  const L = G.__getCoachLessons();
+  const ids = Object.keys(L);
+  ok(ids.length >= 4, 'the lesson registry is populated (' + ids.length + ' lessons)');
+  ok(ids.every(k => typeof L[k] === 'string' && L[k].length > 0 && L[k].length <= 40),
+     'every lesson is a non-empty line short enough to read in play (<=40 chars)');
+  ok(ids.every(k => L[k] === L[k].toUpperCase()),
+     'lessons speak in the game\'s uppercase HUD voice');
+
+  // BIDIRECTIONAL REGISTRY GUARD (same contract the ACHIEVEMENTS suite uses):
+  // scanned from source text so a lesson that is defined but never taught — or
+  // taught but never defined — cannot ship.
+  const fired = new Set([...html.matchAll(/coachFire\('([a-zA-Z]+)'\)/g)].map(m => m[1]));
+  const unreachable = ids.filter(id => !fired.has(id));
+  const undefinedFire = [...fired].filter(id => !L[id]);
+  eq(unreachable.join(','), '', 'every defined lesson has a coachFire() trigger site');
+  eq(undefinedFire.join(','), '', 'every coachFire() call names a defined lesson');
+
+  // The two systems that shipped unexplained are the reason this exists.
+  ok(fired.has('salvage') && fired.has('echo'),
+     'SALVAGE and DEATH ECHO — the two previously unexplained systems — are taught');
+
+  // The loader must (a) tolerate any stored value and (b) filter ids that are
+  // no longer defined, so a removed lesson can't hold a slot forever. Asserted
+  // by re-running the loader's own expression against hostile inputs.
+  const loadCoached = (raw) => {
+    try {
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr.filter(id => L[id]) : []);
+    } catch (e) { return new Set(); }
+  };
+  eq(loadCoached('{not json').size, 0, 'corrupt JSON → no lessons marked learned');
+  eq(loadCoached('"a string"').size, 0, 'non-array JSON → empty set');
+  eq(loadCoached('{"a":1}').size, 0, 'object JSON → empty set');
+  eq(loadCoached(null).size, 0, 'absent key → empty set');
+  eq(loadCoached(JSON.stringify(['retiredLesson', 'alsoGone'])).size, 0,
+     'ids of removed lessons are filtered out, not resurrected');
+  const okSet = loadCoached(JSON.stringify([ids[0], 'notALesson']));
+  ok(okSet.size === 1 && okSet.has(ids[0]), 'valid ids survive while unknown ids are dropped');
+
+  // coachFire must be side-effect-safe when there is no live run.
+  if (typeof G.coachFire === 'function') {
+    const g = G.__getGame && G.__getGame();
+    if (g) {
+      const savedDemo = g.isDemo;
+      g.isDemo = true;
+      eq(G.coachFire('parry'), false, 'demo runs are never coached');
+      g.isDemo = savedDemo;
+    }
+    eq(G.coachFire('not-a-lesson'), false, 'an unknown lesson id is a no-op, not a throw');
+  }
+} else { console.log('  (skipped — COACH_LESSONS not exposed)'); }
 
 section('PIXEL TYPEFACE — embedded base64 woff2 payloads (single-file contract)');
 {

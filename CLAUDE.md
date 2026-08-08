@@ -170,6 +170,25 @@ DASH PARRY: during `dashTimer > 0`, enemy bullets passing through the player are
 
 **GRAZE COMBO GRACE**: a near-miss (graze) while combo ≥ 5 refreshes `comboTimer` by +20f (capped at `COMBO_DECAY`) so skilled dodging bridges kill gaps without dropping the multiplier. Only extends, never grows the combo (kills do that), and the 24f near-miss cooldown prevents farming. Surfaces "COMBO HELD" only when the timer was actually in danger (< 40).
 
+### FLIGHT SCHOOL — teach every new verb once (read this when adding a mechanic)
+
+Depth the player never discovers is depth that does not exist. The help panel's COMBAT
+DEPTH page documents the skill verbs, but a player who never opens help still never
+learns them — and SALVAGE / DEATH ECHO originally shipped with no in-world explanation
+at all (shards scatter; a ghost drifts past; nothing says either can be touched).
+
+`COACH_LESSONS` is a registry of one-line lessons; `coachFire(id)` teaches one **once per
+lifetime** (persisted to `galagaCoached`), at the first moment the player can actually
+use the verb, then retires forever. It self-gates: never in demo runs, never while the
+player is dead, and never over a hazard strike telegraph (that read window belongs to
+the storm — same rule THE DIRECTOR enforces).
+
+**Rule for new work:** a new player-facing verb or reward that isn't self-evident needs a
+`COACH_LESSONS` entry plus a `coachFire()` at its natural first-contact moment. The test
+suite enforces this **bidirectionally** by scanning source text (same contract as
+ACHIEVEMENTS): a lesson with no trigger, or a trigger with no lesson, fails the build.
+Keep lines ≤40 chars and in the uppercase HUD voice.
+
 ### THE DIRECTOR — the attention budget (read this before adding any new actor)
 
 Six optional actor systems (rival ace, magpie, supply crate, guardian, death echo,
