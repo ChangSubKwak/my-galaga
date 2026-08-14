@@ -145,6 +145,10 @@ All mutable state lives on one object built by `resetGame()`. There are no class
 
 A normal stage's enemies move through `entering → formation → diving → returning → formation` (with `capturing` as a boss-only branch). Movement during `entering`/`returning`/`diving` is driven by cubic Bézier paths built from `createEntryPath` / `createLoopPath` and evaluated with `bezierPoint`. Diving uses multi-segment paths (`pathSegments` + `pathSegIndex`); the others use a single segment. When all enemies finish entering, `game.allEntered` flips and the dive-trigger logic in `updateEnemies()` activates.
 
+Which enemy dives and which way its loop arcs are chosen by `mindPickDiver` /
+`mindDiveSide` — with no read from THE SWARM MIND both degrade to the shipped behaviour
+(uniform random pick, arc toward the playfield centre).
+
 **WING TACTICS — the Dive Director**: on normal PLAYING stages the dive trigger sometimes launches a *coordinated maneuver* instead of a lone dive — a **PINCER** (2 flankers bracketing the player's *predicted* position) or a **WALL** (3 enemies descending line-abreast). Driven by pure, logic-tested helpers (`DIVE_TACTICS` registry, `chooseDiveTactic` / `predictIntercept` / `planPincerPair` / `planWallRun`; `launchDiveTactic` commits it). Coordination is a **legible state of the swarm**: likelier while the tactical commander is alive (`isCommander`) and **disabled entirely during formation panic** (`formationPanicked`) — so killing the commander or tripping the panic threshold visibly shatters coordination back to chaotic lone dives. Prediction uses `game.playerVX` (sim-rate, sampled after the clamp in `updatePlayer`) and is **playfield-clamped** (fairness — a pincer can never aim off-screen). Rides the EXISTING 30f→36f preview telegraph (`previewTimer`/`previewPath`/`previewMax`) + path-dots + swarm warning; `drawDivePreviewPaths` tints a maneuver's telegraph the biome colour and adds a colorblind-safe SHAPE marker (pincer chevron / wall bar). A `WING_COOLDOWN` after each maneuver prevents stacking (guards the mass-dive slowdown class). **ZERO new score** — coordinated dives only manufacture the multi-threat frames that parry / CLUSTER PARRY / witch-time / combo already reward. Fires a once-per-run-per-type enemy-comms intercept (`wingPincer`/`wingWall`), no banner. NOTE: `formationPanicked` is the independent panic mechanic — the old `enemyMorale`/`MORALE_STATES` were removed; WING TACTICS keys only off live panic + commander state.
 
 `CHALLENGING` stages are different: enemies are pre-built into `game.challengeWaves` (8 waves × 16 enemies) by `setupChallengingStage()`. Collision code in `updateCollisions()` switches its enemy source between `game.enemies` and the active challenge wave (`game.challengeWaves[game.challengeWaveIdx]`).
@@ -175,6 +179,46 @@ Drops are 20% per kill / 35% for elites **at normal difficulty**, plus a guarant
 | E | SHIELD — +1 absorb charge, max `SHIELD_MAX=3` | Consumed in `killPlayer` before life loss |
 
 Visual: ship sprite changes with S/N/P levels via `drawPlayer(x, y, color, levels)` 4th param — engine flame size, winglet extensions, cockpit ring glow.
+
+### THE SWARM MIND — the formation profiles you, and you can lie to it
+
+Every threat in this game is **rolled**: stage mutations, ambient events, elite/ghost
+spawns, which enemy dives, which tactic fires. Nothing had ever adapted to *how you fly* —
+the only trace of the player in enemy code was one frame of `playerVX`. THE SWARM MIND is
+the first system that holds a **model of the player**: `game.swarmMind`, a decaying
+histogram of which of `MIND_ZONES` (5) lanes the ship actually lives in. Once the read is
+confident it **locks**, and dives converge on your habit instead of the playfield centre.
+
+- Pure, logic-tested core: `mindZoneOf` / `mindZoneCenter` / `mindConfidence` /
+  `mindFavoredZone` / `mindLocked` / `mindBiasedTarget` / `mindObserve` / `mindWipe`.
+  Impure commit sites: `mindPickDiver` (which enemy dives), `mindDiveSide` (which way it
+  arcs), `mindTagDive` (stamp the lane it was addressed to), `drawMindLock` (the bracket).
+- `mindConfidence` is **normalised against uniform**, so a flat histogram scores exactly
+  0 whatever `MIND_ZONES` is — the threshold means the same thing if the lanes change.
+- `p.n` is the **decayed observation weight** (the histogram's own sum), not a raw frame
+  count. This is what makes panic bite: weight saturates at `1/(1-d)` — ~333 under
+  `MIND_DECAY` (0.997), but only ~17 under `MIND_PANIC_DECAY` (0.94), well under
+  `MIND_MIN_SAMPLES` (90). *A raw count would have made panic strengthen the read* (a
+  shorter memory of a camper is a purer memory) — the exact inversion the tests now pin.
+
+**Three rules keep it a mind game instead of an unfair one. Preserve all three.**
+1. **It is DRAWN.** `drawMindLock` brackets the profiled lane on the floor. Aiming at
+   your habit is aiming at a place you can see — that is the whole difference between
+   adaptive and cheating. A future "smarter" read that isn't rendered is not shippable.
+2. **It changes WHERE, never HOW FAST.** Every telegraph keeps its budgeted length and
+   the path still freezes at telegraph time. The driven test asserts the *shortest*
+   preview observed under a hard lock is still ≥ `DIVE_PREVIEW`. See THE FAIRNESS BUDGET.
+3. **It is BREAKABLE, three ways.** Killing the tactical commander **wipes** the profile
+   (the commander finally has a reason to exist beyond a stat); `formationPanicked` drops
+   the lock within ~20 frames; and leaving the bracketed lane after a mind-guided dive has
+   committed sends it into empty air — a **BAIT** (`game.swarmBaited`, lifetime
+   `galagaBaitTotal`, surfaced in run highlights).
+
+**ZERO new score.** The payoff of a bait is the free frames, which parry / CLUSTER PARRY /
+witch-time / combo already price; points on top would double-pay it. Fusion: WING TACTICS
+(`wingInterceptForPool` is fed a mind-biased player position), commander, panic, biome tint
+(`wingTacticColor`), FLIGHT SCHOOL (`mind` lesson), enemy comms (`mindLock`). No new actor,
+so THE DIRECTOR's budget is untouched.
 
 ### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
 

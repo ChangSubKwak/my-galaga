@@ -3715,13 +3715,185 @@ function wingInterceptForPool(playerX, playerVX, pool) {
                           Math.max(16, mnX), Math.min(BASE_W - 16, mxX - 1));
 }
 
+// ===== THE SWARM MIND — the formation profiles you, and you can lie to it =====
+// Every threat in this game is ROLLED: stage mutations, ambient events, elite/ghost
+// spawns, which enemy dives, which tactic fires. Nothing has ever adapted to HOW you
+// fly. The Swarm Mind is the first system that holds a MODEL of the player — a
+// decaying histogram of the lane you actually live in. Once the read is confident it
+// LOCKS, and dives start converging on your habit instead of the playfield centre.
+//
+// Three rules keep it a mind game instead of an unfair one:
+//   1. It is DRAWN. drawMindLock brackets the profiled lane on the floor, so the
+//      swarm's read is public information. Aiming at your habit is aiming at a place
+//      you can see — which is the whole difference between "adaptive" and "cheating".
+//   2. It changes WHERE, never HOW FAST. Every telegraph keeps its budgeted length
+//      (DIVE_PREVIEW / WING_PREVIEW) and the path is still fixed at telegraph time.
+//      Buying difficulty by shortening a warning is the one thing THE FAIRNESS BUDGET
+//      forbids, and this system does not spend a single frame of it.
+//   3. It is BREAKABLE, three ways. Killing the tactical commander WIPES the profile
+//      outright (the commander finally has a reason to exist beyond a stat); formation
+//      panic ages the read ~50× faster; and stepping out of the bracketed lane after a
+//      mind-guided dive has committed sends the whole dive into empty air — a BAIT.
+//
+// ZERO new score. The payoff of a bait is the free frames, which the parry / combo /
+// witch-time economy already prices; adding points on top would double-pay it.
+const MIND_ZONES       = 5;      // the playfield read as 5 lanes
+const MIND_DECAY       = 0.997;  // per-frame forgetting (~4s half-life): a habit, not a history
+const MIND_PANIC_DECAY = 0.94;   // a shattered formation cannot hold a read
+const MIND_MIN_SAMPLES = 90;     // 1.5s of observation before the swarm may read at all
+const MIND_LOCK_CONF   = 0.45;   // confidence at which the read LOCKS (and becomes visible)
+const MIND_MAX_BIAS    = 0.60;   // strongest pull toward the habit — never a perfect snap
+
+// Pure: which lane a screen x falls in (0..MIND_ZONES-1). Non-finite → centre lane.
+function mindZoneOf(x) {
+  if (!isFinite(x)) return (MIND_ZONES - 1) >> 1;
+  return Math.max(0, Math.min(MIND_ZONES - 1, Math.floor((x / BASE_W) * MIND_ZONES)));
+}
+
+// Pure: the screen x at the centre of a lane.
+function mindZoneCenter(i) {
+  const k = Math.max(0, Math.min(MIND_ZONES - 1, (i | 0)));
+  return (k + 0.5) * (BASE_W / MIND_ZONES);
+}
+
+// Pure: 0 = unreadable (you use every lane equally), 1 = you never leave one lane.
+// Normalised against the uniform distribution so a flat histogram scores exactly 0
+// whatever MIND_ZONES is — the threshold means the same thing if the lanes change.
+function mindConfidence(z) {
+  if (!z || !z.length) return 0;
+  let sum = 0, mx = 0;
+  for (let i = 0; i < z.length; i++) {
+    const v = (isFinite(z[i]) && z[i] > 0) ? z[i] : 0;
+    sum += v;
+    if (v > mx) mx = v;
+  }
+  if (sum <= 0) return 0;
+  const base = 1 / z.length;
+  return clamp01((mx / sum - base) / (1 - base));
+}
+
+// Pure: the lane the player favours, or -1 when nothing has been observed.
+function mindFavoredZone(z) {
+  if (!z || !z.length) return -1;
+  let best = -1, bv = 0;
+  for (let i = 0; i < z.length; i++) {
+    const v = (isFinite(z[i]) && z[i] > 0) ? z[i] : 0;
+    if (v > bv) { bv = v; best = i; }
+  }
+  return best;
+}
+
+// Pure: has the swarm EARNED a read? Both gates matter — samples alone would lock on
+// the first second of any run, confidence alone would lock on a 3-frame spawn camp.
+function mindLocked(p) {
+  return !!p && (p.n || 0) >= MIND_MIN_SAMPLES && (p.conf || 0) >= MIND_LOCK_CONF;
+}
+
+// One frame of observation, aged in place. Panic ages it far faster.
+//
+// `n` is the DECAYED observation WEIGHT — the histogram's own sum — not a raw frame
+// count. That distinction is the whole panic mechanic: a raw count only ever grows, so
+// a faster decay would have made a camping player read *purer* (a shorter memory of a
+// player who never moves is a cleaner memory) and panic would have strengthened the
+// read instead of breaking it. As a decayed weight it saturates at 1/(1-d): ~333 under
+// MIND_DECAY, comfortably over MIND_MIN_SAMPLES, but only ~17 under MIND_PANIC_DECAY —
+// so a formation that panics drops below the sample gate and loses its lock outright,
+// which is what "a shattered formation cannot hold a read" has to mean.
+function mindObserve(p, x, panicked) {
+  if (!p || !p.z || !p.z.length) return p;
+  const d = panicked ? MIND_PANIC_DECAY : MIND_DECAY;
+  let sum = 0;
+  for (let i = 0; i < p.z.length; i++) { p.z[i] *= d; sum += p.z[i]; }
+  p.z[mindZoneOf(x)] += 1;
+  p.n = sum + 1;
+  p.conf = mindConfidence(p.z);
+  p.lock = mindLocked(p) ? mindFavoredZone(p.z) : -1;
+  return p;
+}
+
+// Pure: pull a target toward the profiled lane, in proportion to confidence and never
+// past `cap`. No lock (or nothing observed) → the live position, untouched — so every
+// call site degrades exactly to its shipped behaviour when the swarm has no read.
+function mindBiasedTarget(liveX, p, cap) {
+  if (!isFinite(liveX)) return BASE_W / 2;
+  if (!mindLocked(p)) return liveX;
+  const zone = mindFavoredZone(p.z);
+  if (zone < 0) return liveX;
+  const k = Math.max(0, Math.min(cap == null ? MIND_MAX_BIAS : cap, p.conf || 0));
+  const x = liveX + (mindZoneCenter(zone) - liveX) * k;
+  return isFinite(x) ? Math.max(0, Math.min(BASE_W, x)) : liveX;
+}
+
+// Impure: the counter-play. Killing the tactical commander does not merely shatter
+// coordination — it erases what the swarm had learned about you. wipeZone/wipeFlash
+// let drawMindLock shatter the bracket outward so the erasure is SEEN, not inferred.
+function mindWipe(p) {
+  if (!p || !p.z) return p;
+  p.wipeZone = mindFavoredZone(p.z);
+  for (let i = 0; i < p.z.length; i++) p.z[i] = 0;
+  p.n = 0;
+  p.conf = 0;
+  p.lock = -1;
+  p.wipeFlash = MIND_WIPE_FLASH;
+  p.wipes = (p.wipes || 0) + 1;
+  return p;
+}
+const MIND_WIPE_FLASH = 22;
+
+function makeSwarmMind() {
+  return { z: new Array(MIND_ZONES).fill(0), n: 0, conf: 0, lock: -1,
+           wipeFlash: 0, wipeZone: -1, wipes: 0 };
+}
+
+// Impure: choose the lone diver. No read (or an unlucky draw) → uniformly random,
+// byte-identical to the shipped behaviour. With a read → the formation enemy nearest
+// the profiled lane. The draw is gated on confidence itself, so even a hard lock still
+// mixes in random dives and the formation never becomes a metronome.
+function mindPickDiver(candidates) {
+  const p = game && game.swarmMind;
+  if (!mindLocked(p) || !(Math.random() < (p.conf || 0))) {
+    return candidates[randInt(candidates.length)];
+  }
+  const tx = mindBiasedTarget(game.playerX, p, MIND_MAX_BIAS);
+  let best = null, bd = Infinity;
+  for (let i = 0; i < candidates.length; i++) {
+    const d = Math.abs(candidates[i].x - tx);
+    if (d < bd) { bd = d; best = candidates[i]; }
+  }
+  return best || candidates[randInt(candidates.length)];
+}
+
+// Impure: which way a lone dive arcs. Default (no read) is the shipped rule — arc
+// toward the playfield centre. With a lock, arc toward the profiled lane so the dive
+// SWEEPS the place you live rather than the place everyone lives.
+function mindDiveSide(e) {
+  const p = game && game.swarmMind;
+  if (!mindLocked(p)) return e.x < BASE_W / 2 ? 1 : -1;
+  const zone = mindFavoredZone(p.z);
+  if (zone < 0) return e.x < BASE_W / 2 ? 1 : -1;
+  const tx = mindZoneCenter(zone);
+  if (Math.abs(tx - e.x) < 4) return e.x < BASE_W / 2 ? 1 : -1;
+  return tx > e.x ? 1 : -1;
+}
+
+// Impure: stamp the lane a dive is being addressed to, so the launch can tell whether
+// the player was still living there when the telegraph expired (see THE BAIT).
+function mindTagDive(e) {
+  const p = game && game.swarmMind;
+  e._mindZone = mindLocked(p) ? mindFavoredZone(p.z) : -1;
+}
+
 // Impure: launch a coordinated maneuver on the live formation. Returns true if it
 // committed (enough non-boss, non-previewing formation enemies), else false so the caller
 // falls back to a single random dive. Bosses excluded (they run their own escort dives).
 function launchDiveTactic(tactic, candidates) {
   const pool = candidates.filter(e => e.type !== 'boss' && !e.previewTimer && e.state === 'formation');
   if (pool.length < tactic.size) return false;
-  const targetX = wingInterceptForPool(game.playerX, game.playerVX, pool);
+  // THE SWARM MIND feeds the prediction: with a locked read the pincer/wall aims at a
+  // blend of where you ARE and where you LIVE. Unlocked, mindBiasedTarget returns
+  // game.playerX untouched, so this is the shipped intercept exactly.
+  const targetX = wingInterceptForPool(
+    mindBiasedTarget(game.playerX, game.swarmMind, MIND_MAX_BIAS), game.playerVX, pool);
   const squad = (tactic.id === 'pincer')
     ? planPincerPair(pool, targetX)
     : planWallRun(pool, targetX, tactic.size);
@@ -3734,6 +3906,7 @@ function launchDiveTactic(tactic, candidates) {
     e.previewPath = createLoopPath(e.x, e.y, side);
     e._wingTactic = tactic.id;
     e._wingSide = side; // true convergence sign — read by the chevron marker in draw
+    mindTagDive(e);
   });
   playSound('enemyDive', targetX);
   // Reuse the existing 3+-dive swarm warning as the "read this" cue (respects its cooldown).
@@ -4814,7 +4987,8 @@ const INTERCEPT_MSG = {
   rivalSpotted:  ['OUR ACE HAS FOUND YOU!', 'DUELIST ON APPROACH!', 'THE MIRROR HUNTS!'],
   rivalDown:     ['OUR ACE IS DOWN!', 'THE DUELIST FALLS!', 'IMPOSSIBLE — ACE LOST!'],
   salvageDrop:   ['THEIR CORE SCATTERED!', 'DON\'T LET THEM REBUILD!', 'SEIZE THE WRECKAGE!'],
-  magpieSpotted: ['MAGPIE UNIT DEPLOYED!', 'STEAL THEIR SUPPLIES!', 'THE MAGPIE HUNTS YOUR LOOT!']
+  magpieSpotted: ['MAGPIE UNIT DEPLOYED!', 'STEAL THEIR SUPPLIES!', 'THE MAGPIE HUNTS YOUR LOOT!'],
+  mindLock:      ['PATTERN LOCKED.', 'THE TARGET HAS A HABIT.', 'FIRING SOLUTION: ITS LANE.']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
 const INTERCEPT_LIFE = 180;
@@ -5107,7 +5281,8 @@ const COACH_LESSONS = {
   parry:   'DASH THROUGH FIRE — IT DEFLECTS',
   arsenal: 'COMBO 25 ARMS A FREE WEAPON',
   salvage: 'CATCH THE SHARDS — REBUILD YOUR SHIP',
-  magpie:  'SHOOT THE THIEF — IT DROPS YOUR CARGO'
+  magpie:  'SHOOT THE THIEF — IT DROPS YOUR CARGO',
+  mind:    'THEY READ YOUR LANE — MOVE OR BAIT'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -7396,6 +7571,12 @@ function resetGame() {
     playerVX: 0,
     _prevPlayerX: BASE_W / 2,
     _wingSeen: null,
+    // THE SWARM MIND — the formation's decaying model of which lane the player lives
+    // in, plus the run's bait count (dives it committed to a lane you had left).
+    swarmMind: makeSwarmMind(),
+    swarmBaited: 0,
+    _mindSeen: false,
+    _baitCueT: -999,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
     comboArsenalClaimed: {},
@@ -10121,6 +10302,24 @@ function updatePlayer() {
   // wall-hugging player reads as stationary (fair). Feeds predictIntercept for pincers.
   game.playerVX = game.playerX - (game._prevPlayerX != null ? game._prevPlayerX : game.playerX);
   game._prevPlayerX = game.playerX;
+  // THE SWARM MIND — one frame of observation, from the same post-clamp x that feeds
+  // predictIntercept: a wall-hugging player reads as living in the wall lane, which is
+  // exactly true and exactly what should be readable. Formation stages only — the
+  // profile is a property of the FORMATION, and the ~4s half-life means a boss stage
+  // has effectively erased it by the time the next formation sets.
+  if (game.state === STATE.PLAYING && game.swarmMind) {
+    const _mindWasLocked = mindLocked(game.swarmMind);
+    mindObserve(game.swarmMind, game.playerX, !!game.formationPanicked);
+    // FLIGHT SCHOOL — teach the verb at the exact moment the bracket first appears,
+    // never before (a lesson about a thing you cannot see is not a lesson).
+    if (!_mindWasLocked && mindLocked(game.swarmMind) && game.allEntered) {
+      if (typeof coachFire === 'function') coachFire('mind');
+      if (!game._mindSeen && typeof pushIntercept === 'function') {
+        game._mindSeen = true;
+        pushIntercept('mindLock');
+      }
+    }
+  }
 
   // Shoot — speed/count/power scale with power-up levels and ship loadout
   const n = game.lvl.N;
@@ -12510,6 +12709,30 @@ function updateFormationBreathing() {
         if (e.previewTimer <= 0) {
           e.state = 'diving';
           e.diveTimer = 0;
+          // THE BAIT — the payoff of THE SWARM MIND being visible. A mind-guided dive
+          // was addressed to the lane the swarm READ, and its path froze the moment the
+          // telegraph started. Leave that lane before it launches and the whole dive is
+          // committed to empty air. Worth ZERO points on purpose: the reward is the free
+          // frames, which parry / combo / witch-time already price.
+          if (e._mindZone != null && e._mindZone >= 0) {
+            if (mindZoneOf(game.playerX) !== e._mindZone) {
+              game.swarmBaited = (game.swarmBaited || 0) + 1;
+              try {
+                const _bt = (parseInt(localStorage.getItem('galagaBaitTotal') || '0', 10) || 0) + 1;
+                localStorage.setItem('galagaBaitTotal', String(_bt));
+              } catch (_e) {}
+              // One cue per bait, rate-limited so a run of baits can't wall the screen.
+              if ((game.runFrames || 0) - (game._baitCueT || -999) > 60) {
+                game._baitCueT = game.runFrames || 0;
+                game.floatTexts.push({
+                  x: e.x, y: e.y + 6, text: 'BAITED', color: '#9cf',
+                  life: 42, maxLife: 42, size: 5
+                });
+                playSound('graze', e.x);
+              }
+            }
+            e._mindZone = -1;
+          }
           // DIVE TELEGRAPH FLASH — short red pulse marker over the enemy at the
           // instant it transitions to diving. Helps reading sudden dive starts.
           e.diveFlashTimer = 16;
@@ -12953,17 +13176,20 @@ function updateEnemies() {
       // capped at one extra, so this can never become a mass dive.
       if (!_wingLaunched && candidates.length > 1
           && Math.random() < extraDiverChance(game.stage)) {
-        const _x = candidates[randInt(candidates.length)];
+        const _x = mindPickDiver(candidates);
         if (_x && _x.state === 'formation' && !_x.previewTimer && _x.type !== 'boss') {
           _x.previewTimer = DIVE_PREVIEW;
           _x.previewMax = DIVE_PREVIEW;
           _x._wingTactic = null;
           _x._wingSide = 0;
-          _x.previewPath = createLoopPath(_x.x, _x.y, _x.x < BASE_W / 2 ? 1 : -1);
+          _x.previewPath = createLoopPath(_x.x, _x.y, mindDiveSide(_x));
+          mindTagDive(_x);
         }
       }
       if (!_wingLaunched && candidates.length > 0) {
-        const e = candidates[randInt(candidates.length)];
+        // THE SWARM MIND picks the diver: nearest the lane it has read, or uniformly
+        // random when it has no read (which is the shipped behaviour, unchanged).
+        const e = mindPickDiver(candidates);
         // Boss might try to capture
         if (e.type === 'boss' && !e.capturedShip && !game.dualFighter && Math.random() < 0.2 && game.capturedShipEnemy === null) {
           e.state = 'capturing';
@@ -12978,7 +13204,8 @@ function updateEnemies() {
           e.previewMax = DIVE_PREVIEW;
           e._wingTactic = null; // lone dive — clear any stale coordinated-maneuver tag
           e._wingSide = 0;
-          e.previewPath = createLoopPath(e.x, e.y, e.x < BASE_W/2 ? 1 : -1);
+          e.previewPath = createLoopPath(e.x, e.y, mindDiveSide(e));
+          mindTagDive(e);
           playSound('enemyDive', e.x);
           // If boss, escorts get a slightly-delayed preview. Selected by POSITION
           // proximity (2 nearest formation butterflies within 30px), not col/row —
@@ -13578,6 +13805,10 @@ function updateCollisions() {
           if (e.isCommander) {
             game.commanderRageTimer = 360;
             game.commanderKills = (game.commanderKills || 0) + 1;
+            // THE PROFILE DIES WITH THE COMMANDER. Until now killing it only bought a
+            // rage timer and shattered coordination; this is what makes it a DECISION —
+            // the swarm forgets the lane it had read, and the bracket shatters on screen.
+            if (game.swarmMind) mindWipe(game.swarmMind);
             // "COMMANDER DOWN" floatText at kill site
             game.floatTexts.push({
               x: e.x, y: e.y - 12, text: 'COMMANDER DOWN',
@@ -15916,6 +16147,9 @@ function update() {
     }
     // FORMATION COMMANDER — rage timer countdown
     if ((game.commanderRageTimer || 0) > 0) game.commanderRageTimer--;
+    // THE SWARM MIND — bracket-shatter timer. Ticks here (sim rate) rather than in
+    // draw(), like every other effect timer in this file.
+    if (game.swarmMind && (game.swarmMind.wipeFlash || 0) > 0) game.swarmMind.wipeFlash--;
     // FORMATION MORALE BREAK — scatter timer + per-enemy panic offset lerp
     if ((game.panicTimer || 0) > 0) {
       game.panicTimer--;
@@ -17595,6 +17829,10 @@ function pickRunHighlights() {
   // the safe-state PB convention.
   const csBest = game.cleanStreakBest || 0;
   if (csBest >= 3)        out.push({ label: 'CLEAN STREAK MAX', value: 'x' + csBest,    prio: csBest * 18, col: '#0f8' });
+  // BAITED — dives THE SWARM MIND addressed to a lane you had already left. A pure
+  // skill stat: no score anywhere in the system, so this readout is its only payout.
+  const baited = game.swarmBaited || 0;
+  if (baited >= 3)        out.push({ label: 'DIVES BAITED',   value: String(baited),    prio: baited * 14, col: '#9cf' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
@@ -19173,6 +19411,7 @@ function drawGameplay() {
     }
   }
 
+  drawMindLock();
   drawDivePreviewPaths();
   drawThreatIndicators();
   drawLastEnemyAlert();
@@ -19443,6 +19682,44 @@ function drawGameplay() {
 }
 
 // Dashed bezier preview of a dive trajectory — drawn while previewTimer is counting down.
+// THE SWARM'S READ, DRAWN. This function is the reason THE SWARM MIND is fair rather
+// than adaptive-and-cheating: a bracket on the floor under the lane the formation has
+// profiled. Aiming at your habit is aiming at a place you can SEE — and stepping out of
+// the bracket after a dive commits is the counter-play (see THE BAIT). Shatters outward
+// for MIND_WIPE_FLASH frames when the commander dies and the profile is wiped.
+// Read-only: wipeFlash is ticked in update(), like every other effect timer here.
+function drawMindLock() {
+  const p = game && game.swarmMind;
+  if (!p || game.state !== STATE.PLAYING || !game.allEntered) return;
+  const flash = p.wipeFlash || 0;
+  const zone = flash > 0 ? (p.wipeZone != null ? p.wipeZone : -1)
+                         : (mindLocked(p) ? mindFavoredZone(p.z) : -1);
+  if (zone < 0) return;
+  const halfW = BASE_W / MIND_ZONES / 2;
+  const cx = mindZoneCenter(zone);
+  // On a wipe the bracket blows outward as it is erased, so the erasure is legible.
+  const burst = flash > 0 ? (1 - flash / MIND_WIPE_FLASH) * 26 : 0;
+  const x0 = Math.max(1, cx - halfW - burst);
+  const x1 = Math.min(BASE_W - 1, cx + halfW + burst);
+  const y = BASE_H - 5;
+  ctx.save();
+  const pulse = 0.55 + 0.45 * Math.sin(game.animFrame * 0.11);
+  ctx.globalAlpha = flash > 0
+    ? 0.85 * (flash / MIND_WIPE_FLASH)
+    : (0.16 + 0.34 * clamp01(p.conf || 0)) * pulse;
+  // Biome tint (the same fusion WING TACTICS uses), so the read belongs to the world.
+  ctx.strokeStyle = (typeof wingTacticColor === 'function') ? wingTacticColor() : COL.red;
+  ctx.lineWidth = 1;
+  // Baseline with upturned ends: a BRACKET, readable by shape without colour.
+  ctx.beginPath();
+  ctx.moveTo(x0 + 0.5, y - 5);
+  ctx.lineTo(x0 + 0.5, y + 0.5);
+  ctx.lineTo(x1 - 0.5, y + 0.5);
+  ctx.lineTo(x1 - 0.5, y - 5);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawDivePreviewPaths() {
   if (!game.enemies) return;
   const t = game.animFrame;

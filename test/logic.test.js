@@ -188,6 +188,11 @@ const shim = `
 ;try { globalThis.__getCoachLessons = function () { return (typeof COACH_LESSONS !== 'undefined') ? COACH_LESSONS : null; }; } catch (e) {}
 ;try { globalThis.__getState = function () { return (typeof STATE !== 'undefined') ? STATE : null; }; } catch (e) {}
 ;try { globalThis.__getRespawnWhispers = function () { return (typeof RESPAWN_WHISPERS !== 'undefined') ? RESPAWN_WHISPERS : null; }; } catch (e) {}
+;try { globalThis.__getMindConst = function () { return {
+  ZONES: MIND_ZONES, DECAY: MIND_DECAY, PANIC_DECAY: MIND_PANIC_DECAY,
+  MIN_SAMPLES: MIND_MIN_SAMPLES, LOCK_CONF: MIND_LOCK_CONF,
+  MAX_BIAS: MIND_MAX_BIAS, WIPE_FLASH: MIND_WIPE_FLASH,
+  DIVE_PREVIEW: DIVE_PREVIEW, WING_PREVIEW: WING_PREVIEW, BASE_W: BASE_W }; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -4163,6 +4168,312 @@ if (ST && typeof G.startStage === 'function' && G.__getGame) {
   ok((g.witchCooldown || 0) > 0, 'a save arms the cooldown so it cannot be spammed');
   G.resetGame();
 } else { console.log('  (skipped — witch time not drivable)'); }
+
+section('THE SWARM MIND — the pure read (lanes, confidence, lock, bias)');
+{
+  const M = G.__getMindConst && G.__getMindConst();
+  if (M && typeof G.mindZoneOf === 'function') {
+    const BW = M.BASE_W, K = M.ZONES;
+
+    // --- lanes ---
+    eq(G.mindZoneOf(0), 0, 'the left edge is lane 0');
+    eq(G.mindZoneOf(BW - 1), K - 1, 'the right edge is the last lane');
+    eq(G.mindZoneOf(BW / 2), (K - 1) >> 1, 'the centre of the screen is the centre lane');
+    eq(G.mindZoneOf(-500), 0, 'an x left of the playfield clamps into lane 0');
+    eq(G.mindZoneOf(BW + 500), K - 1, 'an x right of it clamps into the last lane');
+    eq(G.mindZoneOf(NaN), (K - 1) >> 1, 'a non-finite x reads as the centre lane, never NaN');
+    let laneMonotone = true;
+    for (let x = 1; x < BW; x++) if (G.mindZoneOf(x) < G.mindZoneOf(x - 1)) laneMonotone = false;
+    ok(laneMonotone, 'lanes run left to right without a gap or a reversal');
+
+    // --- lane centres ---
+    ok(Math.abs(G.mindZoneCenter((K - 1) >> 1) - BW / 2) < 0.001,
+       'the centre lane is centred on the screen');
+    let centresInside = true, centresRise = true;
+    for (let i = 0; i < K; i++) {
+      const c = G.mindZoneCenter(i);
+      if (c <= 0 || c >= BW) centresInside = false;
+      if (i > 0 && c <= G.mindZoneCenter(i - 1)) centresRise = false;
+      if (G.mindZoneOf(c) !== i) centresInside = false;
+    }
+    ok(centresInside, 'every lane centre is on-screen and inside its own lane');
+    ok(centresRise, 'lane centres ascend with the lane index');
+
+    // --- confidence: normalised so uniform is exactly 0, whatever K is ---
+    eq(G.mindConfidence(new Array(K).fill(7)), 0,
+       'a player who uses every lane equally is UNREADABLE — confidence exactly 0');
+    const allOne = new Array(K).fill(0); allOne[2] = 40;
+    eq(G.mindConfidence(allOne), 1, 'a player who never leaves one lane reads 1');
+    eq(G.mindConfidence(new Array(K).fill(0)), 0, 'nothing observed → 0, not NaN');
+    eq(G.mindConfidence(null), 0, 'a missing histogram → 0, never a throw');
+    let confRises = true, prevC = -1;
+    for (let extra = 0; extra <= 60; extra += 5) {
+      const h = new Array(K).fill(10); h[0] += extra;
+      const c = G.mindConfidence(h);
+      if (c < prevC - 1e-9) confRises = false;
+      prevC = c;
+    }
+    ok(confRises, 'confidence rises monotonically as one lane takes a larger share');
+
+    // --- favoured lane ---
+    eq(G.mindFavoredZone(new Array(K).fill(0)), -1, 'no observations → no favoured lane (-1)');
+    const fav = new Array(K).fill(1); fav[K - 1] = 9;
+    eq(G.mindFavoredZone(fav), K - 1, 'the favoured lane is the busiest one');
+
+    // --- the lock needs BOTH gates ---
+    const peaked = new Array(K).fill(0); peaked[1] = 100;
+    ok(!G.mindLocked({ z: peaked, n: M.MIN_SAMPLES - 1, conf: 1 }),
+       'a perfectly peaked read still does not lock before MIN_SAMPLES — a 3-frame '
+       + 'spawn camp is not a habit');
+    ok(!G.mindLocked({ z: peaked, n: M.MIN_SAMPLES + 500, conf: M.LOCK_CONF - 0.01 }),
+       'and a long look at an unreadable player never locks either');
+    ok(G.mindLocked({ z: peaked, n: M.MIN_SAMPLES, conf: M.LOCK_CONF }),
+       'both gates met → locked');
+    ok(!G.mindLocked(null), 'a missing profile is simply not locked');
+
+    // --- the bias: the guard that it degrades to shipped behaviour ---
+    const unread = { z: new Array(K).fill(1), n: 5, conf: 0 };
+    eq(G.mindBiasedTarget(93.5, unread, M.MAX_BIAS), 93.5,
+       'with no lock the target is the live position UNTOUCHED — every call site '
+       + 'degrades exactly to its shipped behaviour');
+    const lockLeft = { z: (() => { const a = new Array(K).fill(0); a[0] = 100; return a; })(),
+                       n: 999, conf: 1 };
+    const c0 = G.mindZoneCenter(0);
+    const biased = G.mindBiasedTarget(BW - 10, lockLeft, M.MAX_BIAS);
+    ok(biased < BW - 10, 'a locked read pulls the target toward the profiled lane');
+    ok(biased > c0, 'but NEVER all the way onto it — the swarm aims at your habit, '
+       + 'not at a perfect snap (' + biased.toFixed(1) + ' vs lane centre ' + c0.toFixed(1) + ')');
+    ok(Math.abs(biased - ((BW - 10) + (c0 - (BW - 10)) * M.MAX_BIAS)) < 0.001,
+       'the pull is exactly MAX_BIAS of the way there at full confidence');
+    ok(G.mindBiasedTarget(BW - 10, lockLeft, 0) === BW - 10,
+       'a zero cap disables the pull entirely');
+    const halfConf = { z: lockLeft.z, n: 999, conf: 0.5 };
+    ok(G.mindBiasedTarget(BW - 10, halfConf, M.MAX_BIAS) > biased,
+       'a half-confident read pulls LESS than a certain one');
+    const bx = G.mindBiasedTarget(NaN, lockLeft, M.MAX_BIAS);
+    ok(isFinite(bx), 'a non-finite live position never propagates NaN into a dive path');
+
+    // --- observation: decay, accumulation, and panic ---
+    let p = G.makeSwarmMind();
+    eq(p.z.length, K, 'a fresh profile has one bucket per lane');
+    eq(p.n, 0, 'and has observed nothing');
+    for (let f = 0; f < 400; f++) G.mindObserve(p, 6, false);
+    ok(G.mindLocked(p), 'camping one lane for 400 frames produces a lock');
+    eq(G.mindFavoredZone(p.z), 0, 'and the lane it locked is the lane that was camped');
+    const campConf = p.conf;
+
+    let q = G.makeSwarmMind();
+    for (let f = 0; f < 400; f++) G.mindObserve(q, (f * 37) % M.BASE_W, false);
+    ok(q.conf < campConf, 'a player who moves everywhere reads far less confidently ('
+       + q.conf.toFixed(2) + ' vs ' + campConf.toFixed(2) + ')');
+    ok(!G.mindLocked(q), 'and is never locked at all');
+
+    // Panic bites through the SAMPLE gate, not the confidence gate: a short memory of
+    // a camper is a *purer* memory, so a panicking swarm can still be certain — it just
+    // no longer has enough recent weight to be allowed to act on it.
+    let r = G.makeSwarmMind();
+    for (let f = 0; f < 400; f++) G.mindObserve(r, 6, true);
+    ok(!G.mindLocked(r), 'a PANICKING formation cannot hold a read at all, however long '
+       + 'it looks (weight ' + r.n.toFixed(1) + ' vs gate ' + M.MIN_SAMPLES + ')');
+    ok(r.n < M.MIN_SAMPLES, 'because its observation weight saturates below the gate');
+
+    let t2 = G.makeSwarmMind();
+    for (let f = 0; f < 400; f++) G.mindObserve(t2, 6, false);
+    ok(G.mindLocked(t2), 'a calm formation reading the same camper IS locked');
+    for (let f = 0; f < 60; f++) G.mindObserve(t2, 6, true);
+    ok(!G.mindLocked(t2), 'and panic BREAKS an already-established lock within a second');
+
+    // decay actually forgets: camp left, then move right, and the read must follow
+    let s = G.makeSwarmMind();
+    for (let f = 0; f < 400; f++) G.mindObserve(s, 6, false);
+    eq(G.mindFavoredZone(s.z), 0, 'read is on the left lane');
+    for (let f = 0; f < 600; f++) G.mindObserve(s, BW - 6, false);
+    eq(G.mindFavoredZone(s.z), K - 1,
+       'change where you live and the read FOLLOWS — it is a habit, not a history');
+
+    // --- the wipe ---
+    const wiped = G.mindWipe(p);
+    eq(wiped.conf, 0, 'a wipe zeroes the confidence');
+    eq(wiped.n, 0, 'and the sample count');
+    eq(G.mindFavoredZone(wiped.z), -1, 'and leaves no favoured lane behind');
+    ok(!G.mindLocked(wiped), 'so the swarm is reading nothing at all');
+    eq(wiped.wipeZone, 0, 'it remembers which lane it lost, so the bracket can shatter there');
+    eq(wiped.wipeFlash, M.WIPE_FLASH, 'and arms the shatter');
+    ok(G.mindWipe(null) === null, 'wiping a missing profile is a no-op, not a throw');
+
+    // --- the arc: a read makes the dive SWEEP your lane, not the playfield centre ---
+    if (G.__getGame && typeof G.mindDiveSide === 'function') {
+      const gg = G.__getGame();
+      const savedMind = gg.swarmMind;
+      const lockAt = (zone) => {
+        const a = new Array(K).fill(0); a[zone] = 400;
+        return { z: a, n: 999, conf: 1 };
+      };
+      gg.swarmMind = G.makeSwarmMind();       // no read
+      eq(G.mindDiveSide({ x: 100 }), 1, 'with no read a dive arcs toward the centre (shipped rule)');
+      eq(G.mindDiveSide({ x: 130 }), -1, 'from the right half, likewise');
+      gg.swarmMind = lockAt(0);               // read on the far LEFT lane
+      eq(G.mindDiveSide({ x: 100 }), -1,
+         'a left-lane read turns a dive that used to arc right BACK toward your lane');
+      gg.swarmMind = lockAt(K - 1);           // read on the far RIGHT lane
+      eq(G.mindDiveSide({ x: 130 }), 1,
+         'and a right-lane read turns one that used to arc left');
+      gg.swarmMind = savedMind;
+    }
+  } else { console.log('  (skipped — swarm mind not exposed)'); }
+}
+
+section('THE SWARM MIND — driven: it reads you, and it can be broken');
+// The pure layer above proves the maths. This proves the SYSTEM: that a real stage
+// actually feeds the profile, that the lock engages on the lane you really camped,
+// that killing the commander erases it, and — the rule this whole design rests on —
+// that a locked read never costs the player a single frame of telegraph.
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getKeys
+    && typeof G.mindLocked === 'function') {
+  const M = G.__getMindConst();
+  const K = G.__getKeys() || {};
+
+  // --- camp the left wall: the swarm reads the lane you live in ---
+  G.resetGame();
+  let g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  // Camping a wall for 45 seconds is exactly the behaviour under test, and it is also
+  // suicidal — without this the run spends most of its frames in RESPAWN, where the
+  // formation does not update and nothing being measured actually happens.
+  g.cheatInvincible = true;
+  let lockedAt = -1;
+  for (let f = 0; f < 900; f++) {
+    K['ArrowLeft'] = true;
+    G.update();
+    if (lockedAt < 0 && G.mindLocked(g.swarmMind)) lockedAt = f;
+  }
+  K['ArrowLeft'] = false;
+  ok(lockedAt >= 0, 'flying the same lane for 15s gets you PROFILED (locked at frame '
+     + lockedAt + ')');
+  ok(lockedAt >= M.MIN_SAMPLES - 1,
+     'and never before the minimum observation window has elapsed');
+  eq(G.mindFavoredZone(g.swarmMind.z), 0,
+     'the lane it locked is the lane the ship actually lived in');
+
+  // --- THE RULE: a locked read changes WHERE, never HOW FAST ---
+  let minPreview = Infinity, previewsSeen = 0, taggedDives = 0;
+  const seenTagged = new Set();
+  for (let f = 0; f < 1800; f++) {
+    K['ArrowLeft'] = true;
+    G.update();
+    for (const e of g.enemies || []) {
+      if (e.previewTimer && e.previewMax) {
+        previewsSeen++;
+        if (e.previewMax < minPreview) minPreview = e.previewMax;
+        if (e._mindZone >= 0 && !seenTagged.has(e)) { seenTagged.add(e); taggedDives++; }
+      }
+      if (!e.previewTimer) seenTagged.delete(e);
+    }
+  }
+  K['ArrowLeft'] = false;
+  ok(previewsSeen > 0, 'dives keep launching against a profiled player ('
+     + previewsSeen + ' telegraph frames observed)');
+  ok(taggedDives > 0, 'and REAL dives carry the lane they were addressed to ('
+     + taggedDives + ' tagged), which is what makes a bait possible in play rather '
+     + 'than only in a fixture');
+  ok(minPreview >= M.DIVE_PREVIEW,
+     'and EVERY one still warns for the full budgeted window — the shortest telegraph '
+     + 'under a hard lock is ' + minPreview + 'f, the baseline is ' + M.DIVE_PREVIEW
+     + 'f. THE SWARM MIND is forbidden from buying difficulty with warning frames.');
+
+  // --- the counter-play: the commander carries the profile ---
+  ok(G.mindLocked(g.swarmMind), 'the read is still locked going into the commander kill');
+  const beforeWipes = g.swarmMind.wipes || 0;
+  const cmd = (g.enemies || []).find(e => e.alive && e.isCommander);
+  if (cmd) {
+    cmd.hp = 1;
+    // shoot it dead through the real collision path (same shape updatePlayer pushes)
+    for (let f = 0; f < 30 && cmd.alive; f++) {
+      g.bullets.push({ x: cmd.x, y: cmd.y + 2, vy: -2, dmg: 99, lvl: 1 });
+      G.update();
+    }
+    ok(!cmd.alive, 'the commander went down through the real kill path');
+    ok(!G.mindLocked(g.swarmMind),
+       'KILLING THE COMMANDER WIPES THE PROFILE — the swarm forgets how you fly');
+    eq(g.swarmMind.wipes, beforeWipes + 1, 'and the wipe is recorded exactly once');
+    ok((g.swarmMind.wipeFlash || 0) > 0,
+       'the bracket shatters on screen, so the erasure is seen and not merely inferred');
+  } else { console.log('  (no commander on this stage — wipe path not driven)'); }
+
+  // --- THE BAIT: a dive addressed to a lane you have left hits nothing ---
+  G.resetGame();
+  g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  for (let f = 0; f < 400 && !g.allEntered; f++) G.update();
+  const victim = (g.enemies || []).find(e => e.alive && e.state === 'formation');
+  if (victim && g.allEntered) {
+    // the swarm commits a dive to lane 0 …
+    g.playerX = G.mindZoneCenter(M.ZONES - 1);   // … while the ship is in the LAST lane
+    g._prevPlayerX = g.playerX;
+    victim._mindZone = 0;
+    victim.previewTimer = 1;
+    victim.previewMax = M.DIVE_PREVIEW;
+    victim.previewPath = G.createLoopPath(victim.x, victim.y, 1);
+    const baitedBefore = g.swarmBaited || 0;
+    G.update();
+    eq(g.swarmBaited || 0, baitedBefore + 1,
+       'leaving the profiled lane before the dive launches BAITS it into empty air');
+    eq(victim._mindZone, -1, 'and the tag is consumed, so one dive can bait only once');
+
+    // the negative: still standing in the lane it read is not a bait
+    const victim2 = (g.enemies || []).find(e => e.alive && e.state === 'formation'
+                                              && e !== victim);
+    if (victim2) {
+      g.playerX = G.mindZoneCenter(0);
+      g._prevPlayerX = g.playerX;
+      victim2._mindZone = 0;
+      victim2.previewTimer = 1;
+      victim2.previewMax = M.DIVE_PREVIEW;
+      victim2.previewPath = G.createLoopPath(victim2.x, victim2.y, 1);
+      const b2 = g.swarmBaited || 0;
+      G.update();
+      eq(g.swarmBaited || 0, b2,
+         'standing exactly where the swarm predicted is NOT a bait');
+    }
+    // and an untagged dive can never bait
+    const victim3 = (g.enemies || []).find(e => e.alive && e.state === 'formation'
+                                              && e !== victim && e.previewTimer !== 1);
+    if (victim3) {
+      g.playerX = G.mindZoneCenter(M.ZONES - 1);
+      g._prevPlayerX = g.playerX;
+      victim3._mindZone = -1;
+      victim3.previewTimer = 1;
+      victim3.previewMax = M.DIVE_PREVIEW;
+      victim3.previewPath = G.createLoopPath(victim3.x, victim3.y, 1);
+      const b3 = g.swarmBaited || 0;
+      G.update();
+      eq(g.swarmBaited || 0, b3, 'a dive the swarm never aimed cannot be baited');
+    }
+  } else { console.log('  (skipped — no formation enemy to bait)'); }
+
+  // --- ZERO new score: the whole system pays in frames, not points ---
+  G.resetGame();
+  g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  g.score = 0;
+  for (let f = 0; f < 600; f++) { K['ArrowLeft'] = true; G.update(); }
+  K['ArrowLeft'] = false;
+  const scoreFromMind = g.score;
+  ok(g.swarmMind.n > 0, 'the profile was being fed the whole time');
+  eq(scoreFromMind, 0,
+     'and being profiled — locked, biased, baited — awarded exactly 0 points. The '
+     + 'payoff routes through parry / combo / witch-time, which already price it.');
+  G.resetGame();
+} else { console.log('  (skipped — swarm mind not drivable)'); }
 
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of
