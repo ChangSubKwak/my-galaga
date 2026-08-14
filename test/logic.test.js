@@ -4067,6 +4067,103 @@ if (ST && typeof G.startBonusGame === 'function' && G.__getGame && G.__getGame()
   G.resetGame();
 } else { console.log('  (skipped — bonus game not drivable)'); }
 
+section('THE DIVE CYCLE — Galaga\'s core threat, previously unguarded');
+// Found by mutation-scoring the suite against itself: flipping `game.allEntered
+// = true` to false left all 1213 assertions green while the game silently lost
+// its ONLY threat — no enemy ever dives, the formation just sits there. The
+// suite covered what enemies score, what they drop, how fast they move and
+// how they telegraph, but never that the dive cycle starts at all.
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getKeys) {
+  G.resetGame();
+  const g = G.__getGame();
+  const K = G.__getKeys() || {};
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+
+  let enteredAt = -1, firstDiveAt = -1, returnedAt = -1, everDove = 0;
+  const wasReturning = new Set();
+  for (let f = 0; f < 3000; f++) {
+    K['ArrowLeft'] = (f % 180) < 90;
+    K['ArrowRight'] = (f % 180) >= 90;
+    G.update();
+    if (enteredAt < 0 && g.allEntered) enteredAt = f;
+    for (const e of g.enemies || []) {
+      if (e.state === 'diving') {
+        if (firstDiveAt < 0) firstDiveAt = f;
+        everDove++;
+      }
+      if (e.state === 'returning') wasReturning.add(e);
+      else if (wasReturning.has(e) && e.state === 'formation') {
+        if (returnedAt < 0) returnedAt = f;
+        wasReturning.delete(e);
+      }
+    }
+  }
+  K['ArrowLeft'] = false; K['ArrowRight'] = false;
+
+  ok(enteredAt >= 0, 'the formation finishes entering and locks (allEntered at frame '
+     + enteredAt + ')');
+  ok(firstDiveAt >= 0, 'enemies actually DIVE — the game has a threat (first dive at frame '
+     + firstDiveAt + ')');
+  ok(firstDiveAt > enteredAt, 'and no one dives before the formation is set');
+  ok(everDove > 20, 'diving is sustained, not a single stray frame (' + everDove
+     + ' enemy-frames spent diving)');
+  ok(returnedAt >= 0, 'a survivor of a dive returns to its slot in formation (frame '
+     + returnedAt + ')');
+  G.resetGame();
+} else { console.log('  (skipped — dive cycle not drivable)'); }
+
+section('WITCH TIME — the save window must always close');
+// The other core-loop gap the mutation score exposed: breaking the guard on
+// `game.witchTimer` left the suite green while the window never ticked down.
+// The consequence is not a missing effect, it is that the deferred death never
+// resolves — after one fatal hit the player is quietly immortal for the rest
+// of the run. Nothing noticed.
+if (ST && typeof G.startStage === 'function' && G.__getGame) {
+  // --- window closes without a dash: the death resolves ---
+  G.resetGame();
+  let g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 3;
+  g.witchTimer = 30;
+  g.witchSaved = false;
+  g.dashTimer = 0;
+  g.shieldCharges = 0;
+  g.cheatInvincible = false;
+  const livesBefore = g.lives;
+  for (let f = 0; f < 240; f++) G.update();
+  eq(g.witchTimer || 0, 0, 'the window always closes — the timer reaches zero');
+  ok(!g.witchSaved, 'and without a dash there is no save');
+  ok(g.lives < livesBefore || g.state === ST.RESPAWN || g.state === ST.GAME_OVER,
+     'the deferred death actually resolves (lives ' + livesBefore + ' -> ' + g.lives
+     + ', state ' + g.state + ') — otherwise the player is silently immortal');
+
+  // --- dashing inside the window saves, and costs the cooldown ---
+  G.resetGame();
+  g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 3;
+  g.witchTimer = 30;
+  g.witchSaved = false;
+  g.dashTimer = 10;
+  g.witchCooldown = 0;
+  const livesBefore2 = g.lives;
+  for (let f = 0; f < 60; f++) {
+    if (g.dashTimer <= 0 && !g.witchSaved) g.dashTimer = 10;  // hold the dash open
+    G.update();
+  }
+  ok(g.witchSaved === true, 'dashing inside the window saves the run');
+  eq(g.lives, livesBefore2, 'and the save costs no life');
+  ok((g.witchCooldown || 0) > 0, 'a save arms the cooldown so it cannot be spammed');
+  G.resetGame();
+} else { console.log('  (skipped — witch time not drivable)'); }
+
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of
 // driven play) because the beam's first visible frame WAS its first grabbing
