@@ -286,13 +286,42 @@ for (const r of rows) {
     + (parts.length ? parts.join(',  ') : 'nothing — every brace completed'));
 }
 
-// The ceiling above assumes a charge is always in hand. This is the rate the
-// shipped shield economy actually allows (E-drop weight + heists + vampire).
-const econ = driveStage(29, 3600, {});
+// The ceiling above assumes a charge is always in hand. What actually limits
+// the verb is SUPPLY: the E-drop weight, heists and the vampire perk. A single
+// stage is too short to sample it (one stage rolls zero E's more often than
+// not), so this drives a real multi-stage run and counts every charge granted.
+function measureSupply(frames) {
+  G.resetGame();
+  const g = G.__g();
+  g.stage = 5;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  g.cheatInvincible = true;
+  let granted = 0, prev = 0;
+  for (let f = 0; f < frames; f++) {
+    K[' '] = true;
+    const drift = (f >> 5) % 2 === 0;
+    K['ArrowLeft'] = drift; K['ArrowRight'] = !drift;
+    G.update();
+    const held = (g.shieldCharges || 0) + ((g.redoubts || []).length);
+    if (held > prev) granted += held - prev;
+    prev = held;
+  }
+  clearKeys();
+  return { granted, stage: g.stage, kills: g.stats ? g.stats.kills : 0 };
+}
+const sup = measureSupply(20000);
 console.log('');
-console.log('  UNDER THE REAL SHIELD ECONOMY (no free charges, stage 29)');
-console.log('    walls planted in one stage ... ' + econ.plants
-  + '   (the ceiling above was ' + rows[1].plants + ' with charges handed out)');
+console.log('  SUPPLY — what the shield economy actually allows (driven run)');
+console.log('    charges granted in ~5.5 min ... ' + sup.granted
+  + '   (run reached stage ' + sup.stage + ', ' + sup.kills + ' kills)');
+console.log('    -> the ceiling above (' + rows[1].plants + ' walls/stage with charges handed out) is');
+console.log('       never reached in play: SUPPLY is the limiter, not the brace. The verb');
+console.log('       is about as frequent as BEAMS ROBBED — a rare, weighed choice.');
+console.log('       If it ever needs to be MORE frequent, feed it from the heist/perk');
+console.log('       supply lines, never by raising the E drop weight (that shifts the');
+console.log('       powerUpDropRate economics curve-audit.js reports).');
 
 const totB = rows.reduce((a, r) => a + r.braces, 0);
 const totP = rows.reduce((a, r) => a + r.plants, 0);
