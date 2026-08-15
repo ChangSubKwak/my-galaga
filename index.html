@@ -4258,10 +4258,16 @@ function launchDiveTactic(tactic, candidates) {
   const targetX = dreadDeflectTarget(_liveTx, game.swarmDread, _cmdAlive);
   const _herded = targetX !== _liveTx;
   if (_herded) dreadMarkHerd(game.swarmDread, targetX > _liveTx ? 1 : -1);
-  const squad = (tactic.id === 'pincer')
+  const _plan = (tactic.id === 'pincer')
     ? planPincerPair(pool, targetX)
     : planWallRun(pool, targetX, tactic.size);
-  if (!squad || squad.length < 2) return false;
+  if (!_plan || _plan.length < 2) return false;
+  // THE EBB — THE SALLY: the commander leads the maneuver it authorised, taking
+  // the slot of the nearest planned member so the maneuver's SHAPE (and the
+  // telegraph the player is about to read) is preserved. Applied BEFORE the
+  // preview is written, the same ordering rule THE KILLING FIELD's deflection
+  // follows — the frozen telegraph always shows the true flight.
+  const squad = sallyLead(_plan, pool.find(e => e.isCommander));
   squad.forEach((e, i) => {
     e.previewTimer = WING_PREVIEW + (tactic.id === 'wall' ? i * 3 : 0); // wall staggers slightly
     e.previewMax = e.previewTimer;
@@ -5669,7 +5675,8 @@ const COACH_LESSONS = {
   vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE',
   cover:   'THE HULL EATS FIRE — BOTH WAYS',
   keystone:'CUT THE MARKED ONE — THE SPAN FALLS',
-  redoubt: 'BRACE STILL — PLANT YOUR SHIELD'
+  redoubt: 'BRACE STILL — PLANT YOUR SHIELD',
+  ebb:     'IT CANT LEAD AND HOLD — CUT NOW'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -8465,6 +8472,8 @@ function resetGame() {
     lattice: null,
     spansDropped: 0,
     spanEscaped: 0,
+    // THE EBB — spans cut while the commander was out leading a sortie.
+    ebbCuts: 0,
     // THE REDOUBT — the kit with a coordinate: planted walls, the brace and
     // reclaim meters, and the run's tallies.
     redoubts: [],
@@ -8748,18 +8757,144 @@ function latticeBuild() {
   latticeRecompute();
 }
 
+// ================================== THE EBB =================================
+// THE KEYSTONE shipped with the drawn wall and the computed wall describing
+// DIFFERENT OBJECTS. drawLattice judges membership by `alive && state ===
+// 'formation'`; latticeRecompute judged it by `alive` alone. So while a squad
+// was diving the player saw a hole in the struts that the model did not have —
+// and when the COMMANDER itself dove, netIntact stayed true while the ring's
+// `find(standing && isCommander)` returned undefined, so the read layer went
+// completely BLANK at the swarm's most committed moment. The code's own comment
+// already promised the fix ("rebuild the load paths for what is left STANDING")
+// and never delivered it.
+//
+// Resolving that contradiction is not a bug fix, because resolving it creates a
+// dimension the game has never had: the formation's structural strength stops
+// being a step function of cumulative kills and starts PULSING with the swarm's
+// own aggression. Add the one rule that follows — A COMMANDER CANNOT LEAD FROM
+// THE FRONT AND HOLD THE NET FROM INSIDE THE WALL AT THE SAME TIME — and the
+// two commander-gated systems (WING TACTICS authorises coordination; the
+// COMMAND NET makes the wall uncuttable) stop being two coincidences sharing a
+// flag and become one object with a fork in it.
+//
+// THE SWARM'S STRONGEST ATTACK IS THE ONE WINDOW ITS OWN STRUCTURE IS CUTTABLE.
+// You camp so THE SWARM MIND locks and the sortie comes; you choose your kill
+// lane so THE KILLING FIELD steers which part of the wall empties; you read the
+// socket forming over the 36f wing telegraph; you survive the pincer on the
+// shipped ladder; and you punch the diamond before the squad flies home. The
+// enemy's attack and the enemy's integrity are the same resource — the first
+// time an incoming threat is a TOOL rather than an obstacle.
+//
+// ZERO new score (collapse is already score-negative), zero new actors, zero
+// new comms, zero new HUD, and exactly one new mark: an OPEN ring where a
+// closed one used to be.
+const EBB_SOCKET_R = 9;   // draw-only; matches the shipped net-ring radius
+
+// Pure: who is actually holding the wall this frame. A diver, a capture holder
+// or a collapsing block holds nothing. Tolerant of malformed rows like
+// latticeComponents.
+function latticeStanding(ents) {
+  const out = [];
+  const n = (ents && ents.length) || 0;
+  for (let i = 0; i < n; i++) {
+    const e = ents[i];
+    out.push(!!(e && e.alive && e.state === 'formation'));
+  }
+  return out;
+}
+
+// Pure: elementwise compare, so the O(n·(n+E)) recompute fires only on the
+// frames manning actually changes rather than every frame.
+function standingChanged(prev, next) {
+  if (!prev || !next) return true;
+  if (prev.length !== next.length) return true;
+  for (let i = 0; i < prev.length; i++) if (!!prev[i] !== !!next[i]) return true;
+  return false;
+}
+
+// Pure: THE EBB LEVEL — the fraction of the wall away on the attack. 0 = fully
+// manned, 1 = empty. Drives the socket's alpha only; never scored, never a HUD
+// number.
+function ebbLevel(standing) {
+  const n = (standing && standing.length) || 0;
+  if (!n) return 0;
+  let held = 0;
+  for (let i = 0; i < n; i++) if (standing[i]) held++;
+  return clamp01(1 - held / n);
+}
+
+// Pure: the index of the commander that is actually STANDING, else -1. The net
+// is the commander's, and it holds only from inside the wall.
+function netHolderIndex(ents, standing) {
+  const n = (ents && ents.length) || 0;
+  for (let i = 0; i < n; i++) {
+    if (ents[i] && ents[i].isCommander && standing && standing[i]) return i;
+  }
+  return -1;
+}
+
+// Pure: THE SALLY. The commander joins the maneuver it authorised, taking the
+// slot of the NEAREST squad member so the maneuver's SHAPE — and therefore the
+// telegraph the player is about to read — is preserved. Identity when there is
+// no commander, when it is a boss type (bosses run their own escort dives), or
+// when it is already in the squad. Returns a NEW array; never mutates.
+function sallyLead(squad, cmd) {
+  if (!squad || !squad.length || !cmd) return squad;
+  if (cmd.type === 'boss') return squad;
+  if (squad.indexOf(cmd) !== -1) return squad;
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < squad.length; i++) {
+    const s = squad[i];
+    const d = Math.abs((s.x || 0) - (cmd.x || 0)) + Math.abs((s.y || 0) - (cmd.y || 0));
+    if (d < bd) { bd = d; best = i; }
+  }
+  const out = squad.slice();
+  out[best] = cmd;
+  return out;
+}
+
+// Pure: is a COORDINATED maneuver still frozen in its telegraph? Replaces the
+// over-wide `diveTimer >= 0` collapse deferral: WING_COOLDOWN (60) is longer
+// than WING_PREVIEW (36), so for 24 frames after a squad committed, a keystone
+// diamond was drawn and live while a kill on it silently did nothing.
+function wingTelegraphing(ents) {
+  const n = (ents && ents.length) || 0;
+  for (let i = 0; i < n; i++) {
+    const e = ents[i];
+    if (e && e.alive && e._wingTactic && (e.previewTimer || 0) > 0) return true;
+  }
+  return false;
+}
+
 // Impure: refresh the load paths. Called on every formation kill — cheap at
 // N<=48 with the degree cap, and never per frame.
 function latticeRecompute() {
   const L = game && game.lattice;
   if (!L) return;
-  const alive = L.ents.map(e => !!e.alive);
-  let cmdIdx = -1;
-  for (let i = 0; i < L.ents.length; i++) if (alive[i] && L.ents[i].isCommander) cmdIdx = i;
+  // THE EBB — the model now judges membership exactly as drawLattice does:
+  // only members STANDING in the wall hold it together. The picture and the
+  // math finally describe the same object, and the wall's strength pulses with
+  // the swarm's own aggression instead of stepping with cumulative kills.
+  // Always recomputed here (O(n<=48), trivial). L.standing is only a CACHE for
+  // the per-frame change detector that decides whether to call this at all —
+  // reusing it as the source would freeze the model at its first manning.
+  const standing = latticeStanding(L.ents);
+  L.standing = standing;
+  const cmdIdx = netHolderIndex(L.ents, standing);
   L.netIntact = cmdIdx >= 0;
-  const adj = L.netIntact ? latticeStiffen(L.adj, cmdIdx, alive) : L.adj;
-  L.cuts = latticeCuts(adj, alive, LAT_MIN_CHUNK);
-  if (L.cuts.length && typeof coachFire === 'function') coachFire('keystone');
+  const adj = L.netIntact ? latticeStiffen(L.adj, cmdIdx, standing) : L.adj;
+  L.cuts = latticeCuts(adj, standing, LAT_MIN_CHUNK);
+  L.ebb = ebbLevel(standing);
+  if (L.cuts.length && typeof coachFire === 'function') {
+    // THE EBB — when the window was opened by the swarm's own sortie rather
+    // than by attrition, that is the lesson worth teaching: the commander
+    // cannot lead from the front and hold the net at the same time.
+    // (Literal call sites, not a ternary argument — the bidirectional
+    // lesson↔trigger source scan looks for coachFire('<id>') verbatim.)
+    const _out = L.ents.some((e, i) => e && e.alive && e.isCommander && !standing[i]);
+    if (_out) coachFire('ebb');
+    else coachFire('keystone');
+  }
 }
 
 // Impure: sever a span. The members stop being formation and become one rigid
@@ -8789,6 +8924,19 @@ function latticeCollapse(cutIdx) {
   L.markT = LAT_MARK_FLASH;
   game.spansDropped = (game.spansDropped || 0) + 1;
   if (span.length >= 6) unlockAchievement('spanBreaker');
+  // THE EBB — was this window opened by the swarm's own sortie? (The commander
+  // is alive but out leading it, so the net is down because it ATTACKED.)
+  const _sallyOut = game.enemies.some(en => en.alive && en.isCommander && en.state !== 'formation');
+  if (_sallyOut) {
+    game.ebbCuts = (game.ebbCuts || 0) + 1;
+    unlockAchievement('sallyCut');
+    if (!game.isDemo) {
+      try {
+        const _et = (parseInt(localStorage.getItem('galagaEbbTotal') || '0', 10) || 0) + 1;
+        localStorage.setItem('galagaEbbTotal', String(_et));
+      } catch (_e) {}
+    }
+  }
   if (!game.isDemo) {
     try {
       const _st = (parseInt(localStorage.getItem('galagaSpanTotal') || '0', 10) || 0) + 1;
@@ -12630,6 +12778,7 @@ const ACHIEVEMENTS = {
   ironclad:      { name: 'IRONCLAD',      desc: '50 shots blocked in shelter' },
   spanBreaker:   { name: 'SPAN BREAKER',  desc: 'Drop a span of 6 or more' },
   quartermaster: { name: 'QUARTERMASTER', desc: 'Reclaim 10 emplacements' },
+  sallyCut:      { name: 'BREACH LEADER', desc: 'Cut a span while the commander leads' },
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
@@ -14911,6 +15060,11 @@ function updateEnemies() {
     if (game.state === STATE.PLAYING) {
       const _cmdCandidates = game.enemies.filter(en =>
         en.alive && en.state === 'formation' &&
+        // THE EBB — the commander must be a member that can actually join the
+        // wing pool it authorises (that filter excludes 'boss'), and a boss
+        // commander is already a degenerate case: the capture branch strips
+        // isCommander the moment it starts a beam.
+        en.type !== 'boss' &&
         en.type !== 'ufo' && en.type !== 'goldenBee' &&
         en.type !== 'minibee' && en.type !== 'hoverer' && !en.elite
       );
@@ -14927,6 +15081,15 @@ function updateEnemies() {
       latticeBuild();
       // SIGNAL INTERCEPT — broadcast formation-set chatter on first locked position
     }
+  }
+
+  // THE EBB — THE MANNING SEAM. The wall is only the members standing in it, so
+  // the model refreshes the frame manning changes (a squad launches, a squad
+  // returns, a span detaches) rather than only when something dies. O(n<=48)
+  // scan per frame; the real recompute fires a few times per second.
+  if (game.state === STATE.PLAYING && game.lattice) {
+    const _st = latticeStanding(game.lattice.ents);
+    if (standingChanged(game.lattice.standing, _st)) latticeRecompute();
   }
 
   // Trigger dives
@@ -15500,7 +15663,12 @@ function updateCollisions() {
           // maneuver is telegraphing (diveTimer < 0 during WING_COOLDOWN) so a span
           // can never land on top of a pincer — a defer, not a cancel.
           if (game.state === STATE.PLAYING && game.lattice && e._lat != null) {
-            if ((game.diveTimer || 0) >= 0) latticeCollapse(e._lat);
+            // Defer only while a coordinated maneuver is still FROZEN in its
+            // telegraph. The old `diveTimer >= 0` test used WING_COOLDOWN (60),
+            // which is longer than WING_PREVIEW (36) — so for 24 frames after a
+            // squad committed, a keystone diamond was drawn and live while a
+            // kill on it silently did nothing. Lone dives are unaffected.
+            if (!wingTelegraphing(game.enemies)) latticeCollapse(e._lat);
             latticeRecompute();
           }
           // REVENGE KILL — if a prior collision death captured this enemy type,
@@ -19764,6 +19932,10 @@ function pickRunHighlights() {
   // never outranks a boss kill in the run's identity.
   const walls = game.redoubtsPlanted || 0;
   if (walls >= 3)         out.push({ label: 'WALLS PLANTED',   value: String(walls),    prio: walls * 8, col: '#4f8' });
+  // SORTIE CUTS — THE EBB: spans cut in the window the swarm opened by
+  // attacking. The rarest structural read in the game.
+  const sortie = game.ebbCuts || 0;
+  if (sortie >= 1)        out.push({ label: 'SORTIE CUTS',     value: String(sortie),   prio: 50 + sortie * 34, col: '#8cf' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
@@ -21790,6 +21962,33 @@ function drawLattice() {
     }
   }
   ctx.stroke();
+  // THE EBB — THE SOCKET. When the commander is alive but NOT standing (it is
+  // out leading the sortie it authorised), the wall has a hole where its net
+  // was anchored: a dashed OPEN ring at the empty home position, with the gap
+  // facing where the commander actually is and a tether dash toward it. Open
+  // ring vs closed ring reads without colour, and it replaces the blank state
+  // this function used to render at exactly this moment.
+  const _absentCmd = ents.find(e => e && e.alive && e.isCommander && !standing(e));
+  if (_absentCmd) {
+    const hx = _absentCmd.homeX, hy = _absentCmd.homeY;
+    const ang = Math.atan2(_absentCmd.y - hy, _absentCmd.x - hx);
+    // Forms over the 36f wing telegraph, full at the commit frame — the player
+    // gets a window's worth of warning that a window is about to open.
+    const prev = _absentCmd.previewTimer || 0;
+    const grow = prev > 0 ? 1 - (prev / (_absentCmd.previewMax || WING_PREVIEW)) : 1;
+    ctx.globalAlpha = (0.25 + 0.45 * clamp01(L.ebb || 0)) * clamp01(0.25 + grow);
+    ctx.strokeStyle = tint;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.arc(hx, hy, EBB_SOCKET_R, ang + 0.6, ang - 0.6 + Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha *= 0.5;
+    ctx.beginPath();
+    ctx.moveTo(hx + Math.cos(ang) * EBB_SOCKET_R, hy + Math.sin(ang) * EBB_SOCKET_R);
+    ctx.lineTo(hx + Math.cos(ang) * (EBB_SOCKET_R + 7), hy + Math.sin(ang) * (EBB_SOCKET_R + 7));
+    ctx.stroke();
+  }
   if (L.netIntact) {
     // COMMAND NET — while the commander holds, the structure is uncuttable, and
     // that is stated by a ring on the one enemy responsible for it.
