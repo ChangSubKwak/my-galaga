@@ -326,6 +326,37 @@ extended) — no comms intercept (band stays 24/24). Tracked: `game.bossBreaks` 
 lifetime `galagaBossBreakTotal` (demo-guarded), BOSS BREAKS highlight, BONE BREAKER
 achievement, `COACH_LESSONS.vent`.
 
+### THE IRON SHADOW — the world's first solid matter (occlusion)
+
+In 23,000 lines no object ever blocked another — position meant dodging, never
+SHELTER. THE IRON SHADOW makes the `cargoShip` ambient event (formerly documented "no
+gameplay effect") **solid during normal PLAYING**: any bullet, enemy or player, crossing
+its 40×10 hull is absorbed (`hullCrossed` — swept segment test, tunnel-proof at laser
+speed, test-pinned). Its span projects onto the floor as a hatched **SHADOW BAND**
+(shape-distinct from the mind bracket / dread X's). Spawn is banded mid-field
+(`HULL_Y_MIN..MAX` 150–205), weighted 3-vs-1 among ambient types, and **DIRECTOR-gated**
+(`directorAllows('gift')`, demotes to scenery when denied; a live hull occupies the
+census as a gift).
+
+**The three-way flown fork**: RIDE it (formation fire can't reach you — but your fire
+can't reach them, combo starves, and the SWARM MIND profiles your hideout lane; dives
+and WING pincers fly the **near plane, unblocked** — bullet-proof is never dive-proof,
+that inversion is load-bearing) / RAID from it (kills land at the shadow's edges → THE
+KILLING FIELD paints dread there and herds dives around your own cover) / **EXPEL it**
+(player shots stress ×2 — 13 of your own rounds vent it early; the first time shooting
+scenery means anything). Absorbing accumulates `ev.stress` (enemy +1, player +2, LASER
+burns through once at +2 keeping its piercing identity); at `HULL_STRESS_CAP` (26) the
+freighter VENTS — `HULL_VENT_WARN` (42f ≥ baseline; **still solid through the klaxon**,
+warning precedes loss — inversion-guarded) then flees at `HULL_VENT_VX`.
+
+**ZERO score** — absorbed bullets award nothing and deny the graze/parry income they
+carried (shelter prices itself). `hullSpan` is null outside `STATE.PLAYING` (never a
+boss-volley sponge or challenge leak — test-pinned). Comms: `ironShadow` **replaced the
+cut `maxPower`** (pickup-moment chatter; band stays 24/24). Tracked: `game.hullBlocks`
+(sheltered absorbs only) + lifetime `galagaHullBlockTotal` (demo-guarded), SHOTS
+SHADOWED highlight, IRONCLAD achievement (50 lifetime), `COACH_LESSONS.cover`. Scorch
+pips on the hull are the fuse, drawn before it blows.
+
 ### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
 
 Difficulty has `curve-audit.js`; fairness now has its own instrument:

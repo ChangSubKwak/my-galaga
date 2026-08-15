@@ -207,6 +207,9 @@ const shim = `
 ;try { globalThis.__getDebriefConst = function () { return {
   WAVES: DEBRIEF_WAVES, DESCEND: COURIER_DESCEND, UPLINK: COURIER_UPLINK,
   HP: COURIER_HP, SEED_W: DEBRIEF_SEED_W, SIGHT: LEDGER_SIGHT }; }; } catch (e) {}
+;try { globalThis.__getHullConst = function () { return {
+  W: HULL_W, HALF_H: HULL_HALF_H, CAP: HULL_STRESS_CAP, WARN: HULL_VENT_WARN,
+  VX: HULL_VENT_VX, Y_MIN: HULL_Y_MIN, Y_MAX: HULL_Y_MAX }; }; } catch (e) {}
 ;try { globalThis.__getVentConst = function () { return {
   OPEN: VENT_OPEN, MIN: VENT_MIN, RAMP: VENT_RAMP, HALF: VENT_HALF,
   OFF: VENT_OFF, SLOW: VENT_SLOW, GAIN: STAGGER_GAIN, DECAY: STAGGER_DECAY,
@@ -5088,6 +5091,111 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
   } else { console.log('  (no mega-boss on stage 10)'); }
   G.resetGame();
 } else { console.log('  (skipped — open wound not drivable)'); }
+
+section('THE IRON SHADOW — the pure hull (occlusion, stress, the vent)');
+{
+  const H = G.__getHullConst && G.__getHullConst();
+  if (H && typeof G.hullSpan === 'function' && ST) {
+    const ev = { type: 'cargoShip', x: 112, y: 180, ventTimer: null, stress: 0 };
+
+    // --- solidity gates: PLAYING only, cargoShip only, never once leaving ---
+    ok(!!G.hullSpan(ev, ST.PLAYING), 'a convoy in normal play is SOLID');
+    eq(G.hullSpan(ev, ST.BOSS_STAGE), null,
+       'never in a boss stage — the hull can never become a SUPER-volley sponge (inversion guard)');
+    eq(G.hullSpan(ev, ST.CHALLENGING), null, 'never in the challenge drill');
+    eq(G.hullSpan({ type: 'satellite', x: 112, y: 60 }, ST.PLAYING), null,
+       'every other ambient type stays scenery');
+    eq(G.hullSpan(null, ST.PLAYING), null, 'no event, no hull');
+    ok(!!G.hullSpan({ type: 'cargoShip', x: 112, y: 180, ventTimer: H.WARN }, ST.PLAYING),
+       'a VENTING hull is still solid — the klaxon warning PRECEDES the loss of cover');
+    eq(G.hullSpan({ type: 'cargoShip', x: 112, y: 180, ventTimer: 0 }, ST.PLAYING), null,
+       'a LEAVING hull blocks nothing');
+
+    // --- the phase ladder ---
+    eq(G.hullPhase(null), 'solid', 'no vent timer: solid');
+    eq(G.hullPhase(20), 'venting', 'counting: venting');
+    eq(G.hullPhase(0), 'leaving', 'expired: leaving');
+
+    // --- crossing: swept, tunnel-proof, NaN-safe ---
+    const span = G.hullSpan(ev, ST.PLAYING);
+    ok(G.hullCrossed(span, 112, 170, 190), 'a bullet sweeping through the hull is caught');
+    ok(G.hullCrossed(span, 112, 170, 200),
+       'even at a step larger than the hull is thick — swept test, no tunnelling at laser speed');
+    ok(!G.hullCrossed(span, 140, 170, 190), 'outside the hull\'s width: passes');
+    ok(!G.hullCrossed(span, 112, 150, 160), 'entirely above: passes');
+    ok(!G.hullCrossed(span, NaN, 170, 190), 'a poisoned x never blocks');
+    ok(!G.hullCrossed(null, 112, 170, 190), 'no span, no block');
+
+    // --- stress: clamped, NaN-safe ---
+    eq(G.hullStress(0, 1, H.CAP), 1, 'an absorbed enemy round adds 1');
+    eq(G.hullStress(H.CAP - 1, 2, H.CAP), H.CAP, 'clamped at the cap');
+    eq(G.hullStress(NaN, 1, H.CAP), 1, 'a poisoned meter reads as 0, never NaN');
+
+    // --- the shadow band ---
+    ok(G.hullShelters(span, 112), 'standing under the hull is SHELTERED');
+    ok(!G.hullShelters(span, 160), 'standing beside it is not');
+    ok(!G.hullShelters(null, 112), 'no hull, no shelter');
+
+    // --- the fairness pin: losing cover warns at or above the baseline ---
+    ok(H.WARN >= 30, 'the vent klaxon (' + H.WARN + 'f) meets the 30f baseline — and cover '
+       + 'costs less than a hit, so the budget ordering holds');
+  } else { console.log('  (skipped — iron shadow not exposed)'); }
+}
+
+section('THE IRON SHADOW — driven: ride it, expel it, lose it');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.hullAbsorb === 'function') {
+  const H = G.__getHullConst();
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 5;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  g.cheatInvincible = true;
+  for (let f = 0; f < 400 && !g.allEntered; f++) G.update();
+
+  // A convoy parked mid-field, player sheltering beneath it.
+  g.ambientEvent = { type: 'cargoShip', life: 0, maxLife: 99999, x: 112, y: 180,
+                     vx: 0.18, lightPhase: 0, stress: 0 };
+  g.playerX = 112;
+  g._prevPlayerX = 112;
+
+  // --- RIDE: an enemy bullet aimed straight down the shadow is EATEN ---
+  g.enemyBullets.push({ x: 112, y: 168, vx: 0, vy: 2, kind: 'dive', fromType: 'bee' });
+  let eaten = false;
+  for (let f = 0; f < 30; f++) {
+    G.update();
+    if (!g.enemyBullets.some(b => b.fromType === 'bee' && b.vy === 2)) { eaten = true; break; }
+  }
+  ok(eaten, 'an enemy round crossing the hull is absorbed through the real update loop');
+  ok((g.hullBlocks || 0) >= 1, 'and counted as a sheltered block (SHOTS SHADOWED)');
+  ok((g.ambientEvent.stress || 0) >= 1, 'stressing the hull by 1');
+
+  // --- EXPEL: the player's own fire stresses it double, to the vent ---
+  const _needShots = Math.ceil((H.CAP - g.ambientEvent.stress) / 2);
+  for (let s = 0; s < _needShots; s++) {
+    g.bullets.push({ x: 112, y: 192, vy: -3, dmg: 1, lvl: 1 });
+    G.update();
+  }
+  for (let f = 0; f < 12 && g.ambientEvent && g.ambientEvent.ventTimer == null; f++) G.update();
+  ok(g.ambientEvent && g.ambientEvent.ventTimer != null,
+     _needShots + ' of your own shots vent the freighter — firing at scenery finally means something');
+  ok(!!G.hullSpan(g.ambientEvent, g.state), 'still SOLID through the klaxon warning');
+
+  // --- LOSE IT: after the warning it flees, and blocks nothing ---
+  for (let f = 0; f < H.WARN + 2; f++) G.update();
+  if (g.ambientEvent) {
+    eq(G.hullSpan(g.ambientEvent, g.state), null, 'once leaving, the hull blocks nothing');
+    ok(Math.abs(g.ambientEvent.vx) >= H.VX - 0.001, 'and it is genuinely fleeing');
+    g.enemyBullets.length = 0;
+    g.enemyBullets.push({ x: g.ambientEvent.x, y: g.ambientEvent.y - 12, vx: 0, vy: 2, kind: 'dive', fromType: 'bee' });
+    const _n0 = g.enemyBullets.length;
+    G.update();
+    eq(g.enemyBullets.length, _n0, 'a bullet now passes clean through where the hull was');
+  }
+  G.resetGame();
+} else { console.log('  (skipped — iron shadow not drivable)'); }
 
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of

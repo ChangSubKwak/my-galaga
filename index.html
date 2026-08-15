@@ -5349,7 +5349,10 @@ const INTERCEPT_MSG = {
   goldenSpotted: ['ROYAL CARGO DETECTED!', 'GUARD THE GOLDEN ONE!', 'HIGH-VALUE TARGET!'],
   bossRage:      ['BOSS ENTERS RAGE!', 'CRITICAL HOSTILE — APEX!', 'TARGET UNLEASHED!'],
   perfectStage:  ['NO HITS LANDED!', 'TARGET UNTOUCHED!', 'PRECISION ENEMY!'],
-  maxPower:      ['TARGET FULLY ARMED!', 'OVERPOWERED!', 'RETREAT — STAGE TWO!'],
+  // (maxPower was CUT for THE IRON SHADOW's slot — it fired at the player's own
+  // pickup moment: not rare, needs no reaction, duplicates the ship-sprite/HUD
+  // feedback. Weakest member by the simplification pass's own bar.)
+  ironShadow:    ['IT HIDES IN THE CONVOY\'S SHADOW!', 'CEASE FIRE — THE HAULER!', 'SHOOTING OUR OWN FREIGHTER?!'],
   firstBlood:    ['CONTACT CONFIRMED!', 'HOSTILE ENGAGES!', 'TARGET HAS WEAPONS!'],
   superBoss:     ['APEX HOSTILE INCOMING!', 'DEPLOY EVERYTHING!', 'LAST LINE — HOLD!'],
   finalLife:     ['FINAL SHIP STANDING!', 'ONE MORE TO FINISH!', 'VICTORY WITHIN REACH!'],
@@ -5659,7 +5662,8 @@ const COACH_LESSONS = {
   struggle:'BEAM GOT YOU? MASH L-R TO TEAR FREE',
   heist:   'STAND IN THE WINDUP TO ROB THE BEAM',
   debrief: 'SHOOT THE COURIER — DENY THE UPLINK',
-  vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE'
+  vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE',
+  cover:   'THE HULL EATS FIRE — BOTH WAYS'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -5750,6 +5754,10 @@ function directorCensus() {
   if (directorStrikePhase() !== 'idle') threat++;
   if (game.supplyCrate) gift++;
   if (game.guardian) gift++;
+  // THE IRON SHADOW — a live solid hull occupies attention like any other gift,
+  // so rival/magpie/crate defer while cover is on the field (Director rule 3:
+  // count it, or the cap silently leaks).
+  if (typeof hullSpan === 'function' && hullSpan(game.ambientEvent, game.state)) gift++;
   return { threat, gift };
 }
 
@@ -7757,12 +7765,128 @@ function drawBiome() {
 // Types:
 //   cargoShip — large freighter silhouette traversing horizontally with running lights
 //   supernova — bright corner flash that fades over ~3 seconds with shockwave ring
+
+// =============================== THE IRON SHADOW ============================
+// A new dimension of game state: OCCLUSION. In 23,000 lines, no object has ever
+// blocked another — position only ever meant dodging, never SHELTER. THE IRON
+// SHADOW makes the cargoShip freighter (documented above as "no gameplay
+// effect") the game's first solid matter during normal PLAYING: any bullet,
+// enemy or player, that crosses its hull is absorbed with a spark. Its span is
+// projected onto the floor as a hatched SHADOW BAND.
+//
+// The three-way flown fork:
+//   RIDE IT  — stand in the band and formation fire cannot reach you. But your
+//              own fire cannot reach the formation, your combo starves, THE
+//              SWARM MIND profiles the shadow lane (camping cover trains the
+//              lock bracket onto your hideout), and dives/WING pincers fly the
+//              near plane, unblocked — bullet-proof is never dive-proof.
+//   RAID IT  — dart out, kill, duck back: your kills land at the shadow's
+//              EDGES, so THE KILLING FIELD paints dread exactly where you fire
+//              from and herds dives around your own cover.
+//   EXPEL IT — 13 of your own shots (2× stress each) vent the freighter early.
+//              The first time shooting the world means anything: when the mind
+//              bracket and the shadow band converge on one lane, the correct
+//              play is to shoot your cover away and break the habit.
+//
+// Absorbing shots accumulates ev.stress; at HULL_STRESS_CAP the freighter
+// VENTS — HULL_VENT_WARN (42f ≥ the 30f baseline, generous because losing
+// cover costs less than a hit) of blinking klaxon, then it flees off-screen.
+// Solid through 'solid' and 'venting' (the warning PRECEDES the loss);
+// transparent the moment it starts 'leaving'.
+//
+// ZERO score anywhere: an absorbed bullet awards nothing and denies the graze/
+// parry income it would have carried — shelter prices itself. Solid only in
+// STATE.PLAYING (never a boss-volley sponge, never in the challenge drill).
+const HULL_W          = 40;   // solid hull width (matches the drawn silhouette)
+const HULL_HALF_H     = 5;    // solid half-height
+const HULL_STRESS_CAP = 26;   // absorbed-shot stress before the vent arms
+const HULL_VENT_WARN  = 42;   // klaxon frames before it flees (≥ 30f baseline)
+const HULL_VENT_VX    = 1.6;  // flee speed
+const HULL_Y_MIN      = 150;  // spawn band: below the formation,
+const HULL_Y_MAX      = 205;  // above the player's lane — usable mid-field
+
+// Pure: the hull's lifecycle. ventTimer null = solid; counting = venting
+// (klaxon, still solid); expired = leaving (transparent, fleeing).
+function hullPhase(ventTimer) {
+  if (ventTimer == null) return 'solid';
+  return ventTimer > 0 ? 'venting' : 'leaving';
+}
+
+// Pure: the solid extent, or null. Null for every other ambient type, outside
+// normal PLAYING (no boss-sponge, no challenge leak), and once leaving.
+function hullSpan(ev, state) {
+  if (!ev || ev.type !== 'cargoShip') return null;
+  if (state !== STATE.PLAYING) return null;
+  if (hullPhase(ev.ventTimer) === 'leaving') return null;
+  return { x0: ev.x - HULL_W / 2, x1: ev.x + HULL_W / 2,
+           y0: ev.y - HULL_HALF_H, y1: ev.y + HULL_HALF_H };
+}
+
+// Pure: swept segment-vs-rect crossing on y — tunnel-proof at max bullet speed
+// (the 1.4× laser at ~9px/f cannot skip the 10px hull between frames).
+function hullCrossed(span, x, yPrev, yNow) {
+  if (!span || !isFinite(x) || !isFinite(yPrev) || !isFinite(yNow)) return false;
+  if (x < span.x0 || x > span.x1) return false;
+  const lo = Math.min(yPrev, yNow), hi = Math.max(yPrev, yNow);
+  return hi >= span.y0 && lo <= span.y1;
+}
+
+// Pure: clamped stress accumulation, NaN/negative-safe like the mind/dread cores.
+function hullStress(stress, add, cap) {
+  const s = isFinite(stress) ? Math.max(0, stress) : 0;
+  const a = isFinite(add) ? Math.max(0, add) : 0;
+  const c = isFinite(cap) ? cap : HULL_STRESS_CAP;
+  return Math.min(c, s + a);
+}
+
+// Pure: is the player inside the floor-projected shadow band?
+function hullShelters(span, px) {
+  return !!span && isFinite(px) && px >= span.x0 && px <= span.x1;
+}
+
+// Impure: one absorbed shot — stress the hull, spark, arm the vent at cap.
+// `sheltered` marks an enemy bullet eaten while the player stood in the band
+// (the protective absorbs — they feed the highlight/lifetime/comms/coach).
+function hullAbsorb(ev, x, y, add, sheltered) {
+  ev.stress = hullStress(ev.stress, add, HULL_STRESS_CAP);
+  game.hitSparks.push({ x, y, life: 0, color: '#8ac' });
+  if (ev.stress >= HULL_STRESS_CAP && ev.ventTimer == null) {
+    ev.ventTimer = HULL_VENT_WARN;
+    playSound('bossWarning', ev.x);
+  }
+  if (sheltered) {
+    game.hullBlocks = (game.hullBlocks || 0) + 1;
+    if (!game._ironSeen && typeof pushIntercept === 'function') {
+      game._ironSeen = true;
+      pushIntercept('ironShadow');
+    }
+    if (typeof coachFire === 'function') coachFire('cover');
+    if (!game.isDemo) {
+      try {
+        const _hb = (parseInt(localStorage.getItem('galagaHullBlockTotal') || '0', 10) || 0) + 1;
+        localStorage.setItem('galagaHullBlockTotal', String(_hb));
+        if (_hb >= 50) unlockAchievement('ironclad');
+      } catch (_e) {}
+    }
+  }
+}
+
 function pickAmbientEvent() {
   if (!game) return null;
   if (game.stage <= 3) return null;            // pure-space tutorial
   if (Math.random() >= 0.35) return null;      // 35% spawn rate
-  const types = ['cargoShip', 'supernova', 'satellite', 'comet', 'pulsar', 'meteorShower'];
-  return types[randInt(types.length)];
+  // THE IRON SHADOW — the convoy is weighted 3-vs-1 (cover is a mechanic now,
+  // not a rare postcard), but it is a DIRECTOR-gated gift: when attention is
+  // already spent the roll demotes to pure scenery instead.
+  const types = ['cargoShip', 'cargoShip', 'cargoShip',
+                 'supernova', 'satellite', 'comet', 'pulsar', 'meteorShower'];
+  let t = types[randInt(types.length)];
+  if (t === 'cargoShip'
+      && !(typeof directorAllows === 'function' && directorAllows('gift'))) {
+    const scenery = ['supernova', 'satellite', 'comet', 'pulsar', 'meteorShower'];
+    t = scenery[randInt(scenery.length)];
+  }
+  return t;
 }
 function startAmbientEvent(type) {
   if (!type) { game.ambientEvent = null; return; }
@@ -7774,9 +7898,12 @@ function startAmbientEvent(type) {
       type, life: 0,
       maxLife: 1200,                  // ~20s — slow drift
       x: fromLeft ? -60 : BASE_W + 60,
-      y: 30 + Math.random() * (BASE_H - 90),
+      // THE IRON SHADOW — banded into the usable mid-field (below the
+      // formation, above the player's lane) so the cover means something.
+      y: HULL_Y_MIN + Math.random() * (HULL_Y_MAX - HULL_Y_MIN),
       vx: (fromLeft ? 1 : -1) * 0.18,
-      lightPhase: 0
+      lightPhase: 0,
+      stress: 0
     };
   } else if (type === 'supernova') {
     const corner = randInt(4);
@@ -7848,6 +7975,14 @@ function updateAmbientEvent() {
   if (ev.type === 'cargoShip') {
     ev.x += ev.vx;
     ev.lightPhase++;
+    // THE IRON SHADOW — vent countdown: klaxon burns down (still solid), then
+    // the freighter flees at HULL_VENT_VX toward the nearer despawn edge.
+    if (ev.ventTimer != null && ev.ventTimer > 0) {
+      ev.ventTimer--;
+      if (ev.ventTimer <= 0) {
+        ev.vx = (ev.vx < 0 ? -1 : 1) * HULL_VENT_VX;
+      }
+    }
     // Despawn when off-screen
     if (ev.x < -80 || ev.x > BASE_W + 80) game.ambientEvent = null;
   } else if (ev.type === 'supernova') {
@@ -7881,7 +8016,12 @@ function drawAmbientEvent() {
   if (ev.type === 'cargoShip') {
     // Long rectangular silhouette (40 × 8 px) with running lights and a small bridge bump
     ctx.save();
-    ctx.globalAlpha = 0.55;
+    // THE IRON SHADOW — a SOLID hull reads solid: brighter than scenery, with a
+    // hatched shadow band on the floor, scorch pips as its fuse burns, and a
+    // blinking klaxon through the vent warning. All read-only (timers in update).
+    const _solid = (typeof hullSpan === 'function')
+      && hullSpan(ev, game.state) != null;
+    ctx.globalAlpha = _solid ? 0.85 : 0.55;
     ctx.fillStyle = '#234';
     ctx.fillRect(ev.x - 20, ev.y - 4, 40, 8);
     ctx.fillRect(ev.x - 8, ev.y - 6, 16, 2);   // bridge / superstructure
@@ -7899,6 +8039,36 @@ function drawAmbientEvent() {
     ctx.fillStyle = '#0cf';
     const trailX = ev.vx > 0 ? ev.x - 28 : ev.x + 22;
     ctx.fillRect(trailX, ev.y - 1, 6, 2);
+    if (_solid) {
+      // Scorch pips — the fuse, legible before it blows
+      const _frac = Math.min(1, (ev.stress || 0) / HULL_STRESS_CAP);
+      const _pips = Math.round(_frac * 6);
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#f44';
+      for (let _k = 0; _k < _pips; _k++) {
+        ctx.fillRect(Math.round(ev.x) - 15 + _k * 6, Math.round(ev.y) + 3, 2, 1);
+      }
+      // Vent klaxon — blinking hull edges through the 42f warning
+      if (hullPhase(ev.ventTimer) === 'venting' && (game.animFrame >> 2) % 2 === 0) {
+        ctx.fillStyle = '#f44';
+        ctx.fillRect(Math.round(ev.x) - 20, Math.round(ev.y) - 5, 40, 1);
+        ctx.fillRect(Math.round(ev.x) - 20, Math.round(ev.y) + 4, 40, 1);
+      }
+      // SHADOW BAND — hatched floor projection of the protected span (shape-
+      // coded: diagonal hatches, distinct from the mind bracket and dread X's).
+      ctx.globalAlpha = 0.32;
+      ctx.strokeStyle = '#8ac';
+      ctx.lineWidth = 1;
+      const _by = BASE_H - 9;
+      ctx.beginPath();
+      const _bx0 = Math.max(2, ev.x - HULL_W / 2);
+      const _bx1 = Math.min(BASE_W - 2, ev.x + HULL_W / 2);
+      for (let _hx = _bx0; _hx < _bx1; _hx += 4) {
+        ctx.moveTo(_hx, _by + 2);
+        ctx.lineTo(_hx + 2, _by - 1);
+      }
+      ctx.stroke();
+    }
     ctx.restore();
   } else if (ev.type === 'supernova') {
     // Expanding ring + central flash. Alpha peaks early then fades.
@@ -8277,6 +8447,9 @@ function resetGame() {
     debriefsDenied: 0,
     // THE OPEN WOUND — boss stances broken this run.
     bossBreaks: 0,
+    // THE IRON SHADOW — enemy shots eaten by the convoy hull while sheltered.
+    hullBlocks: 0,
+    _ironSeen: false,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
     comboArsenalClaimed: {},
@@ -11311,8 +11484,15 @@ function updatePlayer() {
 }
 
 function updateBullets() {
+  // THE IRON SHADOW — the hull eats fire BOTH ways (guardian and parry-echo
+  // rounds obey the same physics: one consistent world). The player's own
+  // shots stress it double, which is the EXPEL verb; the LASER burns through
+  // instead (piercing identity preserved) at the same stress price, once.
+  const _hullP = (typeof hullSpan === 'function')
+    ? hullSpan(game.ambientEvent, game.state) : null;
   for (let i = game.bullets.length - 1; i >= 0; i--) {
     const b = game.bullets[i];
+    const _bpy = b.y;
     if (b.kind === 'homing') {
       // Steer toward the nearest live enemy. Lerp into target heading at fixed turn rate.
       // Filter out targets BEHIND the bullet (y > bullet.y + slack) — without this, a homing
@@ -11369,6 +11549,19 @@ function updateBullets() {
         if (b.trail.length > 5) b.trail.length = 5;
       }
     }
+    // THE IRON SHADOW — absorb after integration, before the off-screen sweep.
+    if (_hullP && hullCrossed(_hullP, b.x, _bpy, b.y)) {
+      if (b.kind === 'laser') {
+        if (!b._hullBurned) {
+          b._hullBurned = true;
+          hullAbsorb(game.ambientEvent, b.x, b.y, 2, false);
+        }
+      } else {
+        hullAbsorb(game.ambientEvent, b.x, b.y, 2, false);
+        game.bullets.splice(i, 1);
+        continue;
+      }
+    }
     if (b.y < -5 || b.y > BASE_H + 5 || b.x < -5 || b.x > BASE_W + 5) {
       // LASER PIERCE COUNT — when a laser bullet exits, if it pierced 3+
       // enemies, emit a magenta "PIERCE xN" text at its final position.
@@ -11388,10 +11581,21 @@ function updateBullets() {
                 : ((game.slowTimer || 0) > 0 ? 0.4
                 : (lastStandActive ? 0.65
                 : (slowMutation ? 0.7 : 1)));
+  // THE IRON SHADOW — hoisted solid extent (null everywhere but a live PLAYING
+  // convoy). Absorption runs BEFORE split and graze, so an eaten bullet neither
+  // fragments nor grazes — it is simply gone.
+  const _hullE = (typeof hullSpan === 'function')
+    ? hullSpan(game.ambientEvent, game.state) : null;
   // Track peak bullet density for BARRAGE achievement
   for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
     const b = game.enemyBullets[i];
+    const _hpy = b.y;
     b.x += b.vx * slowMul; b.y += b.vy * slowMul;
+    if (_hullE && hullCrossed(_hullE, b.x, _hpy, b.y)) {
+      hullAbsorb(game.ambientEvent, b.x, b.y, 1, hullShelters(_hullE, game.playerX));
+      game.enemyBullets.splice(i, 1);
+      continue;
+    }
     // SPLIT SHOT — fragment a tagged bullet into a 3-fan when its split timer runs out.
     // splitAt counts down with slowMul so witch/T pickups also delay the split visually.
     if (b.splitAt && b.splitAt > 0) {
@@ -11834,6 +12038,7 @@ const ACHIEVEMENTS = {
   comboMaster:   { name: 'COMBO MASTER',  desc: 'Reach combo 30' },
   censor:        { name: 'CENSOR',        desc: 'Deny 10 uplinks lifetime' },
   boneBreaker:   { name: 'BONE BREAKER',  desc: 'Break a boss stance' },
+  ironclad:      { name: 'IRONCLAD',      desc: '50 shots blocked in shelter' },
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
@@ -12908,7 +13113,8 @@ function updatePowerUps() {
             game.invincibleTimer = Math.max(game.invincibleTimer || 0, 60);
             rumble(280, 0.9, 0.55);
             // SIGNAL INTERCEPT — enemy comms panic at fully-armed target
-            if (typeof pushIntercept === 'function') pushIntercept('maxPower');
+            // (the 'maxPower' intercept was cut — pickup-moment chatter; the
+            // lifetime tally below stays.)
             try {
               const cur = parseInt(localStorage.getItem('galagaMaxPowerReached') || '0', 10) || 0;
               const nc = cur + 1;
@@ -18906,6 +19112,10 @@ function pickRunHighlights() {
   // boss's own fire line. Amber to match the wound port.
   const breaks = game.bossBreaks || 0;
   if (breaks >= 1)        out.push({ label: 'BOSS BREAKS',     value: String(breaks),   prio: 40 + breaks * 25, col: '#fa0' });
+  // SHOTS SHADOWED — THE IRON SHADOW: enemy fire eaten by the convoy hull while
+  // you stood in its shadow band. Steel blue to match the band's hatching.
+  const shadowed = game.hullBlocks || 0;
+  if (shadowed >= 5)      out.push({ label: 'SHOTS SHADOWED',  value: String(shadowed), prio: shadowed * 8, col: '#8ac' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
