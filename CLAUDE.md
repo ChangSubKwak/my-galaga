@@ -297,6 +297,35 @@ member; still 24/24, still capped). Tracked: `game.debriefsDenied` + lifetime
 lifetime), `COACH_LESSONS.debrief`. Also shipped: `playerHitHalf()` (the 5 duplicated
 `dualFighter ? 16 : 7` collision ternaries collapsed to one helper; source-scan-pinned).
 
+### THE OPEN WOUND — the boss fight gains an exposure/stagger axis
+
+The mega-boss was a solved DPS wall: every shot interchangeable, phases just stat
+changes. THE OPEN WOUND makes WHERE and WHEN you shoot matter: every **signature
+commit** and every **dash recovery** (moments the player just survived — the
+dodge→punish seams) calls `openVent(mb)`: the gun-port hangs open for
+`ventWindowFor(breaks)` frames (`VENT_OPEN` 90 → shrinking `VENT_RAMP` 16 per break,
+hard-floored `VENT_MIN` 42 ≥ the 30f baseline — **an opportunity shrinking is not a
+warning shrinking**; test-pinned). The wound opens on the flank **away from the player**
+— or, with a locked SWARM MIND read, away from the **profiled lane**
+(`ventSideFor`): the swarm's intel reaches the boss tier, DEBRIEF uplinks and BAIT
+lies echo into boss fights. Hits inside the band (`ventContains`, `VENT_HALF`×scale)
+feed `mb.stagger` (`staggerStep`, `STAGGER_GAIN` 0.34 — 3 plain hits); meter full →
+`breakBossStance`: `STAGGER_STUN` 120f of broken stance on the **existing
+telegraph-freeze semantics** (`frozen` extended; phase triggers' `!frozen` guards
+defer metamorphosis cleanly past a stagger). Metamorphosis resets `breaks` — the new
+form's wounds are fresh.
+
+**ZERO new score** — wound hits deal normal damage (driven test pins score delta 0);
+the payoff is the earned silence. Ignoring the wound is fully viable. The price of a
+wound run is flying the boss's own fire cone, priced by the existing
+dash-parry/witch-time/shield ladder. `VENT_SLOW` only lowers boss speed while open.
+Drawn: pulsing amber port + open-chevron + dashed drop-column + remaining-window arc;
+stagger pips under the boss; broken stance slumps and greys. Narrative: **new
+BOSS_TAUNTS situation `stagger`** across all 6 archetype voices (completeness test
+extended) — no comms intercept (band stays 24/24). Tracked: `game.bossBreaks` +
+lifetime `galagaBossBreakTotal` (demo-guarded), BOSS BREAKS highlight, BONE BREAKER
+achievement, `COACH_LESSONS.vent`.
+
 ### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
 
 Difficulty has `curve-audit.js`; fairness now has its own instrument:

@@ -207,6 +207,10 @@ const shim = `
 ;try { globalThis.__getDebriefConst = function () { return {
   WAVES: DEBRIEF_WAVES, DESCEND: COURIER_DESCEND, UPLINK: COURIER_UPLINK,
   HP: COURIER_HP, SEED_W: DEBRIEF_SEED_W, SIGHT: LEDGER_SIGHT }; }; } catch (e) {}
+;try { globalThis.__getVentConst = function () { return {
+  OPEN: VENT_OPEN, MIN: VENT_MIN, RAMP: VENT_RAMP, HALF: VENT_HALF,
+  OFF: VENT_OFF, SLOW: VENT_SLOW, GAIN: STAGGER_GAIN, DECAY: STAGGER_DECAY,
+  STUN: STAGGER_STUN }; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -1900,7 +1904,7 @@ if (typeof G.tauntFor === 'function') {
   // All situations the code triggers, across the 6 real archetypes plus an unknown
   // one. Must never throw; returns a string (a line) or null (no line) — both valid.
   const archs = ['standard', 'horned', 'tendril', 'crystal', 'phantom', 'rune', 'unknownArch'];
-  const sits  = ['intro', 'phase2', 'lowHp', 'dash', 'death', 'finalStand', 'bogusSit'];
+  const sits  = ['intro', 'phase2', 'lowHp', 'dash', 'death', 'finalStand', 'stagger', 'bogusSit'];
   let allOk = true, bad = '';
   for (const a of archs) {
     for (const s of sits) {
@@ -1915,7 +1919,7 @@ if (typeof G.tauntFor === 'function') {
   // longer fall back to standard (gap closed). Lock it: all 6 situations present,
   // non-empty, and at least one line differs from the standard set's line.
   const realArchs = ['standard', 'horned', 'tendril', 'crystal', 'phantom', 'rune'];
-  const realSits  = ['intro', 'phase2', 'lowHp', 'dash', 'death', 'finalStand'];
+  const realSits  = ['intro', 'phase2', 'lowHp', 'dash', 'death', 'finalStand', 'stagger'];
   for (const a of realArchs) {
     let complete = true, differs = (a === 'standard');
     for (const s of realSits) {
@@ -4983,6 +4987,107 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
   ok(!G.mindLocked(g.swarmMind), 'but footage alone still does not LOCK the read');
   G.resetGame();
 } else { console.log('  (skipped — debrief not drivable)'); }
+
+section('THE OPEN WOUND — the pure stagger axis (window, side, meter)');
+{
+  const V = G.__getVentConst && G.__getVentConst();
+  const M = G.__getMindConst && G.__getMindConst();
+  if (V && M && typeof G.ventWindowFor === 'function') {
+    // --- the window: generous first, shrinking per break, hard-floored ---
+    eq(G.ventWindowFor(0), V.OPEN, 'the first wound is the full window');
+    eq(G.ventWindowFor(1), V.OPEN - V.RAMP, 'each break shortens the next opportunity');
+    eq(G.ventWindowFor(99), V.MIN, 'floored at VENT_MIN — the ramp can never close the wound entirely');
+    eq(G.ventWindowFor(NaN), V.OPEN, 'a malformed break count reads as 0, never NaN');
+    ok(V.MIN >= 30,
+       'VENT_MIN (' + V.MIN + ') >= the 30f readability baseline — an opportunity may shrink, '
+       + 'but never below the window a human can act on (absolute-floor pin)');
+
+    // --- the side: away from the player, or away from the PROFILED lane ---
+    eq(G.ventSideFor(50, 112, -1), 1, 'no swarm read: the wound opens on the flank AWAY from the player');
+    eq(G.ventSideFor(180, 112, -1), -1, 'from the right, likewise');
+    eq(G.ventSideFor(50, 112, M.ZONES - 1), -1,
+       'a LOCKED read overrides the live position: the wound opens away from the profiled lane — '
+       + 'the swarm\'s intel reaches the boss tier, and a fed lie pre-positions the opening');
+    const _nanSide = G.ventSideFor(NaN, 112, -1);
+    ok(_nanSide === 1 || _nanSide === -1, 'a non-finite player x still yields a valid side, never NaN');
+
+    // --- the band ---
+    ok(G.ventContains(100, 100, 7), 'a bullet dead-centre in the wound counts');
+    ok(!G.ventContains(108, 100, 7), 'one just outside does not');
+    ok(!G.ventContains(NaN, 100, 7), 'a poisoned x never counts');
+
+    // --- the meter: fed only by wound hits, bleeding while closed ---
+    let m = 0;
+    m = G.staggerStep(m, true, 1);
+    m = G.staggerStep(m, true, 1);
+    ok(!G.staggerBreakReady(m), 'two plain hits are not a break');
+    m = G.staggerStep(m, true, 1);
+    ok(G.staggerBreakReady(m), 'three plain hits in the wound break the stance');
+    ok(G.staggerBreakReady(G.staggerStep(G.staggerStep(0, true, 2), true, 1)),
+       'heavy weapons break faster (damage-scaled gain)');
+    let d = 0.5;
+    for (let f = 0; f < 200; f++) d = G.staggerStep(d, false, 0);
+    ok(d < 0.5 && d >= 0, 'a closed wound bleeds the meter back down, floored at 0');
+    eq(G.staggerStep(NaN, true, 1), Math.min(1, V.GAIN), 'a poisoned meter reads as 0, never NaN');
+  } else { console.log('  (skipped — open wound not exposed)'); }
+}
+
+section('THE OPEN WOUND — driven: dodge, cross the gun, break the stance');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.breakBossStance === 'function') {
+  const V = G.__getVentConst();
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 10;
+  G.startStage();
+  eq(g.state, ST.BOSS_STAGE, 'stage 10 is a boss stage');
+  g.playerAlive = true;
+  g.lives = 99;
+  g.cheatInvincible = true;
+  const mb = (g.megaBosses || [])[0];
+  if (mb) {
+    // --- the dash-recovery seam opens the wound through the real update loop ---
+    mb.dashing = true;
+    mb.dashVy = -3;
+    mb.y = 45;
+    for (let f = 0; f < 10 && mb.dashing; f++) G.update();
+    ok((mb.vent || 0) > 0, 'dash recovery leaves the gun-port hanging open (the stage-10 seam)');
+    eq(mb.vent, G.ventWindowFor(0), 'at the full first-wound window');
+
+    // --- hits inside the wound band, through the real bullet-vs-boss path ---
+    const hpBefore = mb.hp;
+    const scoreBefore = g.score || 0;
+    let broke = false;
+    for (let f = 0; f < 20 && !broke; f++) {
+      const vx = mb.x + mb.ventSide * V.OFF * mb.scale;
+      g.bullets.push({ x: vx, y: mb.y, vy: -2, dmg: 1, lvl: 1 });
+      G.update();
+      broke = (mb.staggerFrames || 0) > 0;
+    }
+    ok(broke, 'three wound hits through the real collision path BREAK the stance');
+    eq(mb.breaks, 1, 'the break is counted on the boss');
+    eq(g.bossBreaks, 1, 'and on the run');
+    ok(mb.hp < hpBefore, 'wound hits still deal their normal damage');
+    eq(g.score || 0, scoreBefore, 'and award ZERO score — the payoff is the silence');
+
+    // --- the earned silence: frozen stance on the telegraph-freeze semantics ---
+    const fx = mb.x;
+    const st0 = mb.staggerFrames;
+    for (let f = 0; f < 30; f++) G.update();
+    ok(Math.abs(mb.x - fx) < 0.001, 'a broken boss does not move');
+    ok(mb.staggerFrames < st0, 'while the stun burns down at sim rate');
+
+    // --- the boss answers: the next window is shorter ---
+    for (let f = 0; f < V.STUN; f++) G.update();
+    eq(mb.staggerFrames || 0, 0, 'the stance recovers');
+    mb.dashTimer = 0; mb.sigTimer = 0; mb.vent = 0; // deterministic second seam
+    mb.dashing = true; mb.dashVy = -3; mb.y = 45;
+    for (let f = 0; f < 10 && mb.dashing; f++) G.update();
+    eq(mb.vent, G.ventWindowFor(1),
+       'the second wound is ' + V.RAMP + 'f shorter — the boss answers each break');
+  } else { console.log('  (no mega-boss on stage 10)'); }
+  G.resetGame();
+} else { console.log('  (skipped — open wound not drivable)'); }
 
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of

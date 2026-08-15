@@ -5658,7 +5658,8 @@ const COACH_LESSONS = {
   dread:   'THEY AVOID WHERE THEY DIE — HERD THEM',
   struggle:'BEAM GOT YOU? MASH L-R TO TEAR FREE',
   heist:   'STAND IN THE WINDUP TO ROB THE BEAM',
-  debrief: 'SHOOT THE COURIER — DENY THE UPLINK'
+  debrief: 'SHOOT THE COURIER — DENY THE UPLINK',
+  vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -8274,6 +8275,8 @@ function resetGame() {
     courier: null,
     ledgerSight: 0,
     debriefsDenied: 0,
+    // THE OPEN WOUND — boss stances broken this run.
+    bossBreaks: 0,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
     comboArsenalClaimed: {},
@@ -8747,6 +8750,113 @@ function bossSpreadForStage(stage) {
   return 7 + Math.round((typeof deepPressure === 'function' ? deepPressure(stage) : 0) * 2);
 }
 
+// =============================== THE OPEN WOUND =============================
+// The mega-boss was the one fight a veteran has fully solved: a DPS wall where
+// all shots are interchangeable. THE OPEN WOUND gives the fight an exposure /
+// stagger axis — WHERE and WHEN you shoot finally matters. Every signature
+// commit and every dash recovery (moments the player just SURVIVED) leaves the
+// boss's gun-port hanging open on its far flank for a drawn window. Cross under
+// the gun, land hits inside the wound, and the stance BREAKS: STAGGER_STUN
+// frames of earned silence on the existing telegraph-freeze semantics.
+//
+// The flown choice: chip the body safely from your lane, or fly the boss's own
+// fire line for the break — priced entirely by the existing defensive ladder
+// (dash i-frames / DASH PARRY / witch-time / shield). Ignoring the wound is
+// fully viable; it only offers tempo. ZERO new score — wound hits deal normal
+// damage, no multiplier, no points.
+//
+// The boss ANSWERS: each break shortens the NEXT window (ventWindowFor, floored
+// at VENT_MIN — an opportunity shrinking is not a warning shrinking, so the
+// fairness budget is untouched). Metamorphosis resets the count: the new form's
+// wounds are fresh, giving the fight's second half its own punish arc.
+//
+// SWARM MIND fusion: with a locked profile the boss buys the swarm's intel and
+// opens the wound on the side AWAY from your habitual lane — the read learned
+// in normal stages (and uplinked by THE DEBRIEF) decides where boss openings
+// appear, and a deliberately-fed false profile pre-positions them for you.
+const VENT_OPEN     = 90;    // first wound window (1.5s)
+const VENT_MIN      = 42;    // hard floor — never below the 30f readability baseline
+const VENT_RAMP     = 16;    // frames shaved off the window per break
+const VENT_HALF     = 7;     // wound hit band half-width (× mb.scale)
+const VENT_OFF      = 10;    // wound offset from boss centre (× mb.scale)
+const VENT_SLOW     = 0.6;   // boss patrol damp while open (lowers speed, never raises)
+const STAGGER_GAIN  = 0.34;  // stagger per damage point landed in the wound (3 plain hits)
+const STAGGER_DECAY = 0.004; // meter bleed per frame while the wound is closed
+const STAGGER_STUN  = 120;   // frames of broken stance (telegraph-freeze semantics)
+
+// Pure: the wound window for a boss that has been broken `breaks` times.
+function ventWindowFor(breaks) {
+  const b = (isFinite(breaks) && breaks > 0) ? breaks : 0;
+  return Math.max(VENT_MIN, VENT_OPEN - b * VENT_RAMP);
+}
+
+// Pure: which flank the wound opens on. Default — the side AWAY from the player
+// at open time (punishing means crossing the gun line). With a locked swarm
+// read, the side away from the PROFILED lane instead: the swarm's intel reaches
+// the boss tier, and lying to the mind pre-positions boss openings.
+function ventSideFor(playerX, bossX, lockedZone) {
+  const ref = (lockedZone != null && lockedZone >= 0)
+    ? mindZoneCenter(lockedZone)
+    : (isFinite(playerX) ? playerX : BASE_W / 2);
+  return ref < bossX ? 1 : -1;
+}
+
+// Pure: is a bullet inside the wound band?
+function ventContains(bulletX, ventX, halfW) {
+  if (!isFinite(bulletX) || !isFinite(ventX)) return false;
+  return Math.abs(bulletX - ventX) < halfW;
+}
+
+// Pure: one step of the stagger meter — grows only on wound hits while open,
+// bleeds while closed. Clamped [0,1], NaN-safe.
+function staggerStep(meter, open, hitDmg) {
+  const m = isFinite(meter) ? meter : 0;
+  if (open && hitDmg > 0) return Math.min(1, m + STAGGER_GAIN * hitDmg);
+  return Math.max(0, m - STAGGER_DECAY);
+}
+
+function staggerBreakReady(meter) {
+  return (meter || 0) >= 1 - 1e-9;
+}
+
+// Impure: open the wound. Called at the two dodge→punish seams (signature
+// commit, dash recovery). coachFire self-gates to once per lifetime.
+function openVent(mb) {
+  mb.vent = ventWindowFor(mb.breaks || 0);
+  const p = game && game.swarmMind;
+  const lockedZone = (p && mindLocked(p)) ? mindFavoredZone(p.z) : -1;
+  mb.ventSide = ventSideFor(game.playerX, mb.x, lockedZone);
+  if (typeof coachFire === 'function') coachFire('vent');
+}
+
+// Impure: the break — the whole payoff. Earned silence, not points.
+function breakBossStance(mb) {
+  mb.stagger = 0;
+  mb.vent = 0;
+  mb.staggerFrames = STAGGER_STUN;
+  mb.breaks = (mb.breaks || 0) + 1;
+  game.bossBreaks = (game.bossBreaks || 0) + 1;
+  if (!game.isDemo) {
+    try {
+      const _bb = (parseInt(localStorage.getItem('galagaBossBreakTotal') || '0', 10) || 0) + 1;
+      localStorage.setItem('galagaBossBreakTotal', String(_bb));
+    } catch (_e) {}
+  }
+  unlockAchievement('boneBreaker');
+  if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 3.6, 90);
+  game.hitStopFrames = Math.max(game.hitStopFrames || 0, 8);
+  if (game.shockwaves) {
+    game.shockwaves.push({ x: mb.x, y: mb.y, life: 0, maxLife: 24, maxR: 28, color: '#fa0' });
+  }
+  game.floatTexts.push({
+    x: mb.x, y: mb.y - 20, text: 'STANCE BROKEN',
+    color: '#fa0', life: 70, maxLife: 70, size: 8
+  });
+  triggerBossTaunt(mb, 'stagger');
+  playSound('bossWarning', mb.x);
+  rumble(320, 0.8, 0.5);
+}
+
 function makeMegaBoss(s, opts) {
   opts = opts || {};
   const baseHp = 20 + s * 3;
@@ -8776,7 +8886,13 @@ function makeMegaBoss(s, opts) {
     super: !!opts.super,
     scale: opts.super ? 1.5 : 1,
     archetype: opts.archetype || archetypeFor(s),
-    sigTimer: 0
+    sigTimer: 0,
+    // THE OPEN WOUND — exposure/stagger axis
+    vent: 0,          // frames the wound is open (0 = closed)
+    ventSide: 1,      // which flank (+1 right / -1 left of boss centre)
+    stagger: 0,       // 0..1 break meter, fed only by wound hits
+    staggerFrames: 0, // frames of broken stance remaining
+    breaks: 0         // times broken this form (reset by metamorphosis)
   };
 }
 
@@ -8815,12 +8931,20 @@ function updateOneMegaBoss(mb) {
     playSound('bossWarning');
     rumble(180, 0.55, 0.3);
   }
-  // Telegraph freeze: skip movement / shoot / dash but allow bullet hits to register
-  const frozen = mb.telegraphFrames > 0;
-  if (frozen) {
+  // Telegraph freeze: skip movement / shoot / dash but allow bullet hits to
+  // register. THE OPEN WOUND's broken stance rides the SAME channel — movement,
+  // fire, dash and signature all stop, bullets still land, phase triggers keep
+  // their !frozen guards so metamorphosis defers cleanly past a stagger.
+  const frozen = mb.telegraphFrames > 0 || (mb.staggerFrames || 0) > 0;
+  if (mb.telegraphFrames > 0) {
     mb.telegraphFrames--;
     mb.hitFlash = 4;
   }
+  if ((mb.staggerFrames || 0) > 0) mb.staggerFrames--;
+  // THE OPEN WOUND — window countdown + meter bleed while closed (update-side,
+  // never in draw).
+  if ((mb.vent || 0) > 0) mb.vent--;
+  else if ((mb.staggerFrames || 0) <= 0) mb.stagger = staggerStep(mb.stagger, false, 0);
 
   // Phase 2 trigger at 40% HP — METAMORPHOSIS: boss morphs to a new archetype with
   // a different signature attack pattern. Visual cinematic: brief freeze, ring burst at
@@ -8837,6 +8961,11 @@ function updateOneMegaBoss(mb) {
     const oldArc = mb.archetype || 'standard';
     mb.archetype = morphMap[oldArc] || 'horned';
     mb.sigTimer = 0; // reset signature timer so the NEW signature lands soon
+    // THE OPEN WOUND — the new form's wounds are fresh: the second half of the
+    // fight gets its own full punish arc.
+    mb.breaks = 0;
+    mb.vent = 0;
+    mb.stagger = 0;
     mb.telegraphFrames = 24; // brief metamorphosis freeze
     // FLOOR-WIDE GRID HEAVE — the metamorphosis shoves a wide patch of the vector grid
     // outward from the boss, so the climactic morph physically rocks the world. Radius
@@ -8920,9 +9049,9 @@ function updateOneMegaBoss(mb) {
     if (typeof pushIntercept === 'function') pushIntercept('bossRage');
   }
 
-  // Horizontal patrol
+  // Horizontal patrol (damped while the wound is open — lowering speed only)
   if (!frozen && !mb.dashing) {
-    mb.x += mb.vx;
+    mb.x += mb.vx * ((mb.vent || 0) > 0 ? VENT_SLOW : 1);
     if (mb.x > BASE_W - 20) { mb.x = BASE_W - 20; mb.vx = -Math.abs(mb.vx); }
     if (mb.x < 20)           { mb.x = 20;           mb.vx =  Math.abs(mb.vx); }
   }
@@ -8952,6 +9081,10 @@ function updateOneMegaBoss(mb) {
       mb.y = 35;
       mb.dashing = false;
       mb.dashVy = 0;
+      // THE OPEN WOUND — dash recovery leaves the gun-port hanging open. This
+      // trigger is what makes the wound reachable at stage 10: the 'standard'
+      // archetype has no signature, but every boss dashes.
+      openVent(mb);
     }
   }
 
@@ -9037,6 +9170,9 @@ function updateOneMegaBoss(mb) {
     }
     if (!frozen && mb.sigTimer >= sigInterval) {
       mb.sigTimer = 0;
+      // THE OPEN WOUND — the signature commit is the other dodge→punish seam:
+      // the gun-port that just fired hangs open on the far flank.
+      openVent(mb);
       // SIGNATURE HEAVE — the floor pulses under the boss each time it unleashes a
       // signature attack, so the grid telegraphs the climax beats (medium radius).
       if (typeof gridRipple === 'function') gridRipple(mb.x, mb.y, 3.2, 78);
@@ -9189,6 +9325,21 @@ function updateOneMegaBoss(mb) {
         }
       }
       mb.hp -= dmgDealt;
+      // THE OPEN WOUND — a hit inside the open vent feeds the stagger meter.
+      // Wound hits deal NORMAL damage (no multiplier, no points): the entire
+      // payoff is the break.
+      if ((mb.vent || 0) > 0) {
+        const _ventX = mb.x + mb.ventSide * VENT_OFF * mb.scale;
+        if (ventContains(b.x, _ventX, VENT_HALF * mb.scale)) {
+          mb.stagger = staggerStep(mb.stagger, true, dmgDealt);
+          for (let _k = 0; _k < 4; _k++) {
+            game.itemBursts.push({
+              x: b.x + jitter(4), y: b.y + jitter(3), life: -_k, color: '#fa0'
+            });
+          }
+          if (staggerBreakReady(mb.stagger)) breakBossStance(mb);
+        }
+      }
       // BOSS HIT IMPACT SCALE — shake/flash scale with damage so heavy weapons
       // (laser, synergy, perks) feel substantively heavier on impact.
       mb.hitFlash = dmgDealt >= 3 ? 14 : dmgDealt >= 2 ? 11 : 8;
@@ -11682,6 +11833,7 @@ const ACHIEVEMENTS = {
   firstBlood:    { name: 'FIRST BLOOD',  desc: 'Score your first kill' },
   comboMaster:   { name: 'COMBO MASTER',  desc: 'Reach combo 30' },
   censor:        { name: 'CENSOR',        desc: 'Deny 10 uplinks lifetime' },
+  boneBreaker:   { name: 'BONE BREAKER',  desc: 'Break a boss stance' },
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
@@ -18507,6 +18659,7 @@ const BOSS_TAUNTS = {
     phase2:  'YOU FIGHT WELL.',
     lowHp:   'THIS IS NOT THE END.',
     dash:    'INCOMING.',
+    stagger: 'MY STANCE — HOLD...',
     intro:   'I HAVE WAITED.',
     death:   'WE WILL RETURN.',
     finalStand: 'I WILL NOT YIELD!'
@@ -18515,6 +18668,7 @@ const BOSS_TAUNTS = {
     phase2:  'NOW YOU SEE MY RAGE.',
     lowHp:   'I REFUSE TO FALL.',
     dash:    'BREAK.',
+    stagger: 'YOU DARE STRIKE THE WOUND?!',
     intro:   'YOU DARED COME HERE.',
     death:   'IMPOSSIBLE...',
     finalStand: 'I AM THE STORM.'
@@ -18523,6 +18677,7 @@ const BOSS_TAUNTS = {
     phase2:  'I HAVE MORE FORMS.',
     lowHp:   'YOU CANNOT KILL WHAT WAITS.',
     dash:    'REACH.',
+    stagger: 'MY LIMBS... SEVERED...',
     intro:   'THE DEPTHS GREET YOU.',
     death:   'I SLEEP, NOT DIE.',
     finalStand: 'EVERYTHING ENDS WITH ME.'
@@ -18531,6 +18686,7 @@ const BOSS_TAUNTS = {
     phase2:  'YOUR CALCULATIONS ARE WRONG.',
     lowHp:   'DATA INSUFFICIENT.',
     dash:    'COMPUTE.',
+    stagger: 'STRUCTURAL FAULT DETECTED.',
     intro:   'PROBABILITY: ZERO.',
     death:   'ANOMALY DETECTED.',
     finalStand: 'RECOMPUTING — ATTACK ALL.'
@@ -18539,6 +18695,7 @@ const BOSS_TAUNTS = {
     phase2:  'NOW I AM EVERYWHERE.',
     lowHp:   'I FADE, NOT FALL.',
     dash:    'BLINK.',
+    stagger: 'YOU FOUND MY SHAPE...',
     intro:   'YOU NEVER SAW ME COME.',
     death:   'I LINGER STILL...',
     finalStand: 'DEATH IS MY DISGUISE.'
@@ -18547,6 +18704,7 @@ const BOSS_TAUNTS = {
     phase2:  'THE SEAL BREAKS OPEN.',
     lowHp:   'THE GLYPHS STILL HOLD.',
     dash:    'INSCRIBE.',
+    stagger: 'A GLYPH... SHATTERED!',
     intro:   'CARVED BEFORE YOUR KIND.',
     death:   'RECARVED IN TIME.',
     finalStand: 'I AM THE FIRST WORD.'
@@ -18744,6 +18902,10 @@ function pickRunHighlights() {
   // reached THE SWARM MIND. An information-war stat: zero score in the system.
   const denied = game.debriefsDenied || 0;
   if (denied >= 2)        out.push({ label: 'DEBRIEFS DENIED', value: String(denied),   prio: denied * 16, col: '#f6f' });
+  // BOSS BREAKS — THE OPEN WOUND: stances shattered by wound runs through the
+  // boss's own fire line. Amber to match the wound port.
+  const breaks = game.bossBreaks || 0;
+  if (breaks >= 1)        out.push({ label: 'BOSS BREAKS',     value: String(breaks),   prio: 40 + breaks * 25, col: '#fa0' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
@@ -21925,6 +22087,14 @@ function drawBossStage() {
         ctx.restore();
       }
     };
+    // THE OPEN WOUND — broken stance: the boss slumps 6px and greys out for the
+    // stun (draw-side offset only; update owns the timers).
+    const _slump = (mb.staggerFrames || 0) > 0;
+    if (_slump) {
+      ctx.save();
+      ctx.translate(0, 6);
+      ctx.globalAlpha = 0.55 + 0.2 * Math.sin(game.animFrame * 0.3);
+    }
     if (mb.telegraphing) {
       const blink = blinkPhase(1);
       renderBoss(blink);
@@ -21943,6 +22113,54 @@ function drawBossStage() {
       }
     } else {
       renderBoss(mb.hitFlash > 0);
+    }
+    if (_slump) ctx.restore();
+    // THE OPEN WOUND — the wound, DRAWN: a pulsing amber port on the open flank,
+    // a short dashed drop-column beneath it (storm/capture telegraph vocabulary),
+    // an open-chevron marker (colorblind-safe shape), and a shrinking arc showing
+    // the remaining window. Read-only; all timers tick in updateOneMegaBoss.
+    if ((mb.vent || 0) > 0) {
+      const _vs = mb.scale || 1;
+      const _vx = Math.round(mb.x + mb.ventSide * VENT_OFF * _vs);
+      const _vy = Math.round(mb.y + 6 * _vs);
+      const _win = mb.vent / ventWindowFor(mb.breaks || 0);
+      ctx.save();
+      const _vp = 0.55 + 0.45 * Math.sin(game.animFrame * 0.35);
+      ctx.globalAlpha = 0.75 * _vp;
+      ctx.fillStyle = '#fa0';
+      ctx.fillRect(_vx - 2, _vy - 2, 4, 4);
+      ctx.fillStyle = '#ff6';
+      ctx.fillRect(_vx - 1, _vy - 1, 2, 2);
+      // Open-chevron marker above the port (shape carries it without colour)
+      ctx.strokeStyle = '#fa0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(_vx - 4, _vy - 8); ctx.lineTo(_vx, _vy - 5); ctx.lineTo(_vx + 4, _vy - 8);
+      ctx.stroke();
+      // Dashed drop-column beneath — "the run to make" — fading with the window
+      ctx.globalAlpha = 0.30 * _win;
+      for (let _yy = _vy + 6; _yy < BASE_H - 30; _yy += 6) {
+        if (((_yy + (game.animFrame >> 1)) % 12) < 6) continue;
+        ctx.fillStyle = '#fa0';
+        ctx.fillRect(_vx, _yy, 1, 3);
+      }
+      // Remaining-window arc over the port
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      ctx.arc(_vx, _vy, 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * _win);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Stagger meter — up to 3 amber pips under the boss while the meter is live
+    if ((mb.stagger || 0) > 0.05 && (mb.staggerFrames || 0) <= 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      const _pips = Math.round(mb.stagger * 3);
+      for (let _k = 0; _k < 3; _k++) {
+        ctx.fillStyle = _k < _pips ? '#fa0' : '#432';
+        ctx.fillRect(Math.round(mb.x) - 5 + _k * 4, Math.round(mb.y) + 14, 3, 2);
+      }
+      ctx.restore();
     }
     // PHASE 3 RAGE — pulsing red square halo around the boss when in critical state.
     // Scales with drawScale so super bosses get a proportionally larger aura.
