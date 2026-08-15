@@ -4262,12 +4262,17 @@ function launchDiveTactic(tactic, candidates) {
     ? planPincerPair(pool, targetX)
     : planWallRun(pool, targetX, tactic.size);
   if (!_plan || _plan.length < 2) return false;
-  // THE EBB — THE SALLY: the commander leads the maneuver it authorised, taking
-  // the slot of the nearest planned member so the maneuver's SHAPE (and the
-  // telegraph the player is about to read) is preserved. Applied BEFORE the
-  // preview is written, the same ordering rule THE KILLING FIELD's deflection
-  // follows — the frozen telegraph always shows the true flight.
-  const squad = sallyLead(_plan, pool.find(e => e.isCommander));
+  // THE SALLY WAS RETIRED BY MEASUREMENT. Having the commander lead the
+  // maneuver it authorised read beautifully and did not survive test/ebb-audit.js:
+  // across three stage bands, SEVEN of seven windows closed because the
+  // commander DIED mid-sortie and none because it flew home — leading a dive
+  // flies it straight into the player's guns. So "spare the commander" was not
+  // a flyable counter-play, windows lasted 10-52 frames, none was ever cuttable,
+  // and every run silently lost its mind-profile and ate a 360f rage timer the
+  // player never chose. The coherence fix THE EBB was built on (the model and
+  // the picture finally judging membership the same way) stands on its own; the
+  // window still opens whenever the commander dives of its own accord.
+  const squad = _plan;
   squad.forEach((e, i) => {
     e.previewTimer = WING_PREVIEW + (tactic.id === 'wall' ? i * 3 : 0); // wall staggers slightly
     e.previewMax = e.previewTimer;
@@ -8815,12 +8820,20 @@ function standingChanged(prev, next) {
 // Pure: THE EBB LEVEL — the fraction of the wall away on the attack. 0 = fully
 // manned, 1 = empty. Drives the socket's alpha only; never scored, never a HUD
 // number.
-function ebbLevel(standing) {
+// Measured against the LIVING wall, not the original roster: counting the dead
+// as "away on the attack" would make the socket's alpha encode cumulative
+// attrition — the exact step function THE EBB exists to replace.
+function ebbLevel(standing, alive) {
   const n = (standing && standing.length) || 0;
   if (!n) return 0;
-  let held = 0;
-  for (let i = 0; i < n; i++) if (standing[i]) held++;
-  return clamp01(1 - held / n);
+  let held = 0, live = 0;
+  for (let i = 0; i < n; i++) {
+    const isLive = alive ? !!alive[i] : true;
+    if (isLive) live++;
+    if (standing[i]) held++;
+  }
+  if (!live) return 0;
+  return clamp01(1 - held / live);
 }
 
 // Pure: the index of the commander that is actually STANDING, else -1. The net
@@ -8831,26 +8844,6 @@ function netHolderIndex(ents, standing) {
     if (ents[i] && ents[i].isCommander && standing && standing[i]) return i;
   }
   return -1;
-}
-
-// Pure: THE SALLY. The commander joins the maneuver it authorised, taking the
-// slot of the NEAREST squad member so the maneuver's SHAPE — and therefore the
-// telegraph the player is about to read — is preserved. Identity when there is
-// no commander, when it is a boss type (bosses run their own escort dives), or
-// when it is already in the squad. Returns a NEW array; never mutates.
-function sallyLead(squad, cmd) {
-  if (!squad || !squad.length || !cmd) return squad;
-  if (cmd.type === 'boss') return squad;
-  if (squad.indexOf(cmd) !== -1) return squad;
-  let best = 0, bd = Infinity;
-  for (let i = 0; i < squad.length; i++) {
-    const s = squad[i];
-    const d = Math.abs((s.x || 0) - (cmd.x || 0)) + Math.abs((s.y || 0) - (cmd.y || 0));
-    if (d < bd) { bd = d; best = i; }
-  }
-  const out = squad.slice();
-  out[best] = cmd;
-  return out;
 }
 
 // Pure: is a COORDINATED maneuver still frozen in its telegraph? Replaces the
@@ -8884,7 +8877,7 @@ function latticeRecompute() {
   L.netIntact = cmdIdx >= 0;
   const adj = L.netIntact ? latticeStiffen(L.adj, cmdIdx, standing) : L.adj;
   L.cuts = latticeCuts(adj, standing, LAT_MIN_CHUNK);
-  L.ebb = ebbLevel(standing);
+  L.ebb = ebbLevel(standing, L.ents.map(e => !!(e && e.alive)));
   if (L.cuts.length && typeof coachFire === 'function') {
     // THE EBB — when the window was opened by the swarm's own sortie rather
     // than by attrition, that is the lesson worth teaching: the commander
@@ -15688,7 +15681,12 @@ function updateCollisions() {
               } catch (_eR) {}
             }
           }
-          const inForm = e.state === 'formation';
+          // A COLLAPSING member is still part of the wall — it is falling out of
+          // it, not attacking. Scoring it as a diver paid 2x-2.67x per member
+          // (bee 50->100, boss 150->400), which made cutting a span a score
+          // MULTIPLIER and falsified THE KEYSTONE's documented invariant that
+          // collapse can only ever COST points. Found by adversarial review.
+          const inForm = e.state === 'formation' || e.state === 'collapsing';
           // EARLY INTERCEPT — kill while enemy is still in entering path.
           // Small flat bonus + callout. Rewards aggressive opening play.
           const isIntercept = e.state === 'entering';
@@ -21968,7 +21966,12 @@ function drawLattice() {
   // facing where the commander actually is and a tether dash toward it. Open
   // ring vs closed ring reads without colour, and it replaces the blank state
   // this function used to render at exactly this moment.
-  const _absentCmd = ents.find(e => e && e.alive && e.isCommander && !standing(e));
+  // Selected on the TELEGRAPH as well as on absence: during a wing preview the
+  // commander's state is still 'formation', so keying only on !standing made the
+  // ring appear on the frame the window opened — 0 frames of warning, and the
+  // growth ramp below was unreachable code.
+  const _absentCmd = ents.find(e => e && e.alive && e.isCommander
+    && (!standing(e) || (e.previewTimer || 0) > 0));
   if (_absentCmd) {
     const hx = _absentCmd.homeX, hy = _absentCmd.homeY;
     const ang = Math.atan2(_absentCmd.y - hy, _absentCmd.x - hx);
@@ -22004,8 +22007,13 @@ function drawLattice() {
   } else {
     // KEYSTONES — diamond + brightened load path. The cut list is only ever as
     // long as the structure genuinely allows, so this is invisible until real.
+    //
+    // Suppressed while LAT_COOLDOWN is running: latticeCollapse refuses during
+    // it, so a diamond drawn there promises a collapse a kill cannot deliver —
+    // the same lie THE EBB deleted 24 frames of, and 150 frames long.
     const pulse = 0.55 + 0.45 * Math.sin(game.animFrame * 0.13);
-    for (const c of L.cuts) {
+    const _armed = (L.cool || 0) <= 0 && !wingTelegraphing(game.enemies);
+    for (const c of (_armed ? L.cuts : [])) {
       const e = ents[c.i];
       if (!standing(e)) continue;
       ctx.globalAlpha = 0.30 * pulse;

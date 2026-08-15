@@ -5429,22 +5429,6 @@ section('THE EBB — the pure manning axis (standing, the net holder, the sally)
        + 'hold the net from inside the wall at the same time');
     eq(G.netHolderIndex([], []), -1, 'no members, no holder');
 
-    // --- THE SALLY preserves the maneuver's shape ---
-    const a = { x: 10, y: 50 }, b = { x: 90, y: 50 }, cmd = { x: 88, y: 52 };
-    const led = G.sallyLead([a, b], cmd);
-    eq(led.length, 2, 'the squad keeps its size — the telegraph the player reads is unchanged');
-    ok(led.indexOf(cmd) !== -1, 'the commander joined the sortie it authorised');
-    ok(led[1] === cmd && led[0] === a,
-       'and took the slot of the NEAREST planned member, so the maneuver keeps its shape');
-    const _plan0 = [a, b];
-    ok(G.sallyLead(_plan0, null) === _plan0, 'no commander is identity — the plan is returned untouched');
-    eq(G.sallyLead([a, b], { x: 0, y: 0, type: 'boss' })[0], a,
-       'a boss-type commander never joins — it runs its own escort dives');
-    eq(G.sallyLead([a, cmd], cmd).length, 2, 'a commander already in the squad is left alone');
-    const orig = [a, b];
-    G.sallyLead(orig, cmd);
-    ok(orig[1] === b, 'sallyLead never mutates the plan it was given');
-
     // --- the 24-frame lie, deleted ---
     ok(!G.wingTelegraphing([{ alive: true, _wingTactic: 'pincer', previewTimer: 0 }]),
        'a committed maneuver is no longer "telegraphing" — the old deferral used '
@@ -5458,74 +5442,48 @@ section('THE EBB — the pure manning axis (standing, the net holder, the sally)
   } else { console.log('  (skipped — ebb not exposed)'); }
 }
 
-section('THE EBB — driven: the swarm opens its own wall by attacking');
+section('THE EBB — driven: the wall opens when its anchor leaves');
 // The SALVAGE lesson: never construct the state a feature needs. This drives a
 // real stage and OBSERVES — it never writes e.state, L.cuts, L.standing or
-// game.lattice, and every kill goes through the real bullet path.
+// game.lattice. The only test-side control is the dive CADENCE (the same
+// diveInterval lever the KEYSTONE test uses), so the commander's own dive —
+// which is a rolled choice among ~36 members — is reached in bounded time.
 if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
     && typeof G.latticeStanding === 'function') {
-  G.resetGame();
-  const g = G.__getGame();
-  g.stage = 7;
-  G.startStage();
-  g.playerAlive = true;
-  g.lives = 99;
-  g.cheatInvincible = true;
-  for (let f = 0; f < 500 && !g.allEntered; f++) G.update();
-
-  ok(!!g.lattice, 'the architecture is built');
-  ok(g.lattice.netIntact, 'and its net is intact while the commander sits in the wall');
-
-  // Carve the wall a little through the REAL bullet path so a hole exists for a
-  // sortie to expose (an intact 4-connected grid has no keystones by design).
-  const kill = (e) => {
-    for (let f = 0; f < 40 && e && e.alive; f++) {
-      g.bullets.push({ x: e.x, y: e.y + 2, vy: -2, dmg: 99, lvl: 1 });
+  // The commander's own dive is a ROLLED choice among ~36 members, and a dive
+  // can end with it ramming the player and dying before any window opens. So
+  // the observation is retried on fresh stages, bounded — the event is rare,
+  // not absent, and a single attempt would make this a coin flip.
+  let sawWindow = false, cmdAliveInWindow = false, sawClose = false;
+  let chunksAllStanding = true, minPreview = Infinity, sawSocketWarning = false;
+  let builtOk = false, netOk = false, scoreClean = true;
+  for (let attempt = 0; attempt < 8 && !sawWindow; attempt++) {
+    G.resetGame();
+    const g = G.__getGame();
+    g.stage = 7;
+    G.startStage();
+    g.playerAlive = true;
+    g.lives = 99;
+    g.cheatInvincible = true;
+    for (let f = 0; f < 500 && !g.allEntered; f++) G.update();
+    if (!g.lattice) continue;
+    builtOk = true;
+    if (g.lattice.netIntact) netOk = true;
+    g.diveInterval = 40;          // dive cadence only — nothing about the mechanic
+    const scoreStart = g.score || 0;
+    for (let f = 0; f < 6000 && !(sawWindow && sawClose); f++) {
       G.update();
-    }
-  };
-  // Never carve the commander — it is designated at random, and killing it
-  // would close the very window under test (that is the shipped counter-play).
-  for (const rc of [[1, 2], [2, 3], [3, 2], [6, 3]]) {
-    const t = (g.enemies || []).find(e => e.alive && !e.isCommander
-      && e.col === rc[0] && e.row === rc[1]);
-    if (t) kill(t);
-  }
-
-  // A sortie is a ROLLED event, so waiting for one makes the assertion a coin
-  // flip (it was, and it failed one run in three). Instead the window is opened
-  // by calling the game's OWN launcher on the real candidate pool: every state
-  // transition, the sally, the manning seam and the recompute are the shipped
-  // code paths. Nothing here writes e.state, L.cuts, L.standing or game.lattice.
-  let sawWindow = false, sawCutsInWindow = false, cmdAliveInWindow = false;
-  let sawClose = false, chunksAllStanding = true, minPreview = Infinity;
-  const scoreStart = g.score || 0;
-  let launched = false, cmdDied = false;
-  for (let f = 0; f < 9000 && !(sawWindow && sawClose); f++) {
-    if (!launched && f > 2) {
-      const cands = (g.enemies || []).filter(e => e.alive && e.state === 'formation');
-      // DIVE_TACTICS is the REGISTRY (an array) — take the pincer entry from it
-      // so the size/id the launcher reads are the shipped ones.
-      const _reg = (G.__getDiveTactics && G.__getDiveTactics()) || [];
-      const _tac = _reg.find(t => t.id === 'pincer') || { id: 'pincer', size: 2 };
-      if (cands.some(e => e.isCommander) && typeof G.launchDiveTactic === 'function') {
-        launched = !!G.launchDiveTactic(_tac, cands);
+      const L = g.lattice;
+      if (!L) break;
+      const cmd = (g.enemies || []).find(e => e.alive && e.isCommander);
+      if (!cmd) break;
+      for (const e of (g.enemies || [])) {
+        if (e.previewTimer > 0 && e.previewMax) minPreview = Math.min(minPreview, e.previewMax);
       }
-    }
-    G.update();
-    const L = g.lattice;
-    if (!L) continue;
-    const cmd = (g.enemies || []).find(e => e.alive && e.isCommander);
-    if (launched && !cmd) cmdDied = true;   // a legitimate outcome: the window then
-                                            // closes permanently, by the other rule
-    for (const e of (g.enemies || [])) {
-      if (e.previewTimer > 0 && e.previewMax) minPreview = Math.min(minPreview, e.previewMax);
-    }
-    if (cmd && cmd.state !== 'formation' && !L.netIntact) {
-      sawWindow = true;
-      cmdAliveInWindow = true;
-      if (L.cuts.length) {
-        sawCutsInWindow = true;
+      if (cmd.state === 'formation' && (cmd.previewTimer || 0) > 0) sawSocketWarning = true;
+      if (cmd.state !== 'formation' && !L.netIntact) {
+        sawWindow = true;
+        cmdAliveInWindow = true;
         for (const c of L.cuts) {
           for (const idx of c.chunk) {
             const m = L.ents[idx];
@@ -5533,27 +5491,28 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
           }
         }
       }
+      if (sawWindow && cmd.state === 'formation' && L.netIntact) sawClose = true;
     }
-    if (sawWindow && cmd && cmd.state === 'formation' && L.netIntact) sawClose = true;
+    if ((g.score || 0) < scoreStart) scoreClean = false;
   }
+  ok(builtOk, 'the architecture is built');
+  ok(netOk, 'and its net is intact while the commander sits in the wall');
 
-  ok(launched, 'the swarm committed a coordinated sortie through its own launcher');
   ok(sawWindow,
-     'a window OPENED without the commander being killed — the swarm led its own sortie '
-     + 'and the net went down because it ATTACKED');
+     'a window OPENED without the commander being killed — the anchor left the wall of '
+     + 'its own accord and the net went down with it');
   ok(cmdAliveInWindow, 'and the commander was alive the whole time the window stood');
-  ok(sawCutsInWindow || !sawWindow,
-     'keystones became live inside that window (the hole the maneuver made is cuttable)');
+  ok(sawSocketWarning,
+     'and THE SOCKET began forming while the commander was still standing — the warning '
+     + 'is real frames, not the frame the window opens (it was zero until measured)');
   ok(chunksAllStanding,
      'every member of every live span is STANDING — the model and the picture finally '
      + 'describe the same object');
-  ok(sawClose || cmdDied,
-     'and the window CLOSED when the squad flew home — the net snapped back (or the '
-     + 'commander fell mid-sortie, which closes it permanently by the other rule)');
+  ok(sawClose || !sawWindow, 'and the window CLOSED when the anchor came home');
   ok(minPreview === Infinity || minPreview >= 30,
-     'THE FAIRNESS BUDGET intact: the shortest telegraph observed across the whole run '
-     + 'is still ' + (minPreview === Infinity ? 'n/a' : minPreview + 'f'));
-  ok((g.score || 0) >= scoreStart, 'and the window is worth ZERO points by itself');
+     'THE FAIRNESS BUDGET intact: the shortest telegraph observed is still '
+     + (minPreview === Infinity ? 'n/a' : minPreview + 'f'));
+  ok(scoreClean, 'and the window is worth ZERO points by itself');
   G.resetGame();
 } else { console.log('  (skipped — ebb not drivable)'); }
 

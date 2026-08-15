@@ -458,61 +458,62 @@ lifetime `galagaRedoubtTotal`/`galagaRedoubtReclaim` (demo-guarded), WALLS PLANT
 highlight, QUARTERMASTER achievement, `COACH_LESSONS.redoubt`. No new comms type (band
 stays 24/24). HUD: hollow chevrons beside the shield row state where the kit went.
 
-### THE EBB — the swarm's strongest attack is the window its own wall is cuttable
+### THE EBB — the model and the picture finally describe the same wall
 
 THE KEYSTONE shipped with **the drawn wall and the computed wall describing different
 objects**. `drawLattice` judged membership by `alive && state === 'formation'`;
 `latticeRecompute` judged it by `alive` alone. So while a squad was diving the player saw
 a hole in the struts the model did not have — and when the **commander itself** dove,
 `netIntact` stayed true while the ring's `find(standing && isCommander)` returned
-undefined, so `drawLattice` rendered **nothing at all**: no ring, no diamonds, a blank
-read layer at the swarm's most committed moment. The code's own comment already promised
-the fix ("rebuild the load paths for what is left STANDING") and never delivered it.
+undefined, so `drawLattice` rendered **nothing at all**: a blank read layer at the swarm's
+most committed moment. The code's own comment already promised the fix ("rebuild the load
+paths for what is left STANDING") and never delivered it.
 
-Resolving that contradiction is not a bug fix, because resolving it creates a dimension
-the game never had: **the wall's strength stops being a step function of cumulative kills
-and starts PULSING with the swarm's own aggression.** Add the one rule that follows — **a
-commander cannot lead from the front and hold the net from inside the wall at the same
-time** (`sallyLead` puts it in the squad it authorised, taking the nearest planned slot so
-the maneuver's shape and telegraph are preserved) — and WING TACTICS (authorises
-coordination) and the COMMAND NET (makes the wall uncuttable) stop being two coincidences
-sharing a flag and become one object with a fork in it.
+What shipped, all verified:
+- `latticeRecompute` judges with `latticeStanding` (a diver, a capture holder, a falling
+  span hold nothing) and **always recomputes it** — `L.standing` is a change-detection
+  cache only; reusing it as the source freezes the model at its first manning.
+- A **manning seam** in `updateEnemies` recomputes the frame manning changes
+  (`standingChanged`, elementwise), not only when something dies.
+- **THE SOCKET**: while the commander is alive but out of the wall — *or telegraphing a
+  dive* — a dashed **OPEN** ring marks its empty home position, gap facing where it
+  actually is. Keying it on absence alone gave the advertised warning **0 frames** (during
+  a telegraph the commander's state is still `formation`); the telegraph clause is what
+  makes the ramp reachable. This replaces the blank state.
+- **Two lies deleted**: the collapse deferral was `diveTimer >= 0` while `WING_COOLDOWN`
+  (60) exceeds `WING_PREVIEW` (36), so a diamond was drawn and live for 24 frames in which
+  a kill on it did nothing; and diamonds were drawn during `LAT_COOLDOWN` (150 frames)
+  when `latticeCollapse` refuses outright. Diamonds now render only when the cut is
+  genuinely armed (`!L.cool && !wingTelegraphing()`).
+- **The score invariant restored**: a `collapsing` member was scored as a diver — bee
+  50→100, boss 150→400 — so cutting a span was a **2×–2.67× score multiplier**, falsifying
+  THE KEYSTONE's documented "collapse can only ever COST points". `inForm` now includes
+  `collapsing`.
+- `ebbLevel` is measured against the **living** wall (counting the dead as "away" made the
+  socket's alpha encode cumulative attrition — the step function this replaces).
+- Commander candidates exclude `boss`.
 
-- Pure core: `latticeStanding` (a diver, a capture holder, a falling span hold nothing) /
-  `standingChanged` (elementwise, so the O(n·(n+E)) recompute fires only on manning seams)
-  / `ebbLevel` / `netHolderIndex` / `sallyLead` / `wingTelegraphing`.
-- `latticeRecompute` now judges with `standing` and **always recomputes it** — `L.standing`
-  is a change-detection cache only; reusing it as the source freezes the model at its
-  first manning (this was caught by the driven KEYSTONE test within minutes).
-- **THE SOCKET, drawn**: while the commander is alive but not standing, a dashed **OPEN**
-  ring at its empty home position, gap facing where it actually is, tether dash toward it,
-  alpha ramping with `ebb`. It forms over the 36f wing telegraph, so the player gets a
-  window's warning that a window is about to open. Open ring vs the net's closed ring reads
-  without colour. **This replaces the blank state** — subtraction, not addition.
-- **The 24-frame lie, deleted**: the collapse deferral was `diveTimer >= 0`, but
-  `WING_COOLDOWN` (60) is longer than `WING_PREVIEW` (36), so for 24 frames after a squad
-  committed a keystone diamond was drawn and live while a kill on it silently did nothing.
-  Now `wingTelegraphing()`; lone dives are byte-identical.
-- Commander candidates exclude `boss` (it could never join the wing pool it authorises,
-  and the capture branch already strips `isCommander`).
+**THE SALLY WAS RETIRED BY MEASUREMENT.** The design had the commander lead the maneuver
+it authorised. It read beautifully and did not survive its own audit: across three stage
+bands, **seven of seven windows closed because the commander DIED mid-sortie and none
+because it flew home** — leading a dive flies it into the player's guns. So "spare the
+commander" was not a flyable counter-play, windows lasted 10–52 frames, none was ever
+cuttable, and every run silently lost its mind profile and ate a 360-frame rage timer the
+player never chose. Retiring it cut involuntary commander deaths from 7 to 2 over the same
+sample. **The coherence fix stands on its own; the window still opens whenever the
+commander dives of its own accord.**
 
-**The played loop, with move/fire/dash only**: camp so THE SWARM MIND locks and the sortie
-comes → choose your kill lane so THE KILLING FIELD steers *which part* of the wall empties
-→ read the socket forming → survive the pincer on the shipped ladder → punch the diamond
-before the squad flies home → the net snaps back and every keystone is annihilated.
-**Breakable**: `formationPanicked` disables WING entirely (panic shuts the window for the
-stage — attrition and the structural game are now in tension), and killing the commander
-closes it permanently (a third, now structural, reason to spare it).
-
-**ZERO new score** (collapse is already score-negative), no new actor, no new comms (band
-stays 24/24), no new HUD, no telegraph shortened. Verified after: KEYSTONE's shipped
-figures are unchanged (40-member wall, first keystone 7 kills after the commander falls,
-one span per wall). Tracked: `game.ebbCuts` + lifetime `galagaEbbTotal` (demo-guarded),
-SORTIE CUTS highlight, BREACH LEADER achievement, `COACH_LESSONS.ebb`. The driven test
-**observes only** — it never writes `e.state`, `L.cuts`, `L.standing` or `game.lattice` —
-and asserts a window opened with the commander alive, that live spans contain only
-standing members, that it closed on the squad's return, and that the shortest telegraph
-observed is still ≥ the baseline.
+```bash
+node test/ebb-audit.js   # report: sorties, windows, ARMED windows, length, cuts, why they closed
+```
+Measured today: windows are real but **rarely cuttable** — an intact 4-connected grid has
+no articulation points, so a sortie's hole makes an *already carved* wall fragile rather
+than creating keystones on a full one. Treat the window as an amplifier, not a generator.
+**ARMED near zero must be fixed structurally (more of the wall standing when the anchor
+leaves), never by rewarding a thing that does not happen.** Tracked: `game.ebbCuts` +
+lifetime `galagaEbbTotal` (demo-guarded), SORTIE CUTS highlight, BREACH LEADER achievement,
+`COACH_LESSONS.ebb`. ZERO new score, no new actor, no new comms (24/24), no new HUD, no
+telegraph shortened.
 
 ### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
 
