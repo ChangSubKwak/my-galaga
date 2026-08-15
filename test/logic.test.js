@@ -207,6 +207,9 @@ const shim = `
 ;try { globalThis.__getDebriefConst = function () { return {
   WAVES: DEBRIEF_WAVES, DESCEND: COURIER_DESCEND, UPLINK: COURIER_UPLINK,
   HP: COURIER_HP, SEED_W: DEBRIEF_SEED_W, SIGHT: LEDGER_SIGHT }; }; } catch (e) {}
+;try { globalThis.__getLatConst = function () { return {
+  R: LAT_LINK_R, DEG: LAT_MAX_DEG, MIN_CHUNK: LAT_MIN_CHUNK, COOL: LAT_COOLDOWN,
+  VY: LAT_FALL_VY, ACC: LAT_FALL_ACC, MAXVY: LAT_FALL_MAX }; }; } catch (e) {}
 ;try { globalThis.__getHullConst = function () { return {
   W: HULL_W, HALF_H: HULL_HALF_H, CAP: HULL_STRESS_CAP, WARN: HULL_VENT_WARN,
   VX: HULL_VENT_VX, Y_MIN: HULL_Y_MIN, Y_MAX: HULL_Y_MAX }; }; } catch (e) {}
@@ -5196,6 +5199,178 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
   }
   G.resetGame();
 } else { console.log('  (skipped — iron shadow not drivable)'); }
+
+section('THE KEYSTONE — the pure architecture (links, components, cuts, the net)');
+{
+  const L = G.__getLatConst && G.__getLatConst();
+  if (L && typeof G.latticeLinks === 'function') {
+    // --- links: symmetric, degree-capped, radius-bounded ---
+    const row = [{x:0,y:0},{x:16,y:0},{x:32,y:0},{x:48,y:0}];
+    const adjRow = G.latticeLinks(row, L.R, L.DEG);
+    eq(adjRow.length, 4, 'one adjacency row per node');
+    let sym = true;
+    for (let i = 0; i < adjRow.length; i++)
+      for (const j of adjRow[i]) if (adjRow[j].indexOf(i) === -1) sym = false;
+    ok(sym, 'every strut is a strut from both ends (symmetric)');
+    ok(adjRow[0].indexOf(2) === -1, 'a node 32px away is outside the 24px link radius');
+    eq(G.latticeLinks([], L.R, L.DEG).length, 0, 'an empty formation has no lattice');
+    eq(G.latticeLinks([{x:5,y:5}], L.R, L.DEG)[0].length, 0, 'a lone member links to nothing');
+    // degree cap: a dense cluster must not exceed the cap before symmetrisation
+    const cluster = [];
+    for (let gx = 0; gx < 3; gx++) for (let gy = 0; gy < 3; gy++) cluster.push({x: gx*10, y: gy*10});
+    const adjC = G.latticeLinks(cluster, L.R, L.DEG);
+    ok(adjC[4].length >= L.DEG, 'the centre of a dense cluster is well connected');
+
+    // --- components ---
+    const path4 = [[1],[0,2],[1,3],[2]];
+    eq(G.latticeComponents(path4, [true,true,true,true]).length, 1, 'an intact path is one component');
+    eq(G.latticeComponents(path4, [false,false,false,false]).length, 0, 'all dead: no components');
+    eq(G.latticeComponents(path4, [true,false,true,true]).length, 2,
+       'a hole in the path splits it in two');
+    ok(G.latticeComponents([[9],[0]], [true,true]).length >= 1,
+       'a malformed adjacency row is tolerated, never a throw');
+
+    // --- cuts: the keystones ---
+    // A path of 8: only nodes 3 and 4 split it into two pieces that are BOTH
+    // worth calling spans (3|4 and 4|3). Everything nearer an end orphans a
+    // stub, and the rule refuses to call that a collapse.
+    const alive8 = [true,true,true,true,true,true,true,true];
+    const path8 = [[1],[0,2],[1,3],[2,4],[3,5],[4,6],[5,7],[6]];
+    const cuts8 = G.latticeCuts(path8, alive8, L.MIN_CHUNK);
+    const cutIdx = cuts8.map(c => c.i).sort((a,b) => a-b);
+    ok(cutIdx.indexOf(3) !== -1 && cutIdx.indexOf(4) !== -1,
+       'the load-bearing interior of a span is a keystone');
+    ok(cutIdx.indexOf(0) === -1 && cutIdx.indexOf(7) === -1, 'a leaf is never a keystone');
+    ok(cutIdx.indexOf(1) === -1 && cutIdx.indexOf(2) === -1
+       && cutIdx.indexOf(5) === -1 && cutIdx.indexOf(6) === -1,
+       'a node whose smaller piece is under ' + L.MIN_CHUNK + ' is NOT a keystone — otherwise '
+       + 'cutting beside a straggler would drop the entire rest of the wall');
+    for (const c of cuts8) ok(c.chunk.length >= L.MIN_CHUNK && c.chunk.length <= 4,
+       'a keystone always reports the SMALLER piece as the span that falls');
+    const cyc = [[1,3],[0,2],[1,3],[2,0]];
+    eq(G.latticeCuts(cyc, [true,true,true,true], L.MIN_CHUNK).length, 0,
+       'a closed cycle has no keystones — a ring carries its own load');
+    // THE CORRECTNESS PIN: an ALREADY disconnected structure (the circle variant's
+    // separate rings) must not flag every member. A bare ">1 component" test would.
+    const twoRings = [[1,2],[0,2],[0,1],[4,5],[3,5],[3,4]];
+    eq(G.latticeCuts(twoRings, [true,true,true,true,true,true], L.MIN_CHUNK).length, 0,
+       'two separate intact rings yield ZERO keystones (component-count comparison, '
+       + 'not a bare multi-component test)');
+    eq(G.latticeCuts([], [], L.MIN_CHUNK).length, 0, 'no structure, no keystones');
+
+    // --- the command net: the invariant the whole design rests on ---
+    ok(cuts8.length > 0, 'the bare span has keystones');
+    const stiff = G.latticeStiffen(path8, 0, alive8);
+    eq(G.latticeCuts(stiff, alive8, L.MIN_CHUNK).length, 0,
+       'WITH THE COMMANDER ALIVE the structure is uncuttable — zero keystones');
+    const deadCmd = [false,true,true,true,true,true,true,true];
+    ok(G.latticeCuts(G.latticeStiffen(path8, 0, deadCmd), deadCmd, L.MIN_CHUNK).length > 0,
+       'and the keystones return the moment the commander falls');
+    ok(G.latticeStiffen(path8, -1, alive8).length === path8.length,
+       'no commander index is a harmless no-op');
+    ok(G.latticeStiffen(path8, 0, alive8) !== path8, 'stiffening never mutates the base graph');
+
+    // --- the descent ---
+    let s = { by: 0, vy: L.VY };
+    const s1 = G.collapseStep(s.by, s.vy, L.ACC, L.MAXVY);
+    ok(s1.by > 0 && s1.vy > L.VY, 'the span accelerates as it falls');
+    let vy = L.VY, by = 0;
+    for (let f = 0; f < 2000; f++) { const st = G.collapseStep(by, vy, L.ACC, L.MAXVY); by = st.by; vy = st.vy; }
+    ok(Math.abs(vy - L.MAXVY) < 1e-9, 'and clamps at its terminal speed, never faster');
+    ok(isFinite(G.collapseStep(NaN, NaN, L.ACC, L.MAXVY).by), 'poisoned input never yields NaN');
+    // the fairness statement: ~190+ frames from the formation to the player line
+    let frames = 0; by = 70; vy = L.VY;
+    while (by < 260 && frames < 5000) { const st = G.collapseStep(by, vy, L.ACC, L.MAXVY); by = st.by; vy = st.vy; frames++; }
+    ok(frames >= 30, 'a falling span warns for ' + frames + ' frames — far above the 30f baseline');
+  } else { console.log('  (skipped — keystone not exposed)'); }
+}
+
+section('THE KEYSTONE — driven: cut the load path, watch the wall come down');
+// The RECOVERY BUDGET lesson: a test that CONSTRUCTS the state a feature needs
+// certifies a dead system. So this drives a real stage, kills the commander and
+// then a computed keystone with real bullets, and asserts a span genuinely
+// detaches, falls under its own physics, and can be shot out of the air.
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.latticeBuild === 'function') {
+  const LC = G.__getLatConst();
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 3;                    // pickFormationVariant: stages < 8 are always 'grid'
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  g.cheatInvincible = true;
+  for (let f = 0; f < 500 && !g.allEntered; f++) G.update();
+  g.diveInterval = 999999;        // hold the wall still; dives are not under test here
+  ok(!!g.lattice, 'the architecture is built the instant the formation locks');
+  ok(g.lattice.ents.length > 10, 'with every standing member as a node ('
+     + (g.lattice ? g.lattice.ents.length : 0) + ')');
+
+  const kill = (e) => {
+    for (let f = 0; f < 40 && e && e.alive; f++) {
+      g.bullets.push({ x: e.x, y: e.y + 2, vy: -2, dmg: 99, lvl: 1 });
+      G.update();
+    }
+  };
+  const at = (col, row) => (g.enemies || []).find(e => e.alive && e.col === col && e.row === row);
+
+  // --- the command net holds: no keystone exists while the commander lives ---
+  ok(g.lattice.netIntact, 'the command net is intact at the start of the stage');
+  eq(g.lattice.cuts.length, 0, 'and NOTHING is cuttable while it holds');
+  const cmd = (g.enemies || []).find(e => e.alive && e.isCommander);
+  ok(!!cmd, 'a commander was designated');
+  kill(cmd);
+  ok(!g.lattice.netIntact, 'killing the commander drops the net — the structure is now cuttable');
+
+  // --- punch the column: two real kills open a load path ---
+  kill(at(1, 2));
+  kill(at(2, 3));
+  ok(g.lattice.cuts.length > 0,
+     'punching a column exposes ' + g.lattice.cuts.length + ' keystone(s) — the wall now has '
+     + 'a load path a player can read');
+
+  // --- cut it, and a span comes down ---
+  const key = g.lattice.ents[g.lattice.cuts[0].i];
+  const spanSize = g.lattice.cuts[0].chunk.length;
+  const scoreBefore = g.score || 0;
+  kill(key);
+  const falling = (g.enemies || []).filter(e => e.alive && e.state === 'collapsing');
+  ok(falling.length >= LC.MIN_CHUNK,
+     'cutting the keystone SEVERS a span of ' + falling.length + ' (predicted ' + spanSize + ')');
+  eq(g.spansDropped, 1, 'the collapse is counted once');
+  ok(!!g.lattice.block, 'and the span is riding a single rigid block');
+
+  // it FALLS, and it keeps its shape
+  const y0 = falling[0].y;
+  const shape0 = falling.map(e => e.x - falling[0].x);
+  for (let f = 0; f < 60; f++) G.update();
+  const stillFalling = (g.enemies || []).filter(e => e.alive && e.state === 'collapsing');
+  if (stillFalling.length) {
+    ok(stillFalling[0].y > y0 + 20, 'the span descends under its own physics');
+    const shape1 = stillFalling.map(e => e.x - stillFalling[0].x);
+    ok(shape1.every((v, i) => Math.abs(v - shape0[i]) < 0.001),
+       'and falls RIGID — it keeps the shape it had in the wall');
+  }
+  // a falling member cannot dive and cannot shoot (state filters do it for free)
+  const divers = (g.enemies || []).filter(e => e.alive && e.state === 'collapsing' && e.previewTimer > 0);
+  eq(divers.length, 0, 'a collapsing member can never be picked as a diver');
+
+  // --- it is shootable out of the air, and escaping costs the player points ---
+  const target = (g.enemies || []).find(e => e.alive && e.state === 'collapsing');
+  if (target) {
+    kill(target);
+    ok(!target.alive, 'a falling member can be burned out of the air with normal fire');
+  }
+  const escBefore = g.spanEscaped || 0;
+  for (let f = 0; f < 900; f++) G.update();
+  eq((g.enemies || []).filter(e => e.alive && e.state === 'collapsing').length, 0,
+     'the rest of the span leaves the field');
+  ok((g.spanEscaped || 0) > escBefore, 'and its escape is recorded ('
+     + ((g.spanEscaped || 0) - escBefore) + ' got away)');
+  ok((g.score || 0) >= scoreBefore, 'the collapse itself awarded no score at all — an escaped '
+     + 'span can only ever COST points, never earn them');
+  G.resetGame();
+} else { console.log('  (skipped — keystone not drivable)'); }
 
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of

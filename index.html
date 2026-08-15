@@ -5353,7 +5353,11 @@ const INTERCEPT_MSG = {
   // pickup moment: not rare, needs no reaction, duplicates the ship-sprite/HUD
   // feedback. Weakest member by the simplification pass's own bar.)
   ironShadow:    ['IT HIDES IN THE CONVOY\'S SHADOW!', 'CEASE FIRE — THE HAULER!', 'SHOOTING OUR OWN FREIGHTER?!'],
-  firstBlood:    ['CONTACT CONFIRMED!', 'HOSTILE ENGAGES!', 'TARGET HAS WEAPONS!'],
+  // (firstBlood was CUT for THE KEYSTONE's slot — it fired on the first kill of
+  // EVERY run: not rare, demands no reaction, and duplicates the kill's own
+  // explosion, score pop and the firstBlood ACHIEVEMENT unlocked beside it.
+  // Weakest member of the full band by the simplification pass's own bar.)
+  collapse:      ['THE SPAN IS FALLING!', 'STRUCTURE BREACHED!', 'IT CUT THE KEYSTONE!'],
   superBoss:     ['APEX HOSTILE INCOMING!', 'DEPLOY EVERYTHING!', 'LAST LINE — HOLD!'],
   finalLife:     ['FINAL SHIP STANDING!', 'ONE MORE TO FINISH!', 'VICTORY WITHIN REACH!'],
   rivalSpotted:  ['OUR ACE HAS FOUND YOU!', 'DUELIST ON APPROACH!', 'THE MIRROR HUNTS!'],
@@ -5663,7 +5667,8 @@ const COACH_LESSONS = {
   heist:   'STAND IN THE WINDUP TO ROB THE BEAM',
   debrief: 'SHOOT THE COURIER — DENY THE UPLINK',
   vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE',
-  cover:   'THE HULL EATS FIRE — BOTH WAYS'
+  cover:   'THE HULL EATS FIRE — BOTH WAYS',
+  keystone:'CUT THE MARKED ONE — THE SPAN FALLS'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -8450,6 +8455,11 @@ function resetGame() {
     // THE IRON SHADOW — enemy shots eaten by the convoy hull while sheltered.
     hullBlocks: 0,
     _ironSeen: false,
+    // THE KEYSTONE — the formation's load-bearing lattice, and the spans cut
+    // out of it this run (plus the members that escaped with their points).
+    lattice: null,
+    spansDropped: 0,
+    spanEscaped: 0,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
     comboArsenalClaimed: {},
@@ -8550,6 +8560,236 @@ function pickFormationVariant() {
   if (m === 1)  return 'diamond';
   if (m === 6)  return 'wave';
   return 'grid';
+}
+
+// ================================ THE KEYSTONE ==============================
+// The formation is this game's title enemy and it was structurally INERT: five
+// cosmetic shapes where every member is worth exactly what every other one is,
+// and killing order means nothing but combo. Five leaps have layered overlays
+// ON the formation (mind bracket, dread embers, wing telegraphs); none made the
+// formation itself a thing you read.
+//
+// THE KEYSTONE makes it an ARCHITECTURE. Struts are drawn between neighbouring
+// members (a radius graph over their HOME positions — never col/row, which the
+// variant layouts all tag identically). A member whose death would orphan a
+// span of LAT_MIN_CHUNK+ is a KEYSTONE: it wears a diamond and its load path
+// lights up. Cut it and the orphaned span DETACHES — it stops breathing, stops
+// diving, stops shooting, and falls as one rigid silent block of matter.
+//
+// The commander is the COMMAND NET: while it lives, latticeStiffen links it to
+// every member, which mathematically annihilates the articulation points — the
+// structure is uncuttable and the lattice draws NET INTACT. Killing it unlocks
+// the whole system at the price it already carries (the 360f DIVE SURGE and a
+// wiped mind profile). The commander finally gates something structural.
+//
+// ORDERING FINALLY MATTERS: you shoot upward, so reaching a keystone means
+// punching a COLUMN beneath it — camping one lane, which is precisely what THE
+// SWARM MIND profiles and punishes. Read → commander → column → keystone →
+// burn the span, with move/fire/dash and nothing else.
+//
+// ZERO new score, and it can only ever LOSE you points: every member that
+// reaches the bottom is a kill FORFEITED. Collapse converts threat in kind (a
+// dense, close, silent block you must burn, dodge or dash) and can never be
+// farmed for profit. No actor spawns, so THE DIRECTOR is untouched.
+const LAT_LINK_R    = 24;   // px — links home positions (grid pitch ~20x14)
+const LAT_MAX_DEG   = 4;    // nearest-4 only: a fully diagonal graph has no keystones
+const LAT_MIN_CHUNK = 3;    // an orphan under 3 is not a collapse
+const LAT_COOLDOWN  = 150;  // frames between collapses
+const LAT_FALL_VY   = 0.70; // initial block descent
+const LAT_FALL_ACC  = 0.004;
+const LAT_FALL_MAX  = 1.40; // ~190+ frames of visible descent — 6x the 30f baseline
+const LAT_MARK_FLASH = 45;  // collapse flash frames (ticks in update, read in draw)
+
+// Pure: symmetric radius graph over home positions, capped to the nearest
+// LAT_MAX_DEG neighbours. Deterministic tie-break on index so the same
+// formation always yields the same architecture.
+function latticeLinks(nodes, radius, maxDeg) {
+  const n = (nodes && nodes.length) || 0;
+  const adj = [];
+  for (let i = 0; i < n; i++) adj.push([]);
+  if (!n) return adj;
+  const r2 = radius * radius;
+  for (let i = 0; i < n; i++) {
+    const cand = [];
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= r2) cand.push({ j, d2 });
+    }
+    cand.sort((a, b) => (a.d2 - b.d2) || (a.j - b.j));
+    for (let k = 0; k < Math.min(maxDeg, cand.length); k++) adj[i].push(cand[k].j);
+  }
+  // Symmetrise: a strut is a strut from both ends.
+  for (let i = 0; i < n; i++) {
+    for (const j of adj[i]) if (adj[j].indexOf(i) === -1) adj[j].push(i);
+  }
+  return adj;
+}
+
+// Pure: connected components of the ALIVE subgraph (BFS). Tolerates malformed
+// rows and a short/absent alive array.
+function latticeComponents(adj, alive) {
+  const n = (adj && adj.length) || 0;
+  const seen = new Array(n).fill(false);
+  const out = [];
+  const isAlive = (i) => !alive || alive[i];
+  for (let s = 0; s < n; s++) {
+    if (seen[s] || !isAlive(s)) continue;
+    const comp = [s];
+    seen[s] = true;
+    for (let q = 0; q < comp.length; q++) {
+      const row = adj[comp[q]] || [];
+      for (const j of row) {
+        if (j >= 0 && j < n && !seen[j] && isAlive(j)) { seen[j] = true; comp.push(j); }
+      }
+    }
+    out.push(comp);
+  }
+  return out;
+}
+
+// Pure: the keystones. A node is a cut iff removing it INCREASES the component
+// count (this comparison — not a bare ">1 component" test — is what keeps an
+// already-disconnected formation, e.g. the circle variant's separate rings,
+// from flagging every member). The chunk returned is the smallest orphan that
+// splits off from that node's own component, and only if it is worth calling a
+// span (>= minChunk).
+function latticeCuts(adj, alive, minChunk) {
+  const n = (adj && adj.length) || 0;
+  const out = [];
+  if (!n) return out;
+  const base = latticeComponents(adj, alive);
+  const compOf = new Array(n).fill(-1);
+  for (let c = 0; c < base.length; c++) for (const i of base[c]) compOf[i] = c;
+  const work = new Array(n);
+  for (let i = 0; i < n; i++) {
+    if (!(!alive || alive[i])) continue;
+    for (let k = 0; k < n; k++) work[k] = !alive || alive[k];
+    work[i] = false;
+    const after = latticeComponents(adj, work);
+    if (after.length <= base.length) continue;   // leaf or isolate: not a cut
+    // The span that falls is the SMALLEST piece the cut splits off, and the node
+    // only counts as a keystone if THAT piece is worth calling a span. Taking
+    // the smallest piece that merely CLEARS minChunk would invert the mechanic:
+    // cutting beside a lone straggler would drop the entire rest of the wall.
+    let smallest = null;
+    for (const comp of after) {
+      if (compOf[comp[0]] !== compOf[i]) continue; // only orphans from i's own body
+      if (!smallest || comp.length < smallest.length) smallest = comp;
+    }
+    if (smallest && smallest.length >= minChunk) out.push({ i: i, chunk: smallest });
+  }
+  return out;
+}
+
+// Pure: THE COMMAND NET. While the commander lives it is linked to every alive
+// member, which removes essentially every articulation point — the structure is
+// uncuttable until you take the commander. Returns a NEW adjacency; the base
+// graph is never mutated.
+function latticeStiffen(adj, cmdIdx, alive) {
+  const n = (adj && adj.length) || 0;
+  const out = [];
+  for (let i = 0; i < n; i++) out.push((adj[i] || []).slice());
+  if (!(cmdIdx >= 0 && cmdIdx < n)) return out;
+  if (alive && !alive[cmdIdx]) return out;
+  for (let i = 0; i < n; i++) {
+    if (i === cmdIdx || (alive && !alive[i])) continue;
+    if (out[cmdIdx].indexOf(i) === -1) out[cmdIdx].push(i);
+    if (out[i].indexOf(cmdIdx) === -1) out[i].push(cmdIdx);
+  }
+  return out;
+}
+
+// Pure: one frame of a severed span's descent.
+function collapseStep(by, vy, acc, maxVy) {
+  const y0 = isFinite(by) ? by : 0;
+  const v0 = isFinite(vy) ? vy : 0;
+  const a = isFinite(acc) ? acc : 0;
+  const cap = isFinite(maxVy) ? maxVy : v0;
+  const v = Math.min(cap, v0 + a);
+  return { by: y0 + v, vy: v };
+}
+
+// Impure: build the architecture from the formation that just locked into place.
+// Keys on HOME POSITION only — the variant layouts tag every member row 0, which
+// has broken row-keyed logic twice before.
+function latticeBuild() {
+  const ents = game.enemies.filter(e => e.alive && e.state === 'formation');
+  if (ents.length < LAT_MIN_CHUNK + 1) { game.lattice = null; return; }
+  const nodes = [];
+  for (let i = 0; i < ents.length; i++) {
+    ents[i]._lat = i;
+    nodes.push({ x: ents[i].homeX, y: ents[i].homeY });
+  }
+  game.lattice = {
+    ents: ents,
+    nodes: nodes,
+    adj: latticeLinks(nodes, LAT_LINK_R, LAT_MAX_DEG),
+    cuts: [],
+    cool: 0,
+    netIntact: true,
+    markT: 0,
+    block: null
+  };
+  latticeRecompute();
+}
+
+// Impure: refresh the load paths. Called on every formation kill — cheap at
+// N<=48 with the degree cap, and never per frame.
+function latticeRecompute() {
+  const L = game && game.lattice;
+  if (!L) return;
+  const alive = L.ents.map(e => !!e.alive);
+  let cmdIdx = -1;
+  for (let i = 0; i < L.ents.length; i++) if (alive[i] && L.ents[i].isCommander) cmdIdx = i;
+  L.netIntact = cmdIdx >= 0;
+  const adj = L.netIntact ? latticeStiffen(L.adj, cmdIdx, alive) : L.adj;
+  L.cuts = latticeCuts(adj, alive, LAT_MIN_CHUNK);
+  if (L.cuts.length && typeof coachFire === 'function') coachFire('keystone');
+}
+
+// Impure: sever a span. The members stop being formation and become one rigid
+// falling block. Anything not currently sitting in formation (a diver, a capture
+// holder) is left flying — the span detaches, the ones already out stay out.
+function latticeCollapse(cutIdx) {
+  const L = game && game.lattice;
+  if (!L || L.cool > 0) return false;
+  const cut = L.cuts.find(c => c.i === cutIdx);
+  if (!cut) return false;
+  const span = cut.chunk
+    .map(i => L.ents[i])
+    .filter(e => e && e.alive && e.state === 'formation' && !e.capturedShip);
+  if (span.length < LAT_MIN_CHUNK) return false;
+  let cx = 0, cy = 0;
+  for (const e of span) { cx += e.x; cy += e.y; }
+  cx /= span.length; cy /= span.length;
+  for (const e of span) {
+    e.state = 'collapsing';
+    e._colDX = e.x - cx;
+    e._colDY = e.y - cy;
+    e.previewTimer = 0;
+    e.previewPath = null;
+  }
+  L.block = { x: cx, y: cy, vy: LAT_FALL_VY, n: span.length };
+  L.cool = LAT_COOLDOWN;
+  L.markT = LAT_MARK_FLASH;
+  game.spansDropped = (game.spansDropped || 0) + 1;
+  if (span.length >= 6) unlockAchievement('spanBreaker');
+  if (!game.isDemo) {
+    try {
+      const _st = (parseInt(localStorage.getItem('galagaSpanTotal') || '0', 10) || 0) + 1;
+      localStorage.setItem('galagaSpanTotal', String(_st));
+    } catch (_e) {}
+  }
+  if (typeof pushIntercept === 'function') pushIntercept('collapse');
+  game.floatTexts.push({
+    x: cx, y: cy - 10, text: 'SPAN SEVERED',
+    color: '#8cf', life: 55, maxLife: 55, size: 7
+  });
+  if (typeof gridRipple === 'function') gridRipple(cx, cy, 2.6, 70);
+  playSound('comboBreak', cx);
+  return true;
 }
 
 function createFormation() {
@@ -9537,10 +9777,6 @@ function updateOneMegaBoss(mb) {
         game.stats.kills++;
         game.stageKills = (game.stageKills || 0) + 1;
         game.bossesKilledThisRun = (game.bossesKilledThisRun || 0) + 1;
-        // SIGNAL INTERCEPT — first kill of run case (if boss is first hostile downed)
-        if (game.stats.kills === 1 && typeof pushIntercept === 'function') {
-          pushIntercept('firstBlood');
-        }
         bumpCombo();
         unlockAchievement('bossSlayer');
         if (mb.super) {
@@ -9974,6 +10210,10 @@ function startStage() {
   // THE DEBRIEF — intel dies with the stage: a courier that outlives its
   // challenge stage never delivers.
   game.courier = null;
+  // THE KEYSTONE — the architecture belongs to the formation that built it;
+  // it is rebuilt when the next wall locks into place (this also gives the
+  // debug stage-jumps their hygiene for free, since they call startStage).
+  game.lattice = null;
   // Drops in flight are NOT wiped — a power-up earned by a late kill keeps
   // falling through the intro (the STAGE_INTRO branch ticks updatePowerUps)
   // and lands in the new stage. The wipe here used to delete them silently.
@@ -12039,6 +12279,7 @@ const ACHIEVEMENTS = {
   censor:        { name: 'CENSOR',        desc: 'Deny 10 uplinks lifetime' },
   boneBreaker:   { name: 'BONE BREAKER',  desc: 'Break a boss stance' },
   ironclad:      { name: 'IRONCLAD',      desc: '50 shots blocked in shelter' },
+  spanBreaker:   { name: 'SPAN BREAKER',  desc: 'Drop a span of 6 or more' },
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
@@ -13942,6 +14183,32 @@ function updateEnemies() {
     }
   }
 
+  // THE KEYSTONE — the severed span falls as ONE rigid block. Integrated once
+  // here (update side), then every member is placed at its stored offset, so the
+  // span keeps the shape it had in the wall it fell out of.
+  if (game.lattice) {
+    if (game.lattice.cool > 0) game.lattice.cool--;
+    if (game.lattice.markT > 0) game.lattice.markT--;
+    const _blk = game.lattice.block;
+    if (_blk) {
+      const st = collapseStep(_blk.y, _blk.vy, LAT_FALL_ACC, LAT_FALL_MAX);
+      _blk.y = st.by; _blk.vy = st.vy;
+      let _left = 0;
+      for (const e of game.enemies) {
+        if (!e.alive || e.state !== 'collapsing') continue;
+        e.x = _blk.x + (e._colDX || 0);
+        e.y = _blk.y + (e._colDY || 0);
+        if (e.y > BASE_H + 12) {
+          // Escaped: the kill — and its points — are forfeited. Collapse can
+          // only ever cost score, never earn it.
+          e.alive = false;
+          game.spanEscaped = (game.spanEscaped || 0) + 1;
+        } else _left++;
+      }
+      if (_left === 0) game.lattice.block = null;
+    }
+  }
+
   for (const e of game.enemies) {
     if (!e.alive) continue;
     e.frameTimer++;
@@ -14305,6 +14572,9 @@ function updateEnemies() {
       // Snapshot formation size for morale threshold calculation.
       game.formationMaxCount = game.enemies.filter(en => en.alive).length;
       game.panicFiredThisStage = false; // re-arm the once-per-stage morale-break latch
+      // THE KEYSTONE — the architecture is built the instant the formation locks,
+      // from HOME positions (never col/row: the variant layouts tag them all 0).
+      latticeBuild();
       // SIGNAL INTERCEPT — broadcast formation-set chatter on first locked position
     }
   }
@@ -14835,10 +15105,6 @@ function updateCollisions() {
           }
           game.stats.kills++;
           game.stageKills = (game.stageKills || 0) + 1;
-          // SIGNAL INTERCEPT — first kill of the run triggers enemy first-contact chatter
-          if (game.stats.kills === 1 && typeof pushIntercept === 'function') {
-            pushIntercept('firstBlood');
-          }
           // SAME-TYPE KILL STREAK — track consecutive kills of same enemy type
           if (game._lastKillType === e.type) {
             game._sameTypeStreak = (game._sameTypeStreak || 1) + 1;
@@ -14877,6 +15143,15 @@ function updateCollisions() {
           // memory of the swarm's own dead.
           if (game.state === STATE.PLAYING && game.swarmDread) {
             dreadObserve(game.swarmDread, e.x);
+          }
+          // THE KEYSTONE — was this one load-bearing? Sever first (the cuts list
+          // still describes the structure as it stood a moment ago), then rebuild
+          // the load paths for what is left standing. Deferred while a coordinated
+          // maneuver is telegraphing (diveTimer < 0 during WING_COOLDOWN) so a span
+          // can never land on top of a pincer — a defer, not a cancel.
+          if (game.state === STATE.PLAYING && game.lattice && e._lat != null) {
+            if ((game.diveTimer || 0) >= 0) latticeCollapse(e._lat);
+            latticeRecompute();
           }
           // REVENGE KILL — if a prior collision death captured this enemy type,
           // killing that type back counts as payback. The in-play "REVENGE!" banner
@@ -19116,6 +19391,10 @@ function pickRunHighlights() {
   // you stood in its shadow band. Steel blue to match the band's hatching.
   const shadowed = game.hullBlocks || 0;
   if (shadowed >= 5)      out.push({ label: 'SHOTS SHADOWED',  value: String(shadowed), prio: shadowed * 8, col: '#8ac' });
+  // SPANS DROPPED — THE KEYSTONE: load-bearing members cut, collapsing whole
+  // sections of the formation. A structural-reading stat; zero score in it.
+  const spans = game.spansDropped || 0;
+  if (spans >= 1)         out.push({ label: 'SPANS DROPPED',   value: String(spans),    prio: 45 + spans * 30, col: '#8cf' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
@@ -20732,6 +21011,7 @@ function drawGameplay() {
     ctx.restore();
   }
 
+  drawLattice();
   drawMindLock();
   drawDreadField();
   drawDivePreviewPaths();
@@ -21044,6 +21324,98 @@ function drawMindLock() {
   ctx.lineTo(x1 - 0.5, y + 0.5);
   ctx.lineTo(x1 - 0.5, y - 5);
   ctx.stroke();
+  ctx.restore();
+}
+
+// THE KEYSTONE, DRAWN. The formation's load paths made visible: faint struts
+// between living neighbours (they breathe with the formation, so the
+// architecture is alive), the commander's COMMAND NET while it holds, and — once
+// the net is gone — a pulsing DIAMOND on every keystone with its own load path
+// brightened. Shape-coded on purpose: a diamond here, a bracket for the mind, X
+// ticks for dread, so three floor/field readouts never blur together.
+// Read-only; markT and cool tick in updateEnemies.
+function drawLattice() {
+  const L = game && game.lattice;
+  if (!L || game.state !== STATE.PLAYING || !game.allEntered) return;
+  const ents = L.ents;
+  const tint = (typeof wingTacticColor === 'function') ? wingTacticColor() : COL.red;
+  ctx.save();
+  ctx.lineWidth = 1;
+  // Struts — every living link, drawn at CURRENT positions so the lattice
+  // breathes with the formation. Skipped for members that have left the wall.
+  const standing = (e) => e && e.alive && e.state === 'formation';
+  ctx.strokeStyle = tint;
+  ctx.globalAlpha = L.netIntact ? 0.10 : 0.14;
+  ctx.beginPath();
+  for (let i = 0; i < ents.length; i++) {
+    if (!standing(ents[i])) continue;
+    for (const j of (L.adj[i] || [])) {
+      if (j <= i || !standing(ents[j])) continue;
+      ctx.moveTo(ents[i].x, ents[i].y);
+      ctx.lineTo(ents[j].x, ents[j].y);
+    }
+  }
+  ctx.stroke();
+  if (L.netIntact) {
+    // COMMAND NET — while the commander holds, the structure is uncuttable, and
+    // that is stated by a ring on the one enemy responsible for it.
+    const cmd = ents.find(e => standing(e) && e.isCommander);
+    if (cmd) {
+      ctx.globalAlpha = 0.30 + 0.15 * Math.sin(game.animFrame * 0.09);
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.arc(cmd.x, cmd.y, 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  } else {
+    // KEYSTONES — diamond + brightened load path. The cut list is only ever as
+    // long as the structure genuinely allows, so this is invisible until real.
+    const pulse = 0.55 + 0.45 * Math.sin(game.animFrame * 0.13);
+    for (const c of L.cuts) {
+      const e = ents[c.i];
+      if (!standing(e)) continue;
+      ctx.globalAlpha = 0.30 * pulse;
+      ctx.beginPath();
+      for (const j of (L.adj[c.i] || [])) {
+        if (!standing(ents[j])) continue;
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(ents[j].x, ents[j].y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 0.55 + 0.35 * pulse;
+      ctx.strokeStyle = '#8cf';
+      ctx.beginPath();
+      ctx.moveTo(e.x, e.y - 7);
+      ctx.lineTo(e.x + 6, e.y);
+      ctx.lineTo(e.x, e.y + 7);
+      ctx.lineTo(e.x - 6, e.y);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.strokeStyle = tint;
+    }
+  }
+  // THE FALLING SPAN — a dashed box riding the block for its whole descent: a
+  // 190-frame telegraph on a threat that costs one hit.
+  if (L.block) {
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, any = false;
+    for (const e of game.enemies) {
+      if (!e.alive || e.state !== 'collapsing') continue;
+      any = true;
+      x0 = Math.min(x0, e.x - 8); x1 = Math.max(x1, e.x + 8);
+      y0 = Math.min(y0, e.y - 8); y1 = Math.max(y1, e.y + 8);
+    }
+    if (any) {
+      ctx.globalAlpha = 0.28 + 0.22 * Math.sin(game.animFrame * 0.2)
+        + (L.markT > 0 ? 0.4 * (L.markT / LAT_MARK_FLASH) : 0);
+      ctx.strokeStyle = '#8cf';
+      ctx.setLineDash([3, 3]);
+      ctx.lineDashOffset = -(game.animFrame * 0.6) % 6;
+      ctx.strokeRect(Math.round(x0) + 0.5, Math.round(y0) + 0.5,
+                     Math.round(x1 - x0), Math.round(y1 - y0));
+      ctx.setLineDash([]);
+    }
+  }
   ctx.restore();
 }
 

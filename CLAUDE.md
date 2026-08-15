@@ -357,6 +357,49 @@ cut `maxPower`** (pickup-moment chatter; band stays 24/24). Tracked: `game.hullB
 SHADOWED highlight, IRONCLAD achievement (50 lifetime), `COACH_LESSONS.cover`. Scorch
 pips on the hull are the fuse, drawn before it blows.
 
+### THE KEYSTONE — the formation is an architecture you dismantle
+
+The title enemy was structurally INERT: five cosmetic shapes where no member was worth
+more than another and killing order meant nothing but combo. Five leaps had layered
+overlays *on* the formation; none made the formation itself readable. THE KEYSTONE
+builds a **lattice** the instant the wall locks (`latticeBuild` at the `allEntered`
+seam): a radius graph over **home positions only** — never `col`/`row`, which every
+variant layout tags identically and which has broken row-keyed logic twice before.
+
+- `latticeLinks(nodes, r, maxDeg)` — symmetric, `LAT_MAX_DEG` 4 nearest (grid pitch
+  16×14 vs `LAT_LINK_R` 24 keeps it 4-connected, so a full wall has no keystones and the
+  system is invisible until the player carves).
+- `latticeCuts(adj, alive, minChunk)` — a node is a keystone iff removing it **increases
+  the component count** (not a bare ">1 component" test — that would flag every member of
+  an already-split formation like the circle variant's rings), and **the smaller piece**
+  is the span that falls, only if it clears `LAT_MIN_CHUNK` (3). Taking the smallest piece
+  that merely *clears* the gate inverts the mechanic — cutting beside a lone straggler
+  would drop the entire rest of the wall. A driven test caught exactly that.
+- `latticeStiffen(adj, cmdIdx, alive)` — **THE COMMAND NET**: while the commander lives it
+  links to every member, annihilating the articulation points. The structure is uncuttable
+  and draws NET INTACT. The commander finally gates something structural; unlocking the
+  system costs the 360f DIVE SURGE and the mind wipe it already carried.
+- `collapseStep` — the severed span stops breathing, diving and shooting (the existing
+  state filters do all of it for free), and falls as **one rigid block** keeping the shape
+  it had in the wall. ~190 frames of descent: 6× the 30f baseline. It is a ram threat
+  through the existing ladder (`tryTriggerWitchTime` → shield → dash i-frames), so **zero
+  new collision code**.
+
+**Ordering finally matters**: you shoot upward, so reaching a keystone means punching a
+COLUMN — camping one lane, which is precisely what THE SWARM MIND profiles and punishes.
+Read → commander → column → keystone → burn the span. **ZERO new score, and collapse can
+only ever LOSE you points**: every member that reaches the bottom is a kill forfeited
+(`game.spanEscaped`). No actor spawns, so THE DIRECTOR is untouched; collapse defers while
+a WING maneuver telegraphs (`diveTimer < 0`), and `LAT_COOLDOWN` 150 caps the rate.
+Measured in ordinary play: 40-member wall, first keystone visible **7 kills** after the
+commander falls, one span down per wall under purely random attrition.
+
+Comms: `collapse` **replaced the cut `firstBlood`** (fired on the first kill of every run —
+not rare, no reaction, duplicated the kill's own explosion and the achievement beside it;
+band stays 24/24). Tracked: `game.spansDropped`/`spanEscaped` + lifetime `galagaSpanTotal`
+(demo-guarded), SPANS DROPPED highlight, SPAN BREAKER achievement (a span of 6+),
+`COACH_LESSONS.keystone`.
+
 ### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
 
 Difficulty has `curve-audit.js`; fairness now has its own instrument:
