@@ -11,6 +11,7 @@
 #   test/curve-audit.js      difficulty + score economy across stages 1-100
 #   test/telegraph-audit.js  the fairness budget (warning frames per threat)
 #   test/pulse-audit.js      the control budget (frames your input does nothing)
+#   test/recovery-audit.js   the recovery budget (does the death spiral have a brake)
 set -uo pipefail
 
 # Resolve repo root relative to this script so it works from any cwd.

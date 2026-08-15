@@ -5898,6 +5898,55 @@ function drawRivalAce() {
 // prefers the deepest-invested axes — a softener, never a source. The pure
 // planner (salvageShardPlan) is logic-tested.
 const SALVAGE_TTL = 300;
+// Once the wreckage stops tumbling it SETTLES INTO THE PLAYER'S LANE and drifts
+// along it. That is not decoration — it is the whole reason the system works.
+//
+// test/recovery-audit.js measured this subsystem returning EXACTLY ZERO levels
+// across every band and every difficulty, and the reason was structural rather
+// than a tuning miss: `game.playerY` is a CONSTANT (BASE_H - 28). The player has
+// no vertical movement whatsoever, so the only y a shard can ever be caught at
+// is that one line. A shard spawned at the wreck popped up, fell back through
+// that line during frames ~75-105 — entirely inside the 90-120f RESPAWN where
+// `playerAlive` is false — and from then on was BELOW a player who cannot
+// descend. It then fell off the bottom and fizzled around frame 166, less than
+// halfway through its own 300f TTL. The generous TTL and the comment reassuring
+// us that it "outlives the 90f respawn cutscene" were both true and both
+// irrelevant: what the shard had to outlive was not the clock, it was the lane.
+//
+// Settling turns recovery into the ONE verb this player actually has — a
+// horizontal race — and it is not free: the shard drifts, so collecting it
+// means leaving whatever lane you were dodging in, which is also the lane
+// THE SWARM MIND is busy profiling.
+const SALVAGE_DRIFT = 0.55;   // px/frame along the lane once settled
+
+// Pure: one frame of shard motion. Kept out of the updater so the settle rule
+// — the part that was silently broken for the system's whole life — can be
+// tested without a screen. `st` is {x, y, vx, vy, held}; a new state is
+// returned rather than mutated.
+function salvageStep(st, laneY, minX, maxX) {
+  let x = st.x, y = st.y, vx = st.vx, vy = st.vy, held = !!st.held;
+  if (!held) {
+    // Tumbling out of the wreck: gravity, horizontal damping.
+    vy = Math.min(0.5, vy + 0.05);
+    vx *= 0.97;
+    x += vx;
+    y += vy;
+    // Settle on the way DOWN only. The shard is spawned AT the lane (it fell
+    // out of a ship sitting on it), so an unguarded test would catch it on
+    // frame one and it would never pop out of the explosion at all.
+    if (vy > 0 && y >= laneY) {
+      y = laneY;
+      vy = 0;
+      held = true;
+      vx = (vx < 0 ? -1 : 1) * SALVAGE_DRIFT;
+    }
+  } else {
+    x += vx;
+  }
+  if (x <= minX) { x = minX; if (held) vx = Math.abs(vx); }
+  else if (x >= maxX) { x = maxX; if (held) vx = -Math.abs(vx); }
+  return { x: x, y: y, vx: vx, vy: vy, held: held };
+}
 
 // Pure: which axis letters scatter, given the pre-death levels and mode.
 // Greedy: always the axis with the most lost levels (ties resolve S > N > P).
@@ -5965,10 +6014,10 @@ function updateSalvageShards() {
   }
   for (let i = game.salvageShards.length - 1; i >= 0; i--) {
     const s = game.salvageShards[i];
-    s.vy = Math.min(0.5, s.vy + 0.05);
-    s.vx *= 0.97;
-    s.x = Math.max(8, Math.min(BASE_W - 8, s.x + s.vx));
-    s.y += s.vy;
+    // The settle rule lives in salvageStep (pure, tested) — the shard tumbles
+    // out of the wreck, then locks to the player's lane and patrols it.
+    const st = salvageStep(s, game.playerY, 8, BASE_W - 8);
+    s.x = st.x; s.y = st.y; s.vx = st.vx; s.vy = st.vy; s.held = st.held;
     s.ttl--;
     if (s.ttl <= 0 || s.y > BASE_H + 8) {
       // Fizzle — the lost level is gone for good.
@@ -6040,6 +6089,16 @@ function drawSalvageShards() {
     ctx.fillStyle = '#fff';
     ctx.fillRect(px, py, 1, 1);
     drawRetroText(s.axis, px + 0.5, py - 7, 4, col);
+    // Settled: the shard is riding the player's lane — draw the skid line it
+    // drifts on, pointing the direction it is moving, so the read is "chase it
+    // down the lane", not "wait for it to fall".
+    if (s.held) {
+      const d = s.vx < 0 ? -1 : 1;
+      ctx.globalAlpha = alpha * 0.45;
+      ctx.fillStyle = col;
+      ctx.fillRect(px - d * 10, py + 5, 6, 1);
+      ctx.fillRect(px - d * 17, py + 5, 3, 1);
+    }
   }
   ctx.restore();
 }

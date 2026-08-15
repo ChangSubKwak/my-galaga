@@ -352,6 +352,42 @@ highlight. Fusion: capture/rescue, dual fighter, FLIGHT SCHOOL (the `struggle` l
 fires the frame the beam goes live — the last moment the player is alive enough to be
 coached), enemy comms (`breakout`). No new actor, so THE DIRECTOR's budget is untouched.
 
+### THE RECOVERY BUDGET — the death spiral's brake, measured (SALVAGE SETTLE)
+
+Death wipes S/N/P to 1/1/1; SALVAGE PROTOCOL is the designed brake (shards of the lost
+build scatter, catch = +1 level). Its planner was logic-tested, its lesson taught, its
+loot magpie-contested — and its real catch rate was never measured. It was **exactly
+zero, for the system's entire shipped life.**
+
+```bash
+node test/recovery-audit.js   # report: catchable-after-respawn, driven catch rate, recovered/lost
+```
+
+The cause was **structural, not tuning**: `playerY` is a constant — the player has no
+vertical movement, so the only y a shard can be caught at is that one line. The old
+trajectory crossed it entirely inside the 90–120f RESPAWN (player dead), then fell below
+a ship that cannot descend, and fizzled at half its own TTL. The comment promising the
+TTL "outlives the 90f respawn cutscene" was true and irrelevant — the shard had to
+outlive **the lane, not the clock**. The suite stayed green throughout because its shard
+tests **hand-placed shards inside the catch band**, teleporting them past the physics
+that made every real catch impossible. *That is the testing lesson: a test that
+constructs the state a feature needs, instead of driving the physics that must produce
+it, certifies a dead system.*
+
+The fix is `salvageStep` (pure, logic-tested): a falling shard **SETTLES into the
+player's lane and patrols it** (drift `SALVAGE_DRIFT`, wall-bounce; settle is a
+*landing* — rising shards pass up through). Recovery becomes the one verb this player
+actually has, a horizontal race, and it stays priced: chasing means leaving your dodge
+lane (the one THE SWARM MIND profiles), and a patrolling shard is exactly the neglected
+loot THE MAGPIE contests — that fusion came free. Measured after: clean-room catch 2/2,
+driven catch 25/31, post-respawn power trajectory climbs again. Recovery stays a
+**SOFTENER** — the planner caps it below what death takes (normal recovers 2 of up to 8
+lost), so the spiral is braked, not cancelled.
+
+**When touching death, respawn, shard physics, TTLs, or the magpie**: run the audit and
+keep three numbers healthy — catchable-after-respawn near 100%, driven catch rate well
+off zero, recovered/lost strictly below 1.
+
 ### Defensive layers
 
 Multiple save mechanisms applied in priority order on fatal hit (`tryTriggerWitchTime` checked at bullet/dive vs player collision):

@@ -196,6 +196,8 @@ const shim = `
 ;try { globalThis.__getStruggleConst = function () { return {
   HOLD: CAPTURE_HOLD, GAIN: STRUGGLE_GAIN, DRAG: STRUGGLE_DRAG,
   BEAM_START: CAPTURE_BEAM_START, BEAM_END: CAPTURE_BEAM_END }; }; } catch (e) {}
+;try { globalThis.__getSalvageConst = function () { return {
+  TTL: SALVAGE_TTL, DRIFT: SALVAGE_DRIFT }; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -3747,6 +3749,122 @@ if (ST && typeof G.updateSalvageShards === 'function' && G.__getGame && G.__getG
   eq(g.salvageShards.length, 0, 'an uncaught shard expires (the loss is permanent)');
   eq(g.lvl.N, 1, 'and it restores nothing');
 } else { console.log('  (skipped — salvage lifecycle not drivable)'); }
+
+section('SALVAGE SETTLE — the shard must reach the only lane the player has');
+// test/recovery-audit.js measured the salvage catch rate at EXACTLY ZERO for
+// the system's entire shipped life. playerY is a constant — the player has no
+// vertical movement — so the only y a shard can be caught at is that one line,
+// and the old trajectory crossed it entirely inside the RESPAWN window (player
+// dead), then fell below a ship that cannot descend. The suite stayed green
+// because its shard tests HAND-PLACED shards inside the catch band. These pin
+// the fix (the shard settles into the lane) at both altitudes: the pure step
+// rule, and the whole wreck-to-catch path driven through the real engine.
+{
+  const SV = (typeof G.__getSalvageConst === 'function') ? G.__getSalvageConst() : null;
+  if (typeof G.salvageStep === 'function' && SV) {
+    const LANE = 260;
+
+    // The pop-out guard: a shard spawns AT the lane (it fell out of a ship
+    // sitting on it) moving UP. Settling on frame one would glue it to the
+    // wreck and erase the scatter.
+    const s0 = G.salvageStep({ x: 100, y: LANE, vx: 0.5, vy: -1.4 }, LANE, 8, 216);
+    ok(!s0.held, 'a shard leaving the wreck upward does not settle at its spawn point');
+    ok(s0.y < LANE, 'it pops out of the explosion first');
+    // Settle is a LANDING, not a crossing: a shard still moving up passes
+    // through the lane without sticking, whichever side it is on.
+    const sUp = G.salvageStep({ x: 100, y: LANE + 4, vx: 0, vy: -1.0 }, LANE, 8, 216);
+    ok(!sUp.held, 'a rising shard passes UP through the lane without sticking');
+
+    // The settle rule itself: falling through the lane locks to it.
+    const s1 = G.salvageStep({ x: 100, y: LANE - 0.1, vx: -0.3, vy: 0.4 }, LANE, 8, 216);
+    eq(s1.y, LANE, 'a falling shard crossing the lane SETTLES exactly onto it');
+    ok(s1.held, 'and is flagged held');
+    ok(Math.abs(Math.abs(s1.vx) - SV.DRIFT) < 1e-9,
+       'settling converts its motion into the lane drift (' + SV.DRIFT + ' px/f)');
+    ok(s1.vx < 0, 'preserving the direction it was already travelling');
+
+    // Held means held: the lane is never left, the patrol never stalls.
+    let s2 = { x: 100, y: LANE, vx: SV.DRIFT, vy: 0, held: true };
+    for (let i = 0; i < 500; i++) s2 = G.salvageStep(s2, LANE, 8, 216);
+    eq(s2.y, LANE, 'a settled shard NEVER leaves the lane (500 frames later: y=' + s2.y + ')');
+    ok(Math.abs(s2.vx) > 0, 'and never stops drifting');
+
+    // Walls turn the patrol around instead of ending it.
+    const s3 = G.salvageStep({ x: 8, y: LANE, vx: -SV.DRIFT, vy: 0, held: true }, LANE, 8, 216);
+    ok(s3.vx > 0, 'the left wall bounces the patrol back into the field');
+    const s4 = G.salvageStep({ x: 216, y: LANE, vx: SV.DRIFT, vy: 0, held: true }, LANE, 8, 216);
+    ok(s4.vx < 0, 'and the right wall does the same');
+
+    // The regression itself, as one number: simulate the real spawn state and
+    // count how many frames the shard is in the band AFTER the respawn ends.
+    // Under the old physics this integral was zero.
+    let sim = { x: 100, y: LANE, vx: 0.5, vy: -1.4 };
+    let inBandAfterRespawn = 0;
+    for (let f = 0; f < SV.TTL; f++) {
+      sim = G.salvageStep(sim, LANE, 8, 216);
+      if (f >= 130 && Math.abs(sim.y - LANE) < 10) inBandAfterRespawn++;
+    }
+    ok(inBandAfterRespawn > 100,
+       'across its TTL the shard spends ' + inBandAfterRespawn + 'f catchable AFTER the '
+       + 'longest respawn (was 0 for the system\'s whole life)');
+  } else { console.log('  (skipped — salvageStep not exposed)'); }
+}
+
+section('SALVAGE SETTLE — driven: wreck to recovery through the real engine');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.killPlayer === 'function') {
+  const SK = G.__getKeys() || {};
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 12;
+  G.startStage();
+  g.state = ST.PLAYING;
+  g.playerAlive = true;
+  g.allEntered = true;
+  g.lives = 5;
+  g.lvl = { S: 5, N: 3, P: 3 };
+  g.shieldCharges = 0;
+  const laneY = g.playerY;
+
+  G.killPlayer(g.playerX, g.playerY, 'bullet', 'bee');
+  ok((g.salvageShards || []).length >= 1,
+     'a confirmed death with a build scatters shards (' + (g.salvageShards || []).length + ')');
+  g.cheatInvincible = true;    // nothing may re-kill mid-measurement
+
+  // Ride the whole respawn with no input at all.
+  let back = -1;
+  for (let f = 0; f < 300 && back < 0; f++) {
+    G.update();
+    if (g.playerAlive && g.state !== ST.RESPAWN) back = f;
+  }
+  ok(back > 0, 'the player comes back (' + back + 'f)');
+  const s = (g.salvageShards || [])[0];
+  ok(!!s, 'a shard is STILL ALIVE when control returns — it outlives the lane, '
+     + 'not just the clock');
+  if (s) {
+    eq(s.y, laneY, 'and it is settled exactly on the player\'s lane');
+    ok(s.held === true, 'in the patrolling state');
+
+    // The catch takes the only verb this player has: horizontal movement.
+    const before = g.lvl.S + g.lvl.N + g.lvl.P;
+    let caught = false;
+    for (let f = 0; f < 400 && !caught; f++) {
+      const t = (g.salvageShards || [])[0];
+      if (!t) break;
+      SK['ArrowLeft'] = t.x < g.playerX - 2;
+      SK['ArrowRight'] = t.x > g.playerX + 2;
+      G.update();
+      if ((g.salvageCount || 0) > 0) caught = true;
+    }
+    SK['ArrowLeft'] = false; SK['ArrowRight'] = false;
+    ok(caught, 'chasing it down the lane catches it');
+    ok(g.lvl.S + g.lvl.N + g.lvl.P > before,
+       'and the build actually recovers (' + before + ' -> '
+       + (g.lvl.S + g.lvl.N + g.lvl.P) + ')');
+  }
+  g.cheatInvincible = false;
+  G.resetGame();
+} else { console.log('  (skipped — salvage path not drivable)'); }
 
 section('FLIGHT SCHOOL — lifetime-once verb coaching (registry wired both sides)');
 if (G.__getCoachLessons && G.__getCoachLessons()) {
