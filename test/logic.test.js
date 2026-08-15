@@ -193,11 +193,20 @@ const shim = `
   MIN_SAMPLES: MIND_MIN_SAMPLES, LOCK_CONF: MIND_LOCK_CONF,
   MAX_BIAS: MIND_MAX_BIAS, WIPE_FLASH: MIND_WIPE_FLASH,
   DIVE_PREVIEW: DIVE_PREVIEW, WING_PREVIEW: WING_PREVIEW, BASE_W: BASE_W }; }; } catch (e) {}
+;try { globalThis.__getDreadConst = function () { return {
+  DECAY: DREAD_DECAY, PANIC_DECAY: DREAD_PANIC_DECAY, MIN_KILLS: DREAD_MIN_KILLS,
+  HOT_CONF: DREAD_HOT_CONF, AVOID: DREAD_AVOID, FLASH: DREAD_FLASH }; }; } catch (e) {}
 ;try { globalThis.__getStruggleConst = function () { return {
   HOLD: CAPTURE_HOLD, GAIN: STRUGGLE_GAIN, DRAG: STRUGGLE_DRAG,
   BEAM_START: CAPTURE_BEAM_START, BEAM_END: CAPTURE_BEAM_END }; }; } catch (e) {}
 ;try { globalThis.__getSalvageConst = function () { return {
   TTL: SALVAGE_TTL, DRIFT: SALVAGE_DRIFT }; }; } catch (e) {}
+;try { globalThis.__getHeistConst = function () { return {
+  NEED: SIPHON_NEED, GAIN: SIPHON_GAIN, LEAK: SIPHON_LEAK,
+  GRAB_HALF_W: CAPTURE_GRAB_HALF_W, BEAM_START: CAPTURE_BEAM_START }; }; } catch (e) {}
+;try { globalThis.__getDebriefConst = function () { return {
+  WAVES: DEBRIEF_WAVES, DESCEND: COURIER_DESCEND, UPLINK: COURIER_UPLINK,
+  HP: COURIER_HP, SEED_W: DEBRIEF_SEED_W, SIGHT: LEDGER_SIGHT }; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -4595,6 +4604,385 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getKeys
      + 'payoff routes through parry / combo / witch-time, which already price it.');
   G.resetGame();
 } else { console.log('  (skipped — swarm mind not drivable)'); }
+
+section('THE KILLING FIELD — the pure grief (casualties, heat, deflection)');
+{
+  const M = G.__getMindConst && G.__getMindConst();
+  const D = G.__getDreadConst && G.__getDreadConst();
+  if (M && D && typeof G.dreadObserve === 'function') {
+    const K = M.ZONES, BW = M.BASE_W;
+    const laneX = (i) => G.mindZoneCenter(i);
+
+    // --- the factory shares the mind's lane vocabulary ---
+    const d0 = G.makeSwarmDread();
+    eq(d0.z.length, K, 'the grave map has one bucket per mind lane — one shared vocabulary');
+    eq(G.dreadHotZone(d0), -1, 'an empty field has no hot lane');
+
+    // --- heat needs BOTH weight and share ---
+    let d = G.makeSwarmDread();
+    for (let i = 0; i < D.MIN_KILLS - 1; i++) G.dreadObserve(d, laneX(2));
+    eq(G.dreadHotZone(d), -1, 'concentrated kills below the weight gate never go hot');
+    G.dreadObserve(d, laneX(2));
+    eq(G.dreadHotZone(d), 2, 'one more casualty and the lane is a KILLING FIELD');
+    ok(d.conf >= D.HOT_CONF, 'with the share threshold genuinely met, not skirted');
+
+    let ds = G.makeSwarmDread();
+    for (let i = 0; i < 40; i++) G.dreadObserve(ds, laneX(i % K));
+    eq(G.dreadHotZone(ds), -1,
+       'kills spread across every lane make no grave, however many there are');
+
+    // --- decay: a grief, not a history ---
+    let dc = G.makeSwarmDread();
+    for (let i = 0; i < 10; i++) G.dreadObserve(dc, laneX(1));
+    eq(G.dreadHotZone(dc), 1, 'ten kills in one lane make it hot');
+    for (let f = 0; f < 600; f++) G.dreadDecay(dc, false);
+    eq(G.dreadHotZone(dc), -1, '10 seconds without a kill there and the field is cold again');
+
+    let dp = G.makeSwarmDread();
+    for (let i = 0; i < 10; i++) G.dreadObserve(dp, laneX(1));
+    for (let f = 0; f < 30; f++) G.dreadDecay(dp, true);
+    eq(G.dreadHotZone(dp), -1, 'formation PANIC collapses a hot field within half a second');
+
+    // --- the inversion-proofing the mind's tests also pin: a panicking formation
+    // cannot hold this memory even under a sustained massacre, because the decayed
+    // weight saturates below the gate (a raw kill count would only ever grow) ---
+    let dm = G.makeSwarmDread();
+    let everHot = false;
+    for (let f = 0; f < 900; f++) {
+      if (f % 6 === 0) G.dreadObserve(dm, laneX(1)); // a kill every 6 frames — a massacre
+      G.dreadDecay(dm, true);
+      if (G.dreadHotZone(dm) >= 0) everHot = true;
+    }
+    ok(!everHot, 'a PANICKING formation cannot hold the grief, however fast its members die');
+
+    // --- the shoulder: pressure moves, it does not vanish ---
+    eq(G.nearestColdLane(0, laneX(0)), 1, 'a grave on the left edge retreats right');
+    eq(G.nearestColdLane(K - 1, laneX(K - 1)), K - 2, 'a grave on the right edge retreats left');
+    eq(G.nearestColdLane(2, laneX(2) - 5), 1, 'a mid grave retreats toward the target side (left)');
+    eq(G.nearestColdLane(2, laneX(2) + 5), 3, 'and right');
+
+    // --- deflection: capped, commander-disciplined, never a sanctuary ---
+    const hotAt = (zone) => {
+      const a = new Array(K).fill(0); a[zone] = 100;
+      return { z: a, n: 100, conf: 1, hot: zone, flash: 0 };
+    };
+    const hd = hotAt(2);
+    const tx = laneX(2);
+    const defl = G.dreadDeflectTarget(tx, hd, false);
+    ok(G.mindZoneOf(defl) !== 2, 'a target dead-centre in the killing field is pulled out of it');
+    ok(Math.abs(defl - laneX(1)) > 0.001 && Math.abs(defl - laneX(3)) > 0.001,
+       'but NEVER all the way to a cold centre — the cap is < 1, so the field is no sanctuary');
+    eq(G.dreadDeflectTarget(laneX(0), hd, false), laneX(0),
+       'a target already outside the field is untouched');
+    eq(G.dreadDeflectTarget(tx, G.makeSwarmDread(), false), tx,
+       'no grave → the shipped intercept, byte-identical');
+    const withCmd = G.dreadDeflectTarget(tx, hd, true);
+    ok(Math.abs(withCmd - tx) < Math.abs(defl - tx),
+       'a LIVE commander disciplines the swarm — half the fear, dives keep coming closer');
+    ok(Math.abs(withCmd - tx) > 0, 'but discipline is not immunity');
+    eq(G.dreadDeflectTarget(NaN, hd, false), BW / 2, 'a non-finite target reads as centre, never NaN');
+
+    // --- the arc flip: a roll against fear, not a veto ---
+    const dg = hotAt(0); // grave on the far left
+    eq(G.dreadDiveSide(100, -1, dg, false, 0), 1, 'an arc sweeping toward the grave flips away');
+    eq(G.dreadDiveSide(100, 1, dg, false, 0), 1, 'an arc already sweeping away is untouched');
+    eq(G.dreadDiveSide(100, -1, dg, false, 0.99), -1, 'the flip is a roll against fear, not a veto');
+    eq(G.dreadDiveSide(100, -1, G.makeSwarmDread(), false, 0), -1,
+       'no grave → the shipped arc, untouched');
+    const midRoll = (D.AVOID * 0.5 + D.AVOID) / 2;
+    eq(G.dreadDiveSide(100, -1, dg, true, midRoll), -1,
+       'a roll inside the disciplined margin does NOT flip while the commander lives');
+    eq(G.dreadDiveSide(100, -1, dg, false, midRoll), 1,
+       'the same roll flips once the commander is dead — killing it unleashes the fear');
+    eq(G.dreadDiveSide(100, -1, dg, false), -1, 'a missing roll defaults safe: no flip');
+
+    // --- herded dives keep BAIT accounting honest ---
+    if (typeof G.mindTagDive === 'function' && G.__getGame && G.__getGame()) {
+      const gg = G.__getGame();
+      const saved = gg.swarmMind;
+      const a = new Array(K).fill(0); a[1] = 400;
+      gg.swarmMind = { z: a, n: 999, conf: 1 };
+      const e1 = { x: 50 };
+      G.mindTagDive(e1);
+      eq(e1._mindZone, 1, 'a mind-guided dive is stamped with the lane it was addressed to');
+      const e2 = { x: 50, _dreadHerded: true };
+      G.mindTagDive(e2);
+      eq(e2._mindZone, -1,
+         'but a dread-herded dive is stamped -1 — a reroute can never be miscounted as a BAIT');
+      ok(!e2._dreadHerded, 'and the herd flag is consumed with the stamp');
+      gg.swarmMind = saved;
+    }
+
+    // --- robustness ---
+    ok(G.dreadObserve(null, 5) === null, 'observing into a missing field is a no-op, not a throw');
+    ok(G.dreadDecay(null, false) === null, 'decaying one likewise');
+  } else { console.log('  (skipped — killing field not exposed)'); }
+}
+
+section('THE KILLING FIELD — driven: the formation records its own dead');
+// The pure layer proves the maths; this proves the WIRING — that real kills through
+// the real collision path feed the grave map, and that the memory decays when the
+// killing stops. (The fairness side needs no new driven guard: deflection runs
+// before createLoopPath/planPincerPair, so the existing SWARM MIND driven test's
+// shortest-preview >= DIVE_PREVIEW assertion already covers herded dives.)
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.dreadHotZone === 'function') {
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  g.cheatInvincible = true;
+  for (let f = 0; f < 400 && !g.allEntered; f++) G.update();
+  const before = (g.swarmDread && g.swarmDread.n) || 0;
+  const targets = (g.enemies || []).filter(e => e.alive && e.state === 'formation').slice(0, 8);
+  for (const t of targets) {
+    t.hp = 1;
+    for (let f = 0; f < 20 && t.alive; f++) {
+      g.bullets.push({ x: t.x, y: t.y + 2, vy: -2, dmg: 99, lvl: 1 });
+      G.update();
+    }
+  }
+  ok(targets.length > 0 && targets.every(t => !t.alive),
+     'the victims went down through the real kill path');
+  ok((g.swarmDread.n || 0) > before,
+     'and every one was recorded in the grave map (weight ' + g.swarmDread.n.toFixed(1) + ')');
+  const nAfter = g.swarmDread.n;
+  for (let f = 0; f < 600; f++) G.update();
+  ok(g.swarmDread.n < nAfter,
+     'the grief decays once the killing stops — a memory, not a ledger');
+  G.resetGame();
+} else { console.log('  (skipped — killing field not drivable)'); }
+
+section('THE HEIST — the pure wager (siphon, the closing window)');
+{
+  const H = G.__getHeistConst && G.__getHeistConst();
+  if (H && typeof G.siphonStep === 'function' && typeof G.heistStillWinnable === 'function') {
+    let m = 0;
+    for (let i = 0; i < H.NEED; i++) m = G.siphonStep(m, true, true);
+    ok(G.heistResolve(m), H.NEED + ' consecutive wind-up frames inside the band fill the meter to the steal');
+    let m2 = 0;
+    for (let i = 0; i < H.NEED - 1; i++) m2 = G.siphonStep(m2, true, true);
+    ok(!G.heistResolve(m2), 'one frame short is not a steal');
+
+    const up = G.siphonStep(0.5, true, true) - 0.5;
+    const down = 0.5 - G.siphonStep(0.5, false, true);
+    ok(Math.abs(down - 2 * up) < 1e-9,
+       'the leak is exactly twice the gain — dipping in and out is strictly losing');
+    eq(G.siphonStep(0.9, true, false), 0, 'no wind-up, no meter — a live beam cannot be siphoned');
+    eq(G.siphonStep(0.01, false, true), 0, 'the meter clamps at zero, never negative');
+    eq(G.siphonStep(NaN, true, true), G.siphonStep(0, true, true),
+       'a poisoned meter reads as zero, never NaN');
+
+    // --- the closing window: the telegraph announces its own point of no return ---
+    ok(G.heistStillWinnable(0, 0), 'a fresh wind-up is winnable');
+    ok(G.heistStillWinnable(0, H.BEAM_START - H.NEED),
+       'the last winnable entry from zero is frame ' + (H.BEAM_START - H.NEED));
+    ok(!G.heistStillWinnable(0, H.BEAM_START - H.NEED + 1),
+       'one frame later the math no longer closes — the gold ticks turn to an X');
+    ok(G.heistStillWinnable(0.5, H.BEAM_START - H.NEED / 2),
+       'half a meter buys half the deadline');
+    ok(!G.heistStillWinnable(0.5, H.BEAM_START - H.NEED / 2 + 1), 'and not one frame more');
+
+    // --- wiring pins (source scan, same contract as the ACHIEVEMENTS guard) ---
+    ok(scriptSrc.includes('!e.capturedShip && !e._robbed'),
+       'the capture roll is gated on !_robbed — one boss can never be farmed twice');
+    ok((scriptSrc.match(/CAPTURE_GRAB_HALF_W/g) || []).length >= 3,
+       'the grab band and the siphon zone share ONE constant — the zone that can rob '
+       + 'is byte-identical to the zone that can be robbed from');
+  } else { console.log('  (skipped — heist not exposed)'); }
+}
+
+section('THE HEIST — driven: the wind-up is raidable, and the stake is real');
+// The pure layer proves the wager's math; this proves the WIRING through the real
+// update loop — a rob through the real wind-up branch, the SHIELD_MAX cap, and,
+// most important, THE STAKE: a player still in the band when the beam goes live
+// is captured exactly as before the heist existed.
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.robBeam === 'function') {
+  const H = G.__getHeistConst();
+  G.resetGame();
+  let g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  g.cheatInvincible = true;
+  for (let f = 0; f < 400 && !g.allEntered; f++) G.update();
+  const bosses = (g.enemies || []).filter(e => e.alive && e.type === 'boss' && e.state === 'formation');
+  if (bosses.length >= 1) {
+    const b1 = bosses[0];
+    b1.state = 'capturing'; b1.captureTimer = 0; b1.siphon = 0;
+    const sBefore = g.shieldCharges || 0;
+    for (let f = 0; f < H.NEED + 6 && b1.state === 'capturing'; f++) {
+      g.playerX = b1.x;              // fly the descending boss's column — the raid
+      g._prevPlayerX = g.playerX;
+      G.update();
+    }
+    eq(b1.state, 'returning', 'the robbed boss leaves by the empty-handed return path');
+    ok(b1._robbed, 'and is stamped robbed — this boss can never be farmed again');
+    eq(g.shieldCharges || 0, Math.min(3, sBefore + 1),
+       '+1 shield — the heist\'s whole material payoff, nothing scoreable');
+    eq(g.beamHeists || 0, 1, 'counted once for the BEAMS ROBBED highlight');
+
+    // --- the cap: at SHIELD_MAX the prize is only the denial ---
+    if (bosses.length >= 2) {
+      g.shieldCharges = 3;
+      const b2 = bosses[1];
+      b2.state = 'capturing'; b2.captureTimer = 0; b2.siphon = 0;
+      for (let f = 0; f < H.NEED + 6 && b2.state === 'capturing'; f++) {
+        g.playerX = b2.x;
+        g._prevPlayerX = g.playerX;
+        G.update();
+      }
+      eq(g.shieldCharges, 3, 'at SHIELD_MAX the shield does not overflow — the prize is the denial');
+      eq(g.beamHeists || 0, 2, 'but the heist still counts');
+    }
+  } else { console.log('  (no formation boss to rob on this stage)'); }
+
+  // --- THE STAKE, pinned: too greedy and the beam takes you exactly as shipped ---
+  G.resetGame();
+  g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  for (let f = 0; f < 400 && !g.allEntered; f++) G.update();
+  const bv = (g.enemies || []).find(e => e.alive && e.type === 'boss' && e.state === 'formation');
+  if (bv) {
+    bv.state = 'capturing';
+    bv.captureTimer = H.BEAM_START - 1;  // one frame from the beam going live
+    bv.siphon = 0.2;                     // a raid begun too late to ever close
+    g.playerX = bv.x;
+    g._prevPlayerX = g.playerX;
+    G.update();
+    ok(!g.playerAlive, 'a player still in the band when the beam goes live is TAKEN');
+    const STATE_ = G.__getState && G.__getState();
+    if (STATE_) eq(g.state, STATE_.CAPTURED,
+       'into the capture — the heist\'s failure path is the already-shipped, already-audited grab');
+    ok(!bv._robbed, 'and no robbery is recorded on a failed raid');
+  } else { console.log('  (no formation boss for the stake pin)'); }
+  G.resetGame();
+} else { console.log('  (skipped — heist not drivable)'); }
+
+section('THE DEBRIEF — the pure film (drill, courier, the seeded mind)');
+{
+  const D = G.__getDebriefConst && G.__getDebriefConst();
+  const M = G.__getMindConst && G.__getMindConst();
+  if (D && M && typeof G.courierPhase === 'function') {
+    // --- lifecycle boundaries: the descend IS the telegraph, at the baseline ---
+    ok(D.DESCEND >= 30, 'the courier\'s descend telegraph meets the 30f fairness baseline');
+    eq(G.courierPhase(0), 'descend', 'a fresh courier is descending');
+    eq(G.courierPhase(D.DESCEND - 1), 'descend', 'up to the last descend frame');
+    eq(G.courierPhase(D.DESCEND), 'uplink', 'then the uplink contest opens');
+    eq(G.courierPhase(D.DESCEND + D.UPLINK - 1), 'uplink', 'to its final frame');
+    eq(G.courierPhase(D.DESCEND + D.UPLINK), 'done', 'and the footage lands');
+    eq(G.courierPhase(-5), 'descend', 'a malformed timer reads as descend, never a throw');
+
+    // --- the drill: footage, not memory (no decay, raw lanes) ---
+    const log = new Array(M.ZONES).fill(0);
+    eq(G.drillFavoredLane(log), -1, 'an empty reel favours nothing');
+    for (let i = 0; i < 50; i++) G.drillObserve(log, 6);
+    for (let i = 0; i < 10; i++) G.drillObserve(log, M.BASE_W - 6);
+    eq(G.drillFavoredLane(log), 0, 'the favoured lane is where the drill was flown');
+    eq(log[0], 50, 'raw counts — footage does not decay');
+    G.drillObserve(log, NaN);
+    eq(log[(M.ZONES - 1) >> 1], 1, 'a non-finite x is filed in the centre lane, never a throw');
+    ok(G.drillObserve(null, 5) === null, 'a missing reel is a no-op');
+
+    // --- the seed: warms the read, can NEVER lock it alone ---
+    ok(D.SEED_W < M.MIN_SAMPLES,
+       'DEBRIEF_SEED_W (' + D.SEED_W + ') sits below MIND_MIN_SAMPLES (' + M.MIN_SAMPLES
+       + ') BY CONSTRUCTION — footage alone can never hard-lock the swarm');
+    const p = G.makeSwarmMind();
+    G.mindSeed(p, 1, D.SEED_W);
+    eq(G.mindFavoredZone(p.z), 1, 'the seed lands in the filmed lane');
+    ok((p.conf || 0) >= M.LOCK_CONF, 'and reads confident (one lane, pure footage)');
+    ok(!G.mindLocked(p),
+       'but the mind is NOT locked — an uplink is a warm start, not a firing solution');
+    // live confirmation next stage completes what footage began
+    for (let f = 0; f < M.MIN_SAMPLES; f++) G.mindObserve(p, G.mindZoneCenter(1), false);
+    ok(G.mindLocked(p), 'live confirmation on top of the seed locks it');
+    // and panic still collapses a seeded mind — the inversion-proofing holds
+    const q = G.makeSwarmMind();
+    G.mindSeed(q, 1, D.SEED_W);
+    for (let f = 0; f < 60; f++) G.mindObserve(q, G.mindZoneCenter(1), true);
+    ok(!G.mindLocked(q), 'a PANICKING formation sheds seeded footage like any other read');
+    ok(G.mindSeed(null, 1, 10) === null, 'seeding a missing mind is a no-op');
+
+    // --- the schedule: no courier after the final wave ---
+    const plan8 = G.debriefPlan(8);
+    ok(plan8.length === 2 && plan8[0] === 2 && plan8[1] === 5,
+       'an 8-wave drill films after waves 3 and 6');
+    eq(G.debriefPlan(3).length, 0, 'a 3-wave drill schedules no courier past its end');
+    eq(G.debriefPlan(6).length, 1, 'a 6-wave drill keeps only the early courier');
+
+    // --- the graft: one hitbox constant, zero drifting copies ---
+    if (typeof G.playerHitHalf === 'function' && G.__getGame && G.__getGame()) {
+      const gg = G.__getGame();
+      const saved = gg.dualFighter;
+      gg.dualFighter = false;
+      eq(G.playerHitHalf(), 7, 'a single hull is 7px');
+      gg.dualFighter = true;
+      eq(G.playerHitHalf(), 16, 'a dual fighter is 16px');
+      gg.dualFighter = saved;
+      const strays = (scriptSrc.match(/hitW\s*=\s*game\.dualFighter/g) || []).length;
+      eq(strays, 0, 'zero inline `hitW = game.dualFighter ? …` copies remain — all 5 routed through playerHitHalf');
+      eq((scriptSrc.match(/return game\.dualFighter \? 16 : 7/g) || []).length, 1,
+         'the ternary lives in exactly one place: playerHitHalf itself');
+    }
+  } else { console.log('  (skipped — debrief not exposed)'); }
+}
+
+section('THE DEBRIEF — driven: deny, steal the ledger, or let the footage land');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.updateCourier === 'function') {
+  const D = G.__getDebriefConst();
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 8;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  g.cheatInvincible = true;
+  ok(Array.isArray(g.drillLog), 'a challenge stage opens a fresh drill reel');
+
+  // --- STEAL: kill the courier mid-uplink, chase the ledger, seize it ---
+  g.courier = { lane: 2, x: G.mindZoneCenter(2), y: -10, timer: 0, hp: D.HP };
+  for (let f = 0; f < D.DESCEND + 2; f++) G.update();
+  eq(G.courierPhase(g.courier.timer), 'uplink', 'the courier reached its uplink');
+  for (let f = 0; f < 30 && g.courier; f++) {
+    g.bullets.push({ x: g.courier.x, y: g.courier.y, vy: -2, dmg: 1, lvl: 1 });
+    G.update();
+  }
+  ok(!g.courier, 'three hits through the real bullet path down the drone');
+  eq(g.debriefsDenied || 0, 1, 'the deny is counted');
+  const ledger = (g.salvageShards || []).find(s => s._ledger);
+  ok(!!ledger, 'killed MID-UPLINK, it drops the swarm\'s own LEDGER');
+  let caught = false;
+  for (let f = 0; f < 400 && !caught; f++) {
+    const sh = (g.salvageShards || []).find(s => s._ledger);
+    if (!sh) break;
+    g.playerX = sh.x;
+    g._prevPlayerX = g.playerX;
+    G.update();
+    caught = (g.ledgerSight || 0) > 0;
+  }
+  ok(caught, 'chased down the settling ledger and SEIZED it (salvageStep physics)');
+  ok(g.ledgerSight >= D.SIGHT - 2, 'ledger sight starts from full (minus the catch frame\'s tick)');
+  eq(g.swarmMind.n || 0, 0, 'and the seizure WIPED what the swarm had learned');
+
+  // --- IGNORE: a second courier completes its uplink and seeds the mind ---
+  g.courier = { lane: 3, x: G.mindZoneCenter(3), y: -10, timer: 0, hp: D.HP };
+  const zBefore = g.swarmMind.z[3] || 0;
+  for (let f = 0; f < D.DESCEND + D.UPLINK + 2 && g.courier; f++) G.update();
+  ok(!g.courier, 'left alone, the courier finishes and leaves');
+  ok((g.swarmMind.z[3] || 0) >= zBefore + D.SEED_W - 1,
+     'the footage landed: the swarm opens the next stage warm on the filmed lane');
+  ok(!G.mindLocked(g.swarmMind), 'but footage alone still does not LOCK the read');
+  G.resetGame();
+} else { console.log('  (skipped — debrief not drivable)'); }
 
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of

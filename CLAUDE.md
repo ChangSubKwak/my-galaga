@@ -220,6 +220,83 @@ witch-time / combo already price; points on top would double-pay it. Fusion: WIN
 (`wingTacticColor`), FLIGHT SCHOOL (`mind` lesson), enemy comms (`mindLock`). No new actor,
 so THE DIRECTOR's budget is untouched.
 
+### THE KILLING FIELD — the swarm remembers its dead, and you herd it
+
+THE SWARM MIND models the player; THE KILLING FIELD is the first system to model the
+**consequences** of the player: `game.swarmDread`, the formation's decaying memory of
+which lane its own members die in — the exact structural sibling of the mind (same
+`MIND_ZONES` lanes, `mindZoneOf`/`mindZoneCenter`/`mindConfidence`/`mindFavoredZone`
+reused verbatim; opposite subject — where you LIVE vs where they DIE). A lane whose
+decayed casualty weight ≥ `DREAD_MIN_KILLS` (6) with share ≥ `DREAD_HOT_CONF` (0.50)
+goes **hot**: lone dive arcs flip away from it (`dreadDiveSide`, a roll against capped
+confidence — never a veto) and coordinated WING targets are pulled toward the nearest
+cold lane (`dreadDeflectTarget`, pull ≤ `DREAD_AVOID` 0.75 × conf). So **kill placement
+becomes an expressive input**: the player herds enemy attack routes by choosing where
+to kill, and the swarm visibly stops flying into the gun and comes around it — deflected
+targets land on the hot lane's SHOULDERS, so pressure moves, it does not vanish.
+
+- Pure, logic-tested core: `makeSwarmDread` / `dreadObserve` (per formation kill, in
+  the kill-commit path, PLAYING only — bespoke hostiles never feed it) / `dreadDecay`
+  (per frame beside `mindObserve`; combat states only, so the grave **persists through
+  STAGE_INTRO** into the next wave; ~3s combat half-life) / `dreadHotZone` /
+  `nearestColdLane` / `dreadDeflectTarget` / `dreadDiveSide`. Impure commit sites:
+  `dreadArcSide` (wraps `mindDiveSide` at both lone-dive launches), the `targetX` line
+  in `launchDiveTactic`, `dreadMarkHerd`, `drawDreadField`.
+
+**The mind's three rules apply unchanged — preserve them here too.**
+1. **DRAWN** — `drawDreadField` marks the hot lane with flickering ember-orange X ticks
+   (`#f80`, shape/colour/phase distinct from the mind bracket) on the same floor line;
+   a herd flares them and slides a chevron toward the rerouted lane. Invisible until real.
+2. **WHERE, never HOW FAST** — deflection runs **before** `createLoopPath` /
+   `planPincerPair`, so the frozen telegraph shows the true path and every preview keeps
+   its budgeted length (the existing SWARM MIND driven shortest-preview guard covers it).
+3. **BREAKABLE** — kill elsewhere (~3s cooling); formation panic collapses it (same
+   decayed-weight inversion-proofing as the mind: under `DREAD_PANIC_DECAY` 0.94 the
+   weight saturates far below the gate — test-pinned); and a **live commander HALVES the
+   deflection** — the first reason to ever *spare* the commander (keep the swarm
+   disciplined and dives keep entering your kill zone; kill it and you blind the swarm
+   but unleash its fear).
+
+**ZERO new score.** Payoff is routing + the multi-threat flank frames parry/witch-time/
+combo already price. Herded dives stamp `_mindZone = -1` via `_dreadHerded` so they can
+never be miscounted as BAITs. Tracked: `game.divesHerded` + lifetime `galagaHerdTotal`
+(demo-guarded), DIVES HERDED run highlight, `dreadRoute` intercept (once/run),
+`COACH_LESSONS.dread`. Debug stage-jumps (`,`/`.`/1–9) reset the field (adjacent-stage
+memory only). No new actor, so THE DIRECTOR's budget is untouched.
+
+### THE DEBRIEF — the challenge round is the swarm's filmed drill
+
+Every adaptive system (mind/dread/heist/wing tactics) lived only in normal PLAYING
+stages — the challenge round was a dead zone in the game's most distinctive dimension.
+THE DEBRIEF opens the run's first **information channel flowing challenge→combat**:
+`game.drillLog` (raw per-stage lane histogram — footage, not memory: no decay) records
+where you fly the drill; after waves 3 and 6 clear (`debriefPlan`, clamped so nothing
+schedules past the final wave), a **courier drone** descends into your footage-richest
+lane (30f descend telegraph — the baseline; dashed column + mind-bracket glyph) and
+uplinks for 150f. It never fires and never collides — **it costs information, not hits**.
+
+Four flown answers: **DENY** (kill it in the descend — 3 HP, 0 points, intel dies
+undelivered) / **STEAL** (kill it mid-uplink at wave-coverage cost → it drops the
+swarm's own **LEDGER** on `salvageStep` physics; catch → `mindWipe` + `ledgerSight`
+`LEDGER_SIGHT` (3600f): drawMindLock/drawDreadField render **below their thresholds**,
+dashed/dim — you see the forming read and the forming fear) / **IGNORE** (uplink
+completes → `mindSeed(swarmMind, lane, DEBRIEF_SEED_W)`) / **LIE** (fly the drill in a
+lane you never fight in; the seeded mind converges on empty air and the existing BAIT
+machinery prices it — zero new code). **`DEBRIEF_SEED_W` (60) < `MIND_MIN_SAMPLES` (90)
+by construction**: footage warms the read, only live confirmation can lock it; panic
+still collapses a seeded mind (test-pinned).
+
+`salvageStep` gained an optional `fallCap` param (`LEDGER_FALL` 1.6) because the ledger
+drops from drone height where the default 0.5px/f cap could never reach the lane inside
+any TTL — the exact lane-vs-clock failure THE RECOVERY BUDGET documented; omitted → 0.5,
+byte-identical shipped physics. **ZERO new score** (courier worth 0; deny cost is the
+existing PERFECT WAVE / hits×100 economy). Comms: `debrief` **replaced the cut
+`playerDown`** (every-death chatter at the one unreactable moment — the band's weakest
+member; still 24/24, still capped). Tracked: `game.debriefsDenied` + lifetime
+`galagaDebriefDeny` (demo-guarded), DEBRIEFS DENIED highlight, CENSOR achievement (10
+lifetime), `COACH_LESSONS.debrief`. Also shipped: `playerHitHalf()` (the 5 duplicated
+`dualFighter ? 16 : 7` collision ternaries collapsed to one helper; source-scan-pinned).
+
 ### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
 
 Difficulty has `curve-audit.js`; fairness now has its own instrument:
@@ -351,6 +428,36 @@ menu.
 highlight. Fusion: capture/rescue, dual fighter, FLIGHT SCHOOL (the `struggle` lesson
 fires the frame the beam goes live — the last moment the player is alive enough to be
 coached), enemy comms (`breakout`). No new actor, so THE DIRECTOR's budget is untouched.
+
+### THE HEIST — the wind-up is raidable (warnings become negotiations)
+
+Every telegraph had only ever been a warning; THE HEIST inverts the sign on one of them.
+During the capture **wind-up** (frames 0–59), standing inside the grab band —
+`CAPTURE_GRAB_HALF_W = 20`, the **same shared constant** the live beam grabs with, so the
+zone that can rob is byte-identical to the zone that can be robbed from — fills `e.siphon`
+by `SIPHON_GAIN = 1/SIPHON_NEED` per frame (leaving leaks at 2×; dipping in and out is
+strictly losing). `SIPHON_NEED = 36` frames of commitment → `robBeam(e)`: the boss leaves
+by the **existing** empty-handed return path, `+1 shieldCharge` (capped `SHIELD_MAX`),
+`e._robbed` (the capture roll is gated `!e._robbed` — one boss can never be farmed twice).
+Latest winnable entry from meter 0 is frame 24; `heistStillWinnable` drives the bail cue:
+gold tick marks climb the telegraph's dashed edges with the siphon and **turn to a white X
+the moment the math no longer closes** — the telegraph announcing its own point of no
+return. A siphon of 0 renders pixel-identical to the shipped telegraph.
+
+**One telegraph, four flown answers**: flee (the shipped game, unchanged) / raid (a life
+staked for a shield + denial) / raid failed → THE STRUGGLE (tear free, forfeit the
+rescue) / submit (pay the life for the dual-fighter shot). The failure path is **zero new
+code** — the already-shipped, already-audited capture; no warning shortened, no audit
+number touched (the heist is a wager, not a threat).
+
+**ZERO new score.** Payoff is a shield, a denial, and tempo — and the price quietly
+includes information (camping the band feeds THE SWARM MIND's read the whole siphon).
+Pure, logic-tested core: `siphonStep` / `heistStillWinnable` / `heistResolve`; impure
+commit `robBeam`. Tracked: `game.beamHeists` + lifetime `galagaHeistTotal` (demo-guarded),
+BEAMS ROBBED run highlight, `beamHeist` intercept, `COACH_LESSONS.heist` (taught only
+after `struggle` is learned — the first witnessed beam teaches escape, a later one teaches
+robbery). **Comms band is now at its ceiling (24/24)** — the next system needing an
+intercept must cut one first. No new actor, so THE DIRECTOR's budget is untouched.
 
 ### THE RECOVERY BUDGET — the death spiral's brake, measured (SALVAGE SETTLE)
 

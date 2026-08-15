@@ -2550,6 +2550,85 @@ function captureTelegraphProgress(timer) {
   return clamp01(timer / CAPTURE_BEAM_START);
 }
 
+// ================================ THE HEIST =================================
+// Every telegraph in this game has only ever been a WARNING — the fairness
+// budget's whole vocabulary is "threat announces, player evades". THE HEIST
+// inverts the sign on one of them for the first time: the wind-up of the single
+// most expensive threat (the only one that costs a LIFE) becomes a drawn, timed
+// PRIZE. Stand inside the grab band — the exact pixels you were taught to flee —
+// for SIPHON_NEED of the wind-up's 60 frames and you ROB the beam: +1 shield,
+// capture denied, the boss sent home empty-handed. Stay past the point the math
+// closes and the beam goes live with you in its jaws — the failure path is the
+// already-shipped, already-audited capture, zero new code.
+//
+// One telegraph, four flown answers: FLEE (safe, the shipped game) / RAID (a
+// life staked for a shield + denial) / raid failed → STRUGGLE (tear free, keep
+// the life, forfeit the rescue) / SUBMIT (pay the life for the dual-fighter
+// shot). Each is chosen with the stick, not a menu.
+//
+// ZERO new score. The payoff is a shield (hard-capped at SHIELD_MAX), a denial,
+// and tempo — and the price quietly includes information: camping the band
+// feeds THE SWARM MIND's read of your lane the whole time you siphon.
+//
+// Anti-cheese: the leak is 2× the gain (dipping in and out is strictly losing),
+// `_robbed` is per-boss (one boss can never be farmed twice), and the latest
+// winnable entry from meter 0 is frame 60−36 = 24 — the decision must be made
+// EARLY, while the drawn column is still thin.
+const CAPTURE_GRAB_HALF_W = 20;      // the beam's grab half-width — and the siphon zone,
+                                     // byte-identical by construction (shared constant)
+const SIPHON_NEED = 36;              // frames-in-band to rob — a full WING_PREVIEW of commitment
+const SIPHON_GAIN = 1 / SIPHON_NEED; // meter per wind-up frame inside the band
+const SIPHON_LEAK = 2 / SIPHON_NEED; // meter lost per wind-up frame outside — 2× gain
+
+// One frame of the siphon. Only the wind-up can be robbed: once the beam is
+// live (or the state ends) the meter is dead, hard zero.
+function siphonStep(meter, inside, windup) {
+  if (!windup) return 0;
+  return clamp01((meter || 0) + (inside ? SIPHON_GAIN : -SIPHON_LEAK));
+}
+
+// Can continued commitment still close the math? Frames still needed vs wind-up
+// frames left. Drives the bail cue: the telegraph's gold ticks turn to a white X
+// the moment this flips false — the raid announcing its own point of no return.
+function heistStillWinnable(meter, timer) {
+  return (1 - clamp01(meter || 0)) * SIPHON_NEED <= CAPTURE_BEAM_START - timer + 1e-9;
+}
+
+// The single steal predicate robBeam() commits on (epsilon absorbs the float
+// dust of summing SIPHON_NEED × SIPHON_GAIN).
+function heistResolve(meter) {
+  return (meter || 0) >= 1 - 1e-9;
+}
+
+// Impure commit: the robbery. The boss leaves by the EXISTING empty-handed
+// return path (the same three lines the wind-up timeout uses), so a robbed
+// capture ends exactly like an expired one — minus the shield in your pocket.
+function robBeam(e) {
+  e._robbed = true;
+  e.siphon = 0;
+  e.state = 'returning';
+  e.path = createEntryPath(e.x, e.y, e.homeX, e.homeY, 1);
+  e.pathProgress = 0;
+  const wasMax = (game.shieldCharges || 0) >= SHIELD_MAX;
+  game.shieldCharges = Math.min(SHIELD_MAX, (game.shieldCharges || 0) + 1);
+  game.beamHeists = (game.beamHeists || 0) + 1;
+  // Lifetime total is the player's record — same demo guard as every other.
+  if (!game.isDemo) {
+    try {
+      const _hT = (parseInt(localStorage.getItem('galagaHeistTotal') || '0', 10) || 0) + 1;
+      localStorage.setItem('galagaHeistTotal', String(_hT));
+    } catch (_e) {}
+  }
+  game.floatTexts.push({
+    x: e.x, y: e.y + 10, text: wasMax ? 'BEAM ROBBED' : 'BEAM ROBBED +1 SHIELD',
+    color: '#fc4', life: 60, maxLife: 60, size: 6
+  });
+  game.flashTimer = Math.max(game.flashTimer || 0, 5);
+  game.flashColor = '#fc4';
+  if (typeof pushIntercept === 'function') pushIntercept('beamHeist');
+  playSound('powerUp');
+}
+
 // ==================== THE STRUGGLE — the capture answers back ===============
 //
 // THE CONTROL BUDGET (test/pulse-audit.js) measured, for the first time, how
@@ -2648,7 +2727,7 @@ function breakCaptureFree() {
   rumble(220, 0.8, 0.5);
 }
 
-function drawCaptureTelegraph(x, y, h, p) {
+function drawCaptureTelegraph(x, y, h, p, siphon, winnable) {
   // Outline only, and GROWING — so it reads as a column forming, not a beam
   // already firing. That distinction is the whole point: one says "move", the
   // other says "too late".
@@ -2672,6 +2751,33 @@ function drawCaptureTelegraph(x, y, h, p) {
   const cy = y + h - 6;
   ctx.moveTo(x - 5, cy - 3); ctx.lineTo(x, cy + 2); ctx.lineTo(x + 5, cy - 3);
   ctx.stroke();
+  // THE HEIST — gold tick marks climb the two dashed edges in proportion to the
+  // siphon (positional progress: colorblind-safe by construction, elite-gold
+  // vocabulary). The moment the raid math no longer closes (`winnable` false),
+  // the ticks turn white and an X overprints the chevron — the telegraph itself
+  // announcing "get out". A siphon of 0 renders pixel-identical to the shipped
+  // telegraph (byte-identical-at-zero contract).
+  if (siphon > 0) {
+    const col = winnable ? '#fc4' : '#fff';
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = 0.9;
+    const n = Math.min(6, Math.floor(siphon * 6) + 1);
+    for (let i = 0; i < n; i++) {
+      const tt = 1 - (i + 0.5) / 6;                 // ticks climb bottom → top
+      const yy = y + h * tt;
+      const w = 8 * p + (30 * p - 8 * p) * tt;
+      ctx.beginPath();
+      ctx.moveTo(x - w - 2, yy); ctx.lineTo(x - w + 2, yy);
+      ctx.moveTo(x + w - 2, yy); ctx.lineTo(x + w + 2, yy);
+      ctx.stroke();
+    }
+    if (!winnable) {
+      ctx.beginPath();
+      ctx.moveTo(x - 4, cy - 4); ctx.lineTo(x + 4, cy + 4);
+      ctx.moveTo(x + 4, cy - 4); ctx.lineTo(x - 4, cy + 4);
+      ctx.stroke();
+    }
+  }
   ctx.restore();
 }
 
@@ -3976,9 +4082,162 @@ function mindDiveSide(e) {
 
 // Impure: stamp the lane a dive is being addressed to, so the launch can tell whether
 // the player was still living there when the telegraph expired (see THE BAIT).
+// A dread-herded dive stamps -1 instead: its route was overridden by THE KILLING
+// FIELD, so leaving the mind's lane afterwards must never count as a BAIT.
 function mindTagDive(e) {
+  if (e._dreadHerded) { e._mindZone = -1; e._dreadHerded = false; return; }
   const p = game && game.swarmMind;
   e._mindZone = mindLocked(p) ? mindFavoredZone(p.z) : -1;
+}
+
+// ============================ THE KILLING FIELD =============================
+// THE SWARM MIND models the player; nothing modelled the CONSEQUENCES of the
+// player until now. game.swarmDread is the formation's decaying memory of which
+// lane its own members die in — the exact structural sibling of the mind (same
+// MIND_ZONES lanes, same normalised confidence, opposite subject: where you
+// LIVE vs where they DIE). A lane that gets hot becomes a KILLING FIELD the
+// swarm refuses to dive into: lone arcs flip away from it, coordinated targets
+// are pulled toward the nearest cold lane. So the player HERDS enemy attack
+// routes by choosing where to kill — and the swarm answers by coming around
+// the gun instead of into it.
+//
+// The mind's three fairness rules apply unchanged:
+//   1. DRAWN — drawDreadField marks the hot lane with ember ticks on the floor
+//      (a grave-marker shape, distinct from the mind bracket) before any
+//      deflection ever fires.
+//   2. WHERE, never HOW FAST — deflection runs BEFORE createLoopPath /
+//      planPincerPair, so the frozen telegraph always shows the TRUE path and
+//      every preview keeps its budgeted length (DIVE_PREVIEW / WING_PREVIEW).
+//   3. BREAKABLE — kill elsewhere and the ~3s half-life cools the field;
+//      formation panic collapses it (same decayed-weight inversion-proofing as
+//      the mind: under DREAD_PANIC_DECAY the weight saturates at ~17·kills/frame,
+//      far below the gate); and a LIVE commander halves the deflection — the
+//      first reason to ever SPARE the commander (keep the swarm disciplined and
+//      dives keep entering your kill zone; kill it and you blind the swarm but
+//      unleash its fear).
+//
+// ZERO new score. The payoff is routing — you dictate the approach axis — and
+// the multi-threat flank frames it creates are already priced by parry /
+// witch-time / combo. Herds surface as a run highlight only.
+const DREAD_DECAY       = 0.996;  // per-frame forgetting (~3s half-life): a grief, not a history
+const DREAD_PANIC_DECAY = 0.94;   // a shattered formation cannot hold this memory either
+const DREAD_MIN_KILLS   = 6;      // decayed casualty weight before any lane may go hot
+const DREAD_HOT_CONF    = 0.50;   // casualty share threshold (reuses mindConfidence)
+const DREAD_AVOID       = 0.75;   // max deflection pull — never a perfect veto (no sanctuary)
+const DREAD_FLASH       = 22;     // herd-moment ember flare, mirrors MIND_WIPE_FLASH
+
+function makeSwarmDread() {
+  return { z: new Array(MIND_ZONES).fill(0), n: 0, conf: 0, hot: -1,
+           flash: 0, flashZone: -1, flashDir: 0 };
+}
+
+// Pure: the hot lane, or -1. Both gates matter — weight alone would flag the
+// first skirmish of any stage, share alone would flag a single opening kill.
+function dreadHotZone(d) {
+  if (!d || !d.z || !d.z.length) return -1;
+  if ((d.n || 0) < DREAD_MIN_KILLS || (d.conf || 0) < DREAD_HOT_CONF) return -1;
+  return mindFavoredZone(d.z);
+}
+
+// One casualty, recorded in the lane it fell in. Elite and ghost weigh 1 like
+// everyone else — this is density of dead, not value of dead.
+function dreadObserve(d, x) {
+  if (!d || !d.z || !d.z.length) return d;
+  d.z[mindZoneOf(x)] += 1;
+  let sum = 0;
+  for (let i = 0; i < d.z.length; i++) sum += d.z[i];
+  d.n = sum;
+  d.conf = mindConfidence(d.z);
+  d.hot = dreadHotZone(d);
+  return d;
+}
+
+// One frame of forgetting. `n` is the decayed casualty WEIGHT (the histogram's
+// own sum) — the same trick that makes panic BREAK the mind's read instead of
+// purifying it: a raw kill count only grows, but the decayed weight saturates
+// at rate/(1-decay), and under DREAD_PANIC_DECAY that ceiling sits far below
+// DREAD_MIN_KILLS at any real kill pace. Also ticks the herd-flare timer
+// (called from update() at sim rate, like every effect timer).
+function dreadDecay(d, panicked) {
+  if (!d || !d.z || !d.z.length) return d;
+  const k = panicked ? DREAD_PANIC_DECAY : DREAD_DECAY;
+  let sum = 0;
+  for (let i = 0; i < d.z.length; i++) { d.z[i] *= k; sum += d.z[i]; }
+  d.n = sum;
+  d.conf = mindConfidence(d.z);
+  d.hot = dreadHotZone(d);
+  if ((d.flash || 0) > 0) d.flash--;
+  return d;
+}
+
+// Pure: the adjacent lane a deflection retreats into — the SHOULDER of the hot
+// lane nearest the target, edge-safe at lanes 0 and MIND_ZONES-1. Adjacency is
+// the point: pressure moves to your flank, it does not vanish.
+function nearestColdLane(hot, tx) {
+  const lo = hot - 1, hi = hot + 1;
+  if (lo < 0) return hi;
+  if (hi > MIND_ZONES - 1) return lo;
+  return (isFinite(tx) && tx <= mindZoneCenter(hot)) ? lo : hi;
+}
+
+// Pure: pull a coordinated target out of the killing field, toward the nearest
+// cold lane's centre. Pull is capped (DREAD_AVOID × conf, HALVED while the
+// commander lives) and always < 1, so the hot lane is feared, never a
+// sanctuary. No hot lane, or a target already outside it → untouched, so every
+// call site degrades exactly to its shipped behaviour.
+function dreadDeflectTarget(tx, d, commanderAlive) {
+  if (!isFinite(tx)) return BASE_W / 2;
+  const hot = dreadHotZone(d);
+  if (hot < 0 || mindZoneOf(tx) !== hot) return tx;
+  const cap = DREAD_AVOID * (commanderAlive ? 0.5 : 1);
+  const k = Math.max(0, Math.min(cap, (d && d.conf) || 0));
+  const x = tx + (mindZoneCenter(nearestColdLane(hot, tx)) - tx) * k;
+  return isFinite(x) ? Math.max(0, Math.min(BASE_W, x)) : tx;
+}
+
+// Pure: flip a lone dive's arc away from the killing field. Only an arc that
+// sweeps TOWARD the hot lane is eligible; the flip fires on `roll` against the
+// capped confidence (halved under a live commander), so discipline is a
+// probability, not a veto. Missing roll → 1 → never flips (safe default).
+function dreadDiveSide(x, side, d, commanderAlive, roll) {
+  const hot = dreadHotZone(d);
+  if (hot < 0 || !isFinite(x)) return side;
+  const toward = mindZoneCenter(hot) > x ? 1 : -1;
+  if (side !== toward) return side;
+  const p = Math.min(DREAD_AVOID * (commanderAlive ? 0.5 : 1), (d && d.conf) || 0);
+  return ((typeof roll === 'number' ? roll : 1) < p) ? -side : side;
+}
+
+// Impure: commit one herd — count it, flare the embers, aim the reroute arrow,
+// teach the verb once, intercept once per run. Mirrors the bait bookkeeping.
+function dreadMarkHerd(d, dir) {
+  game.divesHerded = (game.divesHerded || 0) + 1;
+  d.flash = DREAD_FLASH;
+  d.flashZone = dreadHotZone(d);
+  d.flashDir = dir || 0;
+  if (!game.isDemo) {
+    try {
+      const _ht = (parseInt(localStorage.getItem('galagaHerdTotal') || '0', 10) || 0) + 1;
+      localStorage.setItem('galagaHerdTotal', String(_ht));
+    } catch (_e) {}
+  }
+  if (!game._dreadSeen && typeof pushIntercept === 'function') {
+    game._dreadSeen = true;
+    pushIntercept('dreadRoute');
+  }
+  if (typeof coachFire === 'function') coachFire('dread');
+}
+
+// Impure: the lone-dive arc, dread-aware. Wraps mindDiveSide at both lone-dive
+// launch sites; stamps _dreadHerded so mindTagDive keeps BAIT accounting honest.
+function dreadArcSide(e) {
+  const side = mindDiveSide(e);
+  const d = game && game.swarmDread;
+  if (!d) return side;
+  const cmdAlive = !!(game.enemies && game.enemies.some(en => en.alive && en.isCommander));
+  const s2 = dreadDiveSide(e.x, side, d, cmdAlive, Math.random());
+  if (s2 !== side) { e._dreadHerded = true; dreadMarkHerd(d, s2); }
+  return s2;
 }
 
 // Impure: launch a coordinated maneuver on the live formation. Returns true if it
@@ -3990,8 +4249,15 @@ function launchDiveTactic(tactic, candidates) {
   // THE SWARM MIND feeds the prediction: with a locked read the pincer/wall aims at a
   // blend of where you ARE and where you LIVE. Unlocked, mindBiasedTarget returns
   // game.playerX untouched, so this is the shipped intercept exactly.
-  const targetX = wingInterceptForPool(
+  const _liveTx = wingInterceptForPool(
     mindBiasedTarget(game.playerX, game.swarmMind, MIND_MAX_BIAS), game.playerVX, pool);
+  // THE KILLING FIELD answers back: a target inside the hot lane is pulled toward
+  // the nearest cold lane BEFORE planPincerPair/planWallRun run, so the frozen
+  // telegraph shows the true post-deflection maneuver and the preview never lies.
+  const _cmdAlive = !!(game.enemies && game.enemies.some(en => en.alive && en.isCommander));
+  const targetX = dreadDeflectTarget(_liveTx, game.swarmDread, _cmdAlive);
+  const _herded = targetX !== _liveTx;
+  if (_herded) dreadMarkHerd(game.swarmDread, targetX > _liveTx ? 1 : -1);
   const squad = (tactic.id === 'pincer')
     ? planPincerPair(pool, targetX)
     : planWallRun(pool, targetX, tactic.size);
@@ -4004,6 +4270,7 @@ function launchDiveTactic(tactic, candidates) {
     e.previewPath = createLoopPath(e.x, e.y, side);
     e._wingTactic = tactic.id;
     e._wingSide = side; // true convergence sign — read by the chevron marker in draw
+    if (_herded) e._dreadHerded = true; // herded maneuver → never miscounted as a BAIT
     mindTagDive(e);
   });
   playSound('enemyDive', targetX);
@@ -4488,7 +4755,7 @@ function updateStageWeather() {
       } else if (_verdict === 'hit') {
         // Same defensive ladder as a bullet: witch-time window first, then
         // killPlayer (whose internal ladder still honors cheat/shield).
-        if (!tryTriggerWitchTime(w.strikeX, game.playerY)) {
+        if (!tryTriggerWitchTime(w.strikeX, game.playerY, 'weather', null)) {
           killPlayer(w.strikeX, game.playerY, 'weather', null);
         }
       } else if (_verdict === 'graze') {
@@ -5070,7 +5337,11 @@ const INTERCEPT_MSG = {
   stormFront:    ['THE SKY FIGHTS US TOO!', 'WEATHER WEAPONIZED!', 'EVEN THE STORM STRIKES!'],
   wingPincer:    ['WINGS — PINCER!', 'FLANK AND CONVERGE!', 'BOX THE TARGET IN!'],
   wingWall:      ['WALL FORMATION — DIVE!', 'LINE ABREAST, DESCEND!', 'OVERWHELM AS ONE!'],
-  playerDown:    ['HOSTILE NEUTRALIZED.', 'TARGET DOWN. ADVANCE.', 'ENEMY ELIMINATED.'],
+  // (playerDown was CUT for THE DEBRIEF's slot — the band is capped at 24 and
+  // playerDown was its weakest member by the pass's own bar: it fired on every
+  // death (not rare), at the one moment no reaction is possible, duplicating
+  // the DEATH RECAP whisper's beat.)
+  debrief:       ['FOOTAGE RECEIVED.', 'THE TARGET HAS A STYLE.', 'DRILL ANALYSIS COMPLETE.'],
   witchSave:     ['IMPOSSIBLE...', 'NO HIT REGISTERED?', 'CHECK SENSORS!'],
   supplyDrop:    ['CARGO IN ZONE!', 'PROTECT THE DROP!', 'RESUPPLY EXPOSED!'],
   guardianArrives: ['SECOND TARGET!', 'WHERE DID THAT COME FROM?', 'TWO HOSTILES NOW!'],
@@ -5087,6 +5358,8 @@ const INTERCEPT_MSG = {
   salvageDrop:   ['THEIR CORE SCATTERED!', 'DON\'T LET THEM REBUILD!', 'SEIZE THE WRECKAGE!'],
   magpieSpotted: ['MAGPIE UNIT DEPLOYED!', 'STEAL THEIR SUPPLIES!', 'THE MAGPIE HUNTS YOUR LOOT!'],
   mindLock:      ['PATTERN LOCKED.', 'THE TARGET HAS A HABIT.', 'FIRING SOLUTION: ITS LANE.'],
+  dreadRoute:    ['THAT LANE IS A GRAVE!', 'REROUTE — TOO MANY LOST!', 'AVOID THE KILLING FIELD!'],
+  beamHeist:     ['IT\'S DRAINING THE BEAM!', 'THE PRIZE ROBS US?!', 'CUT THE TRACTOR — TOO LATE!'],
   breakout:      ['IT TORE LOOSE!', 'BEAM BROKEN — HOW?', 'WE LOST THE PRIZE!']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
@@ -5382,7 +5655,10 @@ const COACH_LESSONS = {
   salvage: 'CATCH THE SHARDS — REBUILD YOUR SHIP',
   magpie:  'SHOOT THE THIEF — IT DROPS YOUR CARGO',
   mind:    'THEY READ YOUR LANE — MOVE OR BAIT',
-  struggle:'BEAM GOT YOU? MASH L-R TO TEAR FREE'
+  dread:   'THEY AVOID WHERE THEY DIE — HERD THEM',
+  struggle:'BEAM GOT YOU? MASH L-R TO TEAR FREE',
+  heist:   'STAND IN THE WINDUP TO ROB THE BEAM',
+  debrief: 'SHOOT THE COURIER — DENY THE UPLINK'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -5790,15 +6066,20 @@ function resolveRivalDepleted(r) {
   if (game._revengeType === 'rival') {
     game._revengeType = null;
     game.revengeCount = (game.revengeCount || 0) + 1;
+    // Lifetime totals are the player's record — the attract-mode bot never writes them.
+    if (!game.isDemo) {
+      try {
+        const rv = parseInt(localStorage.getItem('galagaRevengeTotal') || '0', 10) || 0;
+        localStorage.setItem('galagaRevengeTotal', String(rv + 1));
+      } catch (e) {}
+    }
+  }
+  if (!game.isDemo) {
     try {
-      const rv = parseInt(localStorage.getItem('galagaRevengeTotal') || '0', 10) || 0;
-      localStorage.setItem('galagaRevengeTotal', String(rv + 1));
+      const rw = (parseInt(localStorage.getItem('galagaRivalWins') || '0', 10) || 0) + 1;
+      localStorage.setItem('galagaRivalWins', String(rw));
     } catch (e) {}
   }
-  try {
-    const rw = (parseInt(localStorage.getItem('galagaRivalWins') || '0', 10) || 0) + 1;
-    localStorage.setItem('galagaRivalWins', String(rw));
-  } catch (e) {}
   game.rivalDefeats = (game.rivalDefeats || 0) + 1;
   playSound('killFormationBoss', r.x);
   // The squadron sends the NEXT ace later, stronger — deep runs stay contested.
@@ -5923,11 +6204,16 @@ const SALVAGE_DRIFT = 0.55;   // px/frame along the lane once settled
 // — the part that was silently broken for the system's whole life — can be
 // tested without a screen. `st` is {x, y, vx, vy, held}; a new state is
 // returned rather than mutated.
-function salvageStep(st, laneY, minX, maxX) {
+function salvageStep(st, laneY, minX, maxX, fallCap) {
+  // Optional fallCap: THE DEBRIEF's ledger drops from a drone near the top of
+  // the field, where the default 0.5px/f cap could never reach the lane inside
+  // any TTL (the exact lane-vs-clock failure the RECOVERY BUDGET documented).
+  // Omitted → 0.5, byte-identical to the shipped salvage physics.
+  const _cap = (typeof fallCap === 'number' && fallCap > 0) ? fallCap : 0.5;
   let x = st.x, y = st.y, vx = st.vx, vy = st.vy, held = !!st.held;
   if (!held) {
     // Tumbling out of the wreck: gravity, horizontal damping.
-    vy = Math.min(0.5, vy + 0.05);
+    vy = Math.min(_cap, vy + 0.05);
     vx *= 0.97;
     x += vx;
     y += vy;
@@ -6016,7 +6302,7 @@ function updateSalvageShards() {
     const s = game.salvageShards[i];
     // The settle rule lives in salvageStep (pure, tested) — the shard tumbles
     // out of the wreck, then locks to the player's lane and patrols it.
-    const st = salvageStep(s, game.playerY, 8, BASE_W - 8);
+    const st = salvageStep(s, game.playerY, 8, BASE_W - 8, s._ledger ? LEDGER_FALL : undefined);
     s.x = st.x; s.y = st.y; s.vx = st.vx; s.vy = st.vy; s.held = st.held;
     s.ttl--;
     if (s.ttl <= 0 || s.y > BASE_H + 8) {
@@ -6027,6 +6313,20 @@ function updateSalvageShards() {
     }
     // CATCH — same reach as a power-up magnet's core radius.
     if (game.playerAlive && Math.abs(s.x - game.playerX) < 10 && Math.abs(s.y - game.playerY) < 10) {
+      // THE DEBRIEF — the stolen LEDGER is not a power shard: catching it wipes
+      // what the swarm had learned and grants ~1 stage of seeing what they see
+      // (drawMindLock / drawDreadField render below their thresholds).
+      if (s._ledger) {
+        if (game.swarmMind) mindWipe(game.swarmMind);
+        game.ledgerSight = LEDGER_SIGHT;
+        game.floatTexts.push({
+          x: s.x, y: s.y - 8, text: 'LEDGER SEIZED', color: '#9cf',
+          life: 60, maxLife: 60, size: 7
+        });
+        playSound('powerUp');
+        game.salvageShards.splice(i, 1);
+        continue;
+      }
       const col = (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[s.axis]) || '#0df';
       if (game.lvl && game.lvl[s.axis] < MAX_POWER_LVL[s.axis]) {
         game.lvl[s.axis]++;
@@ -6047,10 +6347,13 @@ function updateSalvageShards() {
       }
       playSound('powerUp');
       game.salvageCount = (game.salvageCount || 0) + 1;
-      try {
-        const sv = (parseInt(localStorage.getItem('galagaSalvageTotal') || '0', 10) || 0) + 1;
-        localStorage.setItem('galagaSalvageTotal', String(sv));
-      } catch (e) {}
+      // Same demo guard as the breakout/bait totals — the bot's catches don't count.
+      if (!game.isDemo) {
+        try {
+          const sv = (parseInt(localStorage.getItem('galagaSalvageTotal') || '0', 10) || 0) + 1;
+          localStorage.setItem('galagaSalvageTotal', String(sv));
+        } catch (e) {}
+      }
       game.salvageShards.splice(i, 1);
     }
   }
@@ -6063,7 +6366,10 @@ function drawSalvageShards() {
   const t = game.animFrame;
   ctx.save();
   for (const s of game.salvageShards) {
-    const col = (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[s.axis]) || '#0df';
+    // THE DEBRIEF's ledger wears the mind's colour and a bracket glyph instead
+    // of a shard letter, so "seize intel" and "recover power" never read alike.
+    const col = s._ledger ? '#9cf'
+      : (typeof POWERUP_COL !== 'undefined' && POWERUP_COL[s.axis]) || '#0df';
     // Expiry urgency — gentle alpha pulse in the last 90 frames (no hard blink;
     // the heavy-blink dialect was deliberately removed in the GUI cleanup).
     const expiring = s.ttl < 90;
@@ -6088,7 +6394,17 @@ function drawSalvageShards() {
     ctx.restore();
     ctx.fillStyle = '#fff';
     ctx.fillRect(px, py, 1, 1);
-    drawRetroText(s.axis, px + 0.5, py - 7, 4, col);
+    if (s._ledger) {
+      // The ledger carries a miniature mind-lock bracket, not an axis letter.
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px - 4, py - 10); ctx.lineTo(px - 4, py - 6.5);
+      ctx.lineTo(px + 4, py - 6.5); ctx.lineTo(px + 4, py - 10);
+      ctx.stroke();
+    } else {
+      drawRetroText(s.axis, px + 0.5, py - 7, 4, col);
+    }
     // Settled: the shard is riding the player's lane — draw the skid line it
     // drifts on, pointing the direction it is moving, so the read is "chase it
     // down the lane", not "wait for it to fall".
@@ -6099,6 +6415,206 @@ function drawSalvageShards() {
       ctx.fillRect(px - d * 10, py + 5, 6, 1);
       ctx.fillRect(px - d * 17, py + 5, 3, 1);
     }
+  }
+  ctx.restore();
+}
+
+// ================================ THE DEBRIEF ===============================
+// Every adaptive system (mind, dread, wing tactics, heist) lives in normal
+// PLAYING stages — the challenge round was a dead zone in the game's most
+// distinctive dimension. THE DEBRIEF makes the breather a FRONT in the adaptive
+// war without breaking its identity: the challenge stage was never a breather —
+// it is the swarm's filmed live-fire exercise. `game.drillLog` records which
+// lane you fly during the drill (raw per-stage histogram, MIND_ZONES lanes, no
+// decay); after waves 3 and 6 clear, a COURIER drone descends into your
+// footage-richest lane and uplinks the drill into THE SWARM MIND.
+//
+// Four flown answers, resolved mid-wave under sweep pressure:
+//   DENY   — kill it in its 30f descend: clean kill, intel dies undelivered.
+//   STEAL  — kill it mid-uplink (3 HP, at the cost of unshot snake tails and
+//            the PERFECT WAVE bonus): it drops the swarm's own LEDGER, a shard
+//            on salvageStep physics; catch it → mindWipe + ~1 stage of
+//            ledgerSight (drawMindLock/drawDreadField render BELOW their
+//            thresholds — you see the swarm's forming read and its fear).
+//   IGNORE — the uplink completes: mindSeed warms the swarm's read of your
+//            drill lane. DEBRIEF_SEED_W (60) < MIND_MIN_SAMPLES (90) by design:
+//            footage alone can never hard-lock — it needs live confirmation.
+//   LIE    — fly the drill in a lane you never fight in, let it upload, and the
+//            seeded mind converges on empty air next stage — the existing BAIT
+//            machinery prices the payoff in free frames, zero new code.
+//
+// The courier never fires and never collides — it costs INFORMATION, not hits:
+// the fairness table's first threat that takes less and warns no less (30f
+// descend, at the baseline). ZERO new score: the courier is worth 0 points and
+// the deny cost is the bonus economy that was already there.
+const DEBRIEF_WAVES  = [2, 5]; // couriers launch when these wave indices clear
+const COURIER_DESCEND = 30;    // telegraph phase — at the fairness baseline
+const COURIER_UPLINK  = 150;   // frames of beaming before the footage lands
+const COURIER_HP      = 3;
+const DEBRIEF_SEED_W  = 60;    // < MIND_MIN_SAMPLES: warms the read, never locks it
+const LEDGER_SIGHT    = 3600;  // ~1 stage of seeing what they see
+const LEDGER_FALL     = 1.6;   // the ledger's fall cap — from drone height (y≈30) it
+                               // must reach the lane WELL inside its TTL (lane, not clock)
+
+// Pure: which cleared-wave indices launch a courier — clamped so one can never
+// schedule after the final wave clears (the stage would end under it).
+function debriefPlan(numWaves) {
+  const n = numWaves | 0;
+  return DEBRIEF_WAVES.filter(w => w >= 0 && w < n - 1);
+}
+
+// Pure: the courier's lifecycle. Mirror of strikePhase — descend is the read
+// window, uplink is the contest, done means the footage landed.
+function courierPhase(timer) {
+  if (!(timer >= 0)) return 'descend';
+  if (timer < COURIER_DESCEND) return 'descend';
+  if (timer < COURIER_DESCEND + COURIER_UPLINK) return 'uplink';
+  return 'done';
+}
+
+// Pure: one drill frame — a raw record of where the player flew, in the mind's
+// own lane vocabulary. No decay, no panic semantics: footage, not memory.
+function drillObserve(log, x) {
+  if (!log || !log.length) return log;
+  log[mindZoneOf(x)] += 1;
+  return log;
+}
+
+// Pure: the footage-richest lane, or -1 when nothing was filmed.
+function drillFavoredLane(log) {
+  return mindFavoredZone(log);
+}
+
+// Pure-ish: the uplink lands — add the drill's weight to the swarm's profile
+// and recompute. A lone seed of DEBRIEF_SEED_W can NEVER satisfy mindLocked
+// (60 < 90): the footage warms the read, and only live confirmation next stage
+// can lock it. Panic still collapses a seeded mind exactly like a learned one.
+function mindSeed(p, zone, w) {
+  if (!p || !p.z || !p.z.length) return p;
+  const k = Math.max(0, Math.min(MIND_ZONES - 1, zone | 0));
+  p.z[k] += Math.max(0, w || 0);
+  let sum = 0;
+  for (let i = 0; i < p.z.length; i++) sum += p.z[i];
+  p.n = sum;
+  p.conf = mindConfidence(p.z);
+  p.lock = mindLocked(p) ? mindFavoredZone(p.z) : -1;
+  return p;
+}
+
+// Impure: tick the courier — descend, uplink, resolve. Timers tick here (in
+// update()), never in draw. Self-gates on CHALLENGING.
+function updateCourier() {
+  const c = game && game.courier;
+  if (!c || game.state !== STATE.CHALLENGING) return;
+  c.timer++;
+  const ph = courierPhase(c.timer);
+  if (ph === 'descend') {
+    c.y = -10 + 40 * (c.timer / COURIER_DESCEND);
+  } else if (ph === 'uplink') {
+    c.y = 30;
+  } else {
+    // Footage received — the swarm opens the next stage with a warm read.
+    mindSeed(game.swarmMind, c.lane, DEBRIEF_SEED_W);
+    game.courier = null;
+    if (typeof pushIntercept === 'function') pushIntercept('debrief');
+    game.floatTexts.push({
+      x: c.x, y: c.y + 10, text: 'UPLINK COMPLETE',
+      color: '#f6f', life: 55, maxLife: 55, size: 6
+    });
+    playSound('tick');
+    return;
+  }
+  // Player bullets vs the drone — the existing verb, zero points on the kill.
+  for (let i = game.bullets.length - 1; i >= 0; i--) {
+    const b = game.bullets[i];
+    if (!aabbHit(b.x - c.x, b.y - c.y, 8, 8)) continue;
+    game.bullets.splice(i, 1);
+    c.hp--;
+    game.hitSparks.push({ x: c.x, y: c.y, life: 0, color: '#f6f' });
+    playSound('hit', c.x);
+    if (c.hp > 0) continue;
+    // DENIED — count it, and mid-uplink the half-recorded footage tears loose
+    // as the swarm's own LEDGER (a shard on the already-audited salvage physics).
+    game.debriefsDenied = (game.debriefsDenied || 0) + 1;
+    if (!game.isDemo) {
+      try {
+        const _dT = (parseInt(localStorage.getItem('galagaDebriefDeny') || '0', 10) || 0) + 1;
+        localStorage.setItem('galagaDebriefDeny', String(_dT));
+        if (_dT >= 10) unlockAchievement('censor');
+      } catch (_e) {}
+    }
+    game.explosions.push({ x: c.x, y: c.y, timer: 0, maxTime: 20 });
+    playSound('explode', c.x);
+    if (ph === 'uplink') {
+      game.salvageShards = game.salvageShards || [];
+      game.salvageShards.push({
+        x: c.x, y: c.y, _ledger: true, axis: 'L',
+        vx: jitter(0.5), vy: 0.5, ttl: SALVAGE_TTL + 120
+      });
+      game.floatTexts.push({
+        x: c.x, y: c.y + 8, text: 'LEDGER LOOSE', color: '#9cf',
+        life: 55, maxLife: 55, size: 6
+      });
+    } else {
+      game.floatTexts.push({
+        x: c.x, y: c.y + 8, text: 'UPLINK DENIED', color: '#0ff',
+        life: 55, maxLife: 55, size: 6
+      });
+    }
+    game.courier = null;
+    return;
+  }
+}
+
+// Read-only draw: the drone, its uplink beam, and — during the descend — a
+// dashed telegraph column in the capture/storm vocabulary over the lane it is
+// entering, with the mind-bracket glyph under that lane: the player literally
+// sees which lane the swarm believes is theirs.
+function drawCourier() {
+  const c = game && game.courier;
+  if (!c || game.state !== STATE.CHALLENGING) return;
+  const ph = courierPhase(c.timer);
+  const px = Math.round(c.x), py = Math.round(c.y);
+  ctx.save();
+  if (ph === 'descend') {
+    // Telegraph column — dashes sliding, chevron at the mouth (storm vocabulary).
+    const p = c.timer / COURIER_DESCEND;
+    ctx.globalAlpha = 0.22 + 0.3 * p;
+    ctx.strokeStyle = '#f6f';
+    ctx.setLineDash([3, 3]);
+    ctx.lineDashOffset = -(game.animFrame * 0.7) % 6;
+    const halfW = BASE_W / MIND_ZONES / 2;
+    ctx.strokeRect(c.x - halfW + 1, 0.5, halfW * 2 - 2, BASE_H - 8);
+    ctx.setLineDash([]);
+  }
+  if (ph === 'uplink') {
+    // The beam runs UP — footage leaving the field. Its remaining time is the
+    // beam's own length, so the contest window is drawn, not inferred.
+    const left = 1 - (c.timer - COURIER_DESCEND) / COURIER_UPLINK;
+    ctx.globalAlpha = 0.35 + 0.2 * Math.sin(game.animFrame * 0.3);
+    ctx.fillStyle = '#f6f';
+    ctx.fillRect(px - 1, Math.round(c.y * (1 - left)), 2, Math.round(c.y * left));
+    // Mind-bracket glyph under the filmed lane (drawMindLock vocabulary).
+    const halfW = BASE_W / MIND_ZONES / 2;
+    const y = BASE_H - 5;
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#f6f';
+    ctx.beginPath();
+    ctx.moveTo(c.x - halfW + 1, y - 5); ctx.lineTo(c.x - halfW + 1, y + 0.5);
+    ctx.lineTo(c.x + halfW - 1, y + 0.5); ctx.lineTo(c.x + halfW - 1, y - 5);
+    ctx.stroke();
+  }
+  // The drone: a small camera-eyed rig, magenta so it reads as comms, not combat.
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#f6f';
+  ctx.fillRect(px - 4, py - 2, 9, 4);
+  ctx.fillRect(px - 2, py - 4, 5, 2);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(px, py - 1, 1, 2);
+  // HP pips — the contest's remaining cost, read at a glance.
+  for (let i = 0; i < c.hp; i++) {
+    ctx.fillStyle = '#f6f';
+    ctx.fillRect(px - 4 + i * 4, py + 4, 2, 1);
   }
   ctx.restore();
 }
@@ -6264,10 +6780,13 @@ function updateMagpie() {
       game.killsByTypeRun.magpie = (game.killsByTypeRun.magpie || 0) + 1;
       if (game.stats) game.stats.kills = (game.stats.kills || 0) + 1;
       game.stageKills = (game.stageKills || 0) + 1;
-      try {
-        const mk = (parseInt(localStorage.getItem('galagaMagpieKills') || '0', 10) || 0) + 1;
-        localStorage.setItem('galagaMagpieKills', String(mk));
-      } catch (e) {}
+      // Same demo guard as the other lifetime totals.
+      if (!game.isDemo) {
+        try {
+          const mk = (parseInt(localStorage.getItem('galagaMagpieKills') || '0', 10) || 0) + 1;
+          localStorage.setItem('galagaMagpieKills', String(mk));
+        } catch (e) {}
+      }
       playSound('explode', m.x);
       game.magpie = null;
       game.magpieCd = MAGPIE_COOLDOWN;
@@ -7742,6 +8261,19 @@ function resetGame() {
     swarmBaited: 0,
     _mindSeen: false,
     _baitCueT: -999,
+    // THE KILLING FIELD — the formation's decaying memory of which lane its own
+    // members die in, plus the run's herd count (dives it rerouted around the grave).
+    swarmDread: makeSwarmDread(),
+    divesHerded: 0,
+    _dreadSeen: false,
+    // THE HEIST — tractor beams robbed during their wind-up this run.
+    beamHeists: 0,
+    // THE DEBRIEF — the challenge drill's footage reel, the courier drone that
+    // uplinks it, frames of stolen-ledger sight, and the run's deny count.
+    drillLog: null,
+    courier: null,
+    ledgerSight: 0,
+    debriefsDenied: 0,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
     comboArsenalClaimed: {},
@@ -7762,6 +8294,8 @@ function resetGame() {
     // witchCooldown: frames before next trigger allowed. Prevents trivializing hits.
     witchTimer: 0,
     witchCooldown: 0,
+    witchCause: null,    // identity of the hit the open window is deferring
+    witchSrcType: null,  // ...so a whiff death keeps its tally/revenge/whisper
     activePerk: null,
     perkOffered: null,
     perkSelectFrames: 0,
@@ -8056,6 +8590,10 @@ function challengeGroupSize(stage) {
 function setupChallengingStage() {
   game.challengeHits = 0;
   game.challengeTotal = 0;
+  // THE DEBRIEF — a fresh reel of drill footage per challenge stage, and no
+  // courier carried in from anywhere.
+  game.drillLog = new Array(MIND_ZONES).fill(0);
+  game.courier = null;
   game.challengeWaves = [];
   game.challengeWaveIdx = 0;
   game.challengeWaveTimer = 35; // initial telegraph for first wave
@@ -9109,7 +9647,12 @@ function startStage() {
   game.bullets = [];
   game.enemyBullets = [];
   game.explosions = [];
-  game.powerUps = [];
+  // THE DEBRIEF — intel dies with the stage: a courier that outlives its
+  // challenge stage never delivers.
+  game.courier = null;
+  // Drops in flight are NOT wiped — a power-up earned by a late kill keeps
+  // falling through the intro (the STAGE_INTRO branch ticks updatePowerUps)
+  // and lands in the new stage. The wipe here used to delete them silently.
   game.playerAlive = true;
   game.capturedShipEnemy = null;
   game.diveTimer = 0;
@@ -9429,7 +9972,16 @@ function normalizeKey(e) {
 // sfx). Direction reads the current move keys; falls back to the last dash direction.
 // Top-level so pollGamepad() (outside initInput) can call it too.
 function tryStartDash() {
-  if (!(isCombatState() && game.playerAlive && game.dashCooldown === 0 && game.dashTimer === 0)) return;
+  // WITCH TIME waives the dash cooldown. The window's entire promise is a
+  // 14px-high 'DASH!' — but the dash re-arms every 60f and the window is 30f,
+  // so a window opening inside the cooldown was STRUCTURALLY UNWINNABLE while
+  // the prompt still shouted (measured: a responder dashing on the first legal
+  // frame lost those windows every time). A save window that cannot be won is
+  // the fairness bug in its purest form; bullet-time that lets you move is
+  // also just what witch time claims to be.
+  const _witchOpen = (game.witchTimer || 0) > 0;
+  if (!(isCombatState() && game.playerAlive
+        && (game.dashCooldown === 0 || _witchOpen) && game.dashTimer === 0)) return;
   const dir = (keys['ArrowLeft'] || keys['a'] || keys['A']) ? -1
             : (keys['ArrowRight'] || keys['d'] || keys['D']) ? 1
             : (game.dashDir || 1);
@@ -9733,6 +10285,9 @@ function initInput() {
         const newStage = Math.max(1, game.stage + dir);
         if (newStage !== game.stage) {
           game.stage = newStage;
+          // Debug-jump hygiene: cross-stage grave memory is for ADJACENT stages
+          // only — a teleport must not carry the killing field with it.
+          if (game.swarmDread) game.swarmDread = makeSwarmDread();
           startStage();
           game.floatTexts.push({
             x: BASE_W/2, y: 50, text: 'STAGE → ' + game.stage,
@@ -9744,54 +10299,11 @@ function initInput() {
       // PERK SELECT keys — 1/2/3 picks the corresponding offered perk. Captured here
       // BEFORE the stage-jump 1-9 handler so the perk window owns those keys while open.
       // Note: 4-9 still fall through to stage jump even during perk select (no conflict).
+      // Gamepad/touch take theirs by POSITION at window expiry — see applyPerk /
+      // perkHoverIdx and the perkSelectFrames tick.
       if ((game.perkSelectFrames || 0) > 0 && game.perkOffered && (k === '1' || k === '2' || k === '3')) {
         const idx = (k === '1' ? 0 : k === '2' ? 1 : 2);
-        const perkId = game.perkOffered[idx];
-        if (perkId && PERKS[perkId]) {
-          game.activePerk = perkId;
-          game.perkOffered = null;
-          game.perkSelectFrames = 0;
-          // PERK USAGE TRACKING — increment lifetime pick counter for this perk
-          try {
-            const raw = localStorage.getItem('galagaPerkPicks') || '{}';
-            const tally = JSON.parse(raw);
-            tally[perkId] = (tally[perkId] || 0) + 1;
-            localStorage.setItem('galagaPerkPicks', JSON.stringify(tally));
-          } catch (e) {}
-          // PERK ACTIVATION CINEMATIC — name + desc + shockwave + confetti
-          // burst centered on screen. Marks the moment of strategy commitment.
-          const _perk = PERKS[perkId];
-          game.floatTexts.push({
-            x: BASE_W/2, y: BASE_H/2 - 26,
-            text: 'PERK ACQUIRED',
-            color: '#fff', life: 70, maxLife: 70, size: 6
-          });
-          game.floatTexts.push({
-            x: BASE_W/2, y: BASE_H/2 - 14,
-            text: _perk.name,
-            color: _perk.col, life: 80, maxLife: 80, size: 12
-          });
-          if (_perk.desc) {
-            game.floatTexts.push({
-              x: BASE_W/2, y: BASE_H/2 - 2,
-              text: _perk.desc,
-              color: '#aaa', life: 80, maxLife: 80, size: 5
-            });
-          }
-          if (game.shockwaves) {
-            game.shockwaves.push({
-              x: BASE_W/2, y: BASE_H/2 - 14,
-              life: 0, maxLife: 30, maxR: 50,
-              color: _perk.col
-            });
-          }
-          if (typeof spawnConfetti === 'function') spawnConfetti(10);
-          game.flashTimer = Math.max(game.flashTimer || 0, 6);
-          game.flashColor = _perk.col;
-          playSound('milestone');
-          rumble(220, 0.6, 0.4);
-          return;
-        }
+        if (applyPerk(game.perkOffered[idx])) return;
       }
       // Number keys 1-9 — jump to a specific stage milestone bucket. Useful for testing
       // boss/biome/corruption/transmission tiers without having to play through.
@@ -9802,6 +10314,8 @@ function initInput() {
         if (target !== game.stage) {
           game.stage = target;
           game._stageJumpUsed = true;
+          // Same debug-jump hygiene as ','/'.' — the grave stays with its stage band.
+          if (game.swarmDread) game.swarmDread = makeSwarmDread();
           startStage();
           game.floatTexts.push({
             x: BASE_W/2, y: 50, text: 'JUMP → STAGE ' + target,
@@ -10485,6 +10999,17 @@ function updatePlayer() {
       }
     }
   }
+  // THE KILLING FIELD — one frame of forgetting, at the same sim-rate site as the
+  // mind's observation. Combat states only, so the grave PERSISTS through
+  // STAGE_INTRO and the next wave arrives already dreading where the last wave
+  // died; ~3s of combat without a kill there cools it. Panic collapses it (same
+  // decayed-weight inversion-proofing as the mind).
+  if (isCombatState() && game.swarmDread) {
+    dreadDecay(game.swarmDread, !!game.formationPanicked);
+  }
+  // THE DEBRIEF — stolen-ledger sight burns down in combat only, so the full
+  // ~1 stage of "see what they see" is spent where it matters.
+  if (isCombatState() && (game.ledgerSight || 0) > 0) game.ledgerSight--;
 
   // Shoot — speed/count/power scale with power-up levels and ship loadout
   const n = game.lvl.N;
@@ -10845,6 +11370,69 @@ const PERKS = {
 };
 const PERK_IDS = Object.keys(PERKS);
 const PERK_SELECT_FRAMES = 360;
+
+// FLY TO CHOOSE — which of the 3 offered cards the ship is currently under.
+// The workflow sweep found the perk system's only acquisition path was the
+// keydown handler's '1'/'2'/'3' branch: gamepad and touch players could see
+// every offer and never take one — the entire roguelite layer was
+// keyboard-only, against this project's own input doctrine (poll the shared
+// keys/position, never the keydown handler, so every device works for free).
+// Position IS the one input every device shares, so the ship's column is the
+// hover, and when the window expires the hovered perk is taken. Keyboard
+// 1/2/3 still picks instantly; flying is now an equally first-class choice.
+function perkHoverIdx(x) {
+  const t = Math.floor((typeof x === 'number' ? x : BASE_W / 2) / (BASE_W / 3));
+  return Math.max(0, Math.min(2, isNaN(t) ? 1 : t));
+}
+
+// The one commit path every input device shares. Returns true if the perk was
+// taken (keyboard 1/2/3 and the fly-to-choose expiry both land here).
+function applyPerk(perkId) {
+  if (!perkId || !PERKS[perkId]) return false;
+  game.activePerk = perkId;
+  game.perkOffered = null;
+  game.perkSelectFrames = 0;
+  // PERK USAGE TRACKING — increment lifetime pick counter for this perk
+  try {
+    const raw = localStorage.getItem('galagaPerkPicks') || '{}';
+    const tally = JSON.parse(raw);
+    tally[perkId] = (tally[perkId] || 0) + 1;
+    localStorage.setItem('galagaPerkPicks', JSON.stringify(tally));
+  } catch (e) {}
+  // PERK ACTIVATION CINEMATIC — name + desc + shockwave + confetti
+  // burst centered on screen. Marks the moment of strategy commitment.
+  const _perk = PERKS[perkId];
+  game.floatTexts.push({
+    x: BASE_W/2, y: BASE_H/2 - 26,
+    text: 'PERK ACQUIRED',
+    color: '#fff', life: 70, maxLife: 70, size: 6
+  });
+  game.floatTexts.push({
+    x: BASE_W/2, y: BASE_H/2 - 14,
+    text: _perk.name,
+    color: _perk.col, life: 80, maxLife: 80, size: 12
+  });
+  if (_perk.desc) {
+    game.floatTexts.push({
+      x: BASE_W/2, y: BASE_H/2 - 2,
+      text: _perk.desc,
+      color: '#aaa', life: 80, maxLife: 80, size: 5
+    });
+  }
+  if (game.shockwaves) {
+    game.shockwaves.push({
+      x: BASE_W/2, y: BASE_H/2 - 14,
+      life: 0, maxLife: 30, maxR: 50,
+      color: _perk.col
+    });
+  }
+  if (typeof spawnConfetti === 'function') spawnConfetti(10);
+  game.flashTimer = Math.max(game.flashTimer || 0, 6);
+  game.flashColor = _perk.col;
+  playSound('milestone');
+  rumble(220, 0.6, 0.4);
+  return true;
+}
 // STAGE PERSONAL BEST — tracks fastest clear time per stage in localStorage.
 // On stage clear, compares current `stageFrames` to stored PB:
 //  - if no PB or new time is lower → record + show "NEW PB!" toast with delta
@@ -10871,6 +11459,27 @@ function recordStageScorePB(stage, scoreGained) {
     return { isNew: true, prev };
   }
   return { isNew: false, prev };
+}
+
+// The celebration for a new stage-score PB — banner + yellow shockwave + confetti.
+// One shared helper for all three stage-clear paths (normal / boss / challenge): the
+// simplification pass deleted the old info-tier call bodies at the boss and challenge
+// sites but left their `if` shells, so ~40% of score PBs were being recorded silently.
+function celebrateScorePB(gained, prev) {
+  const txt = prev != null
+    ? 'SCORE PB! +' + fmtScore(gained) + ' (+' + fmtScore(gained - prev) + ')'
+    : 'SCORE PB! +' + fmtScore(gained);
+  game.floatTexts.push({
+    x: BASE_W/2, y: BASE_H/2 + 24, text: txt,
+    color: '#ff4', life: 90, maxLife: 90, size: 7
+  });
+  if (game.shockwaves) {
+    game.shockwaves.push({
+      x: BASE_W/2, y: BASE_H/2 + 24,
+      life: 0, maxLife: 20, maxR: 40, color: '#ff4'
+    });
+  }
+  if (typeof spawnConfetti === 'function') spawnConfetti(6);
 }
 
 const STAGE_PB_KEY = 'galagaStagePBs';
@@ -11072,6 +11681,7 @@ function unlockDex(type) {
 const ACHIEVEMENTS = {
   firstBlood:    { name: 'FIRST BLOOD',  desc: 'Score your first kill' },
   comboMaster:   { name: 'COMBO MASTER',  desc: 'Reach combo 30' },
+  censor:        { name: 'CENSOR',        desc: 'Deny 10 uplinks lifetime' },
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
@@ -11905,7 +12515,7 @@ function updatePowerUps() {
       continue;
     }
     if (!game.playerAlive) continue;
-    const hitW = game.dualFighter ? 16 : 7;
+    const hitW = playerHitHalf();
     if (aabbHit(p.x - game.playerX, p.y - game.playerY, hitW + 4, 8)) {
       const color = POWERUP_COL[p.type] || '#fff';
       // PERK 'scavenger' — timer pickups (T/R/W/H/L) last 1.5×. Applied at pickup
@@ -13242,6 +13852,20 @@ function updateEnemies() {
       // Boss flies down
       if (e.captureTimer < CAPTURE_BEAM_START) {
         e.y += 1.5;
+        // THE HEIST — the wind-up is raidable. The siphon zone is the grab band
+        // itself (CAPTURE_GRAB_HALF_W, the same constant the live beam grabs
+        // with), so the pixels that can rob are the pixels that can be robbed
+        // FROM. Taught only after 'struggle': the first witnessed beam teaches
+        // escape, a later one teaches robbery — never both in one sequence.
+        if (e.captureTimer === 1 && typeof coachFire === 'function'
+            && typeof coachLearned !== 'undefined' && coachLearned.has('struggle')) {
+          coachFire('heist');
+        }
+        const _inBand = game.playerAlive
+          && Math.abs(game.playerX - e.x) < CAPTURE_GRAB_HALF_W
+          && game.playerY > e.y;
+        e.siphon = siphonStep(e.siphon || 0, _inBand, true);
+        if (heistResolve(e.siphon)) robBeam(e);
       } else if (e.captureTimer < CAPTURE_BEAM_END) {
         // Teach the escape verb on the frame the beam goes live — the player is
         // still alive and in control here, which is the only window where a
@@ -13253,7 +13877,7 @@ function updateEnemies() {
         // Tractor beam active — check if player is under
         if (game.playerAlive) {
           const dx = Math.abs(game.playerX - e.x);
-          if (dx < 20 && game.playerY > e.y) {
+          if (dx < CAPTURE_GRAB_HALF_W && game.playerY > e.y) {
             // Capture the player
             game.playerAlive = false;
             e.capturedShip = true;
@@ -13364,7 +13988,7 @@ function updateEnemies() {
           _x.previewMax = DIVE_PREVIEW;
           _x._wingTactic = null;
           _x._wingSide = 0;
-          _x.previewPath = createLoopPath(_x.x, _x.y, mindDiveSide(_x));
+          _x.previewPath = createLoopPath(_x.x, _x.y, dreadArcSide(_x));
           mindTagDive(_x);
         }
       }
@@ -13373,9 +13997,11 @@ function updateEnemies() {
         // random when it has no read (which is the shipped behaviour, unchanged).
         const e = mindPickDiver(candidates);
         // Boss might try to capture
-        if (e.type === 'boss' && !e.capturedShip && !game.dualFighter && Math.random() < 0.2 && game.capturedShipEnemy === null) {
+        if (e.type === 'boss' && !e.capturedShip && !e._robbed && !game.dualFighter && Math.random() < 0.2 && game.capturedShipEnemy === null) {
           e.state = 'capturing';
           e.captureTimer = 0;
+          e.siphon = 0; // THE HEIST — the wind-up starts unrobbed
+
           // If the boss diving is the commander, strip the tag so it doesn't persist during capture.
           if (e.isCommander) e.isCommander = false;
           playSound('captureSiren');
@@ -13386,7 +14012,7 @@ function updateEnemies() {
           e.previewMax = DIVE_PREVIEW;
           e._wingTactic = null; // lone dive — clear any stale coordinated-maneuver tag
           e._wingSide = 0;
-          e.previewPath = createLoopPath(e.x, e.y, mindDiveSide(e));
+          e.previewPath = createLoopPath(e.x, e.y, dreadArcSide(e));
           mindTagDive(e);
           playSound('enemyDive', e.x);
           // If boss, escorts get a slightly-delayed preview. Selected by POSITION
@@ -13547,19 +14173,33 @@ function updateChallengeEnemies() {
     e.x += e.vx;
     e.y += e.vy;
 
+    // ESCAPE = crossing the EXIT edge — the edge the enemy is moving TOWARD.
+    // The old cull had no direction guard, and a snake's tail spawns up to
+    // ~170px beyond its ENTRY edge (x = -15 - i*spacing), i.e. already past
+    // the -20 threshold — so every horizontal enemy past index 0 was culled
+    // as 'escaped' on its FIRST update frame. Measured (workflow sweep +
+    // challenge-audit): 73-78% of challenge enemies never appeared on screen,
+    // PERFECT WAVE was structurally impossible on 5 of 6 patterns (the tail's
+    // day-one escape flag poisoned `wave.some(e => e.escaped)`), and the
+    // challenge bonus (hits/total) was capped at the surviving fraction.
+    // Direction-aware culling keeps real escapes (crossed the far side)
+    // byte-identical and lets the tail actually enter the fight.
     if (e.pattern === 'top_down') {
       // Sine oscillation on x axis; movement is vertical
       e.sinPhase += 0.05;
       e.x = e.baseX + Math.sin(e.sinPhase) * e.sinAmp;
       if (e.y >= BASE_H + 20) { e.alive = false; e.escaped = true; }
     } else if (e.pattern === 'diagonal') {
-      // Straight diagonal — no sine; exit on any far edge or bottom
-      if (e.x <= -30 || e.x >= BASE_W + 30 || e.y >= BASE_H + 30) { e.alive = false; e.escaped = true; }
+      // Straight diagonal — exits on the far side it is heading toward, or the bottom
+      if ((e.vx < 0 && e.x <= -30) || (e.vx > 0 && e.x >= BASE_W + 30)
+          || e.y >= BASE_H + 30) { e.alive = false; e.escaped = true; }
     } else {
       // Horizontal patterns (sweep_lr, sweep_rl, pincer, double_row)
       e.sinPhase += 0.05;
       e.y = e.baseY + Math.sin(e.sinPhase) * e.sinAmp;
-      if (e.x <= -20 || e.x >= BASE_W + 20) { e.alive = false; e.escaped = true; }
+      if ((e.vx < 0 && e.x <= -20) || (e.vx > 0 && e.x >= BASE_W + 20)) {
+        e.alive = false; e.escaped = true;
+      }
     }
   }
 
@@ -13641,6 +14281,17 @@ function updateChallengeEnemies() {
     game.challengeWaveIdx++;
     game.challengeWaveStartFrame = game.stageFrames; // mark start of next wave
     game.challengeWaveTimer = 35; // brief telegraph window between waves
+    // THE DEBRIEF — after the drill waves in debriefPlan clear, a courier drone
+    // descends into the footage-richest lane to uplink the drill. Never two at
+    // once; rides the existing inter-wave telegraph window.
+    if (!game.courier && game.challengeWaves && game.drillLog
+        && debriefPlan(game.challengeWaves.length).indexOf(game.challengeWaveIdx - 1) !== -1) {
+      const _dl = drillFavoredLane(game.drillLog);
+      const _lane = _dl >= 0 ? _dl : (MIND_ZONES - 1) >> 1;
+      game.courier = { lane: _lane, x: mindZoneCenter(_lane), y: -10, timer: 0, hp: COURIER_HP };
+      playSound('enemyDive', mindZoneCenter(_lane));
+      if (typeof coachFire === 'function') coachFire('debrief');
+    }
     // FINAL WAVE BANNER — when the NEXT wave is the last one, surface a clear
     // "FINAL WAVE!" callout so the player knows the stage closes after it.
     if (game.challengeWaves
@@ -13657,6 +14308,14 @@ function updateChallengeEnemies() {
       if (game.waveClrFlash[_wi] > 0) game.waveClrFlash[_wi]--;
     }
   }
+}
+
+// Shared single-source: the player's collision half-width. A dual fighter is
+// physically two hulls side by side (16px); everything else is one hull (7px).
+// Extracted from 5 duplicated `game.dualFighter ? 16 : 7` ternaries — use this,
+// don't re-inline (a source-scan test pins that no literal copies remain).
+function playerHitHalf() {
+  return game.dualFighter ? 16 : 7;
 }
 
 function updateCollisions() {
@@ -13854,6 +14513,13 @@ function updateCollisions() {
             playSound('powerUp');
           }
           bumpCombo();
+          // THE KILLING FIELD — the formation records where this one fell.
+          // Formation stages only: the grave is a property of the FORMATION, and
+          // bespoke hostiles (rival/magpie) never feed it — it is the swarm's
+          // memory of the swarm's own dead.
+          if (game.state === STATE.PLAYING && game.swarmDread) {
+            dreadObserve(game.swarmDread, e.x);
+          }
           // REVENGE KILL — if a prior collision death captured this enemy type,
           // killing that type back counts as payback. The in-play "REVENGE!" banner
           // + sfx + enemy-comms intercept were removed (CEO subtraction: in-play
@@ -13862,10 +14528,14 @@ function updateCollisions() {
           if (game._revengeType && e.type === game._revengeType) {
             game._revengeType = null;
             game.revengeCount = (game.revengeCount || 0) + 1;
-            try {
-              const _rT = parseInt(localStorage.getItem('galagaRevengeTotal') || '0', 10) || 0;
-              localStorage.setItem('galagaRevengeTotal', String(_rT + 1));
-            } catch (_eR) {}
+            // Same demo guard as every other lifetime total (the attract bot
+            // dies and avenges too — its paybacks are not the player's record).
+            if (!game.isDemo) {
+              try {
+                const _rT = parseInt(localStorage.getItem('galagaRevengeTotal') || '0', 10) || 0;
+                localStorage.setItem('galagaRevengeTotal', String(_rT + 1));
+              } catch (_eR) {}
+            }
           }
           const inForm = e.state === 'formation';
           // EARLY INTERCEPT — kill while enemy is still in entering path.
@@ -14531,7 +15201,7 @@ function updateCollisions() {
   // Lives ABOVE the regular collision check (which skips while invincible) so we get
   // the parry effect during exactly the same iframe window as dash invincibility.
   if (game.playerAlive && (game.dashTimer || 0) > 0) {
-    const hitW = game.dualFighter ? 16 : 7;
+    const hitW = playerHitHalf();
     let _parriedThisFrame = 0;
     for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
       const b = game.enemyBullets[i];
@@ -14651,9 +15321,9 @@ function updateCollisions() {
   if (game.playerAlive && game.invincibleTimer <= 0) {
     for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
       const b = game.enemyBullets[i];
-      const hitW = game.dualFighter ? 16 : 7;
+      const hitW = playerHitHalf();
       if (aabbHit(b.x - game.playerX, b.y - game.playerY, hitW, 7)) {
-        if (tryTriggerWitchTime(b.x, b.y)) break;  // bullet not consumed; witch window opened
+        if (tryTriggerWitchTime(b.x, b.y, 'bullet', b.fromType)) break;  // bullet not consumed; witch window opened
         const _bX = b.x, _bY = b.y, _bType = b.fromType;
         // REVENGE: pass the firing enemy's type (formation/dive/elite bullets carry
         // fromType). killPlayer seeds the target only if the hit is actually fatal.
@@ -14670,7 +15340,7 @@ function updateCollisions() {
   // cooldown prevents spam on dense barrages.
   if (game.playerAlive && game.invincibleTimer <= 0
       && (game.nearMissCooldown || 0) <= 0 && (game.dashTimer || 0) <= 0) {
-    const _hitW = game.dualFighter ? 16 : 7;
+    const _hitW = playerHitHalf();
     for (const b of game.enemyBullets) {
       if (b._missed) continue;
       const _dx = Math.abs(b.x - game.playerX);
@@ -14751,9 +15421,9 @@ function updateCollisions() {
   if (game.playerAlive && game.invincibleTimer <= 0) {
     for (const e of game.enemies) {
       if (!e.alive || e.state === 'formation' || e.state === 'entering') continue;
-      const hitW = game.dualFighter ? 16 : 7;
+      const hitW = playerHitHalf();
       if (aabbHit(e.x - game.playerX, e.y - game.playerY, hitW + 6, 10)) {
-        if (tryTriggerWitchTime(e.x, e.y)) break;  // collision not resolved; witch window opened
+        if (tryTriggerWitchTime(e.x, e.y, 'collision', e.type)) break;  // collision not resolved; witch window opened
         const _eX = e.x, _eY = e.y, _eType = e.type;
         e.alive = false;
         game.explosions.push({x: e.x, y: e.y, timer: 0, maxTime: 20});
@@ -14774,14 +15444,21 @@ function updateCollisions() {
 // when the window opened (caller must NOT proceed with the kill); false when no save
 // is available (cooldown active, shield+cheat handle their own paths anyway).
 // The window expires in update() — if dash fired, save; else kill resolves there.
-function tryTriggerWitchTime(srcX, srcY) {
+function tryTriggerWitchTime(srcX, srcY, cause, srcType) {
   if (game.witchTimer > 0) return true;          // already in a window — defer
   if (game.witchCooldown > 0) return false;       // can't save again yet
   if (game.cheatInvincible) return false;         // cheat path handles it
   if ((game.shieldCharges || 0) > 0) return false; // shield path handles it (cheaper)
   game.witchTimer = WITCH_WINDOW;
+  // Carry the hit's full identity into the window. The whiff path used to
+  // resolve with an ARGLESS killPlayer(), so every witch-whiff death (29% of
+  // deaths under a dashing bot) was tallied 'unknown', drew no postmortem
+  // marker, seeded no revenge, and got the generic respawn whisper — the
+  // deferred death lost the identity the immediate death keeps.
   game.witchSrcX = srcX;
   game.witchSrcY = srcY;
+  game.witchCause = cause || 'unknown';
+  game.witchSrcType = srcType || null;
   game.witchSaved = false;
   // Brief invincibility flicker so the same bullet doesn't re-collide while we're paused
   game.invincibleTimer = Math.max(game.invincibleTimer, WITCH_WINDOW + 6);
@@ -14876,8 +15553,8 @@ function killPlayer(srcX, srcY, cause, srcType) {
   // The next kill of this enemy type fires a "REVENGE!" beat. Pairs with DEATH
   // RECAP WHISPER + REVENGE COUNT.
   if (srcType) game._revengeType = srcType;
-  // SIGNAL INTERCEPT — enemy comms celebrate confirmed kill
-  if (typeof pushIntercept === 'function') pushIntercept('playerDown');
+  // (The 'playerDown' intercept was cut — every-death chatter at the one moment
+  // no reaction is possible; the DEATH RECAP whisper owns this beat.)
   // SALVAGE PROTOCOL — the lost build scatters as recoverable power shards.
   // Must run BEFORE the lvl reset below (reads pre-death levels). Skipped when
   // this death ends the run (no dual wing to absorb it and no spare ship left).
@@ -14969,6 +15646,10 @@ function killPlayer(srcX, srcY, cause, srcType) {
   game.pausedState = game.state; // remember current state for respawn
   if (game.dualFighter) {
     game.dualFighter = false;
+    // The wingman's death still has a cause — the respawn whisper reads
+    // lastDeathCause, and a dual downgrade skips the lives-- branch that
+    // normally copies it over.
+    if (game._deathCausePending) game.lastDeathCause = game._deathCausePending;
     // DUAL FIGHTER LOST — cinematic beat for losing the bonus wing. Dual is
     // a rare run asset (boss-capture rescue path or perk), and gain already
     // surfaces a banner — silent loss broke that symmetry.
@@ -15675,11 +16356,7 @@ function checkStageComplete() {
         // Score PB — boss stage variant
         const sGained = (game.score || 0) - (game.stageStartScore || 0);
         const sPbR = recordStageScorePB(game.stage, sGained);
-        if (sPbR.isNew && sGained > 0) {
-          const txt = sPbR.prev != null
-            ? 'SCORE PB! +' + fmtScore(sGained) + ' (+' + fmtScore(sGained - sPbR.prev) + ')'
-            : 'SCORE PB! +' + fmtScore(sGained);
-        }
+        if (sPbR.isNew && sGained > 0) celebrateScorePB(sGained, sPbR.prev);
       }
       if (game.stageEndGraceTimer < STAGE_END_GRACE) {
         game.stageEndGraceTimer++;
@@ -15734,11 +16411,7 @@ function checkStageComplete() {
         // Score PB — challenge stage variant
         const sGained = (game.score || 0) - (game.stageStartScore || 0);
         const sPbR = recordStageScorePB(game.stage, sGained);
-        if (sPbR.isNew && sGained > 0) {
-          const txt = sPbR.prev != null
-            ? 'SCORE PB! +' + fmtScore(sGained) + ' (+' + fmtScore(sGained - sPbR.prev) + ')'
-            : 'SCORE PB! +' + fmtScore(sGained);
-        }
+        if (sPbR.isNew && sGained > 0) celebrateScorePB(sGained, sPbR.prev);
       }
       game.stage++;
       game.stats.maxStage = Math.max(game.stats.maxStage, game.stage);
@@ -15814,23 +16487,7 @@ function checkStageComplete() {
           // STAGE SCORE PB — score gained during this stage vs best
           const scoreGained = (game.score || 0) - (game.stageStartScore || 0);
           const sPbResult = recordStageScorePB(game.stage, scoreGained);
-          if (sPbResult.isNew && scoreGained > 0) {
-            const txt = sPbResult.prev != null
-              ? 'SCORE PB! +' + fmtScore(scoreGained) + ' (+' + fmtScore(scoreGained - sPbResult.prev) + ')'
-              : 'SCORE PB! +' + fmtScore(scoreGained);
-            game.floatTexts.push({
-              x: BASE_W/2, y: BASE_H/2 + 24, text: txt,
-              color: '#ff4', life: 90, maxLife: 90, size: 7
-            });
-            // SCORE PB CINEMATIC — small yellow shockwave for visual punctuation
-            if (game.shockwaves) {
-              game.shockwaves.push({
-                x: BASE_W/2, y: BASE_H/2 + 24,
-                life: 0, maxLife: 20, maxR: 40, color: '#ff4'
-              });
-            }
-            if (typeof spawnConfetti === 'function') spawnConfetti(6);
-          }
+          if (sPbResult.isNew && scoreGained > 0) celebrateScorePB(scoreGained, sPbResult.prev);
           if (!game.stageDied) {
             game.zenStages = (game.zenStages || 0) + 1;
             game.zenStreak = (game.zenStreak || 0) + 1;
@@ -15865,13 +16522,6 @@ function checkStageComplete() {
           if (game.stage + 1 >= 40) unlockAchievement('finalBoss');
           if (game.stage + 1 >= 60) unlockAchievement('apex');
           if (game.stage + 1 >= 100) unlockAchievement('finalForm');
-          // Speedrun: reach stage 10 in under 3 minutes (10800 frames)
-          // Speedrunner: clear stage 5 in under 90s
-          // Marathoner: 20 stages in single run
-          // Iron pilot: no death + 90%+ accuracy this stage
-          {
-            const accStage = computeStageAccuracy();
-          }
           // Performance bonuses
           const timeBonus = Math.max(0, 5000 - game.stageFrames * 6);
           const noDeathBonus = game.stageDied ? 0 : 1500;
@@ -15881,8 +16531,8 @@ function checkStageComplete() {
           const total = timeBonus + noDeathBonus + accBonus + challengeBonus;
           if (total > 0) addScore(total);
           const cy = BASE_H / 2 + 22;
-          // Each bonus animates from 0 → final over 30 frames so they feel like a tally rolling up
-          if (timeBonus > 0)          if (noDeathBonus > 0)          if (accBonus > 0)          if (challengeBonus > 0)          if (total > 0) game.floatTexts.push({
+          // The TOTAL count-up animates from 0 → final over 50 frames — a tally rolling up
+          if (total > 0) game.floatTexts.push({
             x: BASE_W/2, y: cy + 39, text: '', countTo: total, prefix: 'TOTAL +', countDuration: 50,
             color: '#ff4', life: 80, maxLife: 80, size: 9
           });
@@ -16308,9 +16958,10 @@ function update() {
         rumble(260, 0.8, 0.5);
       }
       if (game.witchTimer === 0 && !game.witchSaved) {
-        // Window closed without dash — death resolves
+        // Window closed without dash — death resolves WITH the identity of the
+        // hit that opened the window (tally, postmortem ring, revenge, whisper).
         game.witchCooldown = WITCH_COOLDOWN;
-        killPlayer();
+        killPlayer(game.witchSrcX, game.witchSrcY, game.witchCause, game.witchSrcType);
       }
     }
     if ((game.witchCooldown || 0) > 0) {
@@ -16353,15 +17004,22 @@ function update() {
         game.formationPanicked = false;
       }
     }
-    // Perk select window decrements while the player is choosing. Expires silently
-    // if no choice is made (game.perkOffered = null reset on next boss).
+    // Perk select window decrements while the player is choosing. Keyboard
+    // 1/2/3 commits instantly; every other device commits by POSITION when the
+    // window expires — the card the ship is under is the pick (FLY TO CHOOSE).
+    // Expiring while the pilot is dead is the only silent path left.
     if ((game.perkSelectFrames || 0) > 0) {
       game.perkSelectFrames--;
       // URGENCY TICK fires here at sim rate (not in draw) so it doesn't double on
       // high-refresh displays. Mirrors draw's <90f (1.5s) urgency window + 30f cadence.
       if (game.perkSelectFrames > 0 && game.perkSelectFrames < 90 && game.animFrame % 30 === 0
           && typeof playSound === 'function') playSound('tick');
-      if (game.perkSelectFrames === 0) game.perkOffered = null;
+      if (game.perkSelectFrames === 0) {
+        if (game.perkOffered && game.playerAlive && typeof applyPerk === 'function') {
+          applyPerk(game.perkOffered[perkHoverIdx(game.playerX)]);
+        }
+        game.perkOffered = null;
+      }
     }
     // Weapon activation callout life tick
     if ((game.weaponCalloutLife || 0) > 0) game.weaponCalloutLife--;
@@ -16514,6 +17172,14 @@ function update() {
           playSound('bossWarning');
         }
       }
+      // LOOT SURVIVES THE CUT — keep drops in flight falling (and catchable)
+      // through the intro. They used to freeze here (this branch never ticked
+      // them) and then startStage() wiped the array, so every late-stage kill's
+      // drop — including the pity drop, whose killsSincePowerUp counter had
+      // already been consumed at spawn — was silently deleted at the
+      // transition. Earned rewards are never denied (THE DIRECTOR, rule 2).
+      updatePowerUps();
+      updateItemBursts();
       game.stageTimer--;
       if (game.stageTimer <= 0) startStage();
       break;
@@ -16549,6 +17215,10 @@ function update() {
       updateBullets();
       updatePowerUps();
       updateChallengeEnemies();
+      // THE DEBRIEF — the drill is filmed: record the player's lane, tick the
+      // courier (descend/uplink/resolve). Both self-gate on CHALLENGING.
+      if (game.drillLog && game.playerAlive) drillObserve(game.drillLog, game.playerX);
+      updateCourier();
       updateCollisions();
       updateExplosions();
       updateFloatTexts();
@@ -16727,12 +17397,16 @@ function update() {
         game.flashColor = '#0cf';
         playSound('powerUp');
         // DEATH RECAP WHISPER — short cause-specific coaching line at respawn.
-        // game._deathCausePending was captured in killPlayer (bullet/collision/
-        // unknown). Gray ambient tone (#888) sits below the cyan respawn ring
+        // Reads game.lastDeathCause: the SURVIVING copy of the cause. It used
+        // to read _deathCausePending, which the death-tally branch nulls the
+        // frame the death lands — ~90 frames before this line runs — so the
+        // cause-specific coaching had been dead by construction since it
+        // shipped: every whisper fell through to the generic 'unknown' set.
+        // Gray ambient tone (#888) sits below the cyan respawn ring
         // so the visual rebirth cinematic isn't interrupted. Score-neutral.
         if (typeof RESPAWN_WHISPERS !== 'undefined' && game.floatTexts) {
-          const _cKey = (game._deathCausePending && RESPAWN_WHISPERS[game._deathCausePending])
-            ? game._deathCausePending : 'unknown';
+          const _cKey = (game.lastDeathCause && RESPAWN_WHISPERS[game.lastDeathCause])
+            ? game.lastDeathCause : 'unknown';
           const _wList = RESPAWN_WHISPERS[_cKey] || [];
           if (_wList.length > 0) {
             const _wh = _wList[randInt(_wList.length)];
@@ -17019,6 +17693,7 @@ function draw() {
       drawStageWeather();
       drawSupplyCrate();
       drawSalvageShards();
+      drawCourier();
       drawMagpie();
       drawGuardian();
       drawRivalAce();
@@ -17255,6 +17930,7 @@ function draw() {
     const totalW = cardW * 3 + gap * 2;
     const startX = (BASE_W - totalW) / 2;
     const cardY = 100;
+    const hovered = perkHoverIdx(game.playerX);
     for (let i = 0; i < game.perkOffered.length; i++) {
       const perkId = game.perkOffered[i];
       const p = PERKS[perkId];
@@ -17269,6 +17945,23 @@ function draw() {
       ctx.fillRect(cx, cardY + cardH - 1, cardW, 1);
       ctx.fillRect(cx, cardY, 1, cardH);
       ctx.fillRect(cx + cardW - 1, cardY, 1, cardH);
+      // FLY TO CHOOSE — the card above the ship's column is the live pick for
+      // every non-keyboard device; a chevron under the card points down at the
+      // ship so the link between position and choice is drawn, not implied.
+      if (i === hovered && game.playerAlive) {
+        const hp = 0.55 + 0.45 * Math.sin(game.animFrame * 0.25);
+        ctx.globalAlpha = fadeIn * hp;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(cx - 1, cardY - 1, cardW + 2, 1);
+        ctx.fillRect(cx - 1, cardY + cardH, cardW + 2, 1);
+        ctx.fillRect(cx - 1, cardY - 1, 1, cardH + 2);
+        ctx.fillRect(cx + cardW, cardY - 1, 1, cardH + 2);
+        const chx = cx + cardW / 2;
+        ctx.fillRect(chx - 3, cardY + cardH + 4, 7, 1);
+        ctx.fillRect(chx - 2, cardY + cardH + 5, 5, 1);
+        ctx.fillRect(chx - 1, cardY + cardH + 6, 3, 1);
+        ctx.globalAlpha = fadeIn;
+      }
       // Number key indicator (top center)
       const numCol = blinkPhase(3) ? p.col : '#fff';
       drawRetroText(String(i + 1), cx + cardW / 2, cardY + 8, 11, numCol);
@@ -17285,7 +17978,7 @@ function draw() {
       drawRetroText(line1, cx + cardW / 2, cardY + 40, 5, '#fff');
       if (line2) drawRetroText(line2, cx + cardW / 2, cardY + 48, 5, '#fff');
     }
-    drawRetroText('PRESS 1  2  3', BASE_W/2, 170, 6, COL.gray);
+    drawRetroText('PRESS 1 2 3 — OR FLY UNDER A CARD', BASE_W/2, 170, 5, COL.gray);
     ctx.restore();
   }
 
@@ -18035,8 +18728,22 @@ function pickRunHighlights() {
   // skill stat: no score anywhere in the system, so this readout is its only payout.
   const baited = game.swarmBaited || 0;
   if (baited >= 3)        out.push({ label: 'DIVES BAITED',   value: String(baited),    prio: baited * 14, col: '#9cf' });
+  // DIVES HERDED — attack routes THE KILLING FIELD deflected because of where you
+  // chose to kill. Like BAITED, a pure routing-skill stat: zero score anywhere in
+  // the system, so this readout is its only payout. Ember orange to match the field.
+  const herded = game.divesHerded || 0;
+  if (herded >= 3)        out.push({ label: 'DIVES HERDED',   value: String(herded),    prio: herded * 14, col: '#f80' });
   const broke = game.capturesEscaped || 0;
   if (broke >= 1)         out.push({ label: 'BEAMS BROKEN',   value: String(broke),     prio: 60 + broke * 40, col: '#0cf' });
+  // BEAMS ROBBED — THE HEIST: wind-ups siphoned dry before the beam went live.
+  // Gold to match the siphon ticks. Slightly below BEAMS BROKEN (a completed
+  // struggle outranks a completed raid — the struggle risked more).
+  const robbed = game.beamHeists || 0;
+  if (robbed >= 1)        out.push({ label: 'BEAMS ROBBED',   value: String(robbed),    prio: 55 + robbed * 40, col: '#fc4' });
+  // DEBRIEFS DENIED — courier drones shot down before their drill footage
+  // reached THE SWARM MIND. An information-war stat: zero score in the system.
+  const denied = game.debriefsDenied || 0;
+  if (denied >= 2)        out.push({ label: 'DEBRIEFS DENIED', value: String(denied),   prio: denied * 16, col: '#f6f' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
@@ -19006,7 +19713,8 @@ function drawGameplay() {
           // gives the player the same warning every other threat gives.
           if (e.state === 'capturing') {
             const _ctp = captureTelegraphProgress(e.captureTimer);
-            if (_ctp >= 0) drawCaptureTelegraph(e.x, e.y + 6, 80, _ctp);
+            if (_ctp >= 0) drawCaptureTelegraph(e.x, e.y + 6, 80, _ctp,
+              e.siphon || 0, heistStillWinnable(e.siphon || 0, e.captureTimer));
             else if (e.captureTimer < CAPTURE_BEAM_END) drawTractorBeam(e.x, e.y + 6, 80);
           }
           break;
@@ -19653,6 +20361,7 @@ function drawGameplay() {
   }
 
   drawMindLock();
+  drawDreadField();
   drawDivePreviewPaths();
   drawThreatIndicators();
   drawLastEnemyAlert();
@@ -19933,8 +20642,12 @@ function drawMindLock() {
   const p = game && game.swarmMind;
   if (!p || game.state !== STATE.PLAYING || !game.allEntered) return;
   const flash = p.wipeFlash || 0;
+  // THE DEBRIEF — a seized ledger reveals the swarm's FORMING read: while
+  // ledgerSight burns, the bracket renders below the lock threshold (dashed,
+  // dimmer), so the player sees the profile being built before it matters.
+  const reveal = !mindLocked(p) && (game.ledgerSight || 0) > 0 && (p.n || 0) > 0;
   const zone = flash > 0 ? (p.wipeZone != null ? p.wipeZone : -1)
-                         : (mindLocked(p) ? mindFavoredZone(p.z) : -1);
+                         : ((mindLocked(p) || reveal) ? mindFavoredZone(p.z) : -1);
   if (zone < 0) return;
   const halfW = BASE_W / MIND_ZONES / 2;
   const cx = mindZoneCenter(zone);
@@ -19947,7 +20660,8 @@ function drawMindLock() {
   const pulse = 0.55 + 0.45 * Math.sin(game.animFrame * 0.11);
   ctx.globalAlpha = flash > 0
     ? 0.85 * (flash / MIND_WIPE_FLASH)
-    : (0.16 + 0.34 * clamp01(p.conf || 0)) * pulse;
+    : (0.16 + 0.34 * clamp01(p.conf || 0)) * pulse * (reveal && flash <= 0 ? 0.55 : 1);
+  if (reveal && flash <= 0) ctx.setLineDash([2, 2]);
   // Biome tint (the same fusion WING TACTICS uses), so the read belongs to the world.
   ctx.strokeStyle = (typeof wingTacticColor === 'function') ? wingTacticColor() : COL.red;
   ctx.lineWidth = 1;
@@ -19958,6 +20672,58 @@ function drawMindLock() {
   ctx.lineTo(x1 - 0.5, y + 0.5);
   ctx.lineTo(x1 - 0.5, y - 5);
   ctx.stroke();
+  ctx.restore();
+}
+
+// THE KILLING FIELD, DRAWN. Ember ticks — small flickering X marks, a
+// grave-marker shape readable without colour — along the floor of the lane the
+// swarm has learned to fear. Fixed warm ember orange (#f80) against the mind
+// bracket's biome tint, its own pulse phase, nothing rendered until the field
+// is genuinely hot — the same invisible-until-real rule as the bracket. On a
+// herd (flash > 0) the embers flare and a chevron slides from the grave toward
+// the lane the dive was rerouted into, so the reroute is SEEN, not inferred.
+// Read-only: the flash timer ticks in dreadDecay (update side).
+function drawDreadField() {
+  const d = game && game.swarmDread;
+  if (!d || game.state !== STATE.PLAYING || !game.allEntered) return;
+  const flash = d.flash || 0;
+  const hot = dreadHotZone(d);
+  // THE DEBRIEF — a seized ledger also reveals the swarm's FEAR while it is
+  // still forming: below-threshold embers render dim while ledgerSight burns.
+  const reveal = hot < 0 && (game.ledgerSight || 0) > 0 && (d.n || 0) > 0.5;
+  const zone = hot >= 0 ? hot
+    : (flash > 0 ? (d.flashZone != null ? d.flashZone : -1)
+                 : (reveal ? mindFavoredZone(d.z) : -1));
+  if (zone < 0) return;
+  const laneW = BASE_W / MIND_ZONES;
+  const x0 = zone * laneW;
+  const y = BASE_H - 5;
+  ctx.save();
+  const pulse = 0.55 + 0.45 * Math.sin(game.animFrame * 0.17 + 2.1);
+  const flare = flash > 0 ? 0.5 * (flash / DREAD_FLASH) : 0;
+  ctx.globalAlpha = Math.min(0.9,
+    ((0.14 + 0.30 * clamp01(d.conf || 0)) * pulse + flare) * (reveal ? 0.55 : 1));
+  ctx.strokeStyle = '#f80';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    // One ember rests each beat — a flicker, not a strobe (steps at 8-frame beats).
+    if ((i + (game.animFrame >> 3)) % 4 === 3) continue;
+    const cx = x0 + laneW * (i + 0.5) / 4;
+    ctx.beginPath();
+    ctx.moveTo(cx - 1.5, y - 1.5); ctx.lineTo(cx + 1.5, y + 1.5);
+    ctx.moveTo(cx + 1.5, y - 1.5); ctx.lineTo(cx - 1.5, y + 1.5);
+    ctx.stroke();
+  }
+  if (flash > 0 && d.flashDir) {
+    const prog = 1 - flash / DREAD_FLASH;
+    const ax = x0 + laneW / 2 + d.flashDir * (laneW * 0.9) * prog;
+    ctx.globalAlpha = 0.85 * (flash / DREAD_FLASH);
+    ctx.beginPath();
+    ctx.moveTo(ax - d.flashDir * 3, y - 8);
+    ctx.lineTo(ax, y - 5.5);
+    ctx.lineTo(ax - d.flashDir * 3, y - 3);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
