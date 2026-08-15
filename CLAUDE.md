@@ -48,7 +48,7 @@ stored JSON is enough to fail it.
 
 `test/layout-audit.js` (step 3) catches **text that renders permanently off-screen** —
 the failure mode a canvas game with no layout engine cannot otherwise detect without a
-browser. It runs the real `draw()` across all 21 screens/overlay pages, records every
+browser. It runs the real `draw()` across all 18 screens/overlay pages, records every
 text draw through a transform-tracking stub, and computes true pixel widths from the
 measured font advances, under **both** font configurations (the monospace fallback shown
 before the pixel faces load, and the loaded pixel pair). Three properties make it
@@ -271,8 +271,9 @@ owned by two constants — **`CAPTURE_BEAM_START = 60`** (wind-up) and
   at `CAPTURE_BEAM_START / 2` — 30 frames of lead, matching the dive preview.
 - **frames 60–179, live**: `drawTractorBeam`; a player within `dx < 20` and below the
   boss is taken → `STATE.CAPTURED`, `e.capturedShip = true`, `game.capturedShipEnemy = e`.
-- **cutscene**: `game.captureTimer > 120` → **costs a life** → `STATE.RESPAWN`; the boss
-  returns to formation carrying your ship.
+- **cutscene**: `game.captureTimer > CAPTURE_HOLD` (120) → **costs a life** →
+  `STATE.RESPAWN`; the boss returns to formation carrying your ship.
+- **THE STRUGGLE**: those 120 frames are now **played, not watched** — see below.
 - **rescue**: killing the holder sets `game.dualFighter = true` and clears
   `capturedShipEnemy`.
 
@@ -282,6 +283,74 @@ threat that costs a whole life (dives warn 30–36f, storm strikes 42f). A headl
 measured 87% of beams landing. The siren alone wasn't a warning either, since SFX can be
 off (`galagaSFXOff`). The logic tests lock the window length, the growth direction, and
 the hand-off frame so it can't quietly collapse back to zero.
+
+### THE CONTROL BUDGET — how much of the game do you actually play?
+
+THE FAIRNESS BUDGET asks *does a threat warn you before it takes something*. Its mirror
+was never asked: **after it takes something, how long until you are allowed to play
+again?** Every pause here was added on its own for a good reason — hit-stop punctuates a
+kill, letterbox sells a metamorphosis, the respawn wait carries the death recap — and
+none of them knew about each other, so nothing had ever added them up.
+
+```bash
+node test/pulse-audit.js   # report: frames your input does nothing, per event + per band
+```
+
+The audit drives the **real `gameLoop` accumulator body** (including the hit-stop branch
+that skips `update()` entirely) with a bot that flies, shoots and dies, so what it counts
+is what a player sits through. It vindicated almost everything and indicted one thing:
+
+| event | costs | your hands are off it for |
+|---|---|---|
+| hit-stop | nothing (it punctuates a **kill**) | 12f — healthy, that's punctuation |
+| stage intro | nothing (skippable with fire) | 35f — healthy |
+| respawn | a life, already spent | 119f — the death-recap read window |
+| **CAPTURED** | **A LIFE** | **121f, then the respawn behind it → 211f** |
+
+3.5 seconds, the longest silence in the game, sitting on its most expensive event, with
+**not one input read across the whole of it** — punished twice, once in lives and once in
+time. The rule it broke is the mirror of the fairness rule: **A THREAT THAT TAKES MORE
+MUST NOT HOLD YOUR HANDS LONGER.**
+
+The audit's second column is **DEAD AIR** (in control, but nothing can hurt you), the
+opposite failure. It is reported rather than fixed because the breakdown shows it isn't a
+defect: `empty` (a playfield with nothing on it) is **0f** in every band, and the bulk is
+`parade` (the entry flight, Galaga's own vocabulary and meant to be quiet) and `lull`
+(a held formation — the player's window to line up shots).
+
+**When adding any pause, freeze, cutscene or cinematic**: add it to the audit and check
+the cost/downtime column stays ordered. A pause that costs the player nothing may be
+long; a pause that costs a life must be short **or must be playable**.
+
+### THE STRUGGLE — the capture answers back
+
+The fix for the 121-frame silence was not a shorter cutscene (that only makes the
+punishment quieter). It is a **contest inside it**. Pull against the beam by alternating
+left/right: every **reversal** feeds `game.struggle`, the beam drags it back every frame,
+and 1.0 tears you loose with the life unspent.
+
+- Pure, logic-tested core: `struggleDir(left, right)` (both-or-neither → 0, so
+  mash-everything is not an exploit) and `struggleTick(meter, dir, last)` (a reversal is
+  a change to a **new non-zero** direction — *holding* earns nothing). Commit site:
+  `breakCaptureFree()`. Tuning: `STRUGGLE_GAIN` 0.14 / `STRUGGLE_DRAG` 0.005 over
+  `CAPTURE_HOLD` 120 — measured, not guessed: a brisk human (~6.7 reversals/s) tears free
+  around frame 75–90 of 120, and idle tapping (~3/s) **never** does.
+- Input is **polled from the `keys` map**, never the keydown handler, so keyboard, touch
+  joystick and gamepad all feed it for free — the same rule the stage-intro skip follows.
+
+**The fork is the point.** Your ship is only worth a DUAL FIGHTER *while the captor is
+carrying it*. Break free and you keep the life but forfeit the rescue; go limp and you
+pay the life for a shot at flying two ships. `breakCaptureFree` clears
+`boss.capturedShip`, so killing that enemy afterwards grants nothing — the test pins
+exactly that, because it is what makes this a decision instead of a formality. Galaga's
+signature loop finally has a fork in it, and the fork is **played**, not picked from a
+menu.
+
+**ZERO new score** — the payoff is a life and the tempo, both already priced. Tracked as
+`game.capturesEscaped` + lifetime `galagaBreakoutTotal`, surfaced as the BEAMS BROKEN run
+highlight. Fusion: capture/rescue, dual fighter, FLIGHT SCHOOL (the `struggle` lesson
+fires the frame the beam goes live — the last moment the player is alive enough to be
+coached), enemy comms (`breakout`). No new actor, so THE DIRECTOR's budget is untouched.
 
 ### Defensive layers
 

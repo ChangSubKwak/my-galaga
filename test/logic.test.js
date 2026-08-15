@@ -193,6 +193,9 @@ const shim = `
   MIN_SAMPLES: MIND_MIN_SAMPLES, LOCK_CONF: MIND_LOCK_CONF,
   MAX_BIAS: MIND_MAX_BIAS, WIPE_FLASH: MIND_WIPE_FLASH,
   DIVE_PREVIEW: DIVE_PREVIEW, WING_PREVIEW: WING_PREVIEW, BASE_W: BASE_W }; }; } catch (e) {}
+;try { globalThis.__getStruggleConst = function () { return {
+  HOLD: CAPTURE_HOLD, GAIN: STRUGGLE_GAIN, DRAG: STRUGGLE_DRAG,
+  BEAM_START: CAPTURE_BEAM_START, BEAM_END: CAPTURE_BEAM_END }; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -4585,6 +4588,192 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()) {
   }
   G.resetGame();
 } else { console.log('  (skipped — capture loop not drivable)'); }
+
+section('THE STRUGGLE — the pure tug-of-war (THE CONTROL BUDGET)');
+// test/pulse-audit.js measured, for the first time, how many frames of a real
+// session the player's input does nothing. Nearly all of it is deliberate and
+// short — hit-stop is 12f, the stage intro is 35f and skippable. One event was
+// neither: the capture spent 121 frames reading no input at all and THEN took a
+// life, the longest silence in the game sitting on its most expensive event.
+// THE STRUGGLE turns those frames into a contest, and these pin the contest's
+// shape: holding must not work, mashing both must not work, and the window must
+// be winnable by a human but not by a casual tapper.
+{
+  const SC = (typeof G.__getStruggleConst === 'function') ? G.__getStruggleConst() : null;
+  if (typeof G.struggleDir === 'function' && typeof G.struggleTick === 'function' && SC) {
+    const sdir = G.struggleDir, stick = G.struggleTick;
+
+    eq(sdir(true, false), -1, 'left alone reads as a left pull');
+    eq(sdir(false, true), 1, 'right alone reads as a right pull');
+    eq(sdir(true, true), 0, 'holding BOTH reads as no direction — the mash-everything exploit is closed');
+    eq(sdir(false, false), 0, 'holding neither reads as no direction');
+    eq(sdir(undefined, undefined), 0, 'and a missing input pair is not a pull');
+
+    // A reversal is the only thing that pays.
+    ok(Math.abs(stick(0, 1, -1) - (SC.GAIN - SC.DRAG)) < 1e-9,
+       'a reversal gains exactly one GAIN, less that frame\'s drag');
+    ok(stick(0.5, 1, 1) < 0.5, 'HOLDING the same direction gains nothing and still drags');
+    ok(stick(0.5, 0, 0) < 0.5, 'and no input at all only drags');
+    ok(stick(0, 1, 0) > 0, 'the FIRST pull counts (last direction starts at zero)');
+
+    // Clamped at both ends: a long limp capture cannot go negative and bank
+    // credit, and an over-mashed one cannot bank a head start either.
+    eq(stick(0, 0, 0), 0, 'the meter never goes negative');
+    eq(stick(1, 1, -1), 1, 'and never exceeds full');
+
+    // --- the balance assertion: winnable by effort, not by presence ---
+    // Simulate the whole 120f window at a given reversal period.
+    const windowRun = (period) => {
+      let m = 0, last = 0, freed = -1;
+      for (let f = 0; f < SC.HOLD; f++) {
+        const dir = (Math.floor(f / period) % 2 === 0) ? -1 : 1;
+        m = stick(m, dir, last);
+        if (dir !== 0) last = dir;
+        if (m >= 1 && freed < 0) freed = f;
+      }
+      return freed;
+    };
+    const brisk  = windowRun(9);    // ~6.7 reversals/s — brisk but sustainable
+    const casual = windowRun(20);   // ~3 reversals/s — idle tapping
+    const held   = (() => {         // one direction, held for the whole window
+      let m = 0; for (let f = 0; f < SC.HOLD; f++) m = stick(m, 1, 1); return m;
+    })();
+    ok(brisk > 0, 'a determined human (one reversal per 9 frames) tears free at frame '
+       + brisk + ' of ' + SC.HOLD);
+    ok(brisk > SC.HOLD * 0.4, 'but not instantly — it costs most of the window ('
+       + brisk + 'f of ' + SC.HOLD + '), so the escape is earned, not automatic');
+    eq(casual, -1, 'idle tapping (one reversal per 20 frames) does NOT escape');
+    eq(held, 0, 'and holding a direction for the entire window earns literally nothing');
+  } else { console.log('  (skipped — struggle helpers not exposed)'); }
+}
+
+section('THE STRUGGLE — driven: the capture is now a CHOICE, not a cutscene');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.struggleTick === 'function') {
+  const SK = G.__getKeys() || {};
+  const SC = G.__getStruggleConst();
+
+  // Drive a real capture: formation stage, a boss with a live beam parked over
+  // the player. Returns the boss, or null if the beam never landed.
+  const driveCapture = () => {
+    G.resetGame();
+    const g = G.__getGame();
+    g.stage = 3;
+    G.startStage();
+    g.state = ST.PLAYING;
+    g.playerAlive = true;
+    g.allEntered = true;
+    g.lives = 3;
+    g.dualFighter = false;
+    const b = g.enemies.find(e => e.type === 'boss');
+    if (!b) return null;
+    b.state = 'capturing';
+    b.captureTimer = 100;          // inside the live-beam window
+    b.x = g.playerX;
+    b.y = g.playerY - 40;
+    for (let f = 0; f < 200 && g.state !== ST.CAPTURED; f++) G.update();
+    return g.state === ST.CAPTURED ? b : null;
+  };
+  const clearKeys = () => { SK['ArrowLeft'] = false; SK['ArrowRight'] = false; };
+
+  // ---- 1. going limp still costs a life, exactly as before ----------------
+  {
+    const boss = driveCapture();
+    ok(!!boss, 'a capture can be driven');
+    if (boss) {
+      const g = G.__getGame();
+      const livesBefore = g.lives;
+      clearKeys();
+      for (let f = 0; f < 400 && g.state === ST.CAPTURED; f++) G.update();
+      ok(g.lives < livesBefore, 'a pilot who does not fight still pays the life ('
+         + livesBefore + ' -> ' + g.lives + ')');
+      eq(g.capturesEscaped || 0, 0, 'and records no breakout');
+      eq(g.capturedShipEnemy, boss, 'the captor keeps the ship — the wingman is still on offer');
+    }
+  }
+
+  // ---- 2. fighting the beam buys the life back ---------------------------
+  {
+    const boss = driveCapture();
+    if (boss) {
+      const g = G.__getGame();
+      const livesBefore = g.lives;
+      const scoreBefore = g.score;
+      let frames = 0, drawErr = null;
+      for (let f = 0; f < SC.HOLD && g.state === ST.CAPTURED; f++) {
+        // A human alternating about 6.7 times a second.
+        const flip = Math.floor(f / 9) % 2 === 0;
+        SK['ArrowLeft'] = flip; SK['ArrowRight'] = !flip;
+        G.update();
+        if ((f & 7) === 0) { try { G.draw(); } catch (e) { drawErr = drawErr || e; } }
+        frames++;
+      }
+      clearKeys();
+      ok(!drawErr, 'the struggle bar renders through the whole contest'
+         + (drawErr ? ' — ' + drawErr.message : ''));
+      ok(g.state !== ST.CAPTURED, 'mashing left-right tears the ship out of the beam');
+      eq(g.state, ST.PLAYING, 'and drops the pilot straight back into formation play');
+      eq(g.lives, livesBefore, 'the life is NOT spent (' + g.lives + ')');
+      eq(g.capturesEscaped, 1, 'the breakout is recorded');
+      ok(g.playerAlive === true, 'the pilot is flying again');
+      eq(g.capturedShipEnemy, null, 'nobody is holding a ship any more');
+      ok(boss.capturedShip !== true, 'and the captor left empty-handed');
+      ok((g.invincibleTimer || 0) > 0,
+         'with i-frames, so the beam that just held you cannot re-acquire on the exit frame');
+
+      // THE CONTROL BUDGET, as an invariant rather than a report: the whole
+      // point is that the silence gets SHORTER for a player who fights.
+      ok(frames < SC.HOLD, 'the unplayable stretch is materially shorter than the '
+         + SC.HOLD + 'f cutscene (' + frames + 'f)');
+
+      // ZERO new score. The payoff is a life and the tempo, both already priced;
+      // paying points on top would double-reward it.
+      eq(g.score, scoreBefore, 'a breakout pays NO score');
+
+      // ---- 3. the fork is real: escaping forfeits the wingman -------------
+      g.dualFighter = false;
+      boss.alive = true;
+      boss.hp = 1;
+      boss.state = 'formation';
+      g.bullets = [{ x: boss.x, y: boss.y, vy: -4, dmg: 5, lvl: 1 }];
+      G.updateCollisions();
+      ok(g.dualFighter !== true,
+         'killing the former captor grants NO dual fighter — breaking free trades '
+         + 'the rescue for the life, which is what makes it a decision');
+
+      // ---- 4. the meter cannot be INHERITED by the next capture ----------
+      // Deliberately no resetGame() here. After a breakout the meter is sitting
+      // at full, so if the grab site does not zero it, the very next beam is
+      // escaped for free on frame one and the mechanic stops costing anything.
+      // (Re-driving a fresh capture cannot prove this: resetGame() would zero
+      // the meter on its own and the assertion would pass on a broken grab.)
+      ok((g.struggle || 0) >= 1, 'the winning meter is still full after a breakout ('
+         + g.struggle + ')');
+      const other = (g.enemies || []).find(e => e.alive && e !== boss);
+      ok(!!other, 'the formation still has another enemy to try again with');
+      if (other) {
+        g.state = ST.PLAYING;
+        g.playerAlive = true;
+        g.lives = 3;
+        g.invincibleTimer = 0;
+        other.state = 'capturing';
+        other.captureTimer = 100;
+        other.x = g.playerX;
+        other.y = g.playerY - 40;
+        clearKeys();
+        for (let f = 0; f < 200 && g.state !== ST.CAPTURED; f++) G.update();
+        eq(g.state, ST.CAPTURED, 'a second beam lands');
+        eq(g.struggle, 0,
+           'every capture starts the meter COLD — a full one is never inherited');
+        ok(g.struggleFree === false, 'and the breakout is re-armed for this capture');
+        for (let f = 0; f < 60 && g.state === ST.CAPTURED; f++) G.update();  // no input
+        eq(g.capturesEscaped, 1,
+           'so a pilot who does not fight the second beam does not escape it either');
+      }
+    }
+  }
+  G.resetGame();
+} else { console.log('  (skipped — struggle not drivable)'); }
 
 section('ALTERNATE STAGE MODES — challenge waves and boss stages actually run');
 if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()) {

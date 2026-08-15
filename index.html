@@ -2550,6 +2550,104 @@ function captureTelegraphProgress(timer) {
   return clamp01(timer / CAPTURE_BEAM_START);
 }
 
+// ==================== THE STRUGGLE — the capture answers back ===============
+//
+// THE CONTROL BUDGET (test/pulse-audit.js) measured, for the first time, how
+// many frames of a real session the player's input does NOTHING. Most of the
+// answer is healthy and deliberate: hit-stop is 4-14 frames, the stage intro is
+// skippable, the respawn wait is the death-recap read window and it is short.
+// One event was not. Being captured spends 120 frames on a cutscene and THEN
+// takes a life, without reading a single input the whole time — 211 consecutive
+// dead frames once the respawn behind it is counted. That is 3.5 seconds, the
+// longest stretch in the game, sitting on the single most expensive thing that
+// can happen to you.
+//
+// THE FAIRNESS BUDGET's rule was "a threat that takes MORE must not warn LESS".
+// This is its mirror: A THREAT THAT TAKES MORE MUST NOT HOLD YOUR HANDS LONGER.
+// The capture broke both at once. CAPTURE TELEGRAPH fixed the front half (0f of
+// warning -> 60f); this fixes the back half.
+//
+// The fix is not a shorter cutscene — cutting it would just make the punishment
+// quieter. It is a CONTEST. Pull against the beam by alternating left/right;
+// every REVERSAL feeds the meter and the beam drags it back every frame. Win
+// and you keep the life.
+//
+// And winning costs something, which is what makes it a decision instead of a
+// formality: your ship is only worth a DUAL FIGHTER while the captor is still
+// carrying it. Break free and you keep the life but forfeit the rescue; go limp
+// and you pay the life for a shot at flying two ships. Galaga's signature loop
+// finally has a fork in it, and the fork is PLAYED, not picked from a menu.
+//
+// ZERO new score — the payoff is a life and the tempo, both already priced.
+const CAPTURE_HOLD    = 120;   // frames the cutscene holds before the life is taken
+const STRUGGLE_GAIN   = 0.14;  // meter gained per direction REVERSAL
+const STRUGGLE_DRAG   = 0.005; // meter the beam pulls back every frame
+
+// -1 / 0 / +1 from the raw held-direction pair. Both-or-neither reads as 0, so
+// holding both keys at once is not an exploit — it is simply no direction.
+function struggleDir(left, right) {
+  if (left && !right) return -1;
+  if (right && !left) return 1;
+  return 0;
+}
+
+// One frame of the tug-of-war. `dir` is this frame's direction, `last` the most
+// recent non-zero one; a reversal is any change to a NEW non-zero direction, so
+// HOLDING a direction earns nothing and only alternation beats the drag.
+// Returns the new meter clamped to [0,1] — 1.0 means free.
+function struggleTick(meter, dir, last) {
+  let m = (meter || 0) - STRUGGLE_DRAG;
+  if (dir !== 0 && dir !== last) m += STRUGGLE_GAIN;
+  return clamp01(m);
+}
+
+// The meter filled: tear loose. The life is NOT spent, and the captor leaves
+// empty-handed — which is the price, because a captor with nothing to carry can
+// never be killed for a DUAL FIGHTER. Mirrors the timeout path exactly
+// otherwise (BGM restored, captor sent home, state returned to the formation).
+function breakCaptureFree() {
+  if (!game) return;
+  game.struggleFree = true;
+  game.capturesEscaped = (game.capturesEscaped || 0) + 1;
+  // Lifetime totals are the player's record, so the attract-mode bot does not
+  // get to write to them — the same guard commitGameToCumStats() applies.
+  if (!game.isDemo) {
+    try {
+      const _bt = (parseInt(localStorage.getItem('galagaBreakoutTotal') || '0', 10) || 0) + 1;
+      localStorage.setItem('galagaBreakoutTotal', String(_bt));
+    } catch (e) {}
+  }
+  if (bgmGain) bgmGain.gain.value = bgmEnabled ? 1 : 0;
+  const boss = game.capturedShipEnemy;
+  if (boss) {
+    boss.capturedShip = false;
+    if (boss.state === 'capturing') {
+      boss.state = 'returning';
+      boss.path = createEntryPath(boss.x, boss.y, boss.homeX, boss.homeY, 1);
+      boss.pathProgress = 0;
+    }
+  }
+  game.capturedShipEnemy = null;
+  game.playerAlive = true;
+  // Long enough that the beam that just held you cannot re-acquire on the exit
+  // frame — the same courtesy the respawn path already extends.
+  game.invincibleTimer = Math.max(game.invincibleTimer || 0, 90);
+  // Capture only fires from formation play, so this always returns to PLAYING.
+  game.state = STATE.PLAYING;
+  game.flashTimer = 6;
+  game.flashColor = '#0cf';
+  game.shakeTimer = 10;
+  if (game.floatTexts) {
+    game.floatTexts.push({
+      x: BASE_W / 2, y: game.playerY - 18, text: 'BROKE FREE',
+      color: '#0cf', life: 90, maxLife: 90, size: 8
+    });
+  }
+  playSound('extraLife');
+  if (typeof pushIntercept === 'function') pushIntercept('breakout');
+  rumble(220, 0.8, 0.5);
+}
+
 function drawCaptureTelegraph(x, y, h, p) {
   // Outline only, and GROWING — so it reads as a column forming, not a beam
   // already firing. That distinction is the whole point: one says "move", the
@@ -4988,7 +5086,8 @@ const INTERCEPT_MSG = {
   rivalDown:     ['OUR ACE IS DOWN!', 'THE DUELIST FALLS!', 'IMPOSSIBLE — ACE LOST!'],
   salvageDrop:   ['THEIR CORE SCATTERED!', 'DON\'T LET THEM REBUILD!', 'SEIZE THE WRECKAGE!'],
   magpieSpotted: ['MAGPIE UNIT DEPLOYED!', 'STEAL THEIR SUPPLIES!', 'THE MAGPIE HUNTS YOUR LOOT!'],
-  mindLock:      ['PATTERN LOCKED.', 'THE TARGET HAS A HABIT.', 'FIRING SOLUTION: ITS LANE.']
+  mindLock:      ['PATTERN LOCKED.', 'THE TARGET HAS A HABIT.', 'FIRING SOLUTION: ITS LANE.'],
+  breakout:      ['IT TORE LOOSE!', 'BEAM BROKEN — HOW?', 'WE LOST THE PRIZE!']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
 const INTERCEPT_LIFE = 180;
@@ -5282,7 +5381,8 @@ const COACH_LESSONS = {
   arsenal: 'COMBO 25 ARMS A FREE WEAPON',
   salvage: 'CATCH THE SHARDS — REBUILD YOUR SHIP',
   magpie:  'SHOOT THE THIEF — IT DROPS YOUR CARGO',
-  mind:    'THEY READ YOUR LANE — MOVE OR BAIT'
+  mind:    'THEY READ YOUR LANE — MOVE OR BAIT',
+  struggle:'BEAM GOT YOU? MASH L-R TO TEAR FREE'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -7537,6 +7637,12 @@ function resetGame() {
     respawnTimer: 0,
     capturePhase: 0,
     captureTimer: 0,
+    // THE STRUGGLE — the tug-of-war fought inside the capture cutscene.
+    struggle: 0,          // 0..1 resistance meter; 1.0 tears loose
+    struggleLastDir: 0,   // last non-zero direction, for reversal edges
+    struggleFree: false,  // already broke out of THIS capture
+    struggleTug: 0,       // frames of yank feedback left (drawn)
+    capturesEscaped: 0,   // breakouts this run
     gameOverTimer: 0,
     titleBlink: 0,
     pausedState: STATE.PLAYING,
@@ -12717,10 +12823,14 @@ function updateFormationBreathing() {
           if (e._mindZone != null && e._mindZone >= 0) {
             if (mindZoneOf(game.playerX) !== e._mindZone) {
               game.swarmBaited = (game.swarmBaited || 0) + 1;
-              try {
-                const _bt = (parseInt(localStorage.getItem('galagaBaitTotal') || '0', 10) || 0) + 1;
-                localStorage.setItem('galagaBaitTotal', String(_bt));
-              } catch (_e) {}
+              // Same guard as the breakout total: the attract-mode bot must not
+              // write the player's lifetime record.
+              if (!game.isDemo) {
+                try {
+                  const _bt = (parseInt(localStorage.getItem('galagaBaitTotal') || '0', 10) || 0) + 1;
+                  localStorage.setItem('galagaBaitTotal', String(_bt));
+                } catch (_e) {}
+              }
               // One cue per bait, rate-limited so a run of baits can't wall the screen.
               if ((game.runFrames || 0) - (game._baitCueT || -999) > 60) {
                 game._baitCueT = game.runFrames || 0;
@@ -13074,6 +13184,13 @@ function updateEnemies() {
       if (e.captureTimer < CAPTURE_BEAM_START) {
         e.y += 1.5;
       } else if (e.captureTimer < CAPTURE_BEAM_END) {
+        // Teach the escape verb on the frame the beam goes live — the player is
+        // still alive and in control here, which is the only window where a
+        // lesson can be read AND acted on. Once the grab lands, coachFire is
+        // (correctly) muted by its !playerAlive gate.
+        if (e.captureTimer === CAPTURE_BEAM_START && typeof coachFire === 'function') {
+          coachFire('struggle');
+        }
         // Tractor beam active — check if player is under
         if (game.playerAlive) {
           const dx = Math.abs(game.playerX - e.x);
@@ -13086,6 +13203,12 @@ function updateEnemies() {
             game.state = STATE.CAPTURED;
             game.capturePhase = 0;
             game.captureTimer = 0;
+            // THE STRUGGLE starts cold every grab — a meter carried over from a
+            // previous capture would hand out a free breakout.
+            game.struggle = 0;
+            game.struggleLastDir = 0;
+            game.struggleFree = false;
+            game.struggleTug = 0;
             // Dim BGM during the capture cutscene for tension
             if (bgmGain) bgmGain.gain.value = bgmEnabled ? 0.5 : 0;
             // Cutscene flair — blue flash + spiral particles being sucked up
@@ -16227,6 +16350,7 @@ function update() {
     // instead of render rate (varies by monitor: 60/120/144Hz), keeping their
     // durations refresh-rate independent.
     if ((game.cinematicBars || 0) > 0) game.cinematicBars--;
+    if ((game.struggleTug || 0) > 0) game.struggleTug--;
     if ((game.lifeGainPulseTimer || 0) > 0) game.lifeGainPulseTimer--;
     // RUN TIME MILESTONE BANNERS — 5/10/20/30 minute marks, one-shot per run.
     // Encourages staying alive and offers paced rewards in long sessions.
@@ -16438,8 +16562,27 @@ function update() {
 
     case STATE.CAPTURED:
       game.captureTimer++;
+      // THE STRUGGLE — the 120 frames that used to read no input at all.
+      // Polled from the `keys` map (never the keydown handler) so keyboard,
+      // touch joystick and gamepad d-pad/stick all feed it for free — the same
+      // rule the stage-intro skip and the bonus skill-stop follow.
+      if (!game.struggleFree) {
+        const _sDir = struggleDir(
+          !!(keys['ArrowLeft']  || keys['a'] || keys['A']),
+          !!(keys['ArrowRight'] || keys['d'] || keys['D']));
+        const _sPrev   = game.struggleLastDir || 0;
+        const _sBefore = game.struggle || 0;
+        game.struggle = struggleTick(_sBefore, _sDir, _sPrev);
+        if (_sDir !== 0) game.struggleLastDir = _sDir;
+        if (game.struggle > _sBefore) {
+          game.struggleTug = 6;                    // the yank, drawn
+          playSound('tick');
+        }
+      }
+      // Won the tug-of-war: keep the life, forfeit the rescue.
+      if (game.struggle >= 1 && !game.struggleFree) { breakCaptureFree(); break; }
       // Short pause then lose life
-      if (game.captureTimer > 120) {
+      if (game.captureTimer > CAPTURE_HOLD) {
         // Restore BGM volume (capture cutscene ending)
         if (bgmGain) bgmGain.gain.value = bgmEnabled ? 1 : 0;
         game.lives--;
@@ -17833,6 +17976,8 @@ function pickRunHighlights() {
   // skill stat: no score anywhere in the system, so this readout is its only payout.
   const baited = game.swarmBaited || 0;
   if (baited >= 3)        out.push({ label: 'DIVES BAITED',   value: String(baited),    prio: baited * 14, col: '#9cf' });
+  const broke = game.capturesEscaped || 0;
+  if (broke >= 1)         out.push({ label: 'BEAMS BROKEN',   value: String(broke),     prio: 60 + broke * 40, col: '#0cf' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
@@ -19309,7 +19454,7 @@ function drawGameplay() {
     const _isBoss    = _captor && (_captor.type === 'boss' || _captor.type === 'ufo');
     const _captorCol = _isBoss ? '#a04' : '#c22';
     const _accentCol = _isBoss ? '#f4a' : '#f88';
-    const _outFade   = ct >= 108 ? Math.max(0, (120 - ct) / 12) : 1;
+    const _outFade   = ct >= CAPTURE_HOLD - 12 ? Math.max(0, (CAPTURE_HOLD - ct) / 12) : 1;
     const slideA     = Math.min(1, (ct - 20) / 22);
 
     // Dark overlay (deepens the scene)
@@ -19388,7 +19533,7 @@ function drawGameplay() {
         const barW  = panW - 22;
         const barX  = panX + 11;
         const barY  = panY + panH - 10;
-        const ratio = Math.max(0, 1 - ct / 120);
+        const ratio = Math.max(0, 1 - ct / CAPTURE_HOLD);
         const barCol = ratio > 0.40 ? '#f44' : ratio > 0.20 ? '#f80' : '#f00';
         ctx.save();
         ctx.globalAlpha = _bAlpha;
@@ -19409,6 +19554,43 @@ function drawGameplay() {
         ctx.restore();
       }
     }
+  }
+
+  // ── THE STRUGGLE — the tug-of-war, drawn ────────────────────────────────
+  // Drawn AFTER the capture cutscene's dark overlay (it would be buried under
+  // it otherwise) and from frame 4, not frame 50 like the intel panel: a verb
+  // the player learns halfway through the window is a verb they had half the
+  // window to use. The countdown bar below already reads "time until the beam
+  // wins"; this is the opposing bar, so the cutscene reads as a contest.
+  if (game.state === STATE.CAPTURED && !game.struggleFree && game.captureTimer >= 4) {
+    const _sm   = clamp01(game.struggle || 0);
+    const _tug  = (game.struggleTug || 0) / 6;          // 0..1 yank
+    const _bw   = 110, _bh = 5;
+    const _bx   = Math.round((BASE_W - _bw) / 2 + (_tug ? (game.animFrame % 2 ? 2 : -2) * _tug : 0));
+    const _by   = 82;
+    const _pul  = 0.55 + 0.45 * Math.sin(game.animFrame * 0.35);
+    ctx.save();
+    // Verb
+    ctx.globalAlpha = _pul;
+    drawRetroText('MASH  L - R', BASE_W / 2, _by - 8, 6, '#0cf', 'center');
+    ctx.globalAlpha = 1;
+    // Track
+    ctx.fillStyle = '#022';
+    ctx.fillRect(_bx, _by, _bw, _bh);
+    // Fill — flashes white on the frame a reversal lands, so every successful
+    // input is confirmed even with SFX off.
+    ctx.fillStyle = _tug > 0.5 ? '#fff' : '#0cf';
+    ctx.fillRect(_bx, _by, Math.round(_bw * _sm), _bh);
+    // Goal notch — a SHAPE, so the "you are nearly free" read survives without
+    // colour (same contract as the storm chevron and the wing markers).
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(_bx + _bw - 1, _by - 2, 1, _bh + 4);
+    ctx.fillRect(_bx + _bw - 3, _by - 2, 3, 1);
+    ctx.fillRect(_bx + _bw - 3, _by + _bh + 1, 3, 1);
+    // The fork, stated where the choice is actually being made.
+    ctx.globalAlpha = 0.62;
+    drawRetroText('OR RIDE IT FOR A WINGMAN', BASE_W / 2, _by + 15, 5, '#f88', 'center');
+    ctx.restore();
   }
 
   drawMindLock();

@@ -6,8 +6,11 @@
 # 4) fresh boot   — the first-time player path (test/fresh-boot.js)
 # Exit 0 only if all three pass. Usage:  bash test/run.sh   (or ./test/run.sh)
 #
-# NOT run here: test/curve-audit.js. That one is a REPORT (difficulty + score
-# economy shape), not a pass/fail gate — run it by hand when tuning balance.
+# NOT run here: the three REPORTS, which measure a shape rather than gate a
+# change — run them by hand when working on what they watch:
+#   test/curve-audit.js      difficulty + score economy across stages 1-100
+#   test/telegraph-audit.js  the fairness budget (warning frames per threat)
+#   test/pulse-audit.js      the control budget (frames your input does nothing)
 set -uo pipefail
 
 # Resolve repo root relative to this script so it works from any cwd.

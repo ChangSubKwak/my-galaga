@@ -276,6 +276,21 @@ capture('PLAYING s100', g => {
 capture('CHALLENGING', g => { baseStage(g, 96); g.state = S.CHALLENGING; });
 capture('BOSS_STAGE', g => { baseStage(g, 100); g.state = S.BOSS_STAGE; });
 capture('RESPAWN', g => { baseStage(g, 50); g.state = S.RESPAWN; g.playerAlive = false; });
+// STATE.CAPTURED was never rendered here at all — the cutscene carries the
+// game's longest interpolated string ('PILOT xxx — SIGNAL LOST'), a LIVES
+// REMAINING readout, and now THE STRUGGLE's prompt and fork line, none of which
+// had ever been measured. 130 frames so the whole staged sequence plays: the
+// headline slide-in, the intel panel at ct>=50, and the fade past ct 108.
+capture('CAPTURED', g => {
+  baseStage(g, 50);
+  g.lives = 4;
+  g.playerAlive = false;
+  const b = (g.enemies || []).find(e => e.type === 'boss') || (g.enemies || [])[0];
+  if (b) { b.state = 'capturing'; b.capturedShip = true; g.capturedShipEnemy = b; }
+  g.state = S.CAPTURED;
+  g.captureTimer = 0;
+  g.struggle = 0.55; g.struggleFree = false; g.struggleLastDir = 0; g.struggleTug = 4;
+}, 130);
 capture('GAME_OVER', g => {
   baseStage(g, 100); g.state = S.GAME_OVER; g.score = 999999999;
   g.runEpitaph = 'THE VOID REMEMBERS YOUR NAME';
