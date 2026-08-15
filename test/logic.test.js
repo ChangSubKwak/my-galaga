@@ -207,6 +207,11 @@ const shim = `
 ;try { globalThis.__getDebriefConst = function () { return {
   WAVES: DEBRIEF_WAVES, DESCEND: COURIER_DESCEND, UPLINK: COURIER_UPLINK,
   HP: COURIER_HP, SEED_W: DEBRIEF_SEED_W, SIGHT: LEDGER_SIGHT }; }; } catch (e) {}
+;try { globalThis.__getRedoubtConst = function () { return {
+  PLANT: REDOUBT_PLANT, EPS: REDOUBT_STILL_EPS, HALF_W: REDOUBT_HALF_W,
+  HALF_H: REDOUBT_HALF_H, DY: REDOUBT_DY, HP: REDOUBT_HP, TTL: REDOUBT_TTL,
+  WARN: REDOUBT_WARN, MAX: REDOUBT_MAX, RECLAIM: RECLAIM_FRAMES,
+  SHIELD_MAX: SHIELD_MAX }; }; } catch (e) {}
 ;try { globalThis.__getLatConst = function () { return {
   R: LAT_LINK_R, DEG: LAT_MAX_DEG, MIN_CHUNK: LAT_MIN_CHUNK, COOL: LAT_COOLDOWN,
   VY: LAT_FALL_VY, ACC: LAT_FALL_ACC, MAXVY: LAT_FALL_MAX }; }; } catch (e) {}
@@ -3367,8 +3372,9 @@ if (typeof G.directorBudget === 'function' && typeof G.directorAdmit === 'functi
   // Live census — reads the real actor slots, excludes a retreating rival.
   if (typeof G.directorCensus === 'function' && G.__getGame && G.__getGame()) {
     const g = G.__getGame();
-    const sv = { r: g.rival, m: g.magpie, s: g.supplyCrate, gu: g.guardian, de: g.deathEcho, w: g.stageWeather };
+    const sv = { r: g.rival, m: g.magpie, s: g.supplyCrate, gu: g.guardian, de: g.deathEcho, w: g.stageWeather, rd: g.redoubts };
     g.rival = null; g.magpie = null; g.supplyCrate = null; g.guardian = null; g.deathEcho = null; g.stageWeather = null;
+    g.redoubts = [];   // THE REDOUBT is the seventh census contributor
     let c = G.directorCensus();
     ok(c.threat === 0 && c.gift === 0, 'clear stage → empty census');
     g.rival = { phase: 'duel' };
@@ -3379,8 +3385,15 @@ if (typeof G.directorBudget === 'function' && typeof G.directorAdmit === 'functi
     g.guardian = {}; g.supplyCrate = {};
     c = G.directorCensus();
     ok(c.gift === 2 && c.threat === 0, 'guardian + crate count as two gifts');
+    // THE REDOUBT — the whole emplacement SET is one occupant. Counting per
+    // wall would let two plants veto every ambient actor on normal difficulty.
+    g.guardian = null; g.supplyCrate = null;
+    g.redoubts = [{ x: 100 }, { x: 160 }];
+    ok(G.directorCensus().gift === 1,
+       'two planted walls count as ONE gift, never two — the player cannot black out THE DIRECTOR');
+    g.redoubts = [];
     g.rival = sv.r; g.magpie = sv.m; g.supplyCrate = sv.s;
-    g.guardian = sv.gu; g.deathEcho = sv.de; g.stageWeather = sv.w;
+    g.guardian = sv.gu; g.deathEcho = sv.de; g.stageWeather = sv.w; g.redoubts = sv.rd || [];
   }
 } else { console.log('  (skipped — DIRECTOR not exposed)'); }
 
@@ -5371,6 +5384,216 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
      + 'span can only ever COST points, never earn them');
   G.resetGame();
 } else { console.log('  (skipped — keystone not drivable)'); }
+
+section('THE REDOUBT — the pure emplacement (brace, span, stress, the seal)');
+{
+  const R = G.__getRedoubtConst && G.__getRedoubtConst();
+  if (R && typeof G.plantStill === 'function' && ST) {
+    // --- the brace: intent, not displacement (the cornered-player fatal) ---
+    ok(G.plantStill(0, false, false), 'a still ship with no key held is braced');
+    ok(!G.plantStill(0, false, true),
+       'HOLDING A DIRECTION AT THE WALL IS NOT A BRACE — playerVX is sampled after the '
+       + 'clamp, so a cornered player reads as stationary and would otherwise spend a charge');
+    ok(!G.plantStill(0, true, false), 'a dashing ship is never braced');
+    ok(!G.plantStill(2.5, false, false), 'a moving ship is not braced');
+    ok(!G.plantStill(NaN, false, false), 'a poisoned velocity is never a brace');
+
+    // --- the meter: FIRING resets it, MOVING only pauses it ---
+    let m = 0;
+    for (let f = 0; f < R.PLANT; f++) m = G.plantStep(m, true, false);
+    eq(m, R.PLANT, R.PLANT + ' braced frames fill the meter');
+    eq(G.plantStep(R.PLANT - 1, false, true), 0,
+       'ONE FIRED frame resets the meter to zero — a drain would let a player tap-fire '
+       + 'on the ready frame at full DPS and still plant');
+    eq(G.plantStep(20, false, false), 20,
+       'but DODGING only pauses it: the audit measured 0% brace completion at depth when '
+       + 'movement reset the meter, so the verb was dead exactly where the game gets hard');
+    eq(G.plantStep(NaN, true, false), 1, 'a poisoned meter reads as 0, never NaN');
+    let trickle = 0;
+    for (let f = 0; f < 600; f++) trickle = G.plantStep(trickle, f % 2 === 0, f % 2 !== 0);
+    eq(trickle, 0, 'a player who keeps firing between braced frames plants nothing, ever');
+
+    // --- the lifecycle: BOTH deaths warn ---
+    eq(G.redoubtPhase(R.TTL, 0, null), 'solid', 'a fresh wall is solid');
+    eq(G.redoubtPhase(R.WARN - 1, 0, null), 'failing', 'the clock warns before it runs out');
+    eq(G.redoubtPhase(0, 0, null), 'gone', 'and then it is gone');
+    eq(G.redoubtPhase(R.TTL, R.HP, R.WARN), 'failing',
+       'a wall shot to its cap KEEPS BLOCKING through a drawn warning — cover never '
+       + 'vanishes in a single unannounced frame (the hull vent contract)');
+    eq(G.redoubtPhase(R.TTL, R.HP, 0), 'gone', 'only then does it fail');
+    ok(R.WARN >= 30, 'the blink-out warning (' + R.WARN + 'f) meets the 30f baseline');
+
+    // --- the span: PLAYING only, per-wall width ---
+    const wall = { x: 112, y: 220, halfW: R.HALF_W, stress: 0, blocked: 0, ttl: R.TTL, failTimer: null };
+    ok(!!G.redoubtSpan(wall, ST.PLAYING), 'a wall is solid in normal play');
+    eq(G.redoubtSpan(wall, ST.BOSS_STAGE), null,
+       'NEVER in a boss stage — a 22px column would survive ~6 wide volleys and become a '
+       + 'safe room (the same rule hullSpan already pins)');
+    eq(G.redoubtSpan(wall, ST.CHALLENGING), null, 'never in the challenge drill');
+    eq(G.redoubtSpan({ x: 112, y: 220, ttl: 0 }, ST.PLAYING), null, 'a dead wall spans nothing');
+    const wide = G.redoubtSpan({ x: 112, y: 220, halfW: 19, ttl: R.TTL }, ST.PLAYING);
+    eq(wide.x1 - wide.x0, 38, 'a DUAL FIGHTER plants a wider wall — cover is never narrower '
+       + 'than the ship it is protecting');
+
+    // --- crossing: swept on BOTH axes ---
+    const sp = G.redoubtSpan(wall, ST.PLAYING);
+    ok(G.redoubtCrossed(sp, 112, 112, 210, 230), 'a round sweeping through the wall is caught');
+    ok(G.redoubtCrossed(sp, 112, 112, 210, 240),
+       'even at a step larger than the wall is thick — no tunnelling at laser speed');
+    ok(G.redoubtCrossed(sp, 100, 118, 219, 221),
+       'and a round crossing LATERALLY is caught too — hullCrossed sweeps y only, which is '
+       + 'wrong for a 22px wall that aimed fire crosses at an angle');
+    ok(!G.redoubtCrossed(sp, 160, 160, 210, 230), 'a round beside the wall passes');
+    ok(!G.redoubtCrossed(sp, 112, 112, 100, 150), 'a round entirely above it passes');
+    ok(!G.redoubtCrossed(null, 112, 112, 210, 230), 'no span, no block');
+    ok(!G.redoubtCrossed(sp, NaN, 112, 210, 230), 'a poisoned coordinate never blocks');
+
+    // --- stress + THE EXPLOIT SEAL ---
+    eq(G.redoubtStress(0, 1, R.HP), 1, 'an enemy round costs 1');
+    eq(G.redoubtStress(R.HP - 1, 2, R.HP), R.HP, 'clamped at the cap');
+    eq(G.redoubtStress(NaN, 1, R.HP), 1, 'NaN-safe');
+    ok(G.redoubtReclaimable({ stress: 0, blocked: 0, ttl: R.TTL, failTimer: null }),
+       'a pristine wall can be holstered again');
+    ok(!G.redoubtReclaimable({ stress: 1, blocked: 1, ttl: R.TTL, failTimer: null }),
+       'a wall that took a round FOR you has spent the charge — you can take back only '
+       + 'what you have not used');
+    ok(G.redoubtReclaimable({ stress: 4, blocked: 0, ttl: R.TTL, failTimer: null }),
+       'but shooting your OWN wall is the EXPEL verb, not use — it does not confiscate '
+       + 'the charge as well as the cover');
+    ok(!G.redoubtReclaimable(null), 'nothing to reclaim is not a throw');
+
+    // --- which wall am I under ---
+    const set = [{ x: 40, halfW: R.HALF_W }, { x: 180, halfW: R.HALF_W }];
+    eq(G.redoubtUnder(set, 42), 0, 'the ship is under the nearest wall');
+    eq(G.redoubtUnder(set, 112), -1, 'and under none in the open');
+    eq(G.redoubtUnder(null, 40), -1, 'no walls, no shelter');
+  } else { console.log('  (skipped — redoubt not exposed)'); }
+}
+
+section('THE REDOUBT — driven: brace, plant, block, reclaim, and the real trade');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && typeof G.updateRedoubts === 'function') {
+  const R = G.__getRedoubtConst();
+  const K = G.__getKeys() || {};
+  const clearKeys = () => { K[' '] = false; K['ArrowLeft'] = false; K['ArrowRight'] = false;
+                            K['a'] = false; K['d'] = false; K['A'] = false; K['D'] = false; };
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 3;
+  G.startStage();
+  g.playerAlive = true;
+  g.lives = 99;
+  g.cheatInvincible = true;
+  for (let f = 0; f < 500 && !g.allEntered; f++) G.update();
+  g.diveInterval = 999999;      // hold the wall still; dives are not under test here
+  clearKeys();
+
+  // --- (a) holding fire while stationary plants NOTHING ---
+  g.shieldCharges = 2;
+  K[' '] = true;
+  for (let f = 0; f < 300; f++) G.update();
+  K[' '] = false;
+  eq(g.redoubts.length, 0, 'a stationary player who keeps FIRING never plants');
+  eq(g.shieldCharges, 2, 'and never spends a charge');
+
+  // --- (a2) THE CORNERED-PLAYER FATAL: holding a key at the wall plants nothing ---
+  g.playerX = 8;                 // pinned against the left wall
+  g._prevPlayerX = 8;
+  K['ArrowLeft'] = true;
+  for (let f = 0; f < 300; f++) G.update();
+  K['ArrowLeft'] = false;
+  eq(g.redoubts.length, 0,
+     'a player MASHING INTO THE WALL — playerVX exactly 0 — plants nothing and keeps '
+     + 'their charge; intent is read from the key, not from displacement');
+  eq(g.shieldCharges, 2, 'the charge is untouched');
+
+  // --- (b) a real brace plants exactly one, for exactly one charge ---
+  g.playerX = 112; g._prevPlayerX = 112;
+  const scoreBefore = g.score || 0;
+  for (let f = 0; f < R.PLANT + 4; f++) G.update();
+  eq(g.redoubts.length, 1, R.PLANT + ' braced frames plant exactly one emplacement');
+  eq(g.shieldCharges, 1, 'and spend exactly one charge');
+  eq(g.redoubtsPlanted, 1, 'counted for the WALLS PLANTED highlight');
+
+  // --- the trade is REAL: a planted charge still suppresses witch time ---
+  ok(!G.tryTriggerWitchTime(g.playerX, g.playerY, 'test', null),
+     'a planted charge still suppresses WITCH TIME exactly as a banked one does — without '
+     + 'this the fork inverts and PLANT strictly beats BANK');
+
+  // --- (c) the wall eats enemy fire, awards nothing, and warns before failing ---
+  const wall = g.redoubts[0];
+  for (let n = 0; n < R.HP; n++) {
+    g.enemyBullets.push({ x: wall.x, y: wall.y - 10, vx: 0, vy: 3, kind: 'dive', fromType: 'bee' });
+    for (let f = 0; f < 6 && g.enemyBullets.length; f++) G.update();
+  }
+  ok((g.redoubtBlocks || 0) >= 1, 'incoming rounds are absorbed by the wall ('
+     + (g.redoubtBlocks || 0) + ' blocked)');
+  eq(g.score || 0, scoreBefore,
+     'and absorbing awards ZERO score — shelter denies the graze/parry income it would '
+     + 'have carried, so it prices itself');
+  ok(!G.redoubtReclaimable(wall), 'a wall that did its job is no longer refundable');
+  if (wall.failTimer != null) {
+    ok(!!G.redoubtSpan(wall, g.state),
+       'shot to its cap, the wall KEEPS BLOCKING through its drawn warning');
+  }
+
+  // --- (d) bullet-proof is never dive-proof ---
+  G.resetGame();
+  const g2 = G.__getGame();
+  g2.stage = 3; G.startStage();
+  g2.playerAlive = true; g2.lives = 99;
+  for (let f = 0; f < 500 && !g2.allEntered; f++) G.update();
+  g2.diveInterval = 999999;
+  clearKeys();
+  g2.shieldCharges = 1;
+  g2.playerX = 112; g2._prevPlayerX = 112;
+  for (let f = 0; f < R.PLANT + 4; f++) G.update();
+  eq(g2.redoubts.length, 1, 'a wall stands for the dive test');
+  const diver = (g2.enemies || []).find(e => e.alive && e.state === 'formation');
+  if (diver) {
+    diver.state = 'diving';
+    diver.x = g2.playerX; diver.y = g2.playerY - 4;
+    diver.pathSegments = null; diver.path = null;
+    const livesBefore = g2.lives;
+    G.update();
+    ok(g2.lives < livesBefore || !g2.playerAlive,
+       'a DIVE passes straight through the wall and still takes you — bullet-proof is '
+       + 'never dive-proof, the load-bearing inversion that keeps cover from being a turtle');
+  }
+
+  // --- (e) death takes the emplacements with the pool they came from ---
+  eq(g2.redoubts.length, 0, 'killPlayer clears every planted wall');
+  eq(g2.plantMeter, 0, 'and the brace cannot survive into the respawn');
+
+  // --- (f) RECLAIM: one continuous brace refunds, and never re-spends ---
+  G.resetGame();
+  const g3 = G.__getGame();
+  g3.stage = 3; G.startStage();
+  g3.playerAlive = true; g3.lives = 99; g3.cheatInvincible = true;
+  for (let f = 0; f < 500 && !g3.allEntered; f++) G.update();
+  g3.diveInterval = 999999;
+  clearKeys();
+  g3.shieldCharges = 1;
+  g3.playerX = 112; g3._prevPlayerX = 112;
+  for (let f = 0; f < R.PLANT + 4; f++) G.update();
+  eq(g3.redoubts.length, 1, 'a pristine wall stands');
+  eq(g3.shieldCharges, 0, 'with the charge spent');
+  for (let f = 0; f < R.RECLAIM + 4; f++) G.update();
+  eq(g3.shieldCharges, 1, 'bracing under it holsters the charge again in ' + R.RECLAIM + ' frames');
+  eq(g3.redoubts.length, 0, 'and the wall is gone from the field');
+  // RECLAIM owns the gesture: the refunded charge is NOT re-spent by the tail of
+  // the same brace — re-planting costs a full fresh commitment.
+  for (let f = 0; f < R.PLANT - R.RECLAIM - 6; f++) G.update();
+  eq(g3.redoubts.length, 0,
+     'the refunded charge is NOT re-spent by the tail of the same brace — RECLAIM owns '
+     + 'the gesture while you stand under your own wall');
+  let replanted = false;
+  for (let f = 0; f < R.PLANT + 6 && !replanted; f++) { G.update(); if (g3.redoubts.length) replanted = true; }
+  ok(replanted,
+     'a FULL fresh ' + R.PLANT + '-frame brace is what re-plants it — the round trip costs a '
+     + 'real commitment each way, so holstering can never be a free oscillation');
+  G.resetGame();
+} else { console.log('  (skipped — redoubt not drivable)'); }
 
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of

@@ -400,6 +400,64 @@ band stays 24/24). Tracked: `game.spansDropped`/`spanEscaped` + lifetime `galaga
 (demo-guarded), SPANS DROPPED highlight, SPAN BREAKER achievement (a span of 6+),
 `COACH_LESSONS.keystone`.
 
+### THE REDOUBT — the loadout gains a coordinate
+
+Six leaps added a dimension to something the player SHOOTS AT. The kit stayed what it
+was in 1981, and `shieldCharges` was its most inert member: rolled from a drop, capped,
+then sitting there until `killPlayer` silently ate one. The player never aimed it or knew
+where it was, because a scalar has no WHERE. **Brace** — hold still, hold fire, for
+`REDOUBT_PLANT` (42) frames — and one charge becomes a **solid wall** planted in the lane
+above you. THE IRON SHADOW gave the *world* matter; this makes matter that is authored,
+paid for out of the kit, and reversible back into it.
+
+**Four flown answers**: BANK (the shipped game) / PLANT / **RECLAIM** (brace under a
+*pristine* wall for `RECLAIM_FRAMES` and it holsters back into the kit) / **EXPEL** (your
+own rounds knock it down when the read turns). Pure core: `plantStill` / `plantStep` /
+`redoubtPhase` / `redoubtSpan` / `redoubtStress` / `redoubtReclaimable` / `redoubtUnder`
+/ `redoubtCrossed`. **ZERO new score** — score-*negative*: absorbing denies the graze and
+parry income the round carried, and cover blocks your own gun in that lane.
+
+**Every one of these rules is a red-team or audit finding, not a preference — do not
+"simplify" them away:**
+- **PLAYING only** (`redoubtSpan` → null elsewhere). A 22px column survives ~6 wide boss
+  volleys and would be a safe room; it is also invisible in `drawBossStage`. Same rule
+  `hullSpan` already pins, same test.
+- **Movement INTENT, not `playerVX`.** `playerVX` is sampled *after* the wall clamp, so a
+  cornered player mashing into the edge reads as perfectly stationary and would silently
+  spend a charge. `plantStill` reads the held key first.
+- **Firing RESETS the meter; dodging only PAUSES it.** A drain is gameable (fire cooldown
+  6 → tap-firing on the ready frame keeps a 75% duty cycle at full DPS). And the first cut
+  reset on movement too: `test/loadout-audit.js` measured **0% brace completion at depth**
+  — the verb was dead exactly where the game gets interesting.
+- **Both deaths warn.** A wall shot to `REDOUBT_HP` arms `failTimer` and *keeps blocking*
+  through the same 42-frame blink the clock gets (the hull's vent contract). Cover never
+  vanishes in an unannounced frame.
+- **A planted charge still suppresses witch time** (`tryTriggerWitchTime` tests
+  `redoubts.length` beside `shieldCharges`). Without it the fork inverts: banking
+  *blocks* witch time, so spending the charge would BUY witch access and PLANT would
+  strictly beat BANK.
+- **The pristine seal is keyed on `blocked` (enemy absorbs), not total stress** — shooting
+  your own wall is the EXPEL verb, not use, and must not confiscate the charge as well.
+- **The whole emplacement SET counts as ONE director gift.** Per-wall counting lets two
+  plants veto every ambient actor on normal difficulty for the full TTL.
+- **`redoubtCrossed` sweeps BOTH axes.** `hullCrossed` sweeps y only — right for a 40px
+  hull, wrong for a 22px wall that aimed fire crosses at an angle.
+- **Not gated on `allEntered`.** The entry parade is the one quiet window every stage
+  guarantees; spending it building instead of intercepting is the trade.
+- Own fire stresses at most **once per frame** (a 3-pod dual volley would otherwise flatten
+  a 6-HP wall in one trigger pull); guardian and parry-echo rounds are blocked but never
+  stress it (two earned rewards must not annihilate); dual fighters plant a **wider** wall.
+
+```bash
+node test/loadout-audit.js   # report: brace completion per depth, what breaks it, the price
+```
+Measured now: reachable at every depth (93–100% of committed braces), bought with ~28% of
+the run spent not firing; the **shield economy**, not the gate, limits the count (0–1 per
+stage under real drops). Tracked: `redoubtsPlanted`/`redoubtReclaims`/`redoubtBlocks` +
+lifetime `galagaRedoubtTotal`/`galagaRedoubtReclaim` (demo-guarded), WALLS PLANTED
+highlight, QUARTERMASTER achievement, `COACH_LESSONS.redoubt`. No new comms type (band
+stays 24/24). HUD: hollow chevrons beside the shield row state where the kit went.
+
 ### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
 
 Difficulty has `curve-audit.js`; fairness now has its own instrument:

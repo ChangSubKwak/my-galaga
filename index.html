@@ -5668,7 +5668,8 @@ const COACH_LESSONS = {
   debrief: 'SHOOT THE COURIER — DENY THE UPLINK',
   vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE',
   cover:   'THE HULL EATS FIRE — BOTH WAYS',
-  keystone:'CUT THE MARKED ONE — THE SPAN FALLS'
+  keystone:'CUT THE MARKED ONE — THE SPAN FALLS',
+  redoubt: 'BRACE STILL — PLANT YOUR SHIELD'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -5763,6 +5764,10 @@ function directorCensus() {
   // so rival/magpie/crate defer while cover is on the field (Director rule 3:
   // count it, or the cap silently leaks).
   if (typeof hullSpan === 'function' && hullSpan(game.ambientEvent, game.state)) gift++;
+  // THE REDOUBT — the whole emplacement SET counts as one occupant, not one
+  // each: at DIRECTOR_CAP normal 2, counting per wall would let the player
+  // veto every ambient actor in the game for the full 10-second TTL.
+  if (game.redoubts && game.redoubts.length) gift++;
   return { threat, gift };
 }
 
@@ -8460,6 +8465,14 @@ function resetGame() {
     lattice: null,
     spansDropped: 0,
     spanEscaped: 0,
+    // THE REDOUBT — the kit with a coordinate: planted walls, the brace and
+    // reclaim meters, and the run's tallies.
+    redoubts: [],
+    plantMeter: 0,
+    reclaimMeter: 0,
+    redoubtsPlanted: 0,
+    redoubtReclaims: 0,
+    redoubtBlocks: 0,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
     comboArsenalClaimed: {},
@@ -11730,9 +11743,17 @@ function updateBullets() {
   // instead (piercing identity preserved) at the same stress price, once.
   const _hullP = (typeof hullSpan === 'function')
     ? hullSpan(game.ambientEvent, game.state) : null;
+  // THE REDOUBT — spans hoisted ONCE as an immutable snapshot list (never the
+  // live array): a wall that fails mid-loop has its span nulled here rather
+  // than being spliced out from under the iteration.
+  const _redP = [];
+  for (const r of (game.redoubts || [])) {
+    const s = redoubtSpan(r, game.state);
+    if (s) _redP.push({ r: r, s: s });
+  }
   for (let i = game.bullets.length - 1; i >= 0; i--) {
     const b = game.bullets[i];
-    const _bpy = b.y;
+    const _bpy = b.y, _bpx = b.x;
     if (b.kind === 'homing') {
       // Steer toward the nearest live enemy. Lerp into target heading at fixed turn rate.
       // Filter out targets BEHIND the bullet (y > bullet.y + slack) — without this, a homing
@@ -11789,6 +11810,28 @@ function updateBullets() {
         if (b.trail.length > 5) b.trail.length = 5;
       }
     }
+    // THE REDOUBT — your own wall eats your own fire: that is the EXPEL verb
+    // and the reason cover is not a free upgrade. Stress is charged at most
+    // ONCE PER FRAME, so a 3-pod dual-fighter volley costs the same as a single
+    // shot (otherwise one trigger pull would flatten a 6-HP wall). Guardian and
+    // parry-echo rounds are blocked but never stress it — they are not the
+    // player's aiming decision, and two earned rewards must not annihilate.
+    if (_redP.length && !b._redBurned) {
+      for (const e of _redP) {
+        if (!redoubtCrossed(e.s, _bpx, b.x, _bpy, b.y)) continue;
+        const _own = !b._guardian && !b._parryEcho;
+        if (_own && e.r._selfFrame !== game.animFrame) {
+          e.r._selfFrame = game.animFrame;
+          redoubtAbsorb(e.r, b.x, b.y, 2, false);
+        } else {
+          game.hitSparks.push({ x: b.x, y: b.y, life: 0, color: '#4f8' });
+        }
+        if (b.kind === 'laser') { b._redBurned = true; }
+        else { game.bullets.splice(i, 1); }
+        break;
+      }
+      if (!game.bullets[i] || game.bullets[i] !== b) continue;
+    }
     // THE IRON SHADOW — absorb after integration, before the off-screen sweep.
     if (_hullP && hullCrossed(_hullP, b.x, _bpy, b.y)) {
       if (b.kind === 'laser') {
@@ -11826,11 +11869,31 @@ function updateBullets() {
   // fragments nor grazes — it is simply gone.
   const _hullE = (typeof hullSpan === 'function')
     ? hullSpan(game.ambientEvent, game.state) : null;
+  // THE REDOUBT — same immutable snapshot list as the player-bullet loop.
+  const _redE = [];
+  for (const r of (game.redoubts || [])) {
+    const s = redoubtSpan(r, game.state);
+    if (s) _redE.push({ r: r, s: s });
+  }
   // Track peak bullet density for BARRAGE achievement
   for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
     const b = game.enemyBullets[i];
-    const _hpy = b.y;
+    const _hpy = b.y, _hpx = b.x;
     b.x += b.vx * slowMul; b.y += b.vy * slowMul;
+    // THE REDOUBT — the wall you paid for eats incoming fire. Absorption runs
+    // BEFORE split and graze, so an eaten round neither fragments nor grazes
+    // (and so denies the graze/parry income it carried: shelter prices itself).
+    if (_redE.length) {
+      let _ate = false;
+      for (const e of _redE) {
+        if (!redoubtCrossed(e.s, _hpx, b.x, _hpy, b.y)) continue;
+        redoubtAbsorb(e.r, b.x, b.y, 1, true);
+        game.enemyBullets.splice(i, 1);
+        _ate = true;
+        break;
+      }
+      if (_ate) continue;
+    }
     if (_hullE && hullCrossed(_hullE, b.x, _hpy, b.y)) {
       hullAbsorb(game.ambientEvent, b.x, b.y, 1, hullShelters(_hullE, game.playerX));
       game.enemyBullets.splice(i, 1);
@@ -11936,6 +11999,292 @@ const POWERUP_COL = {S: '#0ff', N: '#0f8', P: '#f6f', T: '#8df', R: '#fc4', W: '
 // S gold → A green → B cyan → C white → D red (worst).
 const GRADE_COL = {S: '#fc4', A: '#0f8', B: '#0cf', C: '#fff', D: '#f88'};
 const SHIELD_MAX = 3;
+
+// ================================ THE REDOUBT ===============================
+// Six leaps taught the swarm to think, the formation to have structure, the
+// boss to have a wound, the world to have matter, and the telegraph to be
+// raidable. Every one of them added a dimension to something the player SHOOTS
+// AT. The player's own kit stayed exactly what it was in 1981 — and
+// shieldCharges is its most inert member: rolled from a drop, granted by a
+// heist or the vampire perk, capped at SHIELD_MAX, and then it just SITS there
+// until killPlayer silently eats one. The player never aims it, places it, or
+// knows where it is, because a scalar has no WHERE.
+//
+// THE REDOUBT gives one loadout item a COORDINATE. Brace — hold still, hold
+// fire — for REDOUBT_PLANT frames and one shield charge becomes a solid wall
+// planted in the lane above you. THE IRON SHADOW gave the WORLD matter (rolled,
+// random lane, random moment); this makes matter that is authored, paid for out
+// of the kit, and reversible back into it.
+//
+// FOUR FLOWN ANSWERS:
+//   BANK    — keep the charge; it absorbs one fatal hit anywhere (the shipped
+//             game, byte-identical).
+//   PLANT   — convert portable one-shot insurance into placed, directional,
+//             six-shot cover. Your own gun is blocked in that lane too.
+//   RECLAIM — brace under a PRISTINE wall and it descends into the ship,
+//             refunding the charge. Pristine-only is the exploit seal: you can
+//             take back only what you have not used.
+//   EXPEL   — three of your own rounds knock your own wall down the instant the
+//             read turns against you (own shots stress double).
+//
+// Why this is not a turtle: your gun is blocked in the covered lane, so kills
+// stop, COMBO_DECAY breaks the chain and the wave cannot clear from behind
+// cover; dives, rams, capture beams and storm strikes pass straight through
+// (bullet-proof is never dive-proof — the load-bearing inversion THE IRON
+// SHADOW already pins); a lane you cannot shoot into records no kills and so
+// stays COLD, which is exactly where THE KILLING FIELD routes coordinated
+// dives; and 42 stationary frames is the single most profile-feeding act
+// available to THE SWARM MIND. Cover is bought with information.
+//
+// ZERO new score — score-NEGATIVE in fact: an absorbed bullet awards nothing
+// and denies the graze/parry income it carried, and blocking your own fire
+// costs kills. Zero new collision math: hullCrossed() is reused verbatim.
+const REDOUBT_PLANT     = 42;   // brace frames to commit (= STRIKE_TELEGRAPH, > SIPHON_NEED 36)
+const REDOUBT_STILL_EPS = 0.05; // |playerVX| under this reads as stationary
+const REDOUBT_HALF_W    = 11;   // 22px span — ~1.5 ship widths
+const REDOUBT_HALF_H    = 3;
+const REDOUBT_DY        = 40;   // planted at playerY - 40, below the IRON SHADOW hull band
+const REDOUBT_HP        = 6;    // 6 enemy rounds, or 3 of your own (EXPEL)
+const REDOUBT_TTL       = 600;  // 10s
+const REDOUBT_WARN      = 42;   // blink-out warning, >= the 30f baseline
+const REDOUBT_MAX       = 2;    // concurrency, below SHIELD_MAX so the kit still matters
+const RECLAIM_FRAMES    = 20;   // brace under a pristine wall to holster it again
+
+// Pure: is the ship braced? Reads movement INTENT (a held key) first, because
+// `playerVX` is sampled AFTER the wall clamp — a cornered player mashing into
+// the edge reads as perfectly stationary, and would otherwise spend a shield
+// charge they never asked to spend. The velocity test stays as the second gate
+// so drifting mid-stop cannot commit either. Non-finite → false.
+function plantStill(vx, dashing, moveHeld) {
+  if (moveHeld || dashing) return false;
+  if (!isFinite(vx)) return false;
+  return Math.abs(vx) < REDOUBT_STILL_EPS;
+}
+
+// Pure: one frame of the brace meter, with two different kinds of interruption
+// — a distinction the loadout audit forced, not a guess.
+//
+//   FIRING resets it to zero. A mere drain would be gameable: with the fire
+//   cooldown at 6 frames, tap-firing on exactly the ready frame keeps a 75%+
+//   accrual duty cycle and would plant a wall at full DPS. Withholding fire is
+//   the whole cost, so it has to be continuous.
+//
+//   MOVING only pauses it. The first cut reset on movement too, and the audit
+//   measured the result: 21% brace completion at stage 12 and **0% at stages
+//   30 and 60** — the dive cadence there never leaves a 42-frame gap, so the
+//   verb was dead exactly where the game gets interesting. Dodging must not
+//   confiscate a commitment the player is still paying for; firing must.
+function plantStep(meter, accruing, firing) {
+  if (firing) return 0;
+  const m = isFinite(meter) ? Math.max(0, meter) : 0;
+  if (!accruing) return m;
+  return Math.min(REDOUBT_PLANT, m + 1);
+}
+
+// Pure: the wall's lifecycle. Both deaths WARN before they happen: the clock
+// runs out over REDOUBT_WARN visible frames, and a wall shot to its stress cap
+// arms failTimer and keeps blocking through the same blink — the hull's vent
+// contract exactly. Without that, the failure mode that actually happens in
+// combat would take the cover away in a single unannounced frame, which is the
+// inversion THE FAIRNESS BUDGET exists to forbid.
+function redoubtPhase(ttl, stress, failTimer) {
+  const failing = failTimer != null;
+  if (failing && !(failTimer > 0)) return 'gone';
+  if (!(ttl > 0)) return 'gone';
+  return (failing || ttl <= REDOUBT_WARN) ? 'failing' : 'solid';
+}
+
+// Pure: the wall's solid extent, or null. Mirrors hullSpan's object shape (and
+// its rule: solid ONLY in normal PLAYING — never a boss-volley sponge, never in
+// the challenge drill). Per-wall halfW, because a DUAL FIGHTER is wider than
+// the default span and must never take hits its own cover appears to stop.
+function redoubtSpan(r, state) {
+  if (!r) return null;
+  if (state !== STATE.PLAYING) return null;
+  if (redoubtPhase(r.ttl, r.stress, r.failTimer) === 'gone') return null;
+  const hw = r.halfW || REDOUBT_HALF_W;
+  return { x0: r.x - hw, x1: r.x + hw,
+           y0: r.y - REDOUBT_HALF_H, y1: r.y + REDOUBT_HALF_H };
+}
+
+// Pure: swept box crossing on BOTH axes. hullCrossed sweeps y only — correct
+// for a 40px-wide hull, wrong for a 22px wall that aimed fire crosses at an
+// angle. Conservative by construction (it tests the motion's bounding box), so
+// a wall the player paid a charge for never leaks a round it should have eaten.
+function redoubtCrossed(span, xPrev, x, yPrev, y) {
+  if (!span) return false;
+  if (!isFinite(x) || !isFinite(y) || !isFinite(xPrev) || !isFinite(yPrev)) return false;
+  const xlo = Math.min(xPrev, x), xhi = Math.max(xPrev, x);
+  if (xhi < span.x0 || xlo > span.x1) return false;
+  const ylo = Math.min(yPrev, y), yhi = Math.max(yPrev, y);
+  return yhi >= span.y0 && ylo <= span.y1;
+}
+
+// Pure: clamped stress accumulation, NaN/negative-safe (mirrors hullStress).
+function redoubtStress(stress, add, cap) {
+  const s = isFinite(stress) ? Math.max(0, stress) : 0;
+  const a = isFinite(add) ? Math.max(0, add) : 0;
+  const c = isFinite(cap) ? cap : REDOUBT_HP;
+  return Math.min(c, s + a);
+}
+
+// Pure: THE EXPLOIT SEAL — you can take back only what you have not USED.
+// Keyed on rounds the wall took FOR you (`blocked`), not on total stress: your
+// own shots are the EXPEL verb, a deliberate demolition, and knocking down a
+// wall that never saved you should not also confiscate the charge. A wall that
+// ate even one enemy round has spent it.
+function redoubtReclaimable(r) {
+  return !!r && (r.blocked || 0) === 0
+    && redoubtPhase(r.ttl, r.stress, r.failTimer) !== 'gone';
+}
+
+// Pure: which wall the ship is standing under (nearest, so stacked or adjacent
+// walls resolve deterministically), or -1.
+function redoubtUnder(redoubts, px) {
+  if (!redoubts || !isFinite(px)) return -1;
+  let best = -1, bd = Infinity;
+  for (let i = 0; i < redoubts.length; i++) {
+    const hw = redoubts[i].halfW || REDOUBT_HALF_W;
+    const d = Math.abs(px - redoubts[i].x);
+    if (d <= hw && d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+
+// Impure: commit the plant. The charge leaves the pool and becomes a place.
+function plantRedoubt() {
+  game.shieldCharges = Math.max(0, (game.shieldCharges || 0) - 1);
+  const hw = Math.max(REDOUBT_HALF_W, playerHitHalf() + 3);
+  game.redoubts.push({
+    x: game.playerX, y: game.playerY - REDOUBT_DY,
+    halfW: hw, stress: 0, blocked: 0, ttl: REDOUBT_TTL, failTimer: null
+  });
+  game.plantMeter = 0;
+  game.redoubtsPlanted = (game.redoubtsPlanted || 0) + 1;
+  if (!game.isDemo) {
+    try {
+      const _rt = (parseInt(localStorage.getItem('galagaRedoubtTotal') || '0', 10) || 0) + 1;
+      localStorage.setItem('galagaRedoubtTotal', String(_rt));
+    } catch (_e) {}
+  }
+  game.floatTexts.push({
+    x: game.playerX, y: game.playerY - REDOUBT_DY - 10, text: 'EMPLACED',
+    color: '#4f8', life: 45, maxLife: 45, size: 6
+  });
+  playSound('powerUp', game.playerX);
+}
+
+// Impure: one absorbed round. `add` is the stress it costs; `enemyRound` marks
+// the absorbs that count as USE (and so void the pristine refund).
+function redoubtAbsorb(r, x, y, add, enemyRound) {
+  r.stress = redoubtStress(r.stress, add, REDOUBT_HP);
+  if (enemyRound) {
+    r.blocked = (r.blocked || 0) + 1;
+    game.redoubtBlocks = (game.redoubtBlocks || 0) + 1;
+  }
+  game.hitSparks.push({ x: x, y: y, life: 0, color: '#4f8' });
+  if (r.stress >= REDOUBT_HP && r.failTimer == null) {
+    // The hull's vent contract: the wall keeps blocking through a drawn
+    // warning. Cover never vanishes in a single unannounced frame.
+    r.failTimer = REDOUBT_WARN;
+    playSound('graze', r.x);
+  }
+}
+
+// Impure: holster a pristine wall back into the kit.
+function reclaimRedoubt(i) {
+  const r = game.redoubts[i];
+  if (!r) return false;
+  game.redoubts.splice(i, 1);
+  game.shieldCharges = Math.min(SHIELD_MAX, (game.shieldCharges || 0) + 1);
+  game.reclaimMeter = 0;
+  game.plantMeter = 0;
+  game.redoubtReclaims = (game.redoubtReclaims || 0) + 1;
+  if (!game.isDemo) {
+    try {
+      const _rr = (parseInt(localStorage.getItem('galagaRedoubtReclaim') || '0', 10) || 0) + 1;
+      localStorage.setItem('galagaRedoubtReclaim', String(_rr));
+      if (_rr >= 10) unlockAchievement('quartermaster');
+    } catch (_e) {}
+  }
+  game.floatTexts.push({
+    x: r.x, y: r.y - 8, text: 'RECLAIMED', color: '#4f8',
+    life: 45, maxLife: 45, size: 6
+  });
+  playSound('powerUp', r.x);
+  return true;
+}
+
+// Impure: the brace, the walls' clocks, and the reclaim. Called once from the
+// shared pre-switch block so the meters drain in every state the player is not
+// flying in (CAPTURED and RESPAWN never call updatePlayer — a meter parked
+// there would auto-plant on the first frame of post-capture play).
+function updateRedoubts() {
+  if (!game) return;
+  if (!game.redoubts) game.redoubts = [];
+  if (game.state === STATE.PAUSED) return;
+  // Walls belong to the fight they were planted in.
+  if (game.state !== STATE.PLAYING) {
+    if (game.state !== STATE.CAPTURED && game.state !== STATE.RESPAWN) {
+      game.redoubts.length = 0;
+    }
+    game.plantMeter = 0;
+    game.reclaimMeter = 0;
+    return;
+  }
+  for (let i = game.redoubts.length - 1; i >= 0; i--) {
+    const r = game.redoubts[i];
+    r.ttl--;
+    if (r.failTimer != null && r.failTimer > 0) r.failTimer--;
+    if (redoubtPhase(r.ttl, r.stress, r.failTimer) === 'gone') {
+      for (let k = 0; k < 6; k++) {
+        game.itemBursts.push({ x: r.x + jitter(8), y: r.y + jitter(3), life: -k, color: '#4f8' });
+      }
+      playSound('graze', r.x);
+      game.redoubts.splice(i, 1);
+    }
+  }
+  // THE BRACE — hold still, hold fire. Movement INTENT is read from the shared
+  // keys map (keyboard/touch/gamepad all feed it), because playerVX is sampled
+  // after the wall clamp and a cornered player reads as perfectly stationary.
+  const moveHeld = !!(keys['ArrowLeft'] || keys['a'] || keys['A']
+                   || keys['ArrowRight'] || keys['d'] || keys['D']);
+  const fireHeld = !!keys[' '];
+  const under = redoubtUnder(game.redoubts, game.playerX);
+  // NOTE: deliberately NOT gated on game.allEntered. The audit measured a 0%
+  // brace-completion rate at stages 30 and 60 with that gate on — once a wall
+  // is set and firing, a 42-frame still window simply does not exist, and the
+  // verb was dead exactly where the game gets interesting. The entry parade is
+  // the one quiet window every stage guarantees, and spending it building
+  // instead of intercepting is a real trade: early kills and the INTERCEPT
+  // bonus are what you pay. You prepare cover BEFORE the pressure arrives.
+  const still = plantStill(game.playerVX, (game.dashTimer || 0) > 0, moveHeld);
+  const braced = game.playerAlive && still && !fireHeld
+    && !(typeof directorStrikePhase === 'function' && directorStrikePhase() === 'telegraph');
+  // RECLAIM owns the gesture while you stand under your own pristine wall, so
+  // holstering a charge can never immediately re-spend it.
+  if (under >= 0 && redoubtReclaimable(game.redoubts[under]) && braced) {
+    game.plantMeter = 0;
+    game.reclaimMeter = (game.reclaimMeter || 0) + 1;
+    if (game.reclaimMeter >= RECLAIM_FRAMES) reclaimRedoubt(under);
+    return;
+  }
+  game.reclaimMeter = 0;
+  const canPlant = braced && under < 0
+    && (game.shieldCharges || 0) > 0
+    && game.redoubts.length < REDOUBT_MAX
+    && !game.redoubts.some(r => Math.abs(r.x - game.playerX) < 2 * (r.halfW || REDOUBT_HALF_W));
+  // Dodging PAUSES the brace; firing (or losing the charge, or a live strike
+  // telegraph) resets it. See plantStep — the split is what the audit measured.
+  const _resets = fireHeld || !game.playerAlive || (game.shieldCharges || 0) <= 0
+    || game.redoubts.length >= REDOUBT_MAX;
+  game.plantMeter = plantStep(game.plantMeter, canPlant, _resets);
+  if (game.plantMeter === Math.ceil(REDOUBT_PLANT / 2) && typeof coachFire === 'function') {
+    coachFire('redoubt');
+  }
+  if (game.plantMeter >= REDOUBT_PLANT) plantRedoubt();
+}
+
 const SLOW_DURATION   = 360; // T — slow enemy bullets, 6 seconds at 60fps
 const RAPID_DURATION  = 360; // R — halved fire cooldown, 6 seconds
 const WAVE_DURATION   = 360; // W — sine-wave zigzag bullets, 6 seconds
@@ -12280,6 +12629,7 @@ const ACHIEVEMENTS = {
   boneBreaker:   { name: 'BONE BREAKER',  desc: 'Break a boss stance' },
   ironclad:      { name: 'IRONCLAD',      desc: '50 shots blocked in shelter' },
   spanBreaker:   { name: 'SPAN BREAKER',  desc: 'Drop a span of 6 or more' },
+  quartermaster: { name: 'QUARTERMASTER', desc: 'Reclaim 10 emplacements' },
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
@@ -16081,7 +16431,13 @@ function tryTriggerWitchTime(srcX, srcY, cause, srcType) {
   if (game.witchTimer > 0) return true;          // already in a window — defer
   if (game.witchCooldown > 0) return false;       // can't save again yet
   if (game.cheatInvincible) return false;         // cheat path handles it
-  if ((game.shieldCharges || 0) > 0) return false; // shield path handles it (cheaper)
+  // A PLANTED charge is still a charge on the board: THE REDOUBT suppresses
+  // witch time exactly as a banked one does. Without this the fork inverts —
+  // spending the shield into a wall would BUY witch-time access, making PLANT
+  // strictly better than BANK instead of a real trade.
+  if ((game.shieldCharges || 0) > 0 || (game.redoubts && game.redoubts.length > 0)) {
+    return false; // shield path handles it (cheaper)
+  }
   game.witchTimer = WITCH_WINDOW;
   // Carry the hit's full identity into the window. The whiff path used to
   // resolve with an ARGLESS killPlayer(), so every witch-whiff death (29% of
@@ -16205,6 +16561,11 @@ function killPlayer(srcX, srcY, cause, srcType) {
   game.laserTimer = 0;
   game.forkTimer = 0;
   game.shieldCharges = 0;
+  // THE REDOUBT — death takes the emplacements with the pool they came from,
+  // and the brace cannot survive into the respawn.
+  if (game.redoubts) game.redoubts.length = 0;
+  game.plantMeter = 0;
+  game.reclaimMeter = 0;
   // Witch window may have been the trigger for this kill — clear so the death cutscene
   // isn't visually framed by lingering edge glow.
   game.witchTimer = 0;
@@ -17683,6 +18044,9 @@ function update() {
     updateRivalAce();
     // SALVAGE PROTOCOL — power shards drift/expire/catch. Self-gates by state.
     updateSalvageShards();
+    // THE REDOUBT — brace meter, wall clocks, reclaim. Self-gates by state, and
+    // must run OUTSIDE updatePlayer so the meters drain in CAPTURED/RESPAWN too.
+    updateRedoubts();
     // THE MAGPIE — loot-raider drone: age loot, raid, flee, drop cargo on kill.
     updateMagpie();
     // ENDURANCE TIERS — check run-frame thresholds, fire ceremony at crossings.
@@ -19395,6 +19759,11 @@ function pickRunHighlights() {
   // sections of the formation. A structural-reading stat; zero score in it.
   const spans = game.spansDropped || 0;
   if (spans >= 1)         out.push({ label: 'SPANS DROPPED',   value: String(spans),    prio: 45 + spans * 30, col: '#8cf' });
+  // WALLS PLANTED — THE REDOUBT: shield charges converted into placed cover.
+  // Priced modestly (no flat base) so a stat you can generate by standing still
+  // never outranks a boss kill in the run's identity.
+  const walls = game.redoubtsPlanted || 0;
+  if (walls >= 3)         out.push({ label: 'WALLS PLANTED',   value: String(walls),    prio: walls * 8, col: '#4f8' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
@@ -21014,6 +21383,7 @@ function drawGameplay() {
   drawLattice();
   drawMindLock();
   drawDreadField();
+  drawRedoubts();
   drawDivePreviewPaths();
   drawThreatIndicators();
   drawLastEnemyAlert();
@@ -21324,6 +21694,70 @@ function drawMindLock() {
   ctx.lineTo(x1 - 0.5, y + 0.5);
   ctx.lineTo(x1 - 0.5, y - 5);
   ctx.stroke();
+  ctx.restore();
+}
+
+// THE REDOUBT, DRAWN. The brace bracket (the plant telegraphs itself for 42
+// frames — longer than a dive does), the wall with its integrity pips, and the
+// reclaim bracket. Nothing renders where redoubtSpan is null, so the wall is
+// never drawn as matter in a state where it absorbs nothing. Read-only: every
+// timer here ticks in updateRedoubts().
+function drawRedoubts() {
+  if (!game || game.state !== STATE.PLAYING) return;
+  ctx.save();
+  ctx.lineWidth = 1;
+  // The wall(s)
+  for (const r of (game.redoubts || [])) {
+    if (!redoubtSpan(r, game.state)) continue;
+    const ph = redoubtPhase(r.ttl, r.stress, r.failTimer);
+    if (ph === 'failing' && blinkPhase(2)) continue;   // 4Hz blink-out warning
+    const hw = r.halfW || REDOUBT_HALF_W;
+    const x0 = Math.round(r.x - hw), y0 = Math.round(r.y - REDOUBT_HALF_H);
+    const w = Math.round(hw * 2), h = REDOUBT_HALF_H * 2;
+    // Hatched bar (shape-distinct from the hull's floor hatching and the dread
+    // X ticks), kept semi-transparent so dive previews read through it.
+    ctx.globalAlpha = 0.75;
+    ctx.strokeStyle = '#4f8';
+    ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    for (let hx = x0 + 2; hx < x0 + w - 1; hx += 4) {
+      ctx.moveTo(hx, y0 + h - 1);
+      ctx.lineTo(hx + 3, y0 + 1);
+    }
+    ctx.stroke();
+    // Integrity pips — the wall's remaining life, read at a glance.
+    const left = Math.max(0, REDOUBT_HP - (r.stress || 0));
+    ctx.globalAlpha = 0.9;
+    for (let k = 0; k < REDOUBT_HP; k++) {
+      ctx.fillStyle = k < left ? '#4f8' : '#243';
+      ctx.fillRect(x0 + 1 + k * 3, y0 - 3, 2, 1);
+    }
+    // Gold rim = pristine, still refundable.
+    if (redoubtReclaimable(r)) {
+      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(game.animFrame * 0.12);
+      ctx.strokeStyle = '#fc4';
+      ctx.strokeRect(x0 - 0.5, y0 - 0.5, w + 1, h + 1);
+    }
+  }
+  // The brace bracket — two stakes closing toward each other over 42 frames.
+  const pm = game.plantMeter || 0;
+  const rm = game.reclaimMeter || 0;
+  if (pm > 0 || rm > 0) {
+    const prog = rm > 0 ? (rm / RECLAIM_FRAMES) : (pm / REDOUBT_PLANT);
+    const by = Math.round(game.playerY - REDOUBT_DY);
+    const reach = REDOUBT_HALF_W;
+    ctx.globalAlpha = 0.35 + 0.5 * prog;
+    ctx.strokeStyle = rm > 0 ? '#fc4' : '#4f8';
+    const px = Math.round(game.playerX);
+    ctx.beginPath();
+    ctx.moveTo(px - reach, by - 4); ctx.lineTo(px - reach, by + 4);
+    ctx.moveTo(px + reach, by - 4); ctx.lineTo(px + reach, by + 4);
+    // The bracket closes into a bar — a SHAPE read, no colour needed.
+    const span = reach * prog;
+    ctx.moveTo(px - span, by); ctx.lineTo(px + span, by);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -22078,7 +22512,9 @@ function drawHUD() {
   // SHIELD stack indicator — small green chevron icons, one per charge.
   // Without this, the only feedback for shield count was the orbital ring around the ship,
   // which is hard to read while dodging.
-  if ((game.shieldCharges || 0) > 0) {
+  // THE REDOUBT — a planted charge is still yours, so the row must survive
+  // planting your last one: hollow chevrons state where the kit went.
+  if ((game.shieldCharges || 0) > 0 || (game.redoubts && game.redoubts.length)) {
     const sy = BASE_H - 11;
     // SHIELD MAX glow — when fully stacked, chevrons get a green shadow so
     // the cap reads as a peak threshold reward (matches HIGH SCORE / ACC /
@@ -22097,6 +22533,17 @@ function drawHUD() {
       ctx.fillRect(sx + 3, sy + 2, 1, 4);   // right side
       ctx.fillStyle = '#cfe';
       ctx.fillRect(sx + 1, sy + 5, 2, 1);   // chevron
+    }
+    // Hollow chevrons — charges that are out there as emplacements.
+    const _nR = (game.redoubts && game.redoubts.length) || 0;
+    for (let s = 0; s < _nR; s++) {
+      const sx = badgeX + ((game.shieldCharges || 0) + s) * 6;
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#4f8';
+      ctx.fillRect(sx,     sy + 1, 4, 1);
+      ctx.fillRect(sx,     sy + 2, 1, 4);
+      ctx.fillRect(sx + 3, sy + 2, 1, 4);
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
   }
