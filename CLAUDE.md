@@ -408,120 +408,48 @@ band stays 24/24). Tracked: `game.spansDropped`/`spanEscaped` + lifetime `galaga
 (demo-guarded), SPANS DROPPED highlight, SPAN BREAKER achievement (a span of 6+),
 `COACH_LESSONS.keystone`.
 
-### THE REDOUBT — the loadout gains a coordinate
+### (RETIRED) THE REDOUBT — the loadout gains a coordinate
 
-Six leaps added a dimension to something the player SHOOTS AT. The kit stayed what it
-was in 1981, and `shieldCharges` was its most inert member: rolled from a drop, capped,
-then sitting there until `killPlayer` silently ate one. The player never aimed it or knew
-where it was, because a scalar has no WHERE. **Brace** — hold still, hold fire, for
-`REDOUBT_PLANT` (42) frames — and one charge becomes a **solid wall** planted in the lane
-above you. THE IRON SHADOW gave the *world* matter; this makes matter that is authored,
-paid for out of the kit, and reversible back into it.
+**Deleted 2026-08-23, by its own instrument.** It turned a shield charge into a
+wall you planted by bracing. `loadout-audit.js` measured the SUPPLY that feeds it:
+about THREE charges in a five-minute run — and a charge is worth more as a SHIELD,
+which absorbs a death, than as a 22px wall that expires in ten seconds. So plants
+in real play were 0–1 per run, each costing the player the thing the wall was made
+of. It also owned half a landmine: `tryTriggerWitchTime` returns false whenever a
+wall stands, so PLANTING ONE SUPPRESSED the save window it was meant to complement
+— the same defect class that got VAMPIRE cut from the card pool.
 
-**Four flown answers**: BANK (the shipped game) / PLANT / **RECLAIM** (brace under a
-*pristine* wall for `RECLAIM_FRAMES` and it holsters back into the kit) / **EXPEL** (your
-own rounds knock it down when the read turns). Pure core: `plantStill` / `plantStep` /
-`redoubtPhase` / `redoubtSpan` / `redoubtStress` / `redoubtReclaimable` / `redoubtUnder`
-/ `redoubtCrossed`. **ZERO new score** — score-*negative*: absorbing denies the graze and
-parry income the round carried, and cover blocks your own gun in that lane.
+**The idea survives**: the loadout should be something you AIM rather than a scalar
+you never touch. That is what THE MANIFEST does, at the scale of a whole run.
 
-**Every one of these rules is a red-team or audit finding, not a preference — do not
-"simplify" them away:**
-- **PLAYING only** (`redoubtSpan` → null elsewhere). A 22px column survives ~6 wide boss
-  volleys and would be a safe room; it is also invisible in `drawBossStage`. Same rule
-  `hullSpan` already pins, same test.
-- **Movement INTENT, not `playerVX`.** `playerVX` is sampled *after* the wall clamp, so a
-  cornered player mashing into the edge reads as perfectly stationary and would silently
-  spend a charge. `plantStill` reads the held key first.
-- **Firing RESETS the meter; dodging only PAUSES it.** A drain is gameable (fire cooldown
-  6 → tap-firing on the ready frame keeps a 75% duty cycle at full DPS). And the first cut
-  reset on movement too: `test/loadout-audit.js` measured **0% brace completion at depth**
-  — the verb was dead exactly where the game gets interesting.
-- **Both deaths warn.** A wall shot to `REDOUBT_HP` arms `failTimer` and *keeps blocking*
-  through the same 42-frame blink the clock gets (the hull's vent contract). Cover never
-  vanishes in an unannounced frame.
-- **A planted charge still suppresses witch time** (`tryTriggerWitchTime` tests
-  `redoubts.length` beside `shieldCharges`). Without it the fork inverts: banking
-  *blocks* witch time, so spending the charge would BUY witch access and PLANT would
-  strictly beat BANK.
-- **The pristine seal is keyed on `blocked` (enemy absorbs), not total stress** — shooting
-  your own wall is the EXPEL verb, not use, and must not confiscate the charge as well.
-- **The whole emplacement SET counts as ONE director gift.** Per-wall counting lets two
-  plants veto every ambient actor on normal difficulty for the full TTL.
-- **`redoubtCrossed` sweeps BOTH axes.** `hullCrossed` sweeps y only — right for a 40px
-  hull, wrong for a 22px wall that aimed fire crosses at an angle.
-- **Not gated on `allEntered`.** The entry parade is the one quiet window every stage
-  guarantees; spending it building instead of intercepting is the trade.
-- Own fire stresses at most **once per frame** (a 3-pod dual volley would otherwise flatten
-  a 6-HP wall in one trigger pull); guardian and parry-echo rounds are blocked but never
-  stress it (two earned rewards must not annihilate); dual fighters plant a **wider** wall.
+### THE MANNING AXIS — the model and the picture describe the same wall
 
-```bash
-node test/loadout-audit.js   # report: brace completion per depth, what breaks it, the price
-```
-Measured now: reachable at every depth (93–100% of committed braces), bought with ~28% of
-the run spent not firing; the **shield economy**, not the gate, limits the count (0–1 per
-stage under real drops). Tracked: `redoubtsPlanted`/`redoubtReclaims`/`redoubtBlocks` +
-lifetime `galagaRedoubtTotal`/`galagaRedoubtReclaim` (demo-guarded), WALLS PLANTED
-highlight, QUARTERMASTER achievement, `COACH_LESSONS.redoubt`. No new comms type (band
-stays 24/24). HUD: hollow chevrons beside the shield row state where the kit went.
+What survives of THE EBB, and it is the half that mattered. THE KEYSTONE shipped
+with **the drawn wall and the computed wall describing different objects**:
+`drawLattice` judged membership by `alive && state === 'formation'`,
+`latticeRecompute` by `alive` alone — so while a squad was diving the player saw a
+hole in the struts the model did not have, and when the commander itself dove,
+`drawLattice` rendered **nothing at all**.
 
-### THE EBB — the model and the picture finally describe the same wall
-
-THE KEYSTONE shipped with **the drawn wall and the computed wall describing different
-objects**. `drawLattice` judged membership by `alive && state === 'formation'`;
-`latticeRecompute` judged it by `alive` alone. So while a squad was diving the player saw
-a hole in the struts the model did not have — and when the **commander itself** dove,
-`netIntact` stayed true while the ring's `find(standing && isCommander)` returned
-undefined, so `drawLattice` rendered **nothing at all**: a blank read layer at the swarm's
-most committed moment. The code's own comment already promised the fix ("rebuild the load
-paths for what is left STANDING") and never delivered it.
-
-What shipped, all verified:
-- `latticeRecompute` judges with `latticeStanding` (a diver, a capture holder, a falling
-  span hold nothing) and **always recomputes it** — `L.standing` is a change-detection
-  cache only; reusing it as the source freezes the model at its first manning.
-- A **manning seam** in `updateEnemies` recomputes the frame manning changes
+- `latticeRecompute` judges with `latticeStanding` (a diver, a capture holder or a
+  falling span holds nothing) and **always recomputes it** — `L.standing` is a
+  change-detection cache only; reusing it as the source freezes the model.
+- A **manning seam** in `updateEnemies` recomputes on the frame manning changes
   (`standingChanged`, elementwise), not only when something dies.
-- **THE SOCKET**: while the commander is alive but out of the wall — *or telegraphing a
-  dive* — a dashed **OPEN** ring marks its empty home position, gap facing where it
-  actually is. Keying it on absence alone gave the advertised warning **0 frames** (during
-  a telegraph the commander's state is still `formation`); the telegraph clause is what
-  makes the ramp reachable. This replaces the blank state.
-- **Two lies deleted**: the collapse deferral was `diveTimer >= 0` while `WING_COOLDOWN`
-  (60) exceeds `WING_PREVIEW` (36), so a diamond was drawn and live for 24 frames in which
-  a kill on it did nothing; and diamonds were drawn during `LAT_COOLDOWN` (150 frames)
-  when `latticeCollapse` refuses outright. Diamonds now render only when the cut is
-  genuinely armed (`!L.cool && !wingTelegraphing()`).
-- **The score invariant restored**: a `collapsing` member was scored as a diver — bee
-  50→100, boss 150→400 — so cutting a span was a **2×–2.67× score multiplier**, falsifying
-  THE KEYSTONE's documented "collapse can only ever COST points". `inForm` now includes
-  `collapsing`.
-- `ebbLevel` is measured against the **living** wall (counting the dead as "away" made the
-  socket's alpha encode cumulative attrition — the step function this replaces).
-- Commander candidates exclude `boss`.
+- **The score invariant**: a `collapsing` member used to be scored as a diver —
+  bee 50→100, boss 150→400 — so cutting a span was a **2×–2.67× score multiplier**,
+  falsifying THE KEYSTONE's documented "collapse can only ever COST points".
+  `inForm` includes `collapsing`.
+- Diamonds render only when a cut is genuinely armed (`!L.cool && !wingTelegraphing()`).
 
-**THE SALLY WAS RETIRED BY MEASUREMENT.** The design had the commander lead the maneuver
-it authorised. It read beautifully and did not survive its own audit: across three stage
-bands, **seven of seven windows closed because the commander DIED mid-sortie and none
-because it flew home** — leading a dive flies it into the player's guns. So "spare the
-commander" was not a flyable counter-play, windows lasted 10–52 frames, none was ever
-cuttable, and every run silently lost its mind profile and ate a 360-frame rage timer the
-player never chose. Retiring it cut involuntary commander deaths from 7 to 2 over the same
-sample. **The coherence fix stands on its own; the window still opens whenever the
-commander dives of its own accord.**
-
-```bash
-node test/ebb-audit.js   # report: sorties, windows, ARMED windows, length, cuts, why they closed
-```
-Measured today: windows are real but **rarely cuttable** — an intact 4-connected grid has
-no articulation points, so a sortie's hole makes an *already carved* wall fragile rather
-than creating keystones on a full one. Treat the window as an amplifier, not a generator.
-**ARMED near zero must be fixed structurally (more of the wall standing when the anchor
-leaves), never by rewarding a thing that does not happen.** Tracked: `game.ebbCuts` +
-lifetime `galagaEbbTotal` (demo-guarded), SORTIE CUTS highlight, BREACH LEADER achievement,
-`COACH_LESSONS.ebb`. ZERO new score, no new actor, no new comms (24/24), no new HUD, no
-telegraph shortened.
+**THE SORTIE REWARD WAS RETIRED (2026-08-23).** `ebb-audit.js` reported 5 windows
+opened and **none cuttable** — an intact 4-connected grid has no articulation
+points, so a sortie's hole makes an *already carved* wall fragile rather than
+creating keystones on a full one. The doctrine that entry itself wrote ("ARMED near
+zero must be fixed **structurally**, never by rewarding a thing that does not
+happen") was applied to it: `ebbCuts`, the SORTIE CUTS highlight, BREACH LEADER,
+`COACH_LESSONS.ebb`, THE SOCKET and `ebb-audit.js` are gone. The coherence fix above
+stands on its own, exactly as that entry predicted it would.
 
 ### THE MEASURE — the modern reform (music + graphics + gameplay, one idea)
 
@@ -796,35 +724,18 @@ highlight. Fusion: capture/rescue, dual fighter, FLIGHT SCHOOL (the `struggle` l
 fires the frame the beam goes live — the last moment the player is alive enough to be
 coached), enemy comms (`breakout`). No new actor, so THE DIRECTOR's budget is untouched.
 
-### THE HEIST — the wind-up is raidable (warnings become negotiations)
+### (RETIRED) THE HEIST — the wind-up was raidable
 
-Every telegraph had only ever been a warning; THE HEIST inverts the sign on one of them.
-During the capture **wind-up** (frames 0–59), standing inside the grab band —
-`CAPTURE_GRAB_HALF_W = 20`, the **same shared constant** the live beam grabs with, so the
-zone that can rob is byte-identical to the zone that can be robbed from — fills `e.siphon`
-by `SIPHON_GAIN = 1/SIPHON_NEED` per frame (leaving leaks at 2×; dipping in and out is
-strictly losing). `SIPHON_NEED = 36` frames of commitment → `robBeam(e)`: the boss leaves
-by the **existing** empty-handed return path, `+1 shieldCharge` (capped `SHIELD_MAX`),
-`e._robbed` (the capture roll is gated `!e._robbed` — one boss can never be farmed twice).
-Latest winnable entry from meter 0 is frame 24; `heistStillWinnable` drives the bail cue:
-gold tick marks climb the telegraph's dashed edges with the siphon and **turn to a white X
-the moment the math no longer closes** — the telegraph announcing its own point of no
-return. A siphon of 0 renders pixel-identical to the shipped telegraph.
+**Deleted 2026-08-23.** Standing in a capture wind-up let you siphon the beam dry
+for a shield charge. It sat behind FOUR conditions at once — a formation boss picked
+as a diver, a 20% roll, `!dualFighter`, and an empty capture slot — so it fired 0–1
+times in an entire run, and carried a constant family, a meter, a leak rate, a bail
+cue, a coach lesson, a lifetime key, a highlight row and one of the 24 comms slots.
 
-**One telegraph, four flown answers**: flee (the shipped game, unchanged) / raid (a life
-staked for a shield + denial) / raid failed → THE STRUGGLE (tear free, forfeit the
-rescue) / submit (pay the life for the dual-fighter shot). The failure path is **zero new
-code** — the already-shipped, already-audited capture; no warning shortened, no audit
-number touched (the heist is a wager, not a threat).
-
-**ZERO new score.** Payoff is a shield, a denial, and tempo — and the price quietly
-includes information (camping the band feeds THE SWARM MIND's read the whole siphon).
-Pure, logic-tested core: `siphonStep` / `heistStillWinnable` / `heistResolve`; impure
-commit `robBeam`. Tracked: `game.beamHeists` + lifetime `galagaHeistTotal` (demo-guarded),
-BEAMS ROBBED run highlight, `beamHeist` intercept, `COACH_LESSONS.heist` (taught only
-after `struggle` is learned — the first witnessed beam teaches escape, a later one teaches
-robbery). **Comms band is now at its ceiling (24/24)** — the next system needing an
-intercept must cut one first. No new actor, so THE DIRECTOR's budget is untouched.
+`CAPTURE_GRAB_HALF_W` **stays** — the live beam grabs with it. The capture loop, its
+telegraph and THE STRUGGLE are untouched: those are Galaga's signature and the
+measured fix for a 211-frame control-budget violation. This was an option bolted to
+the side of them.
 
 ### THE RECOVERY BUDGET — the death spiral's brake, measured (SALVAGE SETTLE)
 
@@ -861,6 +772,36 @@ lost), so the spiral is braked, not cancelled.
 **When touching death, respawn, shard physics, TTLs, or the magpie**: run the audit and
 keep three numbers healthy — catchable-after-respawn near 100%, driven catch rate well
 off zero, recovered/lost strictly below 1.
+
+### THE STAKES — a life is scarce, and that is what makes the rest mean anything
+
+Five systems have a LIFE as their entire subject: the shield, WITCH TIME, dash
+i-frames, THE STRUGGLE and SALVAGE PROTOCOL. `measure-audit.js`'s STAKES column
+drove a run to stage 25 and counted what the game handed over: **60 extra lives**
+(32 from a 30,000-point MODULO faucet, 28 more from the combo milestone). All five
+were decisions about a resource the player had sixty of.
+
+- The score faucet is a **geometric ladder**: the first life still at 30,000 —
+  unchanged, so the early game feels identical — then +90k, +270k, +810k.
+  `extraLivesFor(score)` is pure and tested.
+- The combo milestone pays its challenge-mode reward (5,000 points) in **every**
+  mode. The reward kept, the life removed, two code paths become one.
+- The **scoring** graze got the 24-frame cooldown its **scoreless** sibling always
+  had: it was gated per-bullet by `b.grazed` alone, so parking at a 7-10px offset
+  in a stream was uncapped income, and GHOST WAKE tripled it.
+
+Measured after: **3**. When touching any faucet, re-run the column — and note that
+a driven bot does not park in a bullet stream, so no run's numbers can show the
+graze farm. That one had to be read, not measured.
+
+### THE SHELL — nothing was watching the file around the script
+
+All four gate steps read only what sits between the `<script>` tags. A helper with
+a broken predicate overwrote `<!DOCTYPE html>` and the change SHIPPED GREEN: the
+page served in quirks mode and every test passed. `logic.test.js`'s THE SHELL
+section now pins the doctype, `lang`, the charset and viewport metas, the canvas,
+that there is exactly ONE inline script (every harness's extractor assumes it),
+and that no game statement has leaked into the shell.
 
 ### Defensive layers
 
