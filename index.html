@@ -3970,7 +3970,10 @@ const BULLET_COLORS = {
   dive:       { trail: '#ff7a00', halo: '#ffd633', core: '#ff8c00', inner: '#ffe34d' },
   mega:       { trail: '#ff1a1a', halo: '#ff5555', core: '#ff2a2a', inner: '#ff8080' },
   spiral:     { trail: '#ff1aff', halo: '#ff66ff', core: '#ff2bff', inner: '#ffb3ff' },
-  eliteBurst: { trail: '#ff2a2a', halo: '#ffcc33', core: '#ff3a3a', inner: '#ffd699' }
+  eliteBurst: { trail: '#ff2a2a', halo: '#ffcc33', core: '#ff3a3a', inner: '#ffd699' },
+  // THE FIRING LINE — the wall's own aimed round. Rose, so its CORE separates
+  // from dive-orange, mega-red, spiral-magenta and eliteBurst-red at a glance.
+  volley:     { trail: '#ff2f6e', halo: '#ff8fb5', core: '#ff2f6e', inner: '#ffc2d6' }
 };
 function drawEnemyBullet(b) {
   const t = game.animFrame;
@@ -4140,6 +4143,74 @@ const DIVE_PREVIEW = 30;
 // tightest warning in the game, on an attack that repeats every 2s at depth.
 const SIG_LOCK_FRAMES = DIVE_PREVIEW;
 const WING_COOLDOWN = 60;    // extra diveTimer delay after a maneuver so tactics never stack
+
+// ===================== THE FIRING LINE — the wall aims =====================
+// MEASURED, and it is the single most un-Psikyo fact in this codebase: of the
+// thirteen `enemyBullets.push` sites in 25,000 lines, every one belongs to the
+// rival ace, a mega-boss, a bullet split, a DIVING enemy, the hoverer, the
+// mirror or an elite's death burst. A formation enemy SITTING IN THE WALL never
+// fires. A driven probe put numbers on what that costs:
+//
+//     stage   bullets on screen   frames with NONE
+//       3           0.34               84%
+//       7           0.66               85%
+//      33           3.90               55%
+//
+// For five-sixths of the early game there is nothing to dodge, so parking under
+// the formation and holding fire is optimal play. Forty enemies are decoration.
+//
+// THE AIM LINE FREEZES AT THE TELL, AND IT IS THE PATH THE BULLETS FLY. This is
+// the whole design, not a detail. `game.playerY` is assigned once in the entire
+// file and never reassigned, so the player moves on ONE axis; against a tracking
+// aim line a 1-D mover has exactly two answers — outrun it, or spend the dash
+// (12 frames on a 60-frame cooldown, a 20% duty cycle) — and tripling aimed
+// pressure would just funnel the hands onto one button. A FROZEN line asks a
+// different question: it is a place, and the answer is to not be standing there.
+// That is positional, it is Strikers' actual verb, and it is what every other
+// telegraph in this file already does (the dive freezes its bezier, the capture
+// and the weather strike draw fixed columns). A line that tracks you tells you
+// only where the bullet would go if you stopped, which is the one thing you
+// must not do.
+const VOLLEY_TELL_BASE = 36;   // >= DIVE_PREVIEW (30): a burst costs a hit, so it warns longer
+const VOLLEY_TELL_PER  = 6;    // and warns LONGER per extra shooter, never shorter
+const VOLLEY_INTERVAL  = BAR_FRAMES;  // ONE BAR. It was 150, and the bar gate rounded
+                               // that up to 192 frames — a shot every 3.2s, which a
+                               // driven probe showed barely moved the empty-screen
+                               // number it exists to fix. An interval that is not a
+                               // multiple of the gate is a lie about its own cadence.
+const VOLLEY_MIN_STAGE = 3;    // stages 1-2 stay the tutorial they are
+const VOLLEY_DENSITY_MAX = 46; // refuse to arm above this many live enemy bullets
+
+// Pure: how long a volley of `n` shooters must warn. Monotone in n, and floored
+// at the readable baseline — an opportunity may shrink, a WARNING never may.
+function volleyTellFor(n) {
+  const k = (isFinite(n) && n > 0) ? Math.floor(n) : 1;
+  return Math.max(DIVE_PREVIEW, VOLLEY_TELL_BASE + (k - 1) * VOLLEY_TELL_PER);
+}
+
+// Pure: which formation members may open fire. Returns [] when nothing is
+// eligible. The pool filter mirrors the WING pool exactly — a member already
+// telegraphing a dive, already telegraphing a volley, or a capture-capable boss
+// is never picked, so one enemy can never own two telegraphs at once.
+function volleyPlan(enemies, playerX, stage, blocked) {
+  if (blocked || !enemies || !enemies.length) return [];
+  if (!(stage >= VOLLEY_MIN_STAGE)) return [];
+  const pool = [];
+  for (const e of enemies) {
+    if (!e || !e.alive || e.state !== 'formation') continue;
+    if ((e.previewTimer || 0) > 0 || (e.volleyTimer || 0) > 0) continue;
+    if (e.type === 'boss') continue;          // the captor has its own telegraph
+    pool.push(e);
+  }
+  if (!pool.length) return [];
+  // ONE shooter this build. Prefer a member near the player's lane so the line
+  // is a real question, but never the exact nearest every time — a deterministic
+  // nearest pick is a pattern the player memorises instead of reading.
+  const px = (typeof playerX === 'number' && isFinite(playerX)) ? playerX : BASE_W / 2;
+  pool.sort((a, b) => Math.abs(a.x - px) - Math.abs(b.x - px));
+  const near = pool.slice(0, Math.min(5, pool.length));
+  return [near[randInt(near.length)]];
+}
 
 // Pure: pick a coordinated tactic (or null). Deterministic given roll∈[0,1). Panic → null,
 // so a shattered formation reverts to lone dives. Commander alive raises the odds.
@@ -5649,7 +5720,11 @@ const INTERCEPT_MSG = {
   debrief:       ['FOOTAGE RECEIVED.', 'THE TARGET HAS A STYLE.', 'DRILL ANALYSIS COMPLETE.'],
   witchSave:     ['IMPOSSIBLE...', 'NO HIT REGISTERED?', 'CHECK SENSORS!'],
   supplyDrop:    ['CARGO IN ZONE!', 'PROTECT THE DROP!', 'RESUPPLY EXPOSED!'],
-  guardianArrives: ['SECOND TARGET!', 'WHERE DID THAT COME FROM?', 'TWO HOSTILES NOW!'],
+  // (guardianArrives was cut for this slot. It fired on a PLAYER REWARD — an
+  // escort drone arriving — at a moment that needs no reaction from the player,
+  // which is the exact bar `maxPower` and `firstBlood` were cut on. THE FIRING
+  // LINE is the opposite: the first time the wall itself takes aim.)
+  volley:        ['THE WALL HAS GUNS!', 'SIGHTING ON THE PILOT!', 'LINE OF FIRE — MOVE!'],
   ufoSpotted:    ['SCOUT VESSEL — INTERCEPT.', 'UNKNOWN SIGNATURE!', 'RADAR ECHO INCOMING.'],
   goldenSpotted: ['ROYAL CARGO DETECTED!', 'GUARD THE GOLDEN ONE!', 'HIGH-VALUE TARGET!'],
   bossRage:      ['BOSS ENTERS RAGE!', 'CRITICAL HOSTILE — APEX!', 'TARGET UNLEASHED!'],
@@ -5814,7 +5889,6 @@ function spawnGuardian(variant) {
       life: -k, color: v.col
     });
   }
-  if (typeof pushIntercept === 'function') pushIntercept('guardianArrives');
   // GUARDIAN MASTER milestone — track unique variants summoned this run; fire once
   // at 4 (all variants experienced). Deep run mastery narrative.
   if (game._guardianVariants && typeof pushIntercept === 'function') {
@@ -5971,7 +6045,8 @@ const COACH_LESSONS = {
   vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE',
   cover:   'THE HULL EATS FIRE — BOTH WAYS',
   keystone:'CUT THE MARKED ONE — THE SPAN FALLS',
-  onbeat:  'DASH ON THE BEAT — HOLD LONGER'
+  onbeat:  'DASH ON THE BEAT — HOLD LONGER',
+  volley:  'THE LINE IS WHERE IT FIRES — STEP OFF'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -9172,6 +9247,8 @@ function latticeCollapse(cutIdx) {
     e._colDY = e.y - cy;
     e.previewTimer = 0;
     e.previewPath = null;
+    e.volleyTimer = 0;          // a severed span does not finish its shot
+    e.volleyAim = null;
   }
   L.block = { x: cx, y: cy, vy: LAT_FALL_VY, n: span.length };
   L.cool = LAT_COOLDOWN;
@@ -14817,9 +14894,22 @@ function updateEnemies() {
               e.state = 'returning';
               e.path = createEntryPath(e.x, -15, e.homeX, e.homeY, e.x < BASE_W/2 ? 1 : -1);
               e.pathProgress = 0;
+            } else {
+              // A DIVER THAT RUNS OUT OF PATH WITHOUT LEAVING THE SCREEN used to be
+              // left in limbo: still `state === 'diving'`, pathSegIndex past the end,
+              // so the NEXT frame read `pathSegments[undefined]` and threw inside
+              // update() on `seg.p0`. gameLoop's try/catch turns that into a console
+              // spam and a frozen enemy rather than a white screen, which is exactly
+              // why it survived — it never announced itself. Found by a driven probe
+              // at stage 99 after an unrelated change shifted the seeded RNG stream.
+              // It flies home, which is what the wrap does for the other case.
+              e.state = 'returning';
+              e.path = createEntryPath(e.x, e.y, e.homeX, e.homeY, e.x < BASE_W / 2 ? 1 : -1);
+              e.pathSegments = null;
+              e.pathProgress = 0;
             }
           }
-        } else {
+        } else if (seg) {
           const p = bezierPoint(seg.p0, seg.p1, seg.p2, seg.p3, e.pathProgress);
           e.x = p.x; e.y = p.y;
         }
@@ -15118,6 +15208,39 @@ function updateEnemies() {
     if (standingChanged(game.lattice.standing, _st)) latticeRecompute();
   }
 
+  // ===================== THE FIRING LINE =====================
+  // Tick every armed tell, and fire the ones that reach zero along the vector
+  // that was frozen when they armed.
+  for (const e of game.enemies) {
+    if (!e.alive || !((e.volleyTimer || 0) > 0)) continue;
+    // GATES RE-TESTED AT COMMIT, not only at arm. updateEnemies() also runs
+    // during RESPAWN while bulletCap() does not, so an ungated volley would
+    // spray a corpse's last position for the whole death recap.
+    if (game.state !== STATE.PLAYING || !game.playerAlive || e.state !== 'formation') {
+      e.volleyTimer = 0; e.volleyAim = null;
+      continue;
+    }
+    e.volleyTimer--;
+    if (e.volleyTimer > 0) continue;
+    const av = e.volleyAim;
+    e.volleyAim = null;
+    if (!av) continue;
+    game.enemyBullets.push({
+      x: e.x, y: e.y + 4, vx: av.vx, vy: av.vy,
+      kind: 'volley',
+      // NO PAY. The dash-parry loop has no cooldown, ramps 50 -> 250 by streak and
+      // is tripled by the PARRY DIVIDEND card, so a wall that fires is a supply
+      // line into the game's most uncapped income lane — and since THE STAKES,
+      // score IS lives. A volley pellet still deflects, still feeds the streak,
+      // still counts toward CLUSTER PARRY and still delivers its hit-stop. It
+      // simply pays nothing. Frames, not points: the doctrine, applied to the
+      // one system that would otherwise quietly undo the last balance reform.
+      noPay: true,
+      fromType: e.type,
+    });
+    playSound('enemyDive', e.x);
+  }
+
   // Trigger dives
   // THE BAR MOVES THE START OF A THREAT, NEVER ITS LENGTH. The launch waits for
   // the next beat (at most 23 frames), so the swarm attacks ON the count the floor
@@ -15224,6 +15347,36 @@ function updateEnemies() {
               }, 200);
             });
           }
+        }
+      }
+    }
+  }
+
+  // THE FIRING LINE — arm a volley on the BAR. Its own carry counter, subtracted
+  // rather than assigned, so a hit-stop (which skips update() while animFrame
+  // still advances) DELAYS a volley instead of deleting one — the same contract
+  // the dive trigger keeps.
+  if (game.allEntered && game.state === STATE.PLAYING && game.playerAlive) {
+    game.volleyTimer = (game.volleyTimer || 0) + 1;
+    if (game.volleyTimer >= VOLLEY_INTERVAL && (game.animFrame % BAR_FRAMES) === 0
+        && (game.enemyBullets || []).length < VOLLEY_DENSITY_MAX
+        && !wingTelegraphing(game.enemies)) {
+      game.volleyTimer -= VOLLEY_INTERVAL;
+      const _shooters = volleyPlan(game.enemies, game.playerX, game.stage, false);
+      if (_shooters.length) {
+        const _spd = cappedStageSpeed(3.4, 2.0, 0.045, game.stage, diffSpeedMul());
+        for (const s of _shooters) {
+          s.volleyTimer = volleyTellFor(_shooters.length);
+          // THE FROZEN SOLUTION — computed ONCE, here. The tell draws this exact
+          // vector and the commit fires along it. A tracking line is not a
+          // telegraph: it tells the player where the bullet would go if they
+          // stopped moving, which is the one thing they must not do.
+          s.volleyAim = aimVelocity(s.x, s.y, game.playerX, game.playerY, _spd);
+        }
+        if (typeof coachFire === 'function') coachFire('volley');
+        if (!game._volleySeen && typeof pushIntercept === 'function') {
+          game._volleySeen = true;
+          pushIntercept('volley');
         }
       }
     }
@@ -16409,6 +16562,15 @@ function updateCollisions() {
       const b = game.enemyBullets[i];
       if (aabbHit(b.x - game.playerX, b.y - game.playerY, hitW + 2, 9)) {
         _parriedThisFrame++;
+        // THE FIRING LINE pays in FRAMES, NOT POINTS. This loop has no cooldown
+        // (unlike the graze, which got one), ramps 50 -> 250 by streak, and is
+        // TRIPLED by the PARRY DIVIDEND card — so giving the wall a trigger is a
+        // supply line straight into the game's most uncapped income lane, and
+        // since THE STAKES turned the score into a geometric LIVES ladder, that
+        // income is lives. A volley pellet is still deflected, still feeds the
+        // streak, still counts toward CLUSTER PARRY and still delivers its
+        // hit-stop. It simply never calls addScore.
+        const _pays = !b.noPay;
         // PARRY DEFLECT GHOST — push 3 fading cyan ghosts upward from bullet pos
         // before removing the bullet. Reads as 'deflected back at sender'.
         if (game.itemBursts) {
@@ -16437,16 +16599,16 @@ function updateCollisions() {
         const baseScore = [50, 75, 100, 150, 250][tier];
         const tierCol = '#0ff';
         const tierLabel = game.parryStreak >= 2 ? ('PARRY x' + game.parryStreak) : 'PARRY';
-        if (game.parryStreak === 10 && !game._ultraParryFired) {
+        if (_pays && game.parryStreak === 10 && !game._ultraParryFired) {
           game._ultraParryFired = true;
           addScore(500);
         }
         // PERK 'parryDividend' — parry score → 3×
-        addScore(hasPerk('parryDividend') ? baseScore * 3 : baseScore);
+        if (_pays) addScore(hasPerk('parryDividend') ? baseScore * 3 : baseScore);
         // PERFECT PARRY — parry within the first 3 frames of dash (dashTimer
         // 10-12 of starting 12). Bonus +50 + gold "PERFECT" callout above the
         // bullet's deflect spot. Encourages tight timing reads.
-        if ((game.dashTimer || 0) >= 10) {
+        if (_pays && (game.dashTimer || 0) >= 10) {
           addScore(50);
           // CEO subtraction: the gold "PERFECT" callout banner + enemy-comms
           // intercept were removed. The +50 bonus, the perfect-parry count/stat, and
@@ -16801,6 +16963,10 @@ function killPlayer(srcX, srcY, cause, srcType) {
   // Cancel mid-dash so respawn isn't already moving
   game.dashTimer = 0;
   game.dashCooldown = 0;
+  // THE FIRING LINE stands down. Without this the wall finishes shots aimed at
+  // where the player WAS, firing into the death recap with no one to dodge them.
+  for (const _e of (game.enemies || [])) { _e.volleyTimer = 0; _e.volleyAim = null; }
+  game.volleyTimer = 0;
   // Clear any in-flight fire cooldown so the post-respawn first shot isn't briefly delayed.
   game.fireCooldown = 0;
   // Cinematic death hit-stop — pauses the simulation for 12 frames so the player feels the moment
@@ -17174,9 +17340,21 @@ function shockwaveCap() {
   }
 }
 function bulletCap() {
-  // Cap enemy bullets to 80 max for performance — splice oldest
+  // Cap enemy bullets to 80 for performance. It used to splice the OLDEST —
+  // `splice(0, len - 80)` — which is a fairness failure wearing a perf guard's
+  // clothes: the oldest enemy bullets are the ones that have travelled furthest,
+  // i.e. the ones NEAREST the player and about to matter. Under a boss ring burst
+  // plus an elite death burst, the cap was deleting the exact rounds the player
+  // had already committed to dodging. Trim by DISTANCE instead, so what is culled
+  // is always the round with the most screen left to cross.
   if (game.enemyBullets && game.enemyBullets.length > 80) {
-    game.enemyBullets.splice(0, game.enemyBullets.length - 80);
+    const py = game.playerY, px = game.playerX;
+    game.enemyBullets.sort((a, b) => {
+      const da = (a.x - px) * (a.x - px) + (a.y - py) * (a.y - py);
+      const db = (b.x - px) * (b.x - px) + (b.y - py) * (b.y - py);
+      return da - db;                      // nearest first — they are kept
+    });
+    game.enemyBullets.length = 80;
   }
   // Float texts cap
   if (game.floatTexts && game.floatTexts.length > 50) {
@@ -20936,6 +21114,45 @@ function drawGameplay() {
         ctx.beginPath();
         ctx.arc(e.x, e.y, pulseR, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.restore();
+      }
+      // THE FIRING LINE, DRAWN — and it is drawn as the bullets' LITERAL PATH.
+      // The vector was frozen when the volley armed, so this line is a promise,
+      // not a prediction: stand off it and the round misses by construction.
+      // Every other telegraph in this file already works this way (a dive freezes
+      // its bezier, the capture and the weather strike draw fixed columns); a line
+      // that tracked the player would only ever say "here is where it would go if
+      // you stopped moving", which is the one thing they must not do.
+      if ((e.volleyTimer || 0) > 0 && e.volleyAim) {
+        const _vt = e.volleyTimer;
+        const _grow = 1 - _vt / Math.max(1, volleyTellFor(1));   // 0 -> 1 as it commits
+        const _sp = magnitude(e.volleyAim.vx, e.volleyAim.vy) || 1;
+        const _ux = e.volleyAim.vx / _sp, _uy = e.volleyAim.vy / _sp;
+        // The line reaches all the way to the player's row: the player must be
+        // able to see WHERE it lands, not merely that something is coming.
+        const _len = Math.max(8, (game.playerY - e.y) / Math.max(0.2, _uy));
+        ctx.save();
+        ctx.globalAlpha = (0.30 + 0.45 * _grow) * (blinkPhase(4) ? 1 : 0.65);
+        ctx.strokeStyle = '#ff2f6e';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y + 4);
+        ctx.lineTo(e.x + _ux * _len, e.y + 4 + _uy * _len);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // The muzzle: a bracket that closes as the shot commits.
+        ctx.globalAlpha = 0.45 + 0.45 * _grow;
+        ctx.fillStyle = '#ff8fb5';
+        ctx.fillRect(Math.round(e.x) - 3, Math.round(e.y) + 4, 2, 1);
+        ctx.fillRect(Math.round(e.x) + 1, Math.round(e.y) + 4, 2, 1);
+        // COLORBLIND-SAFE SHAPE at the impact point — the same downward chevron
+        // the storm strike already uses to mean "this exact place is about to be
+        // dangerous", so the vocabulary is reused rather than invented.
+        const _ix = e.x + _ux * _len, _iy = e.y + 4 + _uy * _len;
+        ctx.fillRect(Math.round(_ix) - 3, Math.round(_iy) - 4, 7, 1);
+        ctx.fillRect(Math.round(_ix) - 2, Math.round(_iy) - 3, 5, 1);
+        ctx.fillRect(Math.round(_ix) - 1, Math.round(_iy) - 2, 3, 1);
         ctx.restore();
       }
       // ELITE outline — drawn BEFORE the sprite so it reads as a halo/border.

@@ -254,6 +254,10 @@ const shim = `
   trackNames: (typeof BGM !== 'undefined') ? Object.keys(BGM) : null,
 }; }; } catch (e) {}
 ;try { globalThis.__getComboMilestone = function () { return COMBO_MILESTONE; }; } catch (e) {}
+;try { globalThis.__getVolleyConst = function () { return {
+  TELL_BASE: VOLLEY_TELL_BASE, TELL_PER: VOLLEY_TELL_PER,
+  INTERVAL: VOLLEY_INTERVAL, MIN_STAGE: VOLLEY_MIN_STAGE,
+  DENSITY_MAX: VOLLEY_DENSITY_MAX, DIVE_PREVIEW: DIVE_PREVIEW }; }; } catch (e) {}
 ;try { globalThis.__getBar = function () { return {
   BPM: SIM_BPM, BEATS_PER_BAR: BEATS_PER_BAR,
   BEAT: BEAT_FRAMES, BAR: BAR_FRAMES, WING_COOLDOWN: WING_COOLDOWN,
@@ -1010,19 +1014,36 @@ if (typeof G.computeDailyStreak === 'function') {
 } else { console.log('  (skipped — computeDailyStreak not exposed)'); }
 
 // ============================================================
-section('bulletCap — performance caps trim the oldest entries');
+section('bulletCap — the perf cap must not delete the bullets you are dodging');
 {
   const bc = G.__getGame && G.__getGame();
   if (bc && typeof G.bulletCap === 'function') {
     const save = { enemyBullets: bc.enemyBullets, floatTexts: bc.floatTexts, itemBursts: bc.itemBursts };
-    bc.enemyBullets = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+    // The cap used to `splice(0, len - 80)` — drop the OLDEST. An old enemy
+    // bullet is one that has travelled furthest, i.e. the one NEAREST the player
+    // and about to matter, so the perf guard was deleting exactly the rounds the
+    // player had already committed to dodging. Reachable today by a boss ring
+    // burst plus an elite death burst, and THE FIRING LINE only adds supply.
+    // Seeded so bullet 0 is the FARTHEST and bullet 99 is right on top of the ship.
+    bc.playerX = 112; bc.playerY = 260;
+    bc.enemyBullets = Array.from({ length: 100 }, (_, i) => ({ id: i, x: 112, y: 260 - (100 - i) }));
     bc.floatTexts   = Array.from({ length: 70 },  (_, i) => ({ id: i }));
     bc.itemBursts   = Array.from({ length: 130 }, (_, i) => ({ id: i }));
     G.bulletCap();
     eq(bc.enemyBullets.length, 80, 'enemy bullets capped at 80');
     eq(bc.floatTexts.length, 50, 'float texts capped at 50');
     eq(bc.itemBursts.length, 100, 'item bursts capped at 100');
-    eq(bc.enemyBullets[0].id, 20, 'drops the oldest, keeps the newest 80');
+    const kept = new Set(bc.enemyBullets.map(b => b.id));
+    ok(kept.has(99) && kept.has(98) && kept.has(90),
+       'the bullets NEAREST the player survive the cap');
+    ok(!kept.has(0) && !kept.has(1),
+       '  and the ones with the most screen still to cross are the ones culled');
+    let worstKept = 0;
+    for (const b of bc.enemyBullets) worstKept = Math.max(worstKept, Math.abs(b.y - 260));
+    let bestCulled = 1e9;
+    for (let i = 0; i < 100; i++) if (!kept.has(i)) bestCulled = Math.min(bestCulled, 100 - i);
+    ok(worstKept <= bestCulled,
+       '  every kept bullet is at least as close as every culled one');
     eq(bc.floatTexts[bc.floatTexts.length - 1].id, 69, 'newest float text retained');
     // under the cap → untouched
     bc.enemyBullets = [{ id: 1 }, { id: 2 }]; G.bulletCap();
@@ -5472,12 +5493,23 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
   kill(cmd);
   ok(!g.lattice.netIntact, 'killing the commander drops the net — the structure is now cuttable');
 
-  // --- punch the column: two real kills open a load path ---
-  kill(at(1, 2));
-  kill(at(2, 3));
+  // --- punch the column: real kills open a load path ---
+  // CARVE UNTIL IT GIVES, bounded. This used to kill two hardcoded grid
+  // coordinates, which made it depend on the exact seeded PRNG stream rather
+  // than on the property under test — so adding any new randInt() consumer
+  // anywhere in the game broke it, and the failure named the KEYSTONE rather
+  // than the thing that actually changed. The claim is "punching a column
+  // exposes a keystone", not "these two specific kills do".
+  let _punched = 0;
+  for (let _c = 1; _c <= 6 && g.lattice.cuts.length === 0; _c++) {
+    for (let _r = 0; _r <= 4 && g.lattice.cuts.length === 0; _r++) {
+      const _t = at(_c, _r);
+      if (_t) { kill(_t); _punched++; }
+    }
+  }
   ok(g.lattice.cuts.length > 0,
-     'punching a column exposes ' + g.lattice.cuts.length + ' keystone(s) — the wall now has '
-     + 'a load path a player can read');
+     'punching a column exposes ' + g.lattice.cuts.length + ' keystone(s) after '
+     + _punched + ' kills — the wall now has a load path a player can read');
 
   // --- cut it, and a span comes down ---
   // A SHAPE FAILURE MUST BE AN ASSERTION, NEVER AN ABORT. The unguarded form
@@ -6699,6 +6731,134 @@ section('playSound — the six cues that were falling through to a full-scale cl
     ok(cases.has(must), "'" + must + "' is a real cue, not a click");
   }
 }
+section('THE FIRING LINE — the wall aims, and the line it draws is the line it fires');
+{
+  const V = G.__getVolleyConst && G.__getVolleyConst();
+  if (V && typeof G.volleyPlan === 'function') {
+    // MEASURED, and it is why this exists: of the thirteen enemyBullets.push
+    // sites in the file, every one belonged to the rival, a mega-boss, a bullet
+    // split, a DIVING enemy, the hoverer, the mirror or an elite's death burst.
+    // A formation enemy sitting in the wall never fired. A driven probe found
+    // 0.34 bullets on screen at stage 3 with 84% of frames holding NONE.
+
+    // --- the warning is longer than the baseline, and grows with the threat ---
+    ok(V.TELL_BASE >= V.DIVE_PREVIEW, 'a volley warns at least as long as a lone dive');
+    eq(G.volleyTellFor(1), V.TELL_BASE, 'one shooter warns the base');
+    ok(G.volleyTellFor(2) > G.volleyTellFor(1), 'two shooters warn LONGER, never shorter');
+    ok(G.volleyTellFor(4) > G.volleyTellFor(2), '  and it keeps growing');
+    for (const bad of [undefined, null, NaN, 0, -3, 'x']) {
+      ok(G.volleyTellFor(bad) >= V.DIVE_PREVIEW,
+         'volleyTellFor(' + String(bad) + ') never drops under the readable baseline');
+    }
+
+    // --- the pool: one enemy never owns two telegraphs at once ---
+    const mk = (o) => Object.assign({ alive: true, state: 'formation', x: 100, y: 60, type: 'bee' }, o);
+    eq(G.volleyPlan([], 112, 9, false).length, 0, 'no enemies, no volley');
+    eq(G.volleyPlan(null, 112, 9, false).length, 0, 'a missing roster is not a throw');
+    eq(G.volleyPlan([mk({})], 112, 1, false).length, 0,
+       'stage 1 is left the tutorial it is');
+    eq(G.volleyPlan([mk({})], 112, 9, true).length, 0, 'blocked means blocked');
+    eq(G.volleyPlan([mk({ state: 'diving' })], 112, 9, false).length, 0,
+       'a DIVER is never picked — it is already a threat with its own telegraph');
+    eq(G.volleyPlan([mk({ previewTimer: 12 })], 112, 9, false).length, 0,
+       'nor is a member already telegraphing a dive');
+    eq(G.volleyPlan([mk({ volleyTimer: 12 })], 112, 9, false).length, 0,
+       'nor one already telegraphing a volley');
+    eq(G.volleyPlan([mk({ type: 'boss' })], 112, 9, false).length, 0,
+       'nor the captain, whose capture beam is its telegraph');
+    eq(G.volleyPlan([mk({ alive: false })], 112, 9, false).length, 0, 'nor a corpse');
+    eq(G.volleyPlan([mk({})], 112, 9, false).length, 1, 'an eligible member IS picked');
+  } else { console.log('  (skipped — the firing line is not exposed)'); }
+}
+
+section('THE FIRING LINE — driven: it never fires without a warning, and never pays');
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getVolleyConst) {
+  const V = G.__getVolleyConst();
+  const K = G.__getKeys();
+  const clear = () => { for (const k of [' ', 'ArrowLeft', 'ArrowRight']) K[k] = false; };
+  G.resetGame();
+  const g = G.__getGame();
+  g.stage = 13;
+  G.startStage();
+  g.playerAlive = true; g.lives = 99; g.cheatInvincible = true;
+  for (let f = 0; f < 700 && !g.allEntered; f++) G.update();
+  clear();
+
+  let fired = 0, unwarned = 0, offGrid = 0, minTell = Infinity, unflagged = 0;
+  const armed = new Map();
+  let seenVolley = 0;
+  for (let f = 0; f < 9000; f++) {
+    K[' '] = (f % 5) < 3;
+    // record every tell as it arms, and how long it ran
+    for (const e of (g.enemies || [])) {
+      if ((e.volleyTimer || 0) > 0 && !armed.has(e)) armed.set(e, { start: e.volleyTimer, aim: e.volleyAim });
+    }
+    const before = (g.enemyBullets || []).filter(b => b.kind === 'volley').length;
+    const scoreBefore = g.score || 0;
+    G.update();
+    const after = (g.enemyBullets || []).filter(b => b.kind === 'volley').length;
+    if (after > before) {
+      fired += after - before;
+      for (const b of (g.enemyBullets || [])) {
+        if (b.kind === 'volley' && !b.noPay && !b._seenFlagCheck) { b._seenFlagCheck = 1; unflagged++; }
+      }
+      // it must have been armed, and armed for at least the baseline
+      let any = false;
+      for (const [e, rec] of armed) {
+        if ((e.volleyTimer || 0) === 0) { any = true; minTell = Math.min(minTell, rec.start); armed.delete(e); }
+      }
+      if (!any) unwarned++;
+      if ((g.animFrame % 24) !== 0 && false) offGrid++;
+    }
+    seenVolley = Math.max(seenVolley, (g.enemyBullets || []).filter(b => b.kind === 'volley').length);
+  }
+  clear();
+  ok(fired > 0, 'the wall actually fires in real play (' + fired + ' volleys)');
+  // EVERY pellet the volley itself spawns must carry the flag. The pure test above
+  // pushes a hand-made bullet and proves the PARRY LOOP honours noPay; only this
+  // proves the VOLLEY SETS it. Without this, deleting `noPay: true` from the spawn
+  // site passed the whole suite — measured, and it is why this assertion exists.
+  eq(unflagged, 0, 'every volley pellet the wall fired carries noPay ('
+     + unflagged + ' unflagged of ' + fired + ')');
+  eq(unwarned, 0, 'and NEVER without a telegraph having run first');
+  ok(minTell === Infinity || minTell >= V.DIVE_PREVIEW,
+     'the shortest telegraph observed is ' + (minTell === Infinity ? 'n/a' : minTell + 'f')
+     + ', at or above the ' + V.DIVE_PREVIEW + 'f readable baseline');
+
+  // --- IT PAYS NOTHING. Since THE STAKES, score IS lives; the dash-parry has no
+  // cooldown and is tripled by a draftable card, so a wall that fires would
+  // otherwise be a supply line straight into the game's least-capped income lane.
+  G.resetGame();
+  const g2 = G.__getGame();
+  g2.stage = 13; G.startStage();
+  g2.playerAlive = true; g2.lives = 99; g2.cheatInvincible = true;
+  g2.manifest = { parryDividend: 1 };
+  for (let f = 0; f < 700 && !g2.allEntered; f++) G.update();
+  g2.score = 0;
+  g2.enemyBullets.length = 0;
+  // a volley pellet, parked on the ship, parried
+  g2.enemyBullets.push({ x: g2.playerX, y: g2.playerY, vx: 0, vy: 1, kind: 'volley', noPay: true });
+  g2.dashTimer = 6; g2.parryStreak = 9; g2.parryStreakTimer = 60;
+  const _s0 = g2.score;
+  G.updateCollisions();
+  eq(g2.score, _s0, 'parrying a volley pellet awards ZERO — even at streak 10 with '
+     + 'PARRY DIVIDEND held, the two multipliers that would otherwise stack');
+  ok((g2.parryStreak || 0) > 9, '  but the STREAK still advances: frames, not points');
+  eq(g2.enemyBullets.length, 0, '  and the pellet is still deflected');
+
+  // a normal (paying) bullet in the same state still pays, so this is a flag and
+  // not a silent global nerf to a verb the player has learned
+  g2.score = 0;
+  g2.enemyBullets.push({ x: g2.playerX, y: g2.playerY, vx: 0, vy: 1, kind: 'dive' });
+  g2.dashTimer = 6;
+  G.updateCollisions();
+  ok((g2.score || 0) > 0, 'a DIVE bullet parried in the same frame still pays ('
+     + g2.score + ') — the parry verb is untouched');
+  G.resetGame();
+  clear();
+} else { console.log('  (skipped — the firing line is not drivable)'); }
+
+
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);

@@ -13,6 +13,8 @@
 #   test/pulse-audit.js      the control budget (frames your input does nothing)
 #   test/recovery-audit.js   the recovery budget (does the death spiral have a brake)
 #   test/measure-audit.js    THE MEASURE (clock / authorship / arrangement / rhythm)
+#   test/silhouette-audit.js what the bright pass can see, and what you can tell apart
+#   test/pressure-audit.js   how much incoming fire the arena actually has
 set -uo pipefail
 
 # Resolve repo root relative to this script so it works from any cwd.
