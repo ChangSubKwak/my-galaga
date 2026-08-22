@@ -244,6 +244,10 @@ const shim = `
   OPEN: VENT_OPEN, MIN: VENT_MIN, RAMP: VENT_RAMP, HALF: VENT_HALF,
   OFF: VENT_OFF, SLOW: VENT_SLOW, GAIN: STAGGER_GAIN, DECAY: STAGGER_DECAY,
   STUN: STAGGER_STUN }; }; } catch (e) {}
+;try { globalThis.__getManifestConst = function () { return {
+  PERKS: PERKS, IDS: PERK_IDS, MAX_RANK: PERK_MAX_RANK,
+  SELECT_FRAMES: PERK_SELECT_FRAMES, ARM: DRAFT_ARM, WITCH_WINDOW: WITCH_WINDOW,
+  COMBO_DECAY: COMBO_DECAY, SHIELD_MAX: SHIELD_MAX }; }; } catch (e) {}
 ;try { globalThis.__audioProbe = function () { return {
   duckHold: (typeof _bgmDuckHold !== 'undefined') ? _bgmDuckHold : null,
   stems: (typeof bgmStems !== 'undefined' && bgmStems) ? Object.keys(bgmStems).sort().join(',') : null,
@@ -1712,16 +1716,31 @@ section('PERKS: every activePerk reference resolves to a defined perk');
     const perkKeys = new Set(
       (perksMatch[1].match(/^\s*([a-zA-Z]+)\s*:/gm) || []).map(s => s.replace(/[:\s]/g, ''))
     );
-    ok(perkKeys.size >= 10, 'PERKS defines >= 10 perks (got ' + perkKeys.size + ')');
-    const refs = new Set((scriptSrc.match(/activePerk === '([a-zA-Z]+)'/g) || [])
+    // THE POOL MUST OUT-SIZE THE RUN. The draft now runs at every stage clear
+    // (~29 times in a long run) instead of twice, so a pool that cannot supply
+    // that many DISTINCT takeable cards degrades into a dimmed screen the player
+    // has to sit through. Ranks are what make 15 cards enough.
+    ok(perkKeys.size >= 12, 'PERKS defines >= 12 cards (got ' + perkKeys.size + ')');
+    // Read sites are hasPerk('x') / perkRank('x') / perkStep('x', n) — the scalar
+    // `activePerk === 'x'` form is gone, and this guard moved with it.
+    const refs = new Set((scriptSrc.match(/(?:hasPerk|perkRank|perkStep)\('([a-zA-Z]+)'/g) || [])
       .map(s => s.match(/'([a-zA-Z]+)'/)[1]));
     let allDefined = true, undef = [];
     for (const r of refs) { if (!perkKeys.has(r)) { allDefined = false; undef.push(r); } }
-    ok(allDefined, 'every referenced perk is defined in PERKS' + (undef.length ? ' (undefined: ' + undef.join(', ') + ')' : ''));
-    // every defined perk should also be referenced somewhere (no dead perk)
+    ok(allDefined, 'every referenced card is defined in PERKS' + (undef.length ? ' (undefined: ' + undef.join(', ') + ')' : ''));
+    // every defined card must also be READ somewhere (no card that does nothing)
     let allUsed = true, unused = [];
     for (const k of perkKeys) { if (!refs.has(k)) { allUsed = false; unused.push(k); } }
-    ok(allUsed, 'every defined perk is referenced in logic' + (unused.length ? ' (unused: ' + unused.join(', ') + ')' : ''));
+    ok(allUsed, 'every defined card is read in logic' + (unused.length ? ' (unused: ' + unused.join(', ') + ')' : ''));
+    // NO CARD MAY SUPPRESS A DEFENSIVE LAYER. tryTriggerWitchTime returns false
+    // whenever shieldCharges is non-zero, so a card that grants shield charges
+    // permanently disables WITCH TIME once cards stack and persist — un-takeable
+    // and unexplained. That is exactly what VAMPIRE did, and why it was cut.
+    ok(!perkKeys.has('vampire'), 'VAMPIRE is gone from the pool');
+    const shieldWrites = (scriptSrc.match(/game\.shieldCharges\s*=\s*\(game\.shieldCharges/g) || []).length;
+    const perkShieldWrite = /(?:hasPerk|perkRank)\('[a-zA-Z]+'\)[^;\n]*\n?[^;]*game\.shieldCharges\s*=/.test(scriptSrc);
+    ok(!perkShieldWrite, 'no card writes game.shieldCharges (' + shieldWrites
+       + ' shield grants exist, none behind a card)');
   }
 }
 
@@ -6328,6 +6347,268 @@ section('BGM TABLES — a zero-beat note would hang every harness and the browse
     eq(G.validateBgmTables(null).length, 0, 'a missing table set is not a throw');
   } else { console.log('  (skipped — validateBgmTables not exposed)'); }
 }
+
+section('THE MANIFEST — cards stack instead of erasing each other');
+{
+  const M = G.__getManifestConst && G.__getManifestConst();
+  if (M && typeof G.perkRank === 'function') {
+    const g = fresh();
+    g.manifest = {};
+    // --- an empty manifest holds nothing, and asking is never a throw ---
+    eq(G.perkRank('heavyRound'), 0, 'an empty manifest holds no rank');
+    ok(!G.hasPerk('heavyRound'), 'and hasPerk is false');
+    eq(G.perkRank(null), 0, 'a null id is rank 0, not a throw');
+    eq(G.perkRank('nosuchcard'), 0, 'an unknown id is rank 0');
+    eq(G.perkStep('heavyRound', 5), 0, 'and its step contributes nothing');
+
+    // --- RAISE, DO NOT REPLACE: the single line the whole reform turns on ---
+    ok(G.applyPerk('heavyRound'), 'a card is taken');
+    eq(G.perkRank('heavyRound'), 1, 'at rank 1');
+    ok(G.applyPerk('heavyRound'), 'taking it again is allowed');
+    eq(G.perkRank('heavyRound'), 2, 'and RAISES it to 2 — it does not replace or reset');
+    ok(G.applyPerk('heavyRound'), 'and again');
+    eq(G.perkRank('heavyRound'), 3, 'to the cap');
+    ok(!G.applyPerk('heavyRound'), 'a maxed card cannot be taken again (not a choice)');
+    eq(G.perkRank('heavyRound'), 3, 'and its rank does not creep past the cap');
+    // the old scalar erased on every pick; the manifest keeps what came before
+    ok(G.applyPerk('firebrand'), 'a second, different card is taken');
+    eq(G.perkRank('heavyRound'), 3, 'and the FIRST card is still held at full rank');
+    eq(G.manifestSize(), 2, 'two distinct cards');
+    eq(G.manifestRanks(), 4, 'four ranks between them');
+    eq(G.perkStep('heavyRound', 0.5), 1.5, 'perkStep scales linearly with rank');
+
+    // --- SCORE-BEARING CARDS CAP AT 1 ---
+    // curve-audit measured this game's score economy with these three at their
+    // shipped values; letting them stack would inflate the one number nine
+    // previous leaps deliberately refused to touch.
+    for (const id of ['parryDividend', 'ghostWake', 'bountyHunter']) {
+      eq(G.perkMaxRank(id), 1, id + ' — a score multiplier — caps at rank 1');
+      ok(G.applyPerk(id), id + ' can be taken once');
+      ok(!G.applyPerk(id), '  and never a second time');
+      eq(G.perkRank(id), 1, '  so its multiplier is exactly the shipped one');
+    }
+    eq(G.perkMaxRank('heavyRound'), M.MAX_RANK, 'a power card caps at the global rank cap');
+
+    // --- NO DEAD DRAFT: an offer never contains a card you cannot take ---
+    g.manifest = {};
+    for (const id of M.IDS) g.manifest[id] = G.perkMaxRank(id);   // hold everything, maxed
+    eq(G.pickPerkOffer().length, 0, 'a fully maxed manifest is offered NOTHING '
+       + '(rather than three cards that do nothing when pressed)');
+    ok(!G.offerDraft(), 'and offerDraft declines to open a window it cannot fill');
+    // one slot free → exactly that card is offered
+    g.manifest = {};
+    for (const id of M.IDS) g.manifest[id] = G.perkMaxRank(id);
+    delete g.manifest.kinetic;
+    const only = G.pickPerkOffer();
+    eq(only.length, 1, 'with one takeable card left, the offer holds exactly one');
+    eq(only[0], 'kinetic', 'and it is that card');
+    // a partially-ranked card is still offerable
+    g.manifest = { kinetic: 1 };
+    const off = G.pickPerkOffer();
+    eq(off.length, 3, 'a normal offer is three cards');
+    eq(new Set(off).size, 3, 'all distinct');
+    let maxedOffered = 0;
+    for (let i = 0; i < 200; i++) {
+      for (const id of G.pickPerkOffer()) {
+        if (G.perkRank(id) >= G.perkMaxRank(id)) maxedOffered++;
+      }
+    }
+    eq(maxedOffered, 0, 'across 200 offers, a maxed card is never dealt');
+
+    // --- the rank-aware pure helpers stay byte-identical for booleans ---
+    // Every pinned call in this suite passes true/false; `true|0` is 1 and
+    // `false|0` is 0, which is what makes the conversion free.
+    eq(G.computeBulletDamage(1, 0, false, null, false), G.computeBulletDamage(1, 0, 0, null, 0),
+       'computeBulletDamage: false and 0 agree');
+    eq(G.computeBulletDamage(1, 0, true, null, false), G.computeBulletDamage(1, 0, 1, null, 0),
+       '  and true and 1 agree');
+    eq(G.computeBulletDamage(1, 0, 3, null, 0), G.computeBulletDamage(1, 0, 1, null, 0) + 2,
+       '  while rank 3 is +2 over rank 1 — linear, as the card promises');
+    eq(G.computeFireCooldown(false, false, true, false), G.computeFireCooldown(false, false, 1, false),
+       'computeFireCooldown: true and rank 1 agree');
+    ok(G.computeFireCooldown(false, false, 3, false) < G.computeFireCooldown(false, false, 1, false),
+       '  and rank 3 is strictly faster than rank 1');
+    ok(G.computeFireCooldown(true, true, 3, true) >= 2, '  never below the 2-frame floor');
+    eq(G.computeBulletSpeed(4, 1, false, true), G.computeBulletSpeed(4, 1, false, 1),
+       'computeBulletSpeed: true and rank 1 agree');
+    ok(G.computeBulletSpeed(4, 1, false, 3) > G.computeBulletSpeed(4, 1, false, 1),
+       '  and rank 3 is faster still');
+    eq(G.computeBulletSpeed(4, 1, false, 0), G.computeBulletSpeed(4, 1, false, false),
+       '  and 0 is exactly the no-card case');
+    G.resetGame();
+  } else { console.log('  (skipped — manifest not exposed)'); }
+}
+
+section('THE DRAFT — driven: a card is PRESSED, never drifted into');
+if (ST && typeof G.startStage === 'function' && G.__getGame && typeof G.offerDraft === 'function') {
+  const M = G.__getManifestConst();
+  const K = G.__getKeys();
+  const clearKeys = () => { for (const k of [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'a', 'd', 'A', 'D']) K[k] = false; };
+  const arm = () => { for (let f = 0; f < M.ARM + 1; f++) G.update(); };   // past the arming beat
+
+  // --- EXPIRY TAKES NOTHING ---
+  // The old window auto-applied whatever card the ship was standing under when it
+  // ran out, so a lateral dodge during a hazard telegraph could rewrite the build:
+  // a choice the player never made, taken from them by the act of surviving.
+  G.resetGame();
+  const g = G.__getGame();
+  g.manifest = {};
+  clearKeys();
+  let opened = 0;
+  for (let round = 0; round < 20; round++) {
+    if (G.offerDraft()) opened++;
+    for (let f = 0; f < M.SELECT_FRAMES + 5; f++) G.update();
+  }
+  eq(opened, 20, '20 drafts opened');
+  eq(G.manifestSize(), 0, 'and with NO input, twenty expiries took ZERO cards — '
+     + 'declining is an answer, and an un-pressed card is not a decision');
+
+  // --- A PRESS TAKES EXACTLY ONE ---
+  G.resetGame();
+  const g2 = G.__getGame();
+  g2.manifest = {};
+  clearKeys();
+  let taken = 0;
+  // A FIRE BUTTON ALREADY HELD WHEN THE WINDOW OPENS MUST NOT COMMIT. The player
+  // was holding it to shoot the stage they just cleared; if that counted, the card
+  // would be taken on the first frame, before they had read any of the three.
+  K[' '] = true;
+  G.offerDraft();
+  arm();
+  eq(G.manifestSize(), 0, 'fire held from the cleared stage takes nothing');
+  ok((g2.perkSelectFrames || 0) > 0, 'and the window is still open, waiting for a real press');
+  K[' '] = false; G.update();
+  K[' '] = true;  G.update();
+  eq(G.manifestRanks(), 1, 'releasing and pressing takes exactly one card');
+  K[' '] = false;
+  for (let round = 0; round < 5; round++) {
+    if (!G.offerDraft()) break;
+    K[' '] = false; arm();
+    K[' '] = true;
+    for (let f = 0; f < M.SELECT_FRAMES + 5; f++) G.update();   // stays held the whole window
+    K[' '] = false;
+    taken = G.manifestRanks();
+  }
+  eq(taken, 6, 'six windows, six ranks — a HELD button commits exactly once per '
+     + 'window, never once per frame');
+  ok((g2.perkSelectFrames || 0) === 0, 'and the window closed on commit');
+
+  // --- THE CURSOR IS A REAL INPUT, ON THE SHARED KEYS MAP ---
+  G.resetGame();
+  const g3 = G.__getGame();
+  g3.manifest = {};
+  clearKeys();
+  G.offerDraft();
+  const offered = g3.perkOffered.slice();
+  eq(g3.draftIdx, 1, 'the draft opens on the middle card');
+  // THE ARMING BEAT: a press inside the first beat is refused outright. Measured
+  // cause — with no arm, the draft's longest observed life in a driven session was
+  // SIX FRAMES, because a player mashing fire (which is how a shooter is played)
+  // takes the middle card before the three have finished fading in.
+  K[' '] = false; G.update(); K[' '] = true; G.update();
+  eq(G.manifestSize(), 0, 'a press inside the arming beat takes NOTHING');
+  K[' '] = false;
+  arm();
+  K['ArrowLeft'] = true; G.update(); K['ArrowLeft'] = false; G.update();
+  eq(g3.draftIdx, 0, 'left moves the cursor');
+  K['ArrowLeft'] = true; G.update(); K['ArrowLeft'] = false; G.update();
+  eq(g3.draftIdx, 0, 'and it clamps at the first card');
+  K['ArrowRight'] = true; G.update(); K['ArrowRight'] = false; G.update();
+  K['ArrowRight'] = true; G.update(); K['ArrowRight'] = false; G.update();
+  eq(g3.draftIdx, 2, 'right moves it to the last card');
+  K['ArrowRight'] = true; G.update(); K['ArrowRight'] = false;
+  eq(g3.draftIdx, 2, 'and clamps there');
+  K[' '] = true; G.update(); K[' '] = false;
+  eq(G.perkRank(offered[2]), 1, 'firing takes THE CARD UNDER THE CURSOR');
+  eq(G.manifestSize(), 1, 'and only that one');
+  clearKeys();
+
+  // --- THE INTRO SKIP MUST NOT EAT THE COMMIT ---
+  // Both are the fire button. If the intro consumed it, taking a card would also
+  // skip the intro out from under the card the player was still reading.
+  G.resetGame();
+  const g4 = G.__getGame();
+  g4.state = ST.STAGE_INTRO;
+  g4.stageTimer = 90;
+  g4.manifest = {};
+  G.offerDraft();
+  clearKeys();
+  arm();               // past the arming beat, and past the open-time held guard
+  K[' '] = true;
+  G.update();
+  ok(g4.stageTimer > 1, 'a commit press does not fast-forward the stage intro');
+  eq(G.manifestSize(), 1, 'it takes the card instead');
+  clearKeys();
+
+  // --- THE DRAFT IS MODAL: it never composites over live fire ---
+  // Its window (150f) is longer than the stage intro (120f), so without the hold
+  // the last ~30 frames of three 64x60 cards and a 55%-black scrim would land on
+  // top of a live playfield — the exact "a modal over live bullets" defect the
+  // reform's own red team flagged.
+  G.resetGame();
+  const g6 = G.__getGame();
+  g6.manifest = {};
+  g6.state = ST.STAGE_INTRO;
+  g6.stageTimer = 120;
+  G.offerDraft();
+  clearKeys();
+  let leakedFrames = 0;
+  for (let f = 0; f < M.SELECT_FRAMES + 60; f++) {
+    G.update();
+    if ((g6.perkSelectFrames || 0) > 0 && g6.state !== ST.STAGE_INTRO) leakedFrames++;
+  }
+  eq(leakedFrames, 0, 'across a whole undecided draft, ZERO frames of it were drawn '
+     + 'outside STAGE_INTRO — the playfield behind the cards is always empty');
+  ok(g6.state !== ST.STAGE_INTRO, 'and once the window closes the intro releases '
+     + 'and the stage starts');
+  // ...and a decisive player pays nothing for the hold
+  G.resetGame();
+  const g7 = G.__getGame();
+  g7.manifest = {};
+  g7.state = ST.STAGE_INTRO;
+  g7.stageTimer = 120;
+  G.offerDraft();
+  clearKeys();
+  arm();
+  K[' '] = true; G.update(); K[' '] = false;      // commit at the first legal frame
+  let held = 0;
+  for (let f = 0; f < 300 && g7.state === ST.STAGE_INTRO; f++) { G.update(); held++; }
+  ok(held + M.ARM + 2 <= 120 + M.ARM,
+     'committing at the first legal frame costs no more than the arming beat itself ('
+     + held + 'f left of the 120f intro)');
+  eq(G.manifestSize(), 1, 'and the card was taken');
+  clearKeys();
+
+  // --- ALL THREE CLEAR PATHS OFFER, NOT JUST THE BOSS ---
+  // The offer used to live in the mega-boss death branch alone, which is why a run
+  // ended with one modifier: two decisions, each erasing the last.
+  const advSrc = scriptSrc.slice(scriptSrc.indexOf('function advanceToNextStage()'),
+                                 scriptSrc.indexOf('function advanceToNextStage()') + 600);
+  ok(advSrc.indexOf('offerDraft()') >= 0, 'the shared stage-advance funnel opens a draft');
+  const advCalls = (scriptSrc.match(/advanceToNextStage\(\)/g) || []).length;
+  ok(advCalls >= 4, 'and all three clear paths route through it (' + (advCalls - 1) + ' call sites)');
+  ok(!/game\.perkOffered = pickPerkOffer\(\);/.test(scriptSrc),
+     'no clear path opens a draft by hand any more — there is one funnel');
+
+  // --- THE VAMPIRE REGRESSION CAN NEVER COME BACK ---
+  // A card granting shield charges would permanently suppress WITCH TIME, because
+  // tryTriggerWitchTime returns false whenever shieldCharges is non-zero.
+  G.resetGame();
+  const g5 = G.__getGame();
+  g5.manifest = {};
+  for (const id of M.IDS) g5.manifest[id] = G.perkMaxRank(id);   // hold the ENTIRE pool
+  g5.stage = 3;
+  G.startStage();
+  g5.playerAlive = true; g5.lives = 9; g5.shieldCharges = 0; g5.witchCooldown = 0;
+  clearKeys();
+  for (let f = 0; f < 3000; f++) G.update();
+  eq(g5.shieldCharges || 0, 0, 'holding the ENTIRE card pool through 3000 frames of real '
+     + 'play grants no shield charge — no card writes shieldCharges');
+  g5.witchCooldown = 0;
+  ok(G.tryTriggerWitchTime(), 'so WITCH TIME is still reachable with a full manifest');
+  G.resetGame();
+  clearKeys();
+} else { console.log('  (skipped — draft not drivable)'); }
 
 section('THE STEMS — four buses, a limiter, and a duck that survives the volume key');
 {

@@ -3793,7 +3793,7 @@ function drawPowerUp(p) {
   // POWERUP PROXIMITY GLOW — small pulsing ring when player is within 30px.
   // Helps targeting under bullet pressure. Skipped if magnetic perk active
   // (its own dashed-line aura already telegraphs proximity).
-  if (game.playerAlive && game.activePerk !== 'magnetic') {
+  if (game.playerAlive && !hasPerk('magnetic')) {
     const _dxp = x - game.playerX;
     const _dyp = y - game.playerY;
     const _d2 = _dxp * _dxp + _dyp * _dyp;
@@ -5039,7 +5039,7 @@ function updateStageWeather() {
         // (perk 'parryDividend' applies, matching bullet parries).
         game.parryCount = (game.parryCount || 0) + 1;
         game.weatherParries = (game.weatherParries || 0) + 1;
-        addScore(game.activePerk === 'parryDividend' ? 150 : 50);
+        addScore(hasPerk('parryDividend') ? 150 : 50);
         if (game.hitSparks) game.hitSparks.push({ x: game.playerX, y: game.playerY - 6, life: 0 });
         playSound('graze', game.playerX);
         game.floatTexts.push({
@@ -5055,7 +5055,7 @@ function updateStageWeather() {
       } else if (_verdict === 'graze') {
         // Edge-skim = the near-miss vocabulary: extends (never grows) the combo hold.
         if ((game.combo || 0) >= 5) {
-          game.comboTimer = Math.min(COMBO_DECAY, (game.comboTimer || 0) + 20);
+          game.comboTimer = Math.min(comboHold(), (game.comboTimer || 0) + 20);
         }
         game.nearMissChain = (game.nearMissChain || 0) + 1;
         game.nearMissChainTimer = 90;
@@ -8801,7 +8801,9 @@ function resetGame() {
     witchCooldown: 0,
     witchCause: null,    // identity of the hit the open window is deferring
     witchSrcType: null,  // ...so a whiff death keeps its tally/revenge/whisper
-    activePerk: null,
+    manifest: {},        // THE MANIFEST — id -> rank, the run you author
+    lastPerk: null,      // newest card: what the ship's corner dots show
+    draftIdx: 1,         // which of the three cards the draft cursor sits on
     perkOffered: null,
     perkSelectFrames: 0,
     lastSynergy: null,
@@ -10322,7 +10324,7 @@ function updateOneMegaBoss(mb) {
           });
         }
         // PERK 'bountyHunter' — boss bounty +50%. Surfaced in the bounty banner.
-        const _bountyHunter = game.activePerk === 'bountyHunter';
+        const _bountyHunter = hasPerk('bountyHunter');
         const mbBounty = bossBounty(game.stage, game.combo, _bountyHunter);
         addScore(mbBounty);
         // BOSS BOUNTY label — large yellow score popup at the boss kill site
@@ -10445,10 +10447,9 @@ function updateOneMegaBoss(mb) {
             setTimeout(() => playSound('milestoneStage'), 440);
             rumble(640, 0.95, 0.65);
           }
-          // POST-BOSS PERK SELECT — open the choice window so the player picks a buff
-          // before the next stage begins. activePerk is replaced; previous perk expires.
-          game.perkOffered = pickPerkOffer();
-          game.perkSelectFrames = PERK_SELECT_FRAMES;
+          // (The post-boss perk select moved into advanceToNextStage(). It used to
+          // be the ONLY draft in the game — twice a run, and every pick erased the
+          // last, which is why a build could never be more than one card deep.)
           // Blitz kill bonus — defeat all bosses fast (under ~12 seconds)
           const elapsed = (game.runFrames || 0) - (game.bossStartFrame || 0);
           const BLITZ_FRAMES = 720;
@@ -10997,7 +10998,8 @@ function tryStartDash() {
             : (game.dashDir || 1);
   game.dashDir = dir;
   game.dashTimer = 12;
-  game.dashCooldown = 60;
+  // KINETIC shortens the dash cooldown by 20% a rank (60 -> 48 -> 38 -> 31).
+  game.dashCooldown = Math.round(60 * Math.pow(0.8, perkRank('kinetic')));
   game.invincibleTimer = Math.max(game.invincibleTimer, 14);
   game.dashCount = (game.dashCount || 0) + 1;
   // FLIGHT SCHOOL — the first dash ever is the moment to reveal that dash is
@@ -11907,6 +11909,53 @@ function computeSynergy(s, n, p) {
   return null;
 }
 
+// ================= THE MANIFEST — the run you author, not the run you are dealt =================
+// `game.activePerk` was a SCALAR: one modifier at a time, offered twice a run (only
+// after a mega-boss), and each new pick ERASED the last. That single fact is why
+// nothing in this game synergised — a run ended with exactly one one-line modifier
+// active, no matter how long it lasted. The manifest is the same idea with the
+// erasure removed: an id -> rank map, drafted at every stage clear, where a repeat
+// of a card you hold RAISES it instead of replacing what you had.
+//
+// It stays cheap on purpose. Every card is an additive modifier on plumbing that
+// already exists, read through hasPerk()/perkRank() at a single site each — the
+// same shape the old scalar had, so nothing about collision, scoring or the state
+// machine has to know the manifest exists.
+const PERK_MAX_RANK = 3;
+// SCORE-BEARING CARDS CAP AT RANK 1. PARRY DIVIDEND, GHOST WAKE and BOUNTY HUNTER
+// are the three cards that multiply POINTS rather than power, and curve-audit
+// measured this game's score economy with them at their shipped values. Letting
+// them stack would be the reform quietly inflating the one number nine previous
+// leaps deliberately refused to touch — so they are drafted once and are done.
+// Everything else is power or tempo, and stacks to 3.
+function perkMaxRank(id) {
+  const p = PERKS[id];
+  return (p && p.maxRank) ? p.maxRank : PERK_MAX_RANK;
+}
+function perkRank(id) {
+  if (!id || !game || !game.manifest) return 0;
+  const r = game.manifest[id];
+  return (typeof r === 'number' && r > 0) ? Math.min(PERK_MAX_RANK, Math.floor(r)) : 0;
+}
+function hasPerk(id) { return perkRank(id) > 0; }
+// Linear rank scaling — the one place a card's per-rank step is applied, so a
+// card cannot accidentally be linear in one read site and flat in another.
+function perkStep(id, perRank) { return perkRank(id) * (perRank || 0); }
+// How many cards, and how many total ranks, the player is carrying. Used by the
+// HUD, the run highlights and the draft's own "nothing left to offer" guard.
+function manifestSize() {
+  if (!game || !game.manifest) return 0;
+  let n = 0;
+  for (const k in game.manifest) if (perkRank(k) > 0) n++;
+  return n;
+}
+function manifestRanks() {
+  if (!game || !game.manifest) return 0;
+  let n = 0;
+  for (const k in game.manifest) n += perkRank(k);
+  return n;
+}
+
 // Player fire cooldown (frames between shots). Base 6, halved to 3 by RAPID
 // pickup, then the RAPID FIRE mutation (÷1.7), fastFingers perk (×0.75), and
 // OVERLOAD synergy (×0.6) stack multiplicatively — each fl'd and floored at 2 so
@@ -11915,7 +11964,7 @@ function computeSynergy(s, n, p) {
 function computeFireCooldown(rapidActive, rapidFireMut, fastFingers, overload) {
   let cd = rapidActive ? 3 : 6;
   if (rapidFireMut) cd = Math.max(2, Math.floor(cd / 1.7));
-  if (fastFingers)  cd = Math.max(2, Math.floor(cd * 0.75));
+  for (let _r = Math.max(0, fastFingers | 0); _r > 0; _r--) cd = Math.max(2, Math.floor(cd * 0.75));
   if (overload)     cd = Math.max(2, Math.floor(cd * 0.6));
   return cd;
 }
@@ -11925,10 +11974,13 @@ function computeFireCooldown(rapidActive, rapidFireMut, fastFingers, overload) {
 // perk (+2 when on the final life). Pure + tested so the additive sources stay
 // in sync.
 function computeBulletDamage(pLvl, shipDmgBonus, heavyRound, synergy, lastStandActive) {
-  let dmg = pLvl + (shipDmgBonus || 0) + (heavyRound ? 1 : 0);
+  // heavyRound / lastStandActive take a RANK as readily as a boolean: `true|0`
+  // is 1 and `false|0` is 0, so every pinned call that passes a boolean behaves
+  // exactly as before while a stacked card scales linearly.
+  let dmg = pLvl + (shipDmgBonus || 0) + Math.max(0, heavyRound | 0);
   if (synergy === 'OVERLOAD') dmg += 1;
   else if (synergy === 'HEAVY') dmg += 2;
-  if (lastStandActive) dmg += 2;
+  dmg += 2 * Math.max(0, lastStandActive | 0);
   return dmg;
 }
 
@@ -11937,7 +11989,7 @@ function computeBulletDamage(pLvl, shipDmgBonus, heavyRound, synergy, lastStandA
 function computeBulletSpeed(base, sLvl, blink, firebrand) {
   let speed = base * (1 + 0.25 * (sLvl - 1));
   if (blink) speed *= 1.3;
-  if (firebrand) speed *= 1.3;
+  speed *= Math.pow(1.3, Math.max(0, firebrand | 0));
   return speed;
 }
 
@@ -11947,7 +11999,8 @@ function updatePlayer() {
   // BIOME WEATHER — blizzard mildly slows thrusters (×0.92) for an icy-drag feel.
   // Dash unaffected so the player can still emergency-evade at full speed.
   const weatherSlow = (game.stageWeather && game.stageWeather.id === 'blizzard') ? 0.92 : 1.0;
-  const moveSpeed = PLAYER_SPEED * ship.speedMul * weatherSlow;
+  // THRUSTER: +8% a rank, on the ship's own multiplier so it composes with hull choice.
+  const moveSpeed = PLAYER_SPEED * ship.speedMul * weatherSlow * (1 + perkStep('thruster', 0.08));
   // Dash: 12 frames invincible side-step at 2.6× speed in last input direction
   if (game.dashTimer > 0) {
     game.dashTimer--;
@@ -12051,9 +12104,9 @@ function updatePlayer() {
     });
     playSound('powerUp');
     spawnConfetti(6);
-    // PEAK BUILD ANNOUNCEMENT — when synergy + activePerk both active, surface
-    // 'PEAK BUILD!' bonus banner at the synergy entry moment.
-    if (game.activePerk && PERKS[game.activePerk]) {
+    // PEAK BUILD ANNOUNCEMENT — synergy reached while carrying a drafted build.
+    // (Was "an activePerk exists"; the manifest is that condition, generalised.)
+    if (manifestSize() > 0) {
       game.floatTexts.push({
         x: BASE_W/2, y: BASE_H/2 - 6,
         text: '★ PEAK BUILD ★',
@@ -12068,12 +12121,13 @@ function updatePlayer() {
     game.lastSynergy = null;
   }
   game.activeSynergy = synergy;
-  const speed = computeBulletSpeed(BULLET_SPEED, game.lvl.S, synergy === 'BLINK', game.activePerk === 'firebrand');
+  const speed = computeBulletSpeed(BULLET_SPEED, game.lvl.S, synergy === 'BLINK', perkRank('firebrand'));
   const dmg = computeBulletDamage(
-    game.lvl.P, ship.dmgBonus, game.activePerk === 'heavyRound',
-    synergy, game.activePerk === 'lastStand' && game.lives === 1
+    game.lvl.P, ship.dmgBonus, perkRank('heavyRound'),
+    synergy, game.lives === 1 ? perkRank('lastStand') : 0
   );
-  const maxBullets = ship.bulletCap * n * (game.dualFighter ? 2 : 1);
+  // OVERCHARGE: +1 round in the air a rank, before the N-way and dual multipliers.
+  const maxBullets = (ship.bulletCap + perkRank('overcharge')) * n * (game.dualFighter ? 2 : 1);
   // Guardian-ally and parry-echo bullets share game.bullets (for collision) but are
   // NOT player fire-button shots, so they must not count against maxBullets — else a
   // reward (guardian drone from witch save / combo 50 / boss phase, or a perfect-parry
@@ -12091,7 +12145,7 @@ function updatePlayer() {
     game.fireCooldown = computeFireCooldown(
       (game.rapidTimer || 0) > 0,
       !!(game.stageMutation && game.stageMutation.id === 'rapidFire'),
-      game.activePerk === 'fastFingers',
+      perkRank('fastFingers'),
       synergy === 'OVERLOAD'
     );
     const wave = (game.waveTimer || 0) > 0;
@@ -12114,7 +12168,8 @@ function updatePlayer() {
         else if (wave) { b.kind = 'wave'; b.spawnX = bx; b.spawnFrame = game.animFrame; }
         // CRITICAL HIT — 4% chance bullet is a crit (+50% damage, gold visual).
         // Skipped for laser (already strong) to keep balance proportional.
-        if (!laser && Math.random() < 0.04) {
+        // MARKSMAN raises the base 4% crit chance by 8 points a rank.
+        if (!laser && Math.random() < 0.04 + perkStep('marksman', 0.08)) {
           b.crit = true;
           b.dmg = Math.max(b.dmg + 1, Math.round(b.dmg * 1.5));
           _critFiredThisShot = true;
@@ -12381,7 +12436,7 @@ function updateBullets() {
           game.stageCloseCount = (game.stageCloseCount || 0) + 1;
           if (game.stageCloseCount === 10) unlockAchievement('closeCall');
         }
-        const bonus = grazeScore(close, game.activePerk === 'ghostWake');
+        const bonus = grazeScore(close, hasPerk('ghostWake'));
         const label = (close ? 'CLOSE +' : 'GRAZE +') + bonus;
         addScore(bonus);
         game.grazeCount = (game.grazeCount || 0) + 1;
@@ -12746,40 +12801,98 @@ const WITCH_COOLDOWN  = 720; // 12s real-time before another save is possible
 // the last boss of a stage. Picks 3 random perks; player chooses one (1/2/3 keys).
 // Effects last until next boss kill (i.e., one perk active per "boss interval").
 // Window: 360 frames (6s) — auto-skip if no choice (perks expire silently).
+// THE CARD POOL. Fifteen entries, each an additive modifier on plumbing that
+// already exists, each read at exactly one site through hasPerk()/perkRank().
+// With three ranks apiece that is 45 draftable slots against ~29 offers in a long
+// run, so the draft never runs dry and never has to dim a whole screen.
+//
+// VAMPIRE WAS CUT, AND NO CARD MAY EVER REPLACE IT. It granted a shield charge
+// every 10 kills — and tryTriggerWitchTime returns false whenever shieldCharges is
+// non-zero. When perks were a scalar that was survivable; the moment cards STACK
+// and persist, a card whose trigger is the kill counter itself means the player can
+// never again be at zero charges, so VAMPIRE would PERMANENTLY disable WITCH TIME
+// for the rest of the run, with no un-take and no explanation.
+// THE RULE: no card writes game.shieldCharges.
 const PERKS = {
-  heavyRound:    { name: 'HEAVY ROUND',     desc: 'BULLETS +1 DAMAGE',       col: '#f8a' },
+  heavyRound:    { name: 'HEAVY ROUND',     desc: 'BULLET DAMAGE +1',         col: '#f8a' },
   fastFingers:   { name: 'FAST FINGERS',    desc: 'FIRE COOLDOWN -25%',       col: '#fc4' },
-  magnetic:      { name: 'MAGNETIC',        desc: 'POWER-UP MAGNET 2X RANGE', col: '#0f8' },
-  parryDividend: { name: 'PARRY DIVIDEND',  desc: 'PARRY SCORE 3X',           col: '#0ff' },
-  ghostWake:     { name: 'GHOST WAKE',      desc: 'GRAZE SCORE 3X',           col: '#cef' },
-  vampire:       { name: 'VAMPIRE',         desc: '10-KILL → SHIELD +1',      col: '#f6f' },
-  firebrand:     { name: 'FIREBRAND',       desc: 'BULLET SPEED +30%',         col: '#f44' },
-  scavenger:     { name: 'SCAVENGER',       desc: 'TIMER PICKUPS LAST 1.5X',   col: '#fa6' },
-  bountyHunter:  { name: 'BOUNTY HUNTER',   desc: 'BOSS BOUNTY +50%',          col: '#fc4' },
-  lastStand:     { name: 'LAST STAND',      desc: 'AT 1 LIFE: DMG +2',         col: '#f44' }
+  magnetic:      { name: 'MAGNETIC',        desc: 'PICKUP MAGNET 2X',         col: '#0f8' },
+  parryDividend: { name: 'PARRY DIVIDEND',  desc: 'PARRY SCORE 3X',           col: '#0ff', maxRank: 1 },
+  ghostWake:     { name: 'GHOST WAKE',      desc: 'GRAZE SCORE 3X',           col: '#cef', maxRank: 1 },
+  firebrand:     { name: 'FIREBRAND',       desc: 'BULLET SPEED +30%',        col: '#f44' },
+  scavenger:     { name: 'SCAVENGER',       desc: 'PICKUPS LAST 1.5X',        col: '#fa6' },
+  bountyHunter:  { name: 'BOUNTY HUNTER',   desc: 'BOSS BOUNTY +50%',         col: '#fc4', maxRank: 1 },
+  lastStand:     { name: 'LAST STAND',      desc: 'AT 1 LIFE: DMG +2',        col: '#f44' },
+  marksman:      { name: 'MARKSMAN',        desc: 'CRIT CHANCE +8%',          col: '#ff4' },
+  tempo:         { name: 'TEMPO',           desc: 'COMBO HOLD +50%',          col: '#8cf' },
+  kinetic:       { name: 'KINETIC',         desc: 'DASH COOLDOWN -20%',       col: '#0ff' },
+  aegis:         { name: 'AEGIS',           desc: 'WITCH WINDOW +40%',        col: '#fff' },
+  thruster:      { name: 'THRUSTER',        desc: 'SHIP SPEED +8%',           col: '#8f8' },
+  overcharge:    { name: 'OVERCHARGE',      desc: 'BULLET CAP +1',            col: '#f6f' },
 };
 const PERK_IDS = Object.keys(PERKS);
-const PERK_SELECT_FRAMES = 360;
+// 150, not 360. The draft now runs at EVERY stage clear rather than twice a run,
+// so its cost is paid ~29 times instead of 2 — and it opens inside STAGE_INTRO,
+// which already holds the player for 120 frames. Net new downtime is 30 frames a
+// stage, which is very nearly exactly what the deleted slot machine cost.
+const PERK_SELECT_FRAMES = 150;
+// THE ARMING BEAT. A commit is refused for the first beat the cards are up.
+// Without it, measurement said the draft's longest life was SIX FRAMES: a player
+// mashing fire — which is how everyone plays a shooter — takes the middle card
+// before the three have finished fading in. That is the same "a card you never
+// chose" failure the deleted auto-take had, arriving through the other door.
+// One beat (24f) is long enough to read three names and short enough that a
+// decisive player never feels held.
+const DRAFT_ARM = BEAT_FRAMES;
 
-// FLY TO CHOOSE — which of the 3 offered cards the ship is currently under.
-// The workflow sweep found the perk system's only acquisition path was the
-// keydown handler's '1'/'2'/'3' branch: gamepad and touch players could see
-// every offer and never take one — the entire roguelite layer was
-// keyboard-only, against this project's own input doctrine (poll the shared
-// keys/position, never the keydown handler, so every device works for free).
-// Position IS the one input every device shares, so the ship's column is the
-// hover, and when the window expires the hovered perk is taken. Keyboard
-// 1/2/3 still picks instantly; flying is now an equally first-class choice.
-function perkHoverIdx(x) {
-  const t = Math.floor((typeof x === 'number' ? x : BASE_W / 2) / (BASE_W / 3));
-  return Math.max(0, Math.min(2, isNaN(t) ? 1 : t));
+// (FLY TO CHOOSE was deleted with the auto-take. It read the ship's column as the
+// hover, which worked while the offer floated over live play — but THE DRAFT opens
+// inside STAGE_INTRO, and STAGE_INTRO never calls updatePlayer(), so the ship
+// cannot move and the hover was frozen on whatever column the stage happened to
+// end in. The replacement is a real cursor moved on the same shared keys map, so
+// keyboard, gamepad and touch all steer and commit identically.)
+
+// Open a draft. Returns false when the pool has nothing left the player can take,
+// so a maxed manifest quietly stops asking instead of dealing a dead screen.
+function offerDraft() {
+  if (!game) return false;
+  const offer = pickPerkOffer();
+  if (!offer || offer.length === 0) return false;
+  game.perkOffered = offer;
+  game.perkSelectFrames = PERK_SELECT_FRAMES;
+  game.draftIdx = Math.min(1, offer.length - 1);   // open on the middle card
+  game._draftFPrev = true;   // a fire button held from the stage must not auto-commit
+  game._draftLPrev = false;
+  game._draftRPrev = false;
+  return true;
 }
 
-// The one commit path every input device shares. Returns true if the perk was
-// taken (keyboard 1/2/3 and the fly-to-choose expiry both land here).
+// THE ONE PLACE A CLEARED STAGE BECOMES THE NEXT ONE. All three clear paths
+// (formation, challenge wave, boss) carried an identical copy of this block, which
+// is exactly why authorship had only ever been wired into the boss one.
+function advanceToNextStage() {
+  game.stage++;
+  game.stats.maxStage = Math.max(game.stats.maxStage, game.stage);
+  recordMilestoneTime();
+  offerDraft();
+  if (!tryTriggerBonusGame()) {
+    game.state = STATE.STAGE_INTRO;
+    game.stageTimer = 120;
+    playSound('stageStart');
+  }
+}
+
+// The one commit path every input device shares. Returns true if the card was taken.
 function applyPerk(perkId) {
   if (!perkId || !PERKS[perkId]) return false;
-  game.activePerk = perkId;
+  if (!game.manifest) game.manifest = {};
+  // RAISE, DO NOT REPLACE. This one line is the difference between a run that is
+  // dealt to you and a run you author: taking a card used to throw away the card
+  // you already had, so a build could never be more than one modifier deep.
+  const _prev = perkRank(perkId);
+  if (_prev >= perkMaxRank(perkId)) return false;    // a maxed card is not a choice
+  game.manifest[perkId] = _prev + 1;
+  game.lastPerk = perkId;
   game.perkOffered = null;
   game.perkSelectFrames = 0;
   // PERK USAGE TRACKING — increment lifetime pick counter for this perk
@@ -12995,8 +13108,14 @@ function triggerWeaponCallout(color) {
 }
 
 function pickPerkOffer() {
-  // Pick 3 distinct random perks from the pool. Always returns 3 since pool has 4.
-  const pool = PERK_IDS.slice();
+  // Three distinct cards the player can actually TAKE. The old form spliced from
+  // the full PERK_IDS with no owned-filter — harmless when a perk replaced the
+  // last one and was offered twice a run, fatal once cards stack and the offer
+  // runs every stage: the late run would deal three cards already held at max, and
+  // applyPerk on a maxed id is a no-op, so the draft would silently degrade into a
+  // dimmed screen you had to sit through. (Its own comment, "pool has 4", was
+  // already stale by six entries.)
+  const pool = PERK_IDS.filter(id => perkRank(id) < perkMaxRank(id));
   const out = [];
   for (let i = 0; i < 3 && pool.length > 0; i++) {
     const idx = randInt(pool.length);
@@ -13854,7 +13973,7 @@ function updatePowerUps() {
   // PERK 'magnetic' — doubles the magnet pickup range (36 → 72)
   // COMBO MAGNET BOOST — combo ≥ 30 adds +20 range, combo ≥ 60 adds +40.
   // Rewards sustained combo with easier pickup catching. Stacks with perk.
-  const _baseRange = (game.activePerk === 'magnetic') ? 72 : 36;
+  const _baseRange = 36 + perkStep('magnetic', 36);
   const _comboBoost = (game.combo >= 60) ? 40 : (game.combo >= 30) ? 20 : 0;
   const MAGNET_RANGE = _baseRange + _comboBoost;
   for (let i = game.powerUps.length - 1; i >= 0; i--) {
@@ -13915,7 +14034,7 @@ function updatePowerUps() {
       const color = POWERUP_COL[p.type] || '#fff';
       // PERK 'scavenger' — timer pickups (T/R/W/H/L) last 1.5×. Applied at pickup
       // time so a non-scavenger run's timer can't be retro-extended by perk swap.
-      const _scavMul = game.activePerk === 'scavenger' ? 1.5 : 1;
+      const _scavMul = 1 + perkStep('scavenger', 0.5);
       // PICKUP DURATION HINT — append "+Ns" so the player sees the actual seconds
       // granted (especially valuable when scavenger perk is active for 9s timers).
       const _durSec = (dur) => '+' + (Math.round(dur * _scavMul / 60)) + 's';
@@ -14403,6 +14522,11 @@ function drawAchievementToast(t) {
 }
 
 const COMBO_DECAY = 90; // ~1.5s without a kill resets combo
+// TEMPO stretches the window a chain survives. One helper so the ceiling and
+// the refill can never disagree — the graze-grace path caps against the same
+// number the kill path sets, and a card that moved only one of them would make
+// GRAZE COMBO GRACE silently unable to reach full.
+function comboHold() { return Math.round(COMBO_DECAY * (1 + perkStep('tempo', 0.5))); }
 
 function comboMultiplier(c) {
   // 0-2 kills: 1x, 3-4: 1.25x, 5-9: 1.5x, 10-14: 2x, 15-19: 2.5x, 20+: 3x
@@ -14454,7 +14578,7 @@ const COMBO_ARSENAL = [
 
 function bumpCombo() {
   game.combo++;
-  game.comboTimer = COMBO_DECAY;
+  game.comboTimer = comboHold();
   if (game.combo > game.comboBest) game.comboBest = game.combo;
   // SIGNAL INTERCEPT — enemy threat-level chatter when combo first crosses 10 this stage
   // FLIGHT SCHOOL — signpost the arsenal payout while it is still reachable
@@ -15964,12 +16088,13 @@ function updateCollisions() {
             unlockAchievement('firstBlood');
             markTutorialDone(); // First kill = player understands fire
           }
-          // PERK 'vampire' — every 10th non-bomb kill grants +1 shield (capped by SHIELD_MAX).
-          if (game.activePerk === 'vampire' && game.stats.kills > 0 && game.stats.kills % 10 === 0
-              && (game.shieldCharges || 0) < SHIELD_MAX) {
-            game.shieldCharges = (game.shieldCharges || 0) + 1;
-            playSound('powerUp');
-          }
+          // (VAMPIRE was cut here along with the card. It granted a shield charge
+          // every 10 kills, and tryTriggerWitchTime returns false whenever
+          // shieldCharges is non-zero — so once cards STACK and persist, a card
+          // whose trigger is the kill counter itself means the player can never be
+          // at zero charges again, permanently disabling WITCH TIME for the rest of
+          // the run with no un-take and no explanation. NO CARD WRITES
+          // game.shieldCharges, and the suite pins that.)
           bumpCombo();
           // THE KILLING FIELD — the formation records where this one fell.
           // Formation stages only: the grave is a property of the FORMATION, and
@@ -16717,7 +16842,7 @@ function updateCollisions() {
           addScore(500);
         }
         // PERK 'parryDividend' — parry score → 3×
-        addScore(game.activePerk === 'parryDividend' ? baseScore * 3 : baseScore);
+        addScore(hasPerk('parryDividend') ? baseScore * 3 : baseScore);
         // PERFECT PARRY — parry within the first 3 frames of dash (dashTimer
         // 10-12 of starting 12). Bonus +50 + gold "PERFECT" callout above the
         // bullet's deflect spot. Encourages tight timing reads.
@@ -16856,7 +16981,7 @@ function updateCollisions() {
         // multiplier. The 24f near-miss cooldown + kill-only combo growth prevent
         // farming — this only extends, never grows, the combo.
         if ((game.combo || 0) >= 5) {
-          game.comboTimer = Math.min(COMBO_DECAY, (game.comboTimer || 0) + 20);
+          game.comboTimer = Math.min(comboHold(), (game.comboTimer || 0) + 20);
           // Legibility — only surface "COMBO HELD" when the graze actually rescued
           // a combo that was about to expire (timer < 40). Avoids spam on safe grazes.
         }
@@ -16932,7 +17057,11 @@ function tryTriggerWitchTime(srcX, srcY, cause, srcType) {
   if ((game.shieldCharges || 0) > 0 || (game.redoubts && game.redoubts.length > 0)) {
     return false; // shield path handles it (cheaper)
   }
-  game.witchTimer = WITCH_WINDOW;
+  // AEGIS widens the save window itself — the one defensive card, and it buys
+  // FRAMES rather than a charge, so it can never suppress witch time the way
+  // the cut VAMPIRE did.
+  const _witchW = Math.round(WITCH_WINDOW * (1 + perkStep('aegis', 0.4)));
+  game.witchTimer = _witchW;
   // Carry the hit's full identity into the window. The whiff path used to
   // resolve with an ARGLESS killPlayer(), so every witch-whiff death (29% of
   // deaths under a dashing bot) was tallied 'unknown', drew no postmortem
@@ -16944,7 +17073,7 @@ function tryTriggerWitchTime(srcX, srcY, cause, srcType) {
   game.witchSrcType = srcType || null;
   game.witchSaved = false;
   // Brief invincibility flicker so the same bullet doesn't re-collide while we're paused
-  game.invincibleTimer = Math.max(game.invincibleTimer, WITCH_WINDOW + 6);
+  game.invincibleTimer = Math.max(game.invincibleTimer, _witchW + 6);
   game.flashTimer = 6;
   game.flashColor = '#fff';
   game.shakeTimer = Math.max(game.shakeTimer || 0, 6);
@@ -17850,14 +17979,7 @@ function checkStageComplete() {
         game.stageEndGraceTimer++;
       } else {
         game.stageEndGraceTimer = 0;
-        game.stage++;
-        game.stats.maxStage = Math.max(game.stats.maxStage, game.stage);
-        recordMilestoneTime();
-        if (!tryTriggerBonusGame()) {
-          game.state = STATE.STAGE_INTRO;
-          game.stageTimer = 120;
-          playSound('stageStart');
-        }
+        advanceToNextStage();
       }
     }
   } else if (game.state === STATE.CHALLENGING) {
@@ -17901,14 +18023,7 @@ function checkStageComplete() {
         const sPbR = recordStageScorePB(game.stage, sGained);
         if (sPbR.isNew && sGained > 0) celebrateScorePB(sGained, sPbR.prev);
       }
-      game.stage++;
-      game.stats.maxStage = Math.max(game.stats.maxStage, game.stage);
-      recordMilestoneTime();
-      if (!tryTriggerBonusGame()) {
-        game.state = STATE.STAGE_INTRO;
-        game.stageTimer = 120;
-        playSound('stageStart');
-      }
+      advanceToNextStage();
     }
     if (game.challengeWaveTimer > 0) {
       game.challengeWaveTimer--;
@@ -18155,14 +18270,7 @@ function checkStageComplete() {
         game.stageEndGraceTimer++;
       } else {
         game.stageEndGraceTimer = 0;
-        game.stage++;
-        game.stats.maxStage = Math.max(game.stats.maxStage, game.stage);
-        recordMilestoneTime();
-        if (!tryTriggerBonusGame()) {
-          game.state = STATE.STAGE_INTRO;
-          game.stageTimer = 120;
-          playSound('stageStart');
-        }
+        advanceToNextStage();
       }
     }
   }
@@ -18496,18 +18604,56 @@ function update() {
     // 1/2/3 commits instantly; every other device commits by POSITION when the
     // window expires — the card the ship is under is the pick (FLY TO CHOOSE).
     // Expiring while the pilot is dead is the only silent path left.
+    // ===================== THE DRAFT =====================
+    // Moved and pressed on the SHARED KEYS MAP, never in the keydown handler. That
+    // is this project's documented input doctrine and it is load-bearing twice
+    // here: the draft now opens during STAGE_INTRO, which never calls
+    // updatePlayer(), so the old fly-to-choose hover was frozen dead (the ship
+    // cannot move there) — and the 1/2/3 commit lived in the keydown handler, i.e.
+    // keyboard only, so a gamepad or touch player could watch every offer and take
+    // none of them. Polling gives keyboard, gamepad (pollGamepad writes into keys)
+    // and the touch fire button the same commit for free.
     if ((game.perkSelectFrames || 0) > 0) {
       game.perkSelectFrames--;
-      // URGENCY TICK fires here at sim rate (not in draw) so it doesn't double on
-      // high-refresh displays. Mirrors draw's <90f (1.5s) urgency window + 30f cadence.
-      if (game.perkSelectFrames > 0 && game.perkSelectFrames < 90 && game.animFrame % 30 === 0
-          && typeof playSound === 'function') playSound('tick');
-      if (game.perkSelectFrames === 0) {
-        if (game.perkOffered && game.playerAlive && typeof applyPerk === 'function') {
-          applyPerk(game.perkOffered[perkHoverIdx(game.playerX)]);
-        }
-        game.perkOffered = null;
+      const _dl = !!(keys['ArrowLeft'] || keys['a'] || keys['A']);
+      const _dr = !!(keys['ArrowRight'] || keys['d'] || keys['D']);
+      const _df = !!(keys[' '] || keys['Enter']);
+      const _dn = (game.perkOffered && game.perkOffered.length) ? game.perkOffered.length : 3;
+      if (_dl && !game._draftLPrev) {
+        game.draftIdx = Math.max(0, (game.draftIdx || 0) - 1);
+        if (typeof playSound === 'function') playSound('tick');
       }
+      if (_dr && !game._draftRPrev) {
+        game.draftIdx = Math.min(_dn - 1, (game.draftIdx || 0) + 1);
+        if (typeof playSound === 'function') playSound('tick');
+      }
+      game._draftLPrev = _dl;
+      game._draftRPrev = _dr;
+      // COMMIT IS A PRESS. The window used to auto-apply whatever card the ship
+      // happened to be standing under when it expired — so a lateral dodge during a
+      // hazard telegraph could rewrite your build: a choice you never made, taken
+      // from you by the act of surviving. Expiry now takes NOTHING, and declining
+      // is a legitimate answer.
+      const _armed = game.perkSelectFrames <= PERK_SELECT_FRAMES - DRAFT_ARM;
+      if (_armed && _df && !game._draftFPrev && game.perkOffered && typeof applyPerk === 'function') {
+        applyPerk(game.perkOffered[Math.max(0, Math.min(_dn - 1, game.draftIdx || 0))]);
+      }
+      game._draftFPrev = _df;
+      // ONE PRESS, ONE ACTION. The stage-intro skip runs LATER in this same update
+      // and reads the same button, and applyPerk has already zeroed
+      // perkSelectFrames — so without this the commit press was consumed twice and
+      // taking a card fast-forwarded the intro out from under the card you had
+      // just taken. Keeping the intro's edge detector synchronised with the real
+      // button state while the draft owns it means the intro can only ever see a
+      // press that happened AFTER the draft was done with the button.
+      game._introSkipPrev = _df;
+      // URGENCY TICK fires here at sim rate (not in draw) so it cannot double on a
+      // high-refresh display. Mirrors draw's urgency window + 30f cadence.
+      if (game.perkSelectFrames > 0 && game.perkSelectFrames < 60 && game.animFrame % 30 === 0
+          && typeof playSound === 'function') playSound('tick');
+      if (game.perkSelectFrames === 0) game.perkOffered = null;
+    } else {
+      game._draftFPrev = false; game._draftLPrev = false; game._draftRPrev = false;
     }
     // Weapon activation callout life tick
     if ((game.weaponCalloutLife || 0) > 0) game.weaponCalloutLife--;
@@ -18642,7 +18788,10 @@ function update() {
       // countdown to its final frame. Edge-detected so a held fire button only
       // skips once. Pairs with PB pacing: faster intros = quicker stage entry.
       {
-        const _isFire = !!(keys[' '] || keys['Enter']);
+        // While a draft is open the same button is the COMMIT, so the intro must
+        // not consume it — otherwise taking a card also skips the intro out from
+        // under the card you were still reading.
+        const _isFire = !!(keys[' '] || keys['Enter']) && !((game.perkSelectFrames || 0) > 0);
         if (_isFire && !game._introSkipPrev && game.stageTimer <= 90 && game.stageTimer > 1) {
           game.stageTimer = 1;
         }
@@ -18671,7 +18820,14 @@ function update() {
       // transition. Earned rewards are never denied (THE DIRECTOR, rule 2).
       updatePowerUps();
       updateItemBursts();
-      game.stageTimer--;
+      // THE DRAFT IS MODAL, AND THIS IS WHAT MAKES IT MODAL. The intro holds at
+      // its last frame while a draft is open, so the three cards are never
+      // composited over live bullets — the playfield behind them is empty and
+      // nothing on screen can cost the player a dodge. The hold is bounded by the
+      // draft's own 150-frame window, and it ENDS THE INSTANT THE PLAYER COMMITS:
+      // a decisive player pays nothing for it, and the frames a hesitant one
+      // spends are frames they chose to spend reading.
+      if (game.stageTimer > 1 || (game.perkSelectFrames || 0) <= 0) game.stageTimer--;
       if (game.stageTimer <= 0) startStage();
       break;
 
@@ -19400,7 +19556,7 @@ function draw() {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, BASE_W, BASE_H);
     // PERK SELECT URGENCY — pulse red border + edge bars when <1.5s remaining
-    if (remaining < 90) {
+    if (remaining < 60) {
       const urgPulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.4);
       ctx.globalAlpha = 0.45 * urgPulse;
       ctx.fillStyle = '#f44';
@@ -19412,16 +19568,16 @@ function draw() {
       // it doesn't double on high-refresh monitors. Visual border stays here.)
     }
     ctx.globalAlpha = fadeIn;
-    const titleCol = remaining < 90 ? '#f44' : '#fc4';
-    drawRetroText('CHOOSE A PERK', BASE_W/2, 70, 11, titleCol);
+    const titleCol = remaining < 60 ? '#f44' : '#fc4';
+    drawRetroText('DRAFT', BASE_W/2, 70, 11, titleCol);
     const sec = Math.ceil(remaining / 60);
-    drawRetroText(sec + 'S', BASE_W/2, 84, 6, remaining < 90 ? '#f44' : COL.gray);
+    drawRetroText(sec + 'S', BASE_W/2, 84, 6, remaining < 60 ? '#f44' : COL.gray);
     // 3 cards
     const cardW = 64, cardH = 60, gap = 6;
     const totalW = cardW * 3 + gap * 2;
     const startX = (BASE_W - totalW) / 2;
     const cardY = 100;
-    const hovered = perkHoverIdx(game.playerX);
+    const hovered = Math.max(0, Math.min(game.perkOffered.length - 1, game.draftIdx || 0));
     for (let i = 0; i < game.perkOffered.length; i++) {
       const perkId = game.perkOffered[i];
       const p = PERKS[perkId];
@@ -19436,10 +19592,10 @@ function draw() {
       ctx.fillRect(cx, cardY + cardH - 1, cardW, 1);
       ctx.fillRect(cx, cardY, 1, cardH);
       ctx.fillRect(cx + cardW - 1, cardY, 1, cardH);
-      // FLY TO CHOOSE — the card above the ship's column is the live pick for
-      // every non-keyboard device; a chevron under the card points down at the
-      // ship so the link between position and choice is drawn, not implied.
-      if (i === hovered && game.playerAlive) {
+      // THE CURSOR. Moved by left/right on the shared keys map, so keyboard,
+      // gamepad and touch all steer it; the chevron under the selected card is
+      // the same shape the old fly-to-choose used, kept because it reads.
+      if (i === hovered) {
         const hp = 0.55 + 0.45 * Math.sin(game.animFrame * 0.25);
         ctx.globalAlpha = fadeIn * hp;
         ctx.fillStyle = '#fff';
@@ -19453,9 +19609,26 @@ function draw() {
         ctx.fillRect(chx - 1, cardY + cardH + 6, 3, 1);
         ctx.globalAlpha = fadeIn;
       }
-      // Number key indicator (top center)
-      const numCol = blinkPhase(3) ? p.col : '#fff';
-      drawRetroText(String(i + 1), cx + cardW / 2, cardY + 8, 11, numCol);
+      // RANK PIPS — how many ranks this card is already worth to you, and how
+      // many it can still take. Cards STACK now, so "I already have this" is the
+      // single most important thing a card can tell you, and a number would be
+      // ambiguous (is 2 the rank, or the card's index?). Filled = held.
+      const _held = perkRank(perkId);
+      const _cap = perkMaxRank(perkId);
+      const _pipW = 5, _pipGap = 2;
+      const _pipsW = _cap * _pipW + (_cap - 1) * _pipGap;
+      let _px0 = cx + cardW / 2 - _pipsW / 2;
+      for (let _r = 0; _r < _cap; _r++) {
+        const _on = _r < _held;
+        ctx.fillStyle = _on ? p.col : '#234';
+        ctx.fillRect(_px0 + _r * (_pipW + _pipGap), cardY + 6, _pipW, 3);
+        if (_r === _held) {          // the rank this draft would fill
+          ctx.fillStyle = blinkPhase(3) ? '#fff' : p.col;
+          ctx.fillRect(_px0 + _r * (_pipW + _pipGap), cardY + 6, _pipW, 1);
+        }
+      }
+      drawRetroText(_held > 0 ? 'RANK ' + (_held + 1) : 'NEW',
+                    cx + cardW / 2, cardY + 15, 5, _held > 0 ? p.col : '#fff');
       // Perk name (mid)
       drawRetroText(p.name, cx + cardW / 2, cardY + 28, 6, p.col);
       // Description — split into 2 lines if too long
@@ -19469,7 +19642,12 @@ function draw() {
       drawRetroText(line1, cx + cardW / 2, cardY + 40, 5, '#fff');
       if (line2) drawRetroText(line2, cx + cardW / 2, cardY + 48, 5, '#fff');
     }
-    drawRetroText('PRESS 1 2 3 — OR FLY UNDER A CARD', BASE_W/2, 170, 5, COL.gray);
+    // The prompt appears only once a press would actually be accepted, so the UI
+    // never promises an input the draft is still refusing.
+    if (remaining <= PERK_SELECT_FRAMES - DRAFT_ARM) {
+      drawRetroText('MOVE TO CHOOSE   FIRE TO TAKE', BASE_W/2, 170, 5, COL.gray);
+    }
+    drawManifestStrip(BASE_W / 2, 182, fadeIn);
     ctx.restore();
   }
 
@@ -21386,7 +21564,7 @@ function drawGameplay() {
   // Draw power-up capsules
   // MAGNETIC PERK LINE — when the magnetic perk is active, draw a dashed green line
   // from each in-range power-up toward the player, showing the pull effect.
-  if (game.activePerk === 'magnetic' && game.playerAlive) {
+  if (hasPerk('magnetic') && game.playerAlive) {
     const MAGNET_RANGE_VIS = 72;
     ctx.save();
     // MAGNET RANGE RING — dashed circle showing the magnet's effective radius.
@@ -21574,9 +21752,9 @@ function drawGameplay() {
     // PERK ACTIVE SHIP DOTS — 4 corner dots in perk color so the player sees
     // their current perk reflected on the ship sprite. Suppressed during dash.
     function _drawPerkDots(cx, cy) {
-      if (!game.activePerk || !PERKS[game.activePerk]) return;
+      if (!game.lastPerk || !PERKS[game.lastPerk]) return;
       if (game.dashTimer > 0) return;
-      const pCol = PERKS[game.activePerk].col;
+      const pCol = PERKS[game.lastPerk].col;
       const t = game.animFrame;
       const pulse = 0.55 + 0.35 * Math.sin(t * 0.18);
       ctx.save();
@@ -22167,6 +22345,34 @@ function drawGameplay() {
 // the bracket after a dive commits is the counter-play (see THE BAIT). Shatters outward
 // for MIND_WIPE_FLASH frames when the commander dies and the profile is wiped.
 // Read-only: wipeFlash is ticked in update(), like every other effect timer here.
+// THE MANIFEST, DRAWN. A build the player cannot see is a build they cannot
+// play around, and by the end of a run this is eight or nine stacked cards. One
+// pip per RANK held, grouped and coloured by card — no text, so it cannot
+// overflow and needs no layout budget, and it reads at a glance as "how much
+// machine am I carrying".
+function drawManifestStrip(cx, y, alpha) {
+  if (!game || !game.manifest) return;
+  const ids = [];
+  for (const id of PERK_IDS) if (perkRank(id) > 0) ids.push(id);
+  if (!ids.length) return;
+  const PIP = 3, GAP = 1, GROUP = 3;
+  let w = 0;
+  for (const id of ids) w += perkRank(id) * (PIP + GAP) + GROUP;
+  let x = cx - w / 2;
+  ctx.save();
+  ctx.globalAlpha = (alpha == null ? 1 : alpha);
+  for (const id of ids) {
+    const r = perkRank(id);
+    ctx.fillStyle = PERKS[id].col;
+    for (let i = 0; i < r; i++) {
+      ctx.fillRect(Math.round(x), y, PIP, 3);
+      x += PIP + GAP;
+    }
+    x += GROUP;
+  }
+  ctx.restore();
+}
+
 function drawMindLock() {
   const p = game && game.swarmMind;
   if (!p || game.state !== STATE.PLAYING || !game.allEntered) return;
@@ -23090,7 +23296,13 @@ function drawHUD() {
       ctx.globalAlpha = 1;
     }
     ctx.restore();
+    badgeX += ((game.shieldCharges || 0) + _nR) * 6 + 4;
   }
+  // THE MANIFEST — the build, on screen, during play. A build the player cannot
+  // see is a build they cannot play around, and by the end of a run this is eight
+  // or nine stacked cards rather than the single modifier the old scalar allowed.
+  // Pips only: no text, so it adds nothing to the layout budget.
+  if (isCombatState() && manifestSize() > 0) drawManifestStrip(BASE_W - 30, BASE_H - 10, 1);
   if (dangerLives && (isCombatState())) {
     if (blinkPhase(3)) {
       drawRetroText('LAST LIFE', BASE_W/2, BASE_H - 22, 6, COL.red);
@@ -23098,8 +23310,11 @@ function drawHUD() {
     // (lowLife + heartbeat SFX now fire in update() at sim rate — see "LAST-LIFE
     // AUDIO CUES" — so they don't double on high-refresh monitors. Visual pulse stays.)
     // Screen edge red pulse — synced with heartbeat (peaks at the start of each cycle)
-    const beatPhase = (game.animFrame % 96) / 96;
-    const beatPulse = Math.max(0, 1 - beatPhase * 3.5); // sharp peak at phase 0, fade by 0.3
+    // Rides THE BAR like everything else that pulses, and no longer SHADOWS the
+    // global beatPhase() with a local const of the same name — it already used a
+    // 96-frame cycle, which is exactly the bar, so this is the same pulse said once.
+    const _hbPhase = beatPhase().barPhase;
+    const beatPulse = Math.max(0, 1 - _hbPhase * 3.5); // sharp peak at phase 0, fade by 0.3
     if (beatPulse > 0) {
       ctx.save();
       ctx.globalAlpha = 0.18 * beatPulse;

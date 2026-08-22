@@ -144,7 +144,13 @@ function bucket(g, ranUpdate) {
   if (!ranUpdate) return 'hit-stop';
   if (g.state === ST.CAPTURED) return 'captured';
   if (g.state === ST.RESPAWN) return 'respawn';
-  if (g.state === ST.STAGE_INTRO) return 'stage intro';
+  // THE DRAFT is its own bucket, not part of the intro it opens inside. It is the
+  // reform's one deliberate ADDITION to downtime, so it has to be visible to THE
+  // CONTROL BUDGET on its own line from day one — the whole point of this
+  // instrument is that a pause nobody counted is a pause nobody can defend.
+  if (g.state === ST.STAGE_INTRO) {
+    return ((g.perkSelectFrames || 0) > 0) ? 'draft' : 'stage intro';
+  }
   if (g.state === ST.GAME_OVER) return 'game over';
   if (g.state === ST.BONUS_GAME) return 'control';   // the bonus stage is played
   if (!g.playerAlive) return 'dying';
@@ -259,6 +265,7 @@ for (const [, r] of runs) {
 const COST = {
   'hit-stop':    'nothing (it punctuates a KILL)',
   'stage intro': 'nothing (skippable with fire)',
+  'draft':       'nothing — and it BUYS a choice (press to take, or decline)',
   'respawn':     'a life, already spent',
   'dying':       'a life, already spent',
   'captured':    'A LIFE — the most expensive event',
