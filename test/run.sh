@@ -12,7 +12,6 @@
 #   test/telegraph-audit.js  the fairness budget (warning frames per threat)
 #   test/pulse-audit.js      the control budget (frames your input does nothing)
 #   test/recovery-audit.js   the recovery budget (does the death spiral have a brake)
-#   test/ebb-audit.js        whether the sortie window is ever actually cuttable
 #   test/measure-audit.js    THE MEASURE (clock / authorship / arrangement / rhythm)
 set -uo pipefail
 

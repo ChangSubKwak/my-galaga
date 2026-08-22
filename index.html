@@ -1,4 +1,4 @@
-    badgeX += (game.shieldCharges || 0) * 6 + 4;
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6100,7 +6100,6 @@ const COACH_LESSONS = {
   vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE',
   cover:   'THE HULL EATS FIRE — BOTH WAYS',
   keystone:'CUT THE MARKED ONE — THE SPAN FALLS',
-  ebb:     'IT CANT LEAD AND HOLD — CUT NOW',
   onbeat:  'DASH ON THE BEAT — HOLD LONGER'
 };
 const COACH_KEY = 'galagaCoached';
@@ -8905,8 +8904,6 @@ function resetGame() {
     lattice: null,
     spansDropped: 0,
     spanEscaped: 0,
-    // THE EBB — spans cut while the commander was out leading a sortie.
-    ebbCuts: 0,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
     topRank: -1,
@@ -9214,7 +9211,6 @@ function latticeBuild() {
 // ZERO new score (collapse is already score-negative), zero new actors, zero
 // new comms, zero new HUD, and exactly one new mark: an OPEN ring where a
 // closed one used to be.
-const EBB_SOCKET_R = 9;   // draw-only; matches the shipped net-ring radius
 
 // Pure: who is actually holding the wall this frame. A diver, a capture holder
 // or a collapsing block holds nothing. Tolerant of malformed rows like
@@ -9238,24 +9234,6 @@ function standingChanged(prev, next) {
   return false;
 }
 
-// Pure: THE EBB LEVEL — the fraction of the wall away on the attack. 0 = fully
-// manned, 1 = empty. Drives the socket's alpha only; never scored, never a HUD
-// number.
-// Measured against the LIVING wall, not the original roster: counting the dead
-// as "away on the attack" would make the socket's alpha encode cumulative
-// attrition — the exact step function THE EBB exists to replace.
-function ebbLevel(standing, alive) {
-  const n = (standing && standing.length) || 0;
-  if (!n) return 0;
-  let held = 0, live = 0;
-  for (let i = 0; i < n; i++) {
-    const isLive = alive ? !!alive[i] : true;
-    if (isLive) live++;
-    if (standing[i]) held++;
-  }
-  if (!live) return 0;
-  return clamp01(1 - held / live);
-}
 
 // Pure: the index of the commander that is actually STANDING, else -1. The net
 // is the commander's, and it holds only from inside the wall.
@@ -9298,16 +9276,9 @@ function latticeRecompute() {
   L.netIntact = cmdIdx >= 0;
   const adj = L.netIntact ? latticeStiffen(L.adj, cmdIdx, standing) : L.adj;
   L.cuts = latticeCuts(adj, standing, LAT_MIN_CHUNK);
-  L.ebb = ebbLevel(standing, L.ents.map(e => !!(e && e.alive)));
   if (L.cuts.length && typeof coachFire === 'function') {
-    // THE EBB — when the window was opened by the swarm's own sortie rather
-    // than by attrition, that is the lesson worth teaching: the commander
-    // cannot lead from the front and hold the net at the same time.
-    // (Literal call sites, not a ternary argument — the bidirectional
-    // lesson↔trigger source scan looks for coachFire('<id>') verbatim.)
-    const _out = L.ents.some((e, i) => e && e.alive && e.isCommander && !standing[i]);
-    if (_out) coachFire('ebb');
-    else coachFire('keystone');
+    // (THE EBB's fork went with its reward layer: the lesson is the keystone.)
+    coachFire('keystone');
   }
 }
 
@@ -9338,19 +9309,6 @@ function latticeCollapse(cutIdx) {
   L.markT = LAT_MARK_FLASH;
   game.spansDropped = (game.spansDropped || 0) + 1;
   if (span.length >= 6) unlockAchievement('spanBreaker');
-  // THE EBB — was this window opened by the swarm's own sortie? (The commander
-  // is alive but out leading it, so the net is down because it ATTACKED.)
-  const _sallyOut = game.enemies.some(en => en.alive && en.isCommander && en.state !== 'formation');
-  if (_sallyOut) {
-    game.ebbCuts = (game.ebbCuts || 0) + 1;
-    unlockAchievement('sallyCut');
-    if (!game.isDemo) {
-      try {
-        const _et = (parseInt(localStorage.getItem('galagaEbbTotal') || '0', 10) || 0) + 1;
-        localStorage.setItem('galagaEbbTotal', String(_et));
-      } catch (_e) {}
-    }
-  }
   if (!game.isDemo) {
     try {
       const _st = (parseInt(localStorage.getItem('galagaSpanTotal') || '0', 10) || 0) + 1;
@@ -13014,7 +12972,6 @@ const ACHIEVEMENTS = {
   boneBreaker:   { name: 'BONE BREAKER',  desc: 'Break a boss stance' },
   ironclad:      { name: 'IRONCLAD',      desc: '50 shots blocked in shelter' },
   spanBreaker:   { name: 'SPAN BREAKER',  desc: 'Drop a span of 6 or more' },
-  sallyCut:      { name: 'BREACH LEADER', desc: 'Cut a span while the commander leads' },
   // Achievements added with the Quantum Leap autonomy loop — tie to systems that
   // didn't have a discrete trophy yet.
   parry50:       { name: 'PARRY 50',        desc: '50 parries lifetime' },
@@ -20252,8 +20209,6 @@ function pickRunHighlights() {
   const spans = game.spansDropped || 0;
   if (spans >= 1)         out.push({ label: 'SPANS DROPPED',   value: String(spans),    prio: 45 + spans * 30, col: '#8cf' });
   // attacking. The rarest structural read in the game.
-  const sortie = game.ebbCuts || 0;
-  if (sortie >= 1)        out.push({ label: 'SORTIE CUTS',     value: String(sortie),   prio: 50 + sortie * 34, col: '#8cf' });
   // REVENGE — count of collision-death payback kills this run. Pairs narratively
   // with DEATH RECAP WHISPER. Red color matches the in-stage REVENGE! floattext.
   const _rvR = game.revengeCount || 0;
@@ -22252,38 +22207,6 @@ function drawLattice() {
     }
   }
   ctx.stroke();
-  // THE EBB — THE SOCKET. When the commander is alive but NOT standing (it is
-  // out leading the sortie it authorised), the wall has a hole where its net
-  // was anchored: a dashed OPEN ring at the empty home position, with the gap
-  // facing where the commander actually is and a tether dash toward it. Open
-  // ring vs closed ring reads without colour, and it replaces the blank state
-  // this function used to render at exactly this moment.
-  // Selected on the TELEGRAPH as well as on absence: during a wing preview the
-  // commander's state is still 'formation', so keying only on !standing made the
-  // ring appear on the frame the window opened — 0 frames of warning, and the
-  // growth ramp below was unreachable code.
-  const _absentCmd = ents.find(e => e && e.alive && e.isCommander
-    && (!standing(e) || (e.previewTimer || 0) > 0));
-  if (_absentCmd) {
-    const hx = _absentCmd.homeX, hy = _absentCmd.homeY;
-    const ang = Math.atan2(_absentCmd.y - hy, _absentCmd.x - hx);
-    // Forms over the 36f wing telegraph, full at the commit frame — the player
-    // gets a window's worth of warning that a window is about to open.
-    const prev = _absentCmd.previewTimer || 0;
-    const grow = prev > 0 ? 1 - (prev / (_absentCmd.previewMax || WING_PREVIEW)) : 1;
-    ctx.globalAlpha = (0.25 + 0.45 * clamp01(L.ebb || 0)) * clamp01(0.25 + grow);
-    ctx.strokeStyle = tint;
-    ctx.setLineDash([2, 2]);
-    ctx.beginPath();
-    ctx.arc(hx, hy, EBB_SOCKET_R, ang + 0.6, ang - 0.6 + Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha *= 0.5;
-    ctx.beginPath();
-    ctx.moveTo(hx + Math.cos(ang) * EBB_SOCKET_R, hy + Math.sin(ang) * EBB_SOCKET_R);
-    ctx.lineTo(hx + Math.cos(ang) * (EBB_SOCKET_R + 7), hy + Math.sin(ang) * (EBB_SOCKET_R + 7));
-    ctx.stroke();
-  }
   if (L.netIntact) {
     // COMMAND NET — while the commander holds, the structure is uncuttable, and
     // that is stated by a ring on the one enemy responsible for it.

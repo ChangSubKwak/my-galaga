@@ -5501,7 +5501,7 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
   G.resetGame();
 } else { console.log('  (skipped — keystone not drivable)'); }
 
-section('THE EBB — the pure manning axis (standing, the net holder, the sally)');
+section('THE MANNING AXIS — the model and the picture describe the same wall');
 {
   const LC = G.__getLatConst && G.__getLatConst();
   if (LC && typeof G.latticeStanding === 'function') {
@@ -5528,11 +5528,6 @@ section('THE EBB — the pure manning axis (standing, the net holder, the sally)
     ok(G.standingChanged(null, [true]), 'no previous manning always recomputes');
     ok(G.standingChanged([true], [true, true]), 'a length change always recomputes');
 
-    // --- the ebb level ---
-    eq(G.ebbLevel([true, true, true, true]), 0, 'a fully manned wall has ebbed nothing');
-    eq(G.ebbLevel([true, false]), 0.5, 'half the wall away reads 0.5');
-    eq(G.ebbLevel([false, false]), 1, 'an empty wall reads 1');
-    eq(G.ebbLevel([]), 0, 'no wall, no ebb');
 
     // --- THE NET HOLDS ONLY FROM INSIDE THE WALL ---
     eq(G.netHolderIndex(ents, st), 4, 'a standing commander holds the net');
@@ -5557,80 +5552,6 @@ section('THE EBB — the pure manning axis (standing, the net holder, the sally)
     ok(!G.wingTelegraphing(null), 'no roster is not a throw');
   } else { console.log('  (skipped — ebb not exposed)'); }
 }
-
-section('THE EBB — driven: the wall opens when its anchor leaves');
-// The SALVAGE lesson: never construct the state a feature needs. This drives a
-// real stage and OBSERVES — it never writes e.state, L.cuts, L.standing or
-// game.lattice. The only test-side control is the dive CADENCE (the same
-// diveInterval lever the KEYSTONE test uses), so the commander's own dive —
-// which is a rolled choice among ~36 members — is reached in bounded time.
-if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
-    && typeof G.latticeStanding === 'function') {
-  // The commander's own dive is a ROLLED choice among ~36 members, and a dive
-  // can end with it ramming the player and dying before any window opens. So
-  // the observation is retried on fresh stages, bounded — the event is rare,
-  // not absent, and a single attempt would make this a coin flip.
-  let sawWindow = false, cmdAliveInWindow = false, sawClose = false;
-  let chunksAllStanding = true, minPreview = Infinity, sawSocketWarning = false;
-  let builtOk = false, netOk = false, scoreClean = true;
-  for (let attempt = 0; attempt < 8 && !sawWindow; attempt++) {
-    G.resetGame();
-    const g = G.__getGame();
-    g.stage = 7;
-    G.startStage();
-    g.playerAlive = true;
-    g.lives = 99;
-    g.cheatInvincible = true;
-    for (let f = 0; f < 500 && !g.allEntered; f++) G.update();
-    if (!g.lattice) continue;
-    builtOk = true;
-    if (g.lattice.netIntact) netOk = true;
-    g.diveInterval = 40;          // dive cadence only — nothing about the mechanic
-    const scoreStart = g.score || 0;
-    for (let f = 0; f < 6000 && !(sawWindow && sawClose); f++) {
-      G.update();
-      const L = g.lattice;
-      if (!L) break;
-      const cmd = (g.enemies || []).find(e => e.alive && e.isCommander);
-      if (!cmd) break;
-      for (const e of (g.enemies || [])) {
-        if (e.previewTimer > 0 && e.previewMax) minPreview = Math.min(minPreview, e.previewMax);
-      }
-      if (cmd.state === 'formation' && (cmd.previewTimer || 0) > 0) sawSocketWarning = true;
-      if (cmd.state !== 'formation' && !L.netIntact) {
-        sawWindow = true;
-        cmdAliveInWindow = true;
-        for (const c of L.cuts) {
-          for (const idx of c.chunk) {
-            const m = L.ents[idx];
-            if (!m || !m.alive || m.state !== 'formation') chunksAllStanding = false;
-          }
-        }
-      }
-      if (sawWindow && cmd.state === 'formation' && L.netIntact) sawClose = true;
-    }
-    if ((g.score || 0) < scoreStart) scoreClean = false;
-  }
-  ok(builtOk, 'the architecture is built');
-  ok(netOk, 'and its net is intact while the commander sits in the wall');
-
-  ok(sawWindow,
-     'a window OPENED without the commander being killed — the anchor left the wall of '
-     + 'its own accord and the net went down with it');
-  ok(cmdAliveInWindow, 'and the commander was alive the whole time the window stood');
-  ok(sawSocketWarning,
-     'and THE SOCKET began forming while the commander was still standing — the warning '
-     + 'is real frames, not the frame the window opens (it was zero until measured)');
-  ok(chunksAllStanding,
-     'every member of every live span is STANDING — the model and the picture finally '
-     + 'describe the same object');
-  ok(sawClose || !sawWindow, 'and the window CLOSED when the anchor came home');
-  ok(minPreview === Infinity || minPreview >= 30,
-     'THE FAIRNESS BUDGET intact: the shortest telegraph observed is still '
-     + (minPreview === Infinity ? 'n/a' : minPreview + 'f'));
-  ok(scoreClean, 'and the window is worth ZERO points by itself');
-  G.resetGame();
-} else { console.log('  (skipped — ebb not drivable)'); }
 
 section('CAPTURE TELEGRAPH — the most expensive threat gets a warning');
 // A probe measured 87% of tractor beams landing (34 of 39 across 40 minutes of
