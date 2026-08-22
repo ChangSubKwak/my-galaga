@@ -163,6 +163,14 @@ Which enemy dives and which way its loop arcs are chosen by `mindPickDiver` /
 
 **Ghost variants**: deep-stage (60+) enemies have a 3% chance to spawn as `e.ghost` (mutually exclusive with elite). Ghosts render semi-invisible until the first hit flips `e.ghostRevealed`, score **2×** (the `ghost` factor in `killScore`), Tracked toward the GHOST SLAYER achievement (25 ghost kills). The per-kill ghost intercept and the 5-kill GHOST HUNTER badge were cut in the simplification pass.
 
+### THE MANIFEST (was: one perk at a time)
+
+`game.manifest` is an id→rank map drafted at every stage clear — see **THE
+MEASURE**. The old `game.activePerk` scalar is GONE: read cards through
+`hasPerk(id)` / `perkRank(id)` / `perkStep(id, perRank)`, never by comparing a
+string. The bidirectional registry guard scans for those three call shapes, so a
+card with no read site (or a read site with no card) fails the build.
+
 ### Power-up system
 
 Drops are 20% per kill / 35% for elites **at normal difficulty**, plus a guaranteed S+N+P trio from the mega-boss. The rate is computed by `powerUpDropRate(isElite, mode)` and shifts with difficulty (easy +5%, hard −5%, floored at 5%) — see "Difficulty shapes the economy". Power-up types:
@@ -514,6 +522,147 @@ leaves), never by rewarding a thing that does not happen.** Tracked: `game.ebbCu
 lifetime `galagaEbbTotal` (demo-guarded), SORTIE CUTS highlight, BREACH LEADER achievement,
 `COACH_LESSONS.ebb`. ZERO new score, no new actor, no new comms (24/24), no new HUD, no
 telegraph shortened.
+
+### THE MEASURE — the modern reform (music + graphics + gameplay, one idea)
+
+A 16-agent design panel (4 recon, 5 concept lenses, 3 judges, 3 red teams, 1
+synthesis) was asked for a modern-trend reform. Two of three judges picked a
+beat-clock concept; **all three red teams returned FATAL, and every one of those
+FATALs landed on the concept's SCORE CURRENCY, not on its clock.** So the clock
+shipped and the currency was deleted before it was written. That split is the
+whole design, and it is the rule to read before touching any of this:
+
+> **THE BAR owns WHEN.** It never owns how long a warning lasts, how much a shot
+> does, or what anything scores.
+> **THE MANIFEST owns WHAT.** `comboMultiplier` keeps the score multiplier.
+
+```bash
+node test/measure-audit.js   # report: clock / authorship / arrangement / rhythm
+```
+
+#### THE BAR — one clock, and it is `game.animFrame`
+`SIM_BPM 150` / `BEAT_FRAMES 24` / `BAR_FRAMES 96`, and `beatPhase(frame)` is a
+pure function of the frame counter. **Never derive tempo from `BGM[bgmTrack].bpm`.**
+`bgmTrack` is null whenever audio has not started, is muted, or is paused, so that
+read is `undefined` → NaN — and a NaN reaching a telegraph makes
+`if (previewTimer > 0)` FALSE, firing the threat with ZERO warning. That is the
+fairness budget inverted through its own front door. `animFrame` advances in both
+`gameLoop` branches, resets only in `resetGame`, and is frozen-clock safe in every
+harness, so **the beat exists with the sound off** — the only condition under which
+a rhythm may touch the simulation.
+
+Dive launches snap to the next beat. **The snap must stay cadence-neutral by
+CARRY**: subtract the interval (`diveTimer -= diveInterval`), never zero it, and
+the wing path must `-= WING_COOLDOWN` rather than assign. A driven probe (trigger
+events, 5 stages × 6 seeds) measured the assigning form losing 2.0–4.3% of
+triggers per minute at *every* stage — all five negative, the signature of
+systematic loss. After: −0.7% to +2.5%, signs mixed. 100% of triggers land on the
+grid, against 0–18% before.
+
+#### THE STEMS + THE BAR GRID — the mix, and the arrangement
+Four stem buses (`drum` / `bass` / `harm` / `lead`), a persistent `bgmDuck`
+sidechain **below** `bgmGain` (the old capture-cutscene duck wrote `bgmGain`
+directly — the same param `applyVolume()` rewrites, so any volume keypress
+cancelled it permanently), a master limiter, a tempo-synced dotted-eighth echo
+with a lowpass in the feedback path, and **percussion off the echo send**. `B`
+now stops the *scheduler*, not just a gain: it was allocating ~50–80 nodes a
+second forever to render silence.
+
+`normal` and `normalMid` are re-cut to **eight shared bars at 150 bpm**. Measured
+before: `normal`'s lead ran **35.25 beats** — not a whole bar, not a whole beat —
+against a 16-beat bass and a 32-beat pad, realigning once every 4,512 beats
+(~29 minutes), so the chord progression the comments advertised did not exist.
+150 bpm is load-bearing: 24 frames a beat, 96 a bar, the same grid the simulation
+runs on, so the audible kick lands on the frame of the visible floor pulse.
+**Boss tracks keep their own tempos deliberately** — the sim bar stays 96 frames,
+so a boss fight's visuals pulse slower than its music, which is correct because
+that is where the flash hazard would live.
+
+`stemMask(ranks, combo, bossTrack)` makes **the manifest the arrangement**: drums
+and bass always, the pad with your first card, the melody with your third.
+**Two ways in, always** — every layer also opens on combo, because declining
+every draft is a legitimate style and a rhythm channel must never be the only
+route to anything. Boss tracks ignore the mask.
+
+#### THE DRAFT + THE MANIFEST — the run is authored
+`game.manifest` is an id→rank map; taking a card you hold **raises** it. Fifteen
+cards, each an additive modifier on existing plumbing, each read at one site via
+`hasPerk` / `perkRank` / `perkStep`. The offer runs at **every** stage clear
+through the single shared `advanceToNextStage()` (all three clear paths carried
+identical copies of that block, which is exactly why authorship had only ever
+been wired into the boss one).
+
+Rules that are red-team or measurement findings — do not "simplify" them away:
+- **Score-bearing cards cap at rank 1** (`maxRank`). PARRY DIVIDEND, GHOST WAKE
+  and BOUNTY HUNTER multiply POINTS; curve-audit measured the economy with them
+  at their shipped values.
+- **No card writes `game.shieldCharges`.** `tryTriggerWitchTime` returns false
+  whenever it is non-zero, so once cards stack, a card whose trigger is the kill
+  counter permanently disables WITCH TIME. That is why VAMPIRE was cut; the suite
+  pins it with a driven test that holds the entire pool for 3000 frames.
+- **Modal, inside STAGE_INTRO.** The intro HOLDS at its last frame while cards
+  are up, so a 55%-black scrim is never composited over live bullets, and the
+  hold ends the instant the player commits.
+- **Commit is a PRESS, polled from the shared keys map.** Expiry takes nothing.
+  The old auto-take meant a lateral dodge during a hazard telegraph could rewrite
+  your build. Fly-to-choose was deleted: STAGE_INTRO never calls `updatePlayer`,
+  so that hover was frozen.
+- **`DRAFT_ARM` (one beat) before a commit is accepted.** pulse-audit measured the
+  draft's longest life at SIX FRAMES without it — a player mashing fire took the
+  middle card before the three had faded in.
+- **`pickPerkOffer` filters maxed ids**, and `offerDraft()` declines to open a
+  window it cannot fill.
+
+#### THE LIGHT — a bloom that blooms
+A **soft-knee bright pass**: keep the downsampled buffer in linear and squared
+form and add both back at k and (1−k), `drawImage` only (`ctx.filter` stays banned
+after four whiteout regressions), and **after** the `copy` drawImage — doing it
+before multiplies against the previous frame's stale content. Plus a second wider
+octave, because the buffer is smaller than the game's own 224×288.
+
+**The alpha budget is a whiteout guard and it is arithmetic.** The three draws add
+`A*(KNEE*L² + (1−KNEE)*L + OCT*L²)`, i.e. `A*1.40` at L=1, so A sits at 0.22 to
+hold the peak at the ~0.38 the old single pass had. What changes is the
+distribution: at L=0.13 the same formula adds 0.015 where the old pass added
+0.049. Same energy on bright things, three times less veiling glare on dark ones.
+The grid's `BASE_A` could then rise 0.17 → 0.26 honestly.
+
+Three full-screen washes (witch / boss phase-2 / slow-time) collapsed into **one
+state border**: hue says which state, brightness breathes on the bar.
+
+#### The photosensitivity ceiling — never raise this
+**No full-frame luminance channel exceeds 0.625 Hz or ±0.03 alpha, and all of
+them multiply by `motionScale()`** (0.25 under `reduceMotion`). Verified hazard
+being designed out: `bossEnrage`'s kick is 0.5 beats at 295 bpm = **9.83 Hz** and
+`boss` is **7.0 Hz**, both more than 3× the WCAG 2.3.1 flash threshold, on an
+additive full-screen buffer. The BAR is the only rate slow enough to be safe at
+every tempo the game will ever run. Small local elements (a 1px band, a telegraph
+rect, an enemy outline) may still pulse faster — that is a different hazard class,
+and the suite scans for the *combination* of a fast pulse with a full-frame fill.
+
+#### ON-BEAT DASH — the one rhythm verb, and it cannot be bought
+**On-beat FIRE was cut**, and this is why: `computeFireCooldown` floors at 2
+frames against a 24-frame beat, so at cooldown 3 there is a shot within 1.5
+frames of every grid tick — a RAPID pickup, a 30%-chance stage mutation or one
+card would buy the rhythm outright, and for everyone else the *cooldown* picks the
+frame, not the player. The dash is discrete, deliberate, and sits behind a
+60-frame cooldown against a 24-frame beat. A dash within ±`BEAT_WINDOW` (3) of a
+beat gets **+2 i-frames and +2 dash frames**. It pays in FRAMES, never points —
+`grep 'game.sync'` must return nothing but a comment. The dash-ready pip lights
+inside the window so the verb is playable with the sound off. **THE STRUGGLE is
+explicitly out of scope**: its tuning was measured, and putting the beat on it
+would make a deaf player pay the life they currently keep.
+
+Measured today: a deliberate dasher lands 100% on beat against 28% for a random
+one — a 72-point gap that is pure timing. **If that gap ever falls under ~15, the
+verb is decoration and the fix is structural, never a bigger reward.**
+
+#### The gate is deterministic now, and that came first
+`test/logic.test.js` was measured at **2 failures in 20 runs**, one an uncaught
+`TypeError` that aborted the process ten sections early — so a red run and a green
+run reported on different amounts of code. It now uses the same seeded xorshift
+`layout-audit.js` already had. **Do not remove the seed**; an unseeded harness
+runs a different game every time and cannot be trusted to have covered anything.
 
 ### THE FAIRNESS BUDGET — every threat announces itself (measure before tuning)
 
@@ -877,9 +1026,19 @@ Sound is generated live through Web Audio (`AudioContext`). `playSound(type, pan
 
 **SPATIAL SFX** — `playSound`'s optional `panX` (a screen x) routes the sound through a per-shot `StereoPanner` placed by `panForX(x)` (pure: `0..BASE_W` → `[-0.85, 0.85]`, softened, clamps, non-numeric → 0 centered). Omitting `panX` keeps the sound centered (UI / player-frame / global cues), and the panner is gated on `createStereoPanner` support. Positional combat events pass it (enemy explode/hit/crit, formation & kamikaze dives, all 6 boss signature attacks via `mb.x`, and the positional `graze`-ping events — near-miss/parry-deflect via `b.x`, ghost-reveal via `e.x`); player fire, pickups, milestones, dash-ready/supply-drop cues, and the player's own death stay centered. **PER-SHOT PITCH VARIATION** — types in the `SFX_VARY` set (`shoot/hit/explode/crit/enemyDive/graze`) get a `±SFX_DETUNE_CENTS` (55) random `o.detune` per trigger so rapid repeats aren't mechanically identical; melodic/sequenced cues (milestone/fanfare/comboStep) are deliberately excluded so they stay in tune. `panForX` / `SFX_VARY` / the `playSound` branches are covered by the logic tests. **COMBO HARMONICS** — `playSound`'s optional 3rd arg `detuneAdd` (cents) composes additively with the `SFX_VARY` wobble; the three enemy-kill SFX sites (`explode`/`crit`) pass `comboKillDetune(game.combo)` (pure, tested: linear ramp to a +300-cent cap at combo 30), so a kill chain audibly rises in pitch and drops back on combo break. Player-death / boss / bomb explosions omit it and stay at base pitch.
 
-BGM tracks have 5 voices: `lead` (square/saw, detuned chorus) + `bass` (triangle) + `pad` (sine, polyphonic root+fifth+octave) + `kick` + `hat`. The bus has a feedback delay (250ms, 0.32 fb, 0.30 wet) for spatial depth.
+BGM tracks have 6 voices — `lead` (square/saw, detuned chorus) + `bass` (triangle)
++ `pad` (sine, polyphonic root+fifth+octave) + `motif` (boss archetype signature)
++ `kick` + `hat` — routed to **four stem buses** (`bgmStems`: drum / bass / harm /
+lead). The send is a **tempo-synced dotted-eighth** delay with a lowpass in the
+feedback path, and **percussion is dry** (echoing the kick smears the one thing
+whose job is to be exactly on time, and it is the pulse the floor is locked to).
+The wet returns THROUGH `bgmBus`, so a track change's one fade takes the tail
+with it. A persistent `bgmDuck` sidechain sits **below** `bgmGain` — never write a
+ducked value onto `bgmGain` itself, which is the parameter `applyVolume()` owns —
+and a `masterLimiter` catches the peaks the game's loudest moments make.
+See **THE MEASURE** for the stem mask and the bar grid.
 
-**DYNAMIC BGM INTENSITY** (`computeBgmIntensity()`) — multiplies lead voice volume by 1.0×–1.55× based on combo level, boss phase 2, and last-life urgency. Force-enables hat layer when intensity ≥ 1.30. Snapshotted once per scheduler tick (~120ms) for phrase coherence.
+**DYNAMIC BGM INTENSITY** (`computeBgmIntensity()`) — multiplies lead voice volume by 1.0×–1.55× based on combo level, boss phase 2, and last-life urgency. Force-enables hat layer when intensity ≥ 1.30. Snapshotted once per scheduler tick (~120ms) for phrase coherence. It is now ONE input beside `stemMask()`, which decides *which* stems play at all.
 
 `bgmForGameState(state)` selects track: `normal | boss | bossEnrage | bossSuper | title`.
 

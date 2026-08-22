@@ -99,6 +99,24 @@ The pivot is **Neon Vector Bloom** (Geometry Wars / Rez / Resogun lineage).
   disable it. Bloom is a full-frame additive glow, so "too bright / too hazy" is a
   real comfort complaint and now has a remedy).
 
+## THE MEASURE — bright-pass bloom + one state border (2026-08-22)
+The bloom used to downsample and re-add the WHOLE frame at alpha 0.32 — the void,
+the nebulae, the HUD backings and every mid-grey glyph. That is veiling glare, and
+it quietly greyed the deep black this whole direction rests on. It is now a
+**soft-knee bright pass** (`src*src*k + src*(1-k)`, drawImage only, inserted AFTER
+the `copy` so it never multiplies stale content) plus a **second wider octave**,
+with the alpha budget solved so the PEAK stack stays at the ~0.38 the single pass
+had while the dark end drops by three times. Bright things glow harder; black is
+black. The vector grid's `BASE_A` rose 0.17 → 0.26 because it no longer sets the
+bloom's floor.
+
+Three full-screen washes (witch time / boss phase-2 / slow-time, which could stack
+two at a time) collapsed into **one state border**: HUE is the state, BRIGHTNESS
+breathes on the 96-frame bar. **No full-frame luminance channel may exceed
+0.625 Hz or ±0.03 alpha, and all of them multiply by `motionScale()`** — driving
+one from the audible kick would be 7.0–9.83 Hz on the boss tracks, over 3× the
+WCAG 2.3.1 threshold. See CLAUDE.md → THE MEASURE.
+
 ## SIMPLE-BY-DEFAULT GUI (2026-07-03)
 User directive: "make the overall GUI VERY simple." The default view now shows only
 VITAL elements (score/lives/stage, buff strip, combo box, boss HP, danger telegraphs,

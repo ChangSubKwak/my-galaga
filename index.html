@@ -268,6 +268,34 @@ function beatPhase(frame) {
     onBar: inBar === 0,
   };
 }
+// ===================== THE ONE RHYTHM VERB =====================
+// The design this reform grew out of wanted ON-BEAT FIRE. It does not survive
+// its own file: computeFireCooldown returns 6 frames base, 3 with RAPID and a
+// floor of 2, against a 24-frame beat — so at cooldown 3 there is a shot within
+// 1.5 frames of every single grid tick, and at 2 within 1.0. A green R pickup, a
+// 30%-chance stage mutation or one card would BUY the rhythm outright; and for
+// everyone else the emission frame is chosen by the cooldown, not by intent.
+//
+// THE DASH IS THE VERB INSTEAD. It is discrete, deliberate, one press, and it
+// sits behind a 60-frame cooldown against a 24-frame beat — so it cannot be
+// sprayed onto the grid, and no pickup and no card shortens it below a beat.
+// It is also already the single shared commit path for the Shift key, gamepad B
+// and the touch button, so every device gets this for free.
+//
+// AND IT PAYS IN FRAMES, NEVER IN POINTS. Two extra invincible frames. That is
+// the whole reward, in the currency every previous system in this game used.
+// There is no game.sync, no damage bonus and no multiplier anywhere near the
+// clock — a rhythm channel that sets the score is a tax on every player who
+// cannot hear it.
+const BEAT_WINDOW = 3;   // +-3 frames of a beat line: ~100ms, a real human window
+function onBeatNow(frame) {
+  const f = (typeof frame === 'number' && isFinite(frame))
+    ? Math.max(0, Math.floor(frame))
+    : ((game && game.animFrame) || 0);
+  const off = f % BEAT_FRAMES;
+  return Math.min(off, BEAT_FRAMES - off) <= BEAT_WINDOW;
+}
+
 // THE MOTION VALVE — every continuous luminance/camera channel THE BAR adds
 // multiplies through this. Its sibling effectiveShakeMul caps shake; this caps
 // pulsing. Kept as a function (not a const) because reduceMotion is read at load
@@ -6047,7 +6075,8 @@ const COACH_LESSONS = {
   cover:   'THE HULL EATS FIRE — BOTH WAYS',
   keystone:'CUT THE MARKED ONE — THE SPAN FALLS',
   redoubt: 'BRACE STILL — PLANT YOUR SHIELD',
-  ebb:     'IT CANT LEAD AND HOLD — CUT NOW'
+  ebb:     'IT CANT LEAD AND HOLD — CUT NOW',
+  onbeat:  'DASH ON THE BEAT — HOLD LONGER'
 };
 const COACH_KEY = 'galagaCoached';
 let coachLearned = (() => {
@@ -11083,10 +11112,20 @@ function tryStartDash() {
             : (keys['ArrowRight'] || keys['d'] || keys['D']) ? 1
             : (game.dashDir || 1);
   game.dashDir = dir;
-  game.dashTimer = 12;
+  // ON BEAT: two extra invincible frames, and two extra frames of dash — which is
+  // two extra frames in which enemy fire passing through you is DEFLECTED rather
+  // than fatal. Frames, not points.
+  const _onBeat = onBeatNow();
+  game.dashTimer = _onBeat ? 14 : 12;
+  game.dashOnBeat = _onBeat;
+  if (_onBeat) {
+    game.onBeatDashes = (game.onBeatDashes || 0) + 1;
+    if (typeof gridRipple === 'function') gridRipple(game.playerX, game.playerY, 1.6, 46);
+    if (typeof coachFire === 'function') coachFire('onbeat');
+  }
   // KINETIC shortens the dash cooldown by 20% a rank (60 -> 48 -> 38 -> 31).
   game.dashCooldown = Math.round(60 * Math.pow(0.8, perkRank('kinetic')));
-  game.invincibleTimer = Math.max(game.invincibleTimer, 14);
+  game.invincibleTimer = Math.max(game.invincibleTimer, _onBeat ? 16 : 14);
   game.dashCount = (game.dashCount || 0) + 1;
   // FLIGHT SCHOOL — the first dash ever is the moment to reveal that dash is
   // not just i-frames: it deflects. (Lifetime-once; self-retiring.)
@@ -24423,7 +24462,13 @@ function drawBossStage() {
     if (game.playerAlive && (game.dashCooldown || 0) === 0 && (game.dashTimer || 0) === 0) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.34 + 0.16 * Math.sin(game.animFrame * 0.18);
+      // THE BEAT, DRAWN. The dash-ready pip brightens and widens inside the beat
+      // window, so the one rhythm verb in the game can be played with the sound
+      // off, with autoplay blocked before the first input, or by a player who
+      // cannot hear at all. This project already paid for that lesson once: the
+      // capture siren "wasn't a warning either, since SFX can be off".
+      const _obw = onBeatNow();
+      ctx.globalAlpha = _obw ? 0.85 : (0.34 + 0.16 * Math.sin(game.animFrame * 0.18));
       ctx.fillStyle = '#0ff';
       const _ey = Math.round(_drawPY) + 6;
       if (game.dualFighter) {

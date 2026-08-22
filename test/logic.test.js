@@ -1346,10 +1346,13 @@ section('tryStartDash — shared dash trigger gating (keyboard/touch/gamepad)');
 // otherwise (PLAYING = 2).
 if (typeof G.tryStartDash === 'function') {
   let g = fresh(); g.state = 2; g.playerAlive = true; g.dashCooldown = 0; g.dashTimer = 0; g.invincibleTimer = 0;
+  // OFF the beat — the baseline dash, unchanged from the shipped game.
+  g.animFrame = 12;                     // half a beat away from a beat line
   G.tryStartDash();
-  eq(g.dashTimer, 12, 'ready → dash starts (12 i-frames)');
+  eq(g.dashTimer, 12, 'off-beat → dash starts (12 frames, the shipped length)');
   eq(g.dashCooldown, 60, 'ready → 60f cooldown set');
   ok(g.invincibleTimer >= 14, 'ready → invincibility granted');
+  eq(g.invincibleTimer, 14, '  and 14 i-frames off the beat');
 
   g = fresh(); g.state = 2; g.playerAlive = true; g.dashCooldown = 30; g.dashTimer = 0;
   G.tryStartDash();
@@ -6350,6 +6353,88 @@ section('BGM TABLES — a zero-beat note would hang every harness and the browse
        'and a valid table with kick 0 (an explicit "no kick") passes');
     eq(G.validateBgmTables(null).length, 0, 'a missing table set is not a throw');
   } else { console.log('  (skipped — validateBgmTables not exposed)'); }
+}
+
+section('ON-BEAT DASH — the one rhythm verb, and why it is the DASH');
+{
+  const B = G.__getBar && G.__getBar();
+  if (B && typeof G.onBeatNow === 'function' && typeof G.tryStartDash === 'function') {
+    // --- the window is a real human window, and it is symmetric ---
+    ok(G.onBeatNow(0), 'frame 0 is on the beat');
+    ok(G.onBeatNow(3), 'and so is 3 frames after it');
+    ok(G.onBeatNow(B.BEAT - 3), 'and 3 frames before the next one');
+    ok(!G.onBeatNow(B.BEAT / 2), 'the middle of a beat is not');
+    ok(!G.onBeatNow(8), 'nor is a third of the way in');
+    let hits = 0;
+    for (let f = 0; f < B.BEAT * 40; f++) if (G.onBeatNow(f)) hits++;
+    const pct = Math.round(100 * hits / (B.BEAT * 40));
+    ok(pct >= 20 && pct <= 32, 'the window is ' + pct + '% of the timeline — wide enough '
+       + 'to hit deliberately, narrow enough that random dashing does not get it free');
+    for (const bad of [undefined, null, NaN, -1, 'x']) {
+      const v = G.onBeatNow(bad);
+      ok(v === true || v === false, 'onBeatNow(' + String(bad) + ') is a boolean, not a throw');
+    }
+
+    // --- it pays in FRAMES ---
+    const dash = (frame) => {
+      const g = fresh();
+      g.state = 2; g.playerAlive = true; g.dashCooldown = 0; g.dashTimer = 0;
+      g.invincibleTimer = 0; g.animFrame = frame;
+      G.tryStartDash();
+      return g;
+    };
+    const off = dash(12), on = dash(0);
+    eq(off.dashTimer, 12, 'off the beat: 12 frames of dash');
+    eq(on.dashTimer, 14, 'on the beat: 14 — two more frames in which fire is DEFLECTED');
+    eq(off.invincibleTimer, 14, 'off the beat: 14 i-frames');
+    eq(on.invincibleTimer, 16, 'on the beat: 16');
+    ok(on.dashOnBeat === true && off.dashOnBeat === false, 'and the dash records which it was');
+    eq(on.onBeatDashes, 1, 'on-beat dashes are counted');
+    ok(!off.onBeatDashes, 'off-beat ones are not');
+
+    // --- ...AND NOTHING SCOREABLE. THIS IS THE INVARIANT THE WHOLE CLOCK RESTS ON ---
+    eq(on.score || 0, off.score || 0, 'an on-beat dash awards ZERO extra score');
+    eq(on.combo || 0, off.combo || 0, 'and nothing to the combo');
+    // Scan CODE, not prose — the comment explaining why game.sync does not exist
+    // is allowed to name it.
+    const codeOnly = scriptSrc.split('\n').filter(l => l.trim().indexOf('//') !== 0).join('\n');
+    ok(codeOnly.indexOf('game.sync') < 0,
+       'there is no game.sync anywhere in the code — the clock owns no currency');
+    ok(codeOnly.indexOf('onBeatFire') < 0, 'and on-beat FIRE was never built');
+
+    // --- IT CANNOT BE BOUGHT ---
+    // This is why the verb is the dash and not the trigger. computeFireCooldown
+    // floors at 2 frames against a 24-frame beat, so at cooldown 3 there is a shot
+    // within 1.5 frames of EVERY grid tick: a green R pickup, a 30%-chance stage
+    // mutation or one card would have handed a player the rhythm outright.
+    ok(G.computeFireCooldown(true, true, 3, true) <= 3,
+       'a fully stacked fire rate is <= 3 frames — well inside the beat window, '
+       + 'which is exactly why FIRE could never carry this');
+    ok(60 > B.BEAT * 2, 'the dash cooldown (60f) is more than two beats, so the verb '
+       + 'cannot be sprayed onto the grid');
+    // no pickup or card shortens the dash below one beat
+    const g2 = fresh();
+    g2.manifest = { kinetic: 3 };
+    g2.state = 2; g2.playerAlive = true; g2.dashCooldown = 0; g2.dashTimer = 0; g2.animFrame = 0;
+    G.tryStartDash();
+    ok(g2.dashCooldown >= B.BEAT, 'even KINETIC at max rank leaves the cooldown at '
+       + g2.dashCooldown + 'f — still at least a beat, so the window must still be aimed for');
+
+    // --- THE BEAT HAS A NON-AUDIO CARRIER ---
+    // A player on galagaBGMOff, on mute, with autoplay blocked before the first
+    // input, or who simply cannot hear, must be able to play this.
+    ok(/THE BEAT, DRAWN/.test(scriptSrc), 'the dash-ready pip lights inside the beat window');
+    ok(/const _obw = onBeatNow\(\)/.test(scriptSrc), '  reading the same clock the verb does');
+
+    // --- and THE STRUGGLE was deliberately left alone ---
+    // Its tuning was measured so ~6.7 reversals/s tears free at frame 75-90 and
+    // ~3/s never does. Putting the beat on it would move that curve and make a
+    // deaf player pay the life they currently keep, on the most expensive event
+    // in the game.
+    const strugSrc = scriptSrc.slice(scriptSrc.indexOf('function struggleTick'),
+                                     scriptSrc.indexOf('function struggleTick') + 900);
+    ok(strugSrc.indexOf('onBeatNow') < 0, 'THE STRUGGLE does not read the beat');
+  } else { console.log('  (skipped — the rhythm verb is not exposed)'); }
 }
 
 section('THE LIGHT — the motion valve, and the last draw-side state mutation');
