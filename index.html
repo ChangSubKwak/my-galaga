@@ -6090,7 +6090,6 @@ function drawGuardian() {
 // never speaks while a strike telegraph is up or the player is dead.
 const COACH_LESSONS = {
   parry:   'DASH THROUGH FIRE — IT DEFLECTS',
-  arsenal: 'COMBO 25 ARMS A FREE WEAPON',
   salvage: 'CATCH THE SHARDS — REBUILD YOUR SHIP',
   magpie:  'SHOOT THE THIEF — IT DROPS YOUR CARGO',
   mind:    'THEY READ YOUR LANE — MOVE OR BAIT',
@@ -8923,7 +8922,6 @@ function resetGame() {
     redoubtBlocks: 0,
     // COMBO ARSENAL — set of milestone combo values already triggered THIS streak.
     // Cleared when combo resets so each new run can re-earn the unlocks.
-    comboArsenalClaimed: {},
     topRank: -1,
     kamikazeTimer: 0,
     ufoTimer: 0,
@@ -14729,12 +14727,14 @@ const COMBO_MILESTONE = 40; // every N kills in a combo grants a milestone rewar
 // Avoids 30 (already EXTRA SHIP) and the 3/5/10/15/20 multiplier-tier sound triggers.
 // Once claimed in a streak the entry is locked until combo resets — prevents farming the
 // same milestone by hovering at threshold-1.
-const COMBO_ARSENAL = [
-  { combo: 25,  buff: 'rapid',  duration: 180, label: 'RAPID UNLOCK!',  color: '#fc4' },
-  { combo: 50,  buff: 'wave',   duration: 180, label: 'WAVE UNLOCK!',   color: '#f8a' },
-  { combo: 75,  buff: 'homing', duration: 180, label: 'HOMING UNLOCK!', color: '#0ef' },
-  { combo: 100, buff: 'laser',  duration: 180, label: 'LASER UNLOCK!',  color: '#f6c' }
-];
+// (COMBO ARSENAL was deleted here. It handed out a free RAPID / WAVE / HOMING /
+// LASER at combo 25 / 50 / 75 / 100 — weapons the player did not choose, arriving
+// on top of the weapon they did. Only one bullet `kind` can be active at a time,
+// so a gifted LASER simply overwrote a drafted build's WAVE: the exact inverse of
+// THE MANIFEST, which is the whole reform — the run is a thing you author. A high
+// combo is still paid, and paid well: the score multiplier to x3, a 5,000-point
+// milestone every 40 kills, an attack guardian at 50, the milestone rings, and the
+// stem mask opening the pad and then the melody in the music.)
 
 function bumpCombo() {
   game.combo++;
@@ -14743,7 +14743,6 @@ function bumpCombo() {
   // SIGNAL INTERCEPT — enemy threat-level chatter when combo first crosses 10 this stage
   // FLIGHT SCHOOL — signpost the arsenal payout while it is still reachable
   // (combo 20, five kills short of the 25 threshold) rather than after.
-  if (game.combo === 20 && typeof coachFire === 'function') coachFire('arsenal');
   if (game.combo === 10 && !game._stageComboInterceptFired) {
     game._stageComboInterceptFired = true;
   }
@@ -14832,7 +14831,7 @@ function bumpCombo() {
   }
   // MEGA COMBO FIREWORKS — escalating screen-wide explosion + confetti spectacle
   // at combo 50/75/100. Layered on top of existing arsenal triggers (which fire on
-  // the *first* reach via comboArsenalClaimed). Pure visual; no score impact.
+  // the *first* reach via a one-shot flag). Pure visual; no score impact.
   const megaTier = game.combo === 50 ? 1
                  : game.combo === 75 ? 2
                  : game.combo === 100 ? 3 : 0;
@@ -14856,32 +14855,6 @@ function bumpCombo() {
       color: game.flashColor, life: 90, maxLife: 90, size: 14
     });
     rumble(300 + megaTier * 60, 0.85, 0.5);
-  }
-  // COMBO ARSENAL — trigger any unlocks now reachable. Using `>=` so a missed exact
-  // increment (e.g. trickShot frame skipping value 25 → 26) still pays out.
-  for (const a of COMBO_ARSENAL) {
-    if (game.combo >= a.combo && !game.comboArsenalClaimed[a.combo]) {
-      game.comboArsenalClaimed[a.combo] = true;
-      if      (a.buff === 'rapid')  game.rapidTimer  = Math.max(game.rapidTimer  || 0, a.duration);
-      else if (a.buff === 'wave')   game.waveTimer   = Math.max(game.waveTimer   || 0, a.duration);
-      else if (a.buff === 'homing') game.homingTimer = Math.max(game.homingTimer || 0, a.duration);
-      else if (a.buff === 'laser')  game.laserTimer  = Math.max(game.laserTimer  || 0, a.duration);
-      game.floatTexts.push({
-        x: BASE_W/2, y: BASE_H/2 - 30, text: a.label,
-        color: a.color, life: 80, maxLife: 80, size: 12
-      });
-      game.floatTexts.push({
-        x: BASE_W/2, y: BASE_H/2 - 18, text: 'COMBO ' + a.combo,
-        color: '#ff4', life: 80, maxLife: 80, size: 8
-      });
-      game.flashTimer = 8;
-      game.flashColor = a.color;
-      game.shakeTimer = Math.min(20, (game.shakeTimer || 0) + 6);
-      playSound('powerUp');
-      rumble(220, 0.7, 0.4);
-      spawnConfetti(10);
-      triggerWeaponCallout(a.color);
-    }
   }
   if (game.combo === 30) {
     unlockAchievement('comboMaster');
@@ -14953,7 +14926,6 @@ function bumpCombo() {
 // Reset milestone tracking when combo resets
 function resetComboMilestone() {
   game.comboMilestoneClaimed = 0;
-  game.comboArsenalClaimed = {};
 }
 
 function updateCombo() {
