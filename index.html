@@ -21370,7 +21370,12 @@ function drawStageIntro() {
 
   // STAGE_INTRO SKIP HINT — once skipping is allowed (≥ 30 frames shown), prompt
   // the player they can fast-forward. Subtle gray, bottom of screen, pulsing.
-  if (game.stageTimer <= 90 && game.stageTimer > 2 && blinkPhase(3)) {
+  // Suppressed while a draft is open: fire TAKES A CARD there, and the intro is
+  // deliberately held anyway, so the prompt would be advertising an input the
+  // game is refusing — and would sit under a modal that already says what fire
+  // does. Verified by eye in the browser, which is where this was found.
+  if (game.stageTimer <= 90 && game.stageTimer > 2 && blinkPhase(3)
+      && (game.perkSelectFrames || 0) <= 0) {
     drawRetroText('FIRE: SKIP', BASE_W / 2, BASE_H - 8, 4, '#888', 'center');
   }
 
@@ -22505,7 +22510,7 @@ function drawGameplay() {
 // pip per RANK held, grouped and coloured by card — no text, so it cannot
 // overflow and needs no layout budget, and it reads at a glance as "how much
 // machine am I carrying".
-function drawManifestStrip(cx, y, alpha) {
+function drawManifestStrip(cx, y, alpha, align) {
   if (!game || !game.manifest) return;
   const ids = [];
   for (const id of PERK_IDS) if (perkRank(id) > 0) ids.push(id);
@@ -22513,7 +22518,10 @@ function drawManifestStrip(cx, y, alpha) {
   const PIP = 3, GAP = 1, GROUP = 3;
   let w = 0;
   for (const id of ids) w += perkRank(id) * (PIP + GAP) + GROUP;
-  let x = cx - w / 2;
+  // Right-aligned in the HUD so the strip GROWS LEFTWARDS as the build fills in
+  // and its right edge never moves; centred under the draft, where it is the
+  // subject rather than a readout.
+  let x = align === 'right' ? (cx - w) : (cx - w / 2);
   ctx.save();
   ctx.globalAlpha = (alpha == null ? 1 : alpha);
   for (const id of ids) {
@@ -23457,7 +23465,7 @@ function drawHUD() {
   // see is a build they cannot play around, and by the end of a run this is eight
   // or nine stacked cards rather than the single modifier the old scalar allowed.
   // Pips only: no text, so it adds nothing to the layout budget.
-  if (isCombatState() && manifestSize() > 0) drawManifestStrip(BASE_W - 30, BASE_H - 10, 1);
+  if (isCombatState() && manifestSize() > 0) drawManifestStrip(BASE_W - 5, BASE_H - 19, 1, 'right');
   if (dangerLives && (isCombatState())) {
     if (blinkPhase(3)) {
       drawRetroText('LAST LIFE', BASE_W/2, BASE_H - 22, 6, COL.red);
