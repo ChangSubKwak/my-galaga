@@ -299,6 +299,14 @@ let audioCtx = null;
 let masterGain = null;
 let bgmGain = null;
 let sfxGain = null;
+// masterLimiter catches the peaks the game's best moments produce; bgmDuck is the
+// sidechain the SFX push the music down through. Both persist for the life of the
+// context — bgmDuck deliberately OUTLIVES a track change, so a duck cannot be
+// stranded by one, and lives off bgmGain so applyVolume() can never fight it.
+let masterLimiter = null;
+let bgmDuck = null;
+// Four stems, rebuilt with each track's bus. The mix is no longer one wire.
+let bgmStems = null;
 let audioVolume = (() => {
   const v = parseFloat(localStorage.getItem('galagaVol'));
   return isNaN(v) ? 1 : clamp01(v);
@@ -823,10 +831,37 @@ function ensureAudio() {
       audioCtx = new AudioCtx();
       masterGain = audioCtx.createGain();
       masterGain.gain.value = audioMuted ? 0 : audioVolume;
-      masterGain.connect(audioCtx.destination);
+      // THE LIMITER. `createDynamicsCompressor` existed in every stub in this repo
+      // and was used in zero of 24,922 lines, while the BGM bus peaks around 0.4,
+      // the kick alone is 0.18, and a high-combo explosion chain stacks a dozen
+      // one-shots on top of that with nothing to catch them — so the loudest,
+      // best moments of the game were the ones that clipped. Set with `.value`
+      // rather than setValueAtTime: the harness stubs return a bare function for
+      // unknown params, which absorbs a property write but has no scheduler.
+      try {
+        masterLimiter = audioCtx.createDynamicsCompressor();
+        masterLimiter.threshold.value = -6;
+        masterLimiter.knee.value = 6;
+        masterLimiter.ratio.value = 12;
+        masterLimiter.attack.value = 0.003;
+        masterLimiter.release.value = 0.18;
+        masterGain.connect(masterLimiter);
+        masterLimiter.connect(audioCtx.destination);
+      } catch (e) {
+        masterLimiter = null;
+        masterGain.connect(audioCtx.destination);
+      }
       bgmGain = audioCtx.createGain();
       bgmGain.gain.value = bgmEnabled ? 1 : 0;
       bgmGain.connect(masterGain);
+      // THE DUCK BUS — persistent, so it survives track changes, and separate from
+      // bgmGain so it can never collide with applyVolume(). The old capture-cutscene
+      // duck wrote `bgmGain.gain.value = 0.5` directly, which is the SAME param
+      // applyVolume() rewrites: pressing a volume key mid-cutscene silently
+      // un-ducked the music and nothing ever put it back.
+      bgmDuck = audioCtx.createGain();
+      bgmDuck.gain.value = 1;
+      bgmDuck.connect(bgmGain);
       sfxGain = audioCtx.createGain();
       sfxGain.gain.value = sfxEnabled ? 1 : 0;
       sfxGain.connect(masterGain);
@@ -848,6 +883,54 @@ function applyVolume() {
   } catch (e) {}
   volIndicatorTimer = 60;
 }
+
+// ===================== THE DUCK — the music gets out of the way =====================
+// Sidechain ducking is the single cheapest thing that makes a live mix sound
+// produced rather than layered: every impact pushes the music down a couple of dB
+// and lets it back up, so the two stop fighting for the same space. The game had
+// exactly one duck before this — a HARD, un-ramped `bgmGain.gain.value = 0.5` for
+// the capture cutscene — and it wrote the same parameter applyVolume() writes, so
+// a volume keypress during a capture silently cancelled it forever.
+const BGM_DUCK_DEPTH = 0.72;      // ~-2.8 dB: audible, never a hole in the music
+const BGM_DUCK_ATTACK = 0.010;    // fast enough to get out of an impact's way
+const BGM_DUCK_RELEASE = 0.090;   // slow enough to breathe, fast enough to pump
+let _bgmDuckHold = 1;             // sustained floor (cutscenes) the transient returns to
+let _bgmDuckLast = -1;
+// A param the stubs can actually automate; otherwise fall back to a plain write.
+// The harness proxies return a bare function for unknown params, so this is what
+// keeps a new automation call from throwing inside a test that never wanted audio.
+function _audioParam(p) {
+  return (p && typeof p.setTargetAtTime === 'function') ? p : null;
+}
+function duckMusic(depth) {
+  if (!audioCtx || !bgmDuck) return;
+  const now = audioCtx.currentTime;
+  // Rate-limit: at a 20-combo kill chain this is called many times a second and
+  // every call would otherwise push another pair of events onto the timeline.
+  if (_bgmDuckLast >= 0 && now - _bgmDuckLast < 0.04) return;
+  _bgmDuckLast = now;
+  const floor = _bgmDuckHold * (typeof depth === 'number' ? depth : BGM_DUCK_DEPTH);
+  const p = _audioParam(bgmDuck.gain);
+  if (!p) { bgmDuck.gain.value = floor; return; }
+  p.setTargetAtTime(floor, now, BGM_DUCK_ATTACK);
+  p.setTargetAtTime(_bgmDuckHold, now + 0.06, BGM_DUCK_RELEASE);
+}
+// Sustained duck for cutscenes. Replaces the bgmGain write; survives a volume change.
+function setMusicDuckHold(v) {
+  _bgmDuckHold = Math.max(0, Math.min(1, typeof v === 'number' && isFinite(v) ? v : 1));
+  if (!audioCtx || !bgmDuck) return;
+  const p = _audioParam(bgmDuck.gain);
+  if (!p) { bgmDuck.gain.value = _bgmDuckHold; return; }
+  p.setTargetAtTime(_bgmDuckHold, audioCtx.currentTime, 0.05);
+}
+// WHICH CUES DUCK. Impacts and announcements — never the player's own trigger
+// finger ('shoot' fires up to 30x a second and would turn the duck into a tremolo).
+const SFX_DUCK = new Set([
+  'explode', 'explosion', 'crit', 'killKamikaze', 'killShielded', 'killFormationBoss',
+  'capture', 'extraLife', 'milestone', 'milestoneStage', 'gameOver', 'bossWarning',
+  'lowHealth', 'rescue', 'dualFighter', 'powerMax',
+  'fanfareBoss', 'fanfareChallenge', 'fanfareSuperBoss',
+]);
 
 // --- BGM system ---
 let bgmTrack = null;
@@ -1049,25 +1132,68 @@ function startBGM(name) {
   // New bus that fades in. Demo mode is half-volume + slower fade so it feels like attract-mode.
   bgmBus = audioCtx.createGain();
   bgmBus.gain.value = 0;
-  // Send tap — feedback delay (echo) for spatial depth. ~250ms tap with 0.3 feedback creates
-  // 2-3 audible echoes that decay naturally. Wet ~30% so dry signal stays dominant.
+  const _out = bgmDuck || bgmGain || masterGain || audioCtx.destination;
+
+  // ===================== THE STEMS =====================
+  // Six voices used to share one wire, so the mix had exactly one control: total
+  // volume. Four stems give it a shape — and, from stage 8, a way for the score to
+  // OPEN as the fight escalates instead of just getting louder.
+  //   drum = kick + hat   bass = bass   harm = pad + motif   lead = lead
+  bgmStems = {
+    drum: audioCtx.createGain(),
+    bass: audioCtx.createGain(),
+    harm: audioCtx.createGain(),
+    lead: audioCtx.createGain(),
+  };
+  for (const _k in bgmStems) bgmStems[_k].gain.value = 1;
+
+  // Send tap — feedback delay (echo) for spatial depth.
+  // TEMPO-SYNCED. It was a hardcoded 250ms against tracks running 96-295bpm, so at
+  // 155bpm (a 387ms beat) every repeat landed on nothing — an echo that is not a
+  // musical division is just smear. A dotted eighth is the standard choice because
+  // it fills the gaps between beats instead of doubling them.
+  const _trk = BGM[name];
+  const _beatSec = 60 / ((_trk && _trk.bpm > 0) ? _trk.bpm : SIM_BPM);
   const delay = audioCtx.createDelay(1.0);
-  delay.delayTime.value = 0.25;
+  delay.delayTime.value = Math.max(0.02, Math.min(0.99, _beatSec * 0.75));
   const fb = audioCtx.createGain();
   fb.gain.value = 0.32;
+  // Lowpass IN THE FEEDBACK PATH so each repeat is darker than the last, the way a
+  // real space behaves. Without it the tail keeps every hiss the hat put into it
+  // and the accumulated top end is what made the old echo read as smear.
+  const fbLp = audioCtx.createBiquadFilter();
+  try { fbLp.type = 'lowpass'; fbLp.frequency.value = 2400; } catch (e) {}
   const wet = audioCtx.createGain();
   wet.gain.value = 0.30;
-  bgmBus.connect(delay);
-  delay.connect(fb);
+
+  // PERCUSSION IS DRY. The kick and hat were being echoed, which smears the one
+  // thing in the mix whose whole job is to be exactly on time — and it is the
+  // pulse the floor and the bloom are now visibly locked to.
+  bgmStems.drum.connect(bgmBus);
+  for (const _k of ['bass', 'harm', 'lead']) {
+    bgmStems[_k].connect(bgmBus);
+    bgmStems[_k].connect(delay);
+  }
+  delay.connect(fbLp);
+  fbLp.connect(fb);
   fb.connect(delay);
   delay.connect(wet);
-  wet.connect(bgmGain || masterGain || audioCtx.destination);
-  bgmBus.connect(bgmGain || masterGain || audioCtx.destination);
+  // THE WET RETURNS THROUGH THE BUS, not straight to the output. The send is now
+  // tapped off the STEMS rather than off bgmBus, so a wet path wired directly to
+  // the output would no longer be severed when a track change disconnects the bus
+  // — the previous track's echo would keep ringing at full level while its dry
+  // signal faded. One output means one fade, and the tail goes with it.
+  wet.connect(bgmBus);
+  bgmBus.connect(_out);
   const now = audioCtx.currentTime;
   const demoMode = game && game.isDemo;
   const targetVol = demoMode ? 0.5 : 1;
   const fade = demoMode ? BGM_FADE * 2 : BGM_FADE;
   bgmBus.gain.linearRampToValueAtTime(targetVol, now + fade);
+
+  // A cutscene duck must never outlive the cutscene's track. Belt-and-braces
+  // against any exit path from CAPTURED that does not reach an explicit restore.
+  setMusicDuckHold(1);
 
   bgmTrack = name;
   bgmScheduled = true;
@@ -1305,7 +1431,11 @@ function scheduleBGMNotes() {
   const beatSec = 60 / t.bpm;
   const AHEAD = 0.4;
   const horizon = audioCtx.currentTime + AHEAD;
-  const dest = bgmBus || masterGain || audioCtx.destination;
+  // Each voice goes to its own stem. The fallback keeps the scheduler working if
+  // it is ever reached before startBGM built a graph (and keeps every harness that
+  // calls it directly out of a null dereference).
+  const _dest = bgmBus || masterGain || audioCtx.destination;
+  const S = bgmStems || { drum: _dest, bass: _dest, harm: _dest, lead: _dest };
   // Snapshot intensity ONCE per scheduler tick — not per note — so volumes stay
   // coherent within each scheduling window (~120ms) and don't jitter inside a phrase.
   const intensity = computeBgmIntensity();
@@ -1334,7 +1464,7 @@ function scheduleBGMNotes() {
       ];
       for (const v of voices) {
         const g = audioCtx.createGain();
-        g.connect(dest);
+        g.connect(S.lead);
         const o = audioCtx.createOscillator();
         o.type = t.type;
         o.frequency.setValueAtTime(v.freq, bgmNextTime);
@@ -1361,7 +1491,7 @@ function scheduleBGMNotes() {
         const bnoteDur = bdur * 0.85;
         const bvol = t.vol * 0.85;
         const g = audioCtx.createGain();
-        g.connect(dest);
+        g.connect(S.bass);
         const o = audioCtx.createOscillator();
         o.type = 'triangle';
         o.frequency.setValueAtTime(bfreq * biomePitch, bgmBassNextTime);
@@ -1397,7 +1527,7 @@ function scheduleBGMNotes() {
         ];
         for (const v of padVoices) {
           const g = audioCtx.createGain();
-          g.connect(dest);
+          g.connect(S.harm);
           const o = audioCtx.createOscillator();
           o.type = 'sine';
           o.frequency.setValueAtTime(v.freq, bgmPadNextTime);
@@ -1429,7 +1559,7 @@ function scheduleBGMNotes() {
         const mNoteDur = mdur * 0.9;
         const mvol = motif.vol * intensity;
         const g = audioCtx.createGain();
-        g.connect(dest);
+        g.connect(S.harm);
         const o = audioCtx.createOscillator();
         o.type = motif.type;
         // Rides the archetype lead-detune so motif + lead stay in tune together.
@@ -1457,7 +1587,7 @@ function scheduleBGMNotes() {
   if (t.kick && t.kick > 0) {
     const kickInterval = t.kick * beatSec;
     while (bgmKickNextTime < horizon) {
-      scheduleBgmKick(bgmKickNextTime, dest);
+      scheduleBgmKick(bgmKickNextTime, S.drum);
       bgmKickNextTime += kickInterval;
     }
   }
@@ -1472,7 +1602,7 @@ function scheduleBGMNotes() {
   if (effectiveHat > 0) {
     const hatInterval = effectiveHat * beatSec;
     while (bgmHatNextTime < horizon) {
-      scheduleBgmHat(bgmHatNextTime, dest);
+      scheduleBgmHat(bgmHatNextTime, S.drum);
       bgmHatNextTime += hatInterval;
     }
   }
@@ -1498,6 +1628,10 @@ const SFX_VARY = new Set(['shoot', 'hit', 'explode', 'crit', 'enemyDive', 'graze
 function playSound(type, panX, detuneAdd) {
   ensureAudio();
   if (!audioCtx) return;
+  // SIDECHAIN — an impact pushes the music down and lets it back up, so the two
+  // stop competing for the same space. Curated: the player's own trigger fires up
+  // to 30 times a second and would turn this into a tremolo.
+  if (SFX_DUCK.has(type)) duckMusic();
   const now = audioCtx.currentTime;
   // Spatial routing: when an event x is supplied, insert a StereoPanner before the
   // SFX bus so the sound is placed in the stereo field by where it happened.
@@ -2845,7 +2979,7 @@ function breakCaptureFree() {
       localStorage.setItem('galagaBreakoutTotal', String(_bt));
     } catch (e) {}
   }
-  if (bgmGain) bgmGain.gain.value = bgmEnabled ? 1 : 0;
+  setMusicDuckHold(1);
   const boss = game.capturedShipEnemy;
   if (boss) {
     boss.capturedShip = false;
@@ -11079,6 +11213,19 @@ function initInput() {
       try { localStorage.setItem('galagaBGMOff', bgmEnabled ? '0' : '1'); } catch (err) {}
       ensureAudio();
       applyVolume();
+      // BGM OFF NOW STOPS THE ENGINE, NOT JUST THE GAIN. Zeroing bgmGain left the
+      // scheduler running forever: it kept allocating and starting ~50-80
+      // oscillator+gain nodes every second, for the whole session, to render
+      // silence — the one setting a player picks to make the game cheaper was the
+      // one that cost the most. Turning it back on restarts the track this state
+      // should be playing, since nothing re-arms BGM per frame.
+      if (!bgmEnabled) {
+        stopBGM();
+      } else if (game && typeof bgmForGameState === 'function') {
+        const _st = (game.state === STATE.PAUSED && game.pausedState != null)
+          ? game.pausedState : game.state;
+        startBGM(bgmForGameState(_st));
+      }
       volIndicatorTimer = 60;
     }
     if (k === 'n') {
@@ -15168,7 +15315,10 @@ function updateEnemies() {
             game.struggleFree = false;
             game.struggleTug = 0;
             // Dim BGM during the capture cutscene for tension
-            if (bgmGain) bgmGain.gain.value = bgmEnabled ? 0.5 : 0;
+            // Through the DUCK bus, not bgmGain: bgmGain is the param applyVolume()
+            // rewrites, so the old `bgmGain.gain.value = 0.5` was cancelled outright by
+            // any volume/mute keypress during the cutscene and never restored.
+            setMusicDuckHold(0.5);
             // Cutscene flair — blue flash + spiral particles being sucked up
             game.flashTimer = 8;
             game.flashColor = '#08f';
@@ -18654,7 +18804,7 @@ function update() {
       // Short pause then lose life
       if (game.captureTimer > CAPTURE_HOLD) {
         // Restore BGM volume (capture cutscene ending)
-        if (bgmGain) bgmGain.gain.value = bgmEnabled ? 1 : 0;
+        setMusicDuckHold(1);
         game.lives--;
         if (game.lives <= 0) {
           game.state = STATE.GAME_OVER;

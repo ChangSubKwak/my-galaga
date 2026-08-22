@@ -244,6 +244,16 @@ const shim = `
   OPEN: VENT_OPEN, MIN: VENT_MIN, RAMP: VENT_RAMP, HALF: VENT_HALF,
   OFF: VENT_OFF, SLOW: VENT_SLOW, GAIN: STAGGER_GAIN, DECAY: STAGGER_DECAY,
   STUN: STAGGER_STUN }; }; } catch (e) {}
+;try { globalThis.__audioProbe = function () { return {
+  duckHold: (typeof _bgmDuckHold !== 'undefined') ? _bgmDuckHold : null,
+  stems: (typeof bgmStems !== 'undefined' && bgmStems) ? Object.keys(bgmStems).sort().join(',') : null,
+  limiter: (typeof masterLimiter !== 'undefined') && !!masterLimiter,
+  duckBus: (typeof bgmDuck !== 'undefined') && !!bgmDuck,
+  duckSet: (typeof SFX_DUCK !== 'undefined') ? [...SFX_DUCK] : null,
+  track: (typeof bgmTrack !== 'undefined') ? bgmTrack : null,
+  scheduled: (typeof bgmScheduled !== 'undefined') ? bgmScheduled : null,
+  trackNames: (typeof BGM !== 'undefined') ? Object.keys(BGM) : null,
+}; }; } catch (e) {}
 ;try { globalThis.__getBar = function () { return {
   BPM: SIM_BPM, BEATS_PER_BAR: BEATS_PER_BAR,
   BEAT: BEAT_FRAMES, BAR: BAR_FRAMES, WING_COOLDOWN: WING_COOLDOWN,
@@ -6317,6 +6327,72 @@ section('BGM TABLES — a zero-beat note would hang every harness and the browse
        'and a valid table with kick 0 (an explicit "no kick") passes');
     eq(G.validateBgmTables(null).length, 0, 'a missing table set is not a throw');
   } else { console.log('  (skipped — validateBgmTables not exposed)'); }
+}
+
+section('THE STEMS — four buses, a limiter, and a duck that survives the volume key');
+{
+  const A = G.__audioProbe && G.__audioProbe();
+  if (A) {
+    // --- the graph actually gets built, for every shipped track ---
+    // This is the test that would have caught a mis-wired stem: a voice pointed at
+    // a stem that does not exist throws inside the scheduler, which has already
+    // nulled its own timer id, so the music dies permanently and silently.
+    let threw = null;
+    for (const name of (A.trackNames || [])) {
+      try {
+        G.startBGM(name);
+        G.scheduleBGMNotes();
+        G.scheduleBGMNotes();   // the re-arm path, where a stale cursor would show
+      } catch (e) { threw = name + ': ' + e.message; break; }
+    }
+    ok(!threw, 'every shipped track builds its graph and schedules twice without throwing'
+       + (threw ? ' (' + threw + ')' : ''));
+    const A2 = G.__audioProbe();
+    eq(A2.stems, 'bass,drum,harm,lead', 'four stems exist and are named');
+    ok(A2.limiter, 'the master limiter is in the chain');
+    ok(A2.duckBus, 'and the duck bus exists');
+
+    // --- the duck must not be the player's trigger finger ---
+    const D = new Set(A2.duckSet || []);
+    ok(D.size > 0, 'some cues duck the music (' + D.size + ')');
+    ok(!D.has('shoot'), "'shoot' does NOT duck — it fires up to 30x a second and would "
+       + 'turn the sidechain into a tremolo');
+    ok(!D.has('graze'), "and neither does 'graze', for the same reason");
+    ok(D.has('explode'), "'explode' does duck — an impact is exactly what a sidechain is for");
+    ok(D.has('lowHealth'), 'and so does the LAST LIFE warning, the cue that most needs room');
+
+    // --- THE BUG THIS REPLACES: a volume keypress cancelled the cutscene duck ---
+    // The old form wrote bgmGain.gain.value directly, which is the SAME parameter
+    // applyVolume() rewrites from bgmEnabled. So [ ] b n or t during a capture
+    // silently un-ducked the music, permanently.
+    G.setMusicDuckHold(0.5);
+    eq(G.__audioProbe().duckHold, 0.5, 'a cutscene duck sets a sustained hold');
+    G.applyVolume();
+    eq(G.__audioProbe().duckHold, 0.5,
+       'and a VOLUME CHANGE no longer cancels it — the duck lives on its own bus');
+    G.setMusicDuckHold(1);
+    eq(G.__audioProbe().duckHold, 1, 'and it is released cleanly');
+    // malformed input is a released duck, never a NaN gain on the whole music bus
+    for (const bad of [undefined, null, NaN, 'x', -3, 9]) {
+      G.setMusicDuckHold(bad);
+      const h = G.__audioProbe().duckHold;
+      ok(h >= 0 && h <= 1, 'setMusicDuckHold(' + String(bad) + ') stays in [0,1] (' + h + ')');
+    }
+    G.setMusicDuckHold(1);
+
+    // --- and no site writes the ducked value onto bgmGain any more ---
+    ok(!/bgmGain\.gain\.value\s*=\s*bgmEnabled\s*\?\s*0\.5/.test(scriptSrc),
+       'no cutscene writes a ducked value onto bgmGain (the param applyVolume owns)');
+
+    // --- BGM off stops the ENGINE, not just the gain ---
+    // Zeroing bgmGain left the scheduler allocating ~50-80 nodes a second forever
+    // to render silence: the setting a player picks to make the game cheaper was
+    // the most expensive one in the file.
+    const bBranch = scriptSrc.slice(scriptSrc.indexOf("if (k === 'b') {"),
+                                    scriptSrc.indexOf("if (k === 'n') {"));
+    ok(bBranch.indexOf('stopBGM()') >= 0, 'the BGM toggle stops the scheduler when it turns off');
+    ok(bBranch.indexOf('startBGM(') >= 0, 'and restarts it when it turns back on');
+  } else { console.log('  (skipped — audio internals not exposed)'); }
 }
 
 section('playSound — the six cues that were falling through to a full-scale click');
