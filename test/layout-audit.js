@@ -234,6 +234,15 @@ function capture(label, setup, frames) {
     frameNo++;
     try { G.draw(); } catch (e) {
       recording = false;
+      // A THROWING draw() IS A FAILURE, AND IT USED TO BE A SILENT ONE. This
+      // logged one line and carried on to `process.exit(0)`, so the audit could
+      // report "no text overflows" for a screen it had never finished
+      // rasterizing — which is worse than missing the exception: the PASS became
+      // MEANINGLESS for that screen, because its text was never measured.
+      // Proven by injecting `throw` into drawWarper: two screens broke, the audit
+      // exited 0, and run.sh's `| tail -n 6` discarded both log lines, so the
+      // operator saw nothing but the green RESULT.
+      drawFaults.push(label + ' frame ' + i + ': ' + e.message);
       console.log('  (draw threw on ' + label + ' frame ' + i + ': ' + e.message + ')');
       break;
     }
@@ -241,6 +250,9 @@ function capture(label, setup, frames) {
     try { G.update(); } catch (e) { break; }
   }
 }
+
+// Every screen whose draw() threw. Non-empty means the audit did not do its job.
+const drawFaults = [];
 
 function baseStage(g, stage) {
   g.stage = stage;
@@ -273,6 +285,37 @@ capture('PLAYING s100', g => {
   // ratio), so its sprite went unrendered. Seed one mid-damage.
   g.supplyCrate = { x: 112, y: 150, vy: 0, hp: 2, maxHp: 3, life: 40, rot: 0.4, rotSpeed: 0.025 };
 }, 300);
+// EVERY SPRITE AND EVERY STATE, RASTERIZED ONCE PER RUN.
+// `grep -c 'elite|ghost|isCommander|panicTimer' test/layout-audit.js` returned
+// ZERO: the four states the per-enemy overlay stack re-encodes were never drawn
+// here, and a natural capture only ever spawns the types that stage rolls. So a
+// fault in drawWarper, drawUFO, an elite's outline or a ghost's alpha could not
+// be caught by anything. That mattered little while a throwing draw() still
+// exited 0; now that it does not, this is what gives the gate something to catch.
+//
+// The enemies are the stage's OWN, re-labelled — not fabricated objects. Every
+// field the dispatcher reads is therefore whatever startStage() really built.
+capture('PLAYING roster', g => {
+  baseStage(g, 60);
+  g.state = S.PLAYING;
+  const types = ['bee', 'butterfly', 'boss', 'mirror', 'splitter', 'shielded',
+                 'ufo', 'hoverer', 'kamikaze', 'goldenBee', 'minibee', 'warper'];
+  const live = (g.enemies || []).filter(e => e && e.alive);
+  live.forEach((e, i) => {
+    if (i < types.length) { e.type = types[i]; return; }
+    switch (i - types.length) {
+      case 0: e.elite = true; break;
+      case 1: e.ghost = true; break;
+      case 2: e.ghost = true; e.ghostRevealed = true; break;
+      case 3: e.isCommander = true; break;
+      case 4: e.hp = 1; e.maxHp = 3; break;          // a damaged multi-HP member
+      case 5: e.hit = 6; break;                       // the hit flash
+      default: break;
+    }
+  });
+  g.panicTimer = 90;                                  // the panicked outline
+}, 120);
+
 capture('CHALLENGING', g => { baseStage(g, 96); g.state = S.CHALLENGING; });
 capture('BOSS_STAGE', g => { baseStage(g, 100); g.state = S.BOSS_STAGE; });
 capture('RESPAWN', g => { baseStage(g, 50); g.state = S.RESPAWN; g.playerAlive = false; });
@@ -476,6 +519,15 @@ if (process.env.OVERLAP) {
   }
 }
 
+// Printed before the verdict so the verdict can never contradict it, and last
+// in the output so run.sh's tail cannot hide it.
+if (drawFaults.length) {
+  console.log('\n-- draw() FAULTS --');
+  for (const f of drawFaults) console.log('   ** ' + f);
+  console.log('\nRESULT: ' + drawFaults.length + ' screen(s) FAILED TO RENDER. Their');
+  console.log('text was never measured, so this run proves nothing about them.\n');
+  process.exit(1);
+}
 if (totalBad) {
   console.log('RESULT: ' + totalBad + ' string(s) never fully visible - see above.\n');
   process.exit(1);
