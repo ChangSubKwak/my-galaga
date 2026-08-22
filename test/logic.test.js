@@ -244,6 +244,7 @@ const shim = `
   OPEN: VENT_OPEN, MIN: VENT_MIN, RAMP: VENT_RAMP, HALF: VENT_HALF,
   OFF: VENT_OFF, SLOW: VENT_SLOW, GAIN: STAGGER_GAIN, DECAY: STAGGER_DECAY,
   STUN: STAGGER_STUN }; }; } catch (e) {}
+;try { globalThis.__getBgmTables = function () { return BGM; }; } catch (e) {}
 ;try { globalThis.__getTransitionFade = function () { return transitionFade; }; } catch (e) {}
 ;try { globalThis.__setReduceMotion = function (v) { reduceMotion = !!v; }; } catch (e) {}
 ;try { globalThis.__getReduceMotion = function () { return reduceMotion; }; } catch (e) {}
@@ -6680,6 +6681,64 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && typeof G.offerDra
   G.resetGame();
   clearKeys();
 } else { console.log('  (skipped — draft not drivable)'); }
+
+section('THE BAR GRID — the score finally shares a cycle with the world');
+{
+  const A = G.__audioProbe && G.__audioProbe();
+  const B = G.__getBar && G.__getBar();
+  if (A && B && A.trackNames) {
+    // --- the two tracks the player actually lives in run on the sim's own grid ---
+    const bgm = G.__getBgmTables ? G.__getBgmTables() : null;
+    if (bgm) {
+      for (const name of ['normal', 'normalMid']) {
+        const t = bgm[name];
+        ok(!!t, name + ' exists');
+        eq(t.bpm, B.BPM, name + ' runs at the simulation tempo, so the AUDIBLE kick '
+           + 'and the VISIBLE bar pulse land on the same frame');
+        eq(3600 / t.bpm, B.BEAT, '  a beat is exactly ' + B.BEAT + ' frames — an integer, '
+           + 'so the grid never drifts and never needs a resync');
+        // ALL THREE VOICES SHARE THE BAR. Measured before this rewrite: normal's
+        // lead ran 35.25 beats — not even a whole beat — against a 16-beat bass and
+        // a 32-beat pad, so the three realigned once every 4,512 beats (~29 minutes)
+        // and the I-vi-IV-V-I progression the comments advertised was a coincidence
+        // that drifted apart within seconds of the loop starting.
+        const beats = rows => rows.reduce((a, r) => a + r[1], 0);
+        const L = beats(t.notes), Ba = beats(t.bass), Pa = beats(t.pad);
+        eq(L % 4, 0, name + ' lead is a whole number of bars (' + (L / 4) + ')');
+        eq(Ba % 4, 0, '  bass too (' + (Ba / 4) + ')');
+        eq(Pa % 4, 0, '  and pad (' + (Pa / 4) + ')');
+        eq(L, Ba, '  lead and bass are the SAME length — they cannot drift apart');
+        eq(L, Pa, '  and so is the pad: one cycle, one harmony, forever');
+      }
+    } else { console.log('  (BGM tables not exposed — grid check skipped)'); }
+
+    // --- THE ARRANGEMENT IS THE BUILD ---
+    if (typeof G.stemMask === 'function') {
+      const m0 = G.stemMask(0, 0, false);
+      eq(m0.drum, 1, 'a run opens with drums');
+      eq(m0.bass, 1, 'and bass — the groove is never withheld');
+      eq(m0.harm, 0, 'but no pad');
+      eq(m0.lead, 0, 'and no tune: the record fills in as the ship becomes a machine');
+      eq(G.stemMask(1, 0, false).harm, 1, 'your first card brings the pad in');
+      eq(G.stemMask(1, 0, false).lead, 0, '  but not yet the melody');
+      eq(G.stemMask(3, 0, false).lead, 1, 'a real build brings the melody');
+      // TWO WAYS IN, ALWAYS. A player who declines every draft is playing a
+      // legitimate style and must not be punished with a permanently thin mix.
+      eq(G.stemMask(0, 3, false).harm, 1, 'and combo opens the pad with no cards at all');
+      eq(G.stemMask(0, 8, false).lead, 1, 'and the melody too — neither path is the only one');
+      // the boss fight is the one arrangement written to be heard whole
+      const mb = G.stemMask(0, 0, true);
+      ok(mb.drum === 1 && mb.bass === 1 && mb.harm === 1 && mb.lead === 1,
+         'a boss track ignores the mask entirely and plays in full');
+      // malformed input never silences the pulse the floor is locked to
+      for (const bad of [undefined, null, NaN, -5, 'x']) {
+        const mx = G.stemMask(bad, bad, false);
+        eq(mx.drum, 1, 'stemMask(' + String(bad) + ') keeps the drums');
+        eq(mx.bass, 1, '  and the bass');
+      }
+    } else { console.log('  (stemMask not exposed)'); }
+  } else { console.log('  (skipped — audio internals not exposed)'); }
+}
 
 section('THE STEMS — four buses, a limiter, and a duck that survives the volume key');
 {
