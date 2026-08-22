@@ -122,6 +122,28 @@ const windowStub = {
   setTimeout: () => 0, clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
 };
 
+// DETERMINISM — the gate must be reproducible before it can be trusted.
+// The game calls Math.random() in ~180 places (formation variants, stage
+// mutations, which enemy dives, elite/ghost rolls, the commander's own dive),
+// so an UNSEEDED harness runs a different game every time. Measured on the
+// shipped tree: 2 failures in 20 runs (10%) — one an uncaught TypeError that
+// ABORTED the process ten sections early, so a red run and a green run were
+// telling you about different code. test/layout-audit.js already learned this
+// lesson (its comment: an unseeded run "can MISS a real overflow — that is
+// exactly how this tool first reported a clean pass on a deliberately
+// over-long boss name"); the logic suite simply never got the same treatment.
+// Same xorshift, same shape, so both instruments are seeded the same way.
+let _seed = 0x2f6e2b1;
+const seededRandom = () => {
+  _seed ^= _seed << 13; _seed ^= _seed >>> 17; _seed ^= _seed << 5;
+  return ((_seed >>> 0) % 1000000) / 1000000;
+};
+// Object.create(Math) so the ~9 sections that temporarily stub G.Math.random
+// (and restore it afterwards) keep working: they set/clear an OWN property and
+// the seeded implementation sits behind it on the prototype.
+const SeededMath = Object.create(Math);
+SeededMath.random = seededRandom;
+
 const sandbox = {
   console,
   document: documentStub,
@@ -134,7 +156,7 @@ const sandbox = {
   cancelAnimationFrame() {},
   setTimeout: () => 0, clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
   performance: { now: () => 0 },
-  Math, Date, JSON, parseInt, parseFloat, isNaN, isFinite,
+  Math: SeededMath, Date, JSON, parseInt, parseFloat, isNaN, isFinite,
   Float32Array, Uint8Array, Array, Object, String, Number, Boolean, Set, Map, Symbol,
   alert() {}, prompt() { return null; }, confirm() { return false; },
 };
@@ -222,6 +244,10 @@ const shim = `
   OPEN: VENT_OPEN, MIN: VENT_MIN, RAMP: VENT_RAMP, HALF: VENT_HALF,
   OFF: VENT_OFF, SLOW: VENT_SLOW, GAIN: STAGGER_GAIN, DECAY: STAGGER_DECAY,
   STUN: STAGGER_STUN }; }; } catch (e) {}
+;try { globalThis.__getBar = function () { return {
+  BPM: SIM_BPM, BEATS_PER_BAR: BEATS_PER_BAR,
+  BEAT: BEAT_FRAMES, BAR: BAR_FRAMES, WING_COOLDOWN: WING_COOLDOWN,
+  DIVE_PREVIEW: DIVE_PREVIEW }; }; } catch (e) {}
 `;
 
 vm.createContext(sandbox);
@@ -5343,8 +5369,14 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
      + 'a load path a player can read');
 
   // --- cut it, and a span comes down ---
-  const key = g.lattice.ents[g.lattice.cuts[0].i];
-  const spanSize = g.lattice.cuts[0].chunk.length;
+  // A SHAPE FAILURE MUST BE AN ASSERTION, NEVER AN ABORT. The unguarded form
+  // (`g.lattice.cuts[0].i`) threw an uncaught TypeError whenever the punch above
+  // failed to expose a keystone, which killed the process and silently skipped
+  // every section below this one — so a failing run reported on less code than a
+  // passing run did. The assertions below now fail and keep going.
+  const _cut0 = (g.lattice.cuts && g.lattice.cuts.length) ? g.lattice.cuts[0] : null;
+  const key = _cut0 ? g.lattice.ents[_cut0.i] : null;
+  const spanSize = _cut0 ? _cut0.chunk.length : 0;
   const scoreBefore = g.score || 0;
   kill(key);
   const falling = (g.enemies || []).filter(e => e.alive && e.state === 'collapsing');
@@ -5354,8 +5386,8 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
   ok(!!g.lattice.block, 'and the span is riding a single rigid block');
 
   // it FALLS, and it keeps its shape
-  const y0 = falling[0].y;
-  const shape0 = falling.map(e => e.x - falling[0].x);
+  const y0 = falling.length ? falling[0].y : 0;
+  const shape0 = falling.length ? falling.map(e => e.x - falling[0].x) : [];
   for (let f = 0; f < 60; f++) G.update();
   const stillFalling = (g.enemies || []).filter(e => e.alive && e.state === 'collapsing');
   if (stillFalling.length) {
@@ -6155,6 +6187,160 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame() && 
 
   G.resetGame();   // hygiene: leave a clean game for anything that follows
 } else { console.log('  (skipped — long-session probe not drivable)'); }
+
+section('THE BAR — the one clock, and why it is not the audio clock');
+{
+  const B = G.__getBar && G.__getBar();
+  if (B && typeof G.beatPhase === 'function') {
+    // --- the grid is exact at 60fps: no drift, no resync, ever ---
+    eq(B.BPM, 150, 'SIM_BPM is 150');
+    eq(B.BEAT, 24, '60fps / (150/60) = exactly 24 frames a beat — an integer');
+    eq(B.BAR, 96, 'and 4 of those is a 96-frame bar');
+    eq(B.BEAT * B.BEATS_PER_BAR, B.BAR, 'the bar is beats-per-bar beats long');
+
+    // --- pure, and a pure function of the frame ONLY ---
+    const at0 = G.beatPhase(0);
+    eq(at0.bar, 0, 'frame 0 is bar 0'); eq(at0.beat, 0, 'beat 0');
+    ok(at0.onBeat && at0.onBar, 'and it is both a beat line and a bar line');
+    eq(G.beatPhase(23).beat, 0, 'frame 23 is still inside beat 0');
+    ok(!G.beatPhase(23).onBeat, 'and is not itself a beat line');
+    eq(G.beatPhase(24).beat, 1, 'frame 24 opens beat 1');
+    ok(G.beatPhase(24).onBeat, 'and IS a beat line');
+    ok(!G.beatPhase(24).onBar, 'but not a bar line');
+    eq(G.beatPhase(95).beat, 3, 'frame 95 is the last frame of the bar');
+    eq(G.beatPhase(96).bar, 1, 'frame 96 opens bar 1');
+    ok(G.beatPhase(96).onBar && G.beatPhase(96).onBeat, 'which is both');
+    eq(G.beatPhase(2400).bar, 25, 'and it still lands exactly 25 bars later — no drift');
+    eq(G.beatPhase(2400).barPhase, 0, 'with the phase back at zero');
+
+    // exactly one beat line in every 24 frames, and one bar line in every 96
+    let beats = 0, bars = 0;
+    for (let f = 0; f < 960; f++) {
+      if (G.beatPhase(f).onBeat) beats++;
+      if (G.beatPhase(f).onBar) bars++;
+    }
+    eq(beats, 40, 'exactly one beat line per 24 frames across 960 frames');
+    eq(bars, 10, 'and exactly one bar line per 96');
+
+    // --- malformed input is a clock reading, never a throw and never a NaN ---
+    // This is the whole reason the clock is animFrame and not BGM[bgmTrack].bpm:
+    // a NaN reaching a telegraph makes `if (previewTimer > 0)` FALSE and the
+    // threat fires with zero warning — the fairness budget inverted through its
+    // own front door.
+    for (const bad of [undefined, null, NaN, Infinity, -5, 'x', {}]) {
+      const p = G.beatPhase(bad);
+      ok(p && isFinite(p.bar) && isFinite(p.beat) && isFinite(p.barPhase),
+         'beatPhase(' + String(bad) + ') is finite, never NaN');
+      ok(p.beat >= 0 && p.beat < B.BEATS_PER_BAR, '  and its beat is in range');
+      ok(p.barPhase >= 0 && p.barPhase < 1, '  and its bar phase is in [0,1)');
+    }
+
+    // --- THE BAR MOVES A START, NEVER A LENGTH ---
+    // The telegraph constants must remain literal frames. If a future edit ever
+    // expresses one in beats, this fails: at 150bpm two beats is 48f, which
+    // would silently double the dive preview, and at a faster track it would
+    // silently halve it.
+    eq(B.DIVE_PREVIEW, 30, 'DIVE_PREVIEW is still a literal 30 frames, not a beat count');
+    ok(B.DIVE_PREVIEW > B.BEAT, 'the readable baseline is longer than one beat, so a '
+       + 'launch snapped up to a beat line can never eat into its own warning');
+
+    // --- the wing cooldown must SUBTRACT, or the snap silently costs cadence ---
+    ok(B.WING_COOLDOWN > 0, 'the wing cooldown is a positive extra gap');
+  } else { console.log('  (skipped — the bar is not exposed)'); }
+}
+
+section('THE BAR — driven: every dive launches on the grid, at the shipped cadence');
+// Measured, not asserted from the constant: the beat-snap is only legitimate if
+// it moves WHEN a dive starts without changing HOW OFTEN dives happen. The first
+// cut of this failed exactly here — the wing path assigned the timer instead of
+// subtracting from it, discarding the frames the trigger had spent waiting for
+// the beat, and cost 2-4% of triggers per minute at every stage measured.
+if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
+    && G.__getBar) {
+  const B = G.__getBar();
+  const g0 = G.__getGame();
+  let triggers = 0, onGrid = 0, minGap = Infinity;
+  for (const stage of [7, 33]) {
+    G.resetGame();
+    const g = G.__getGame();
+    g.stage = stage;
+    G.startStage();
+    g.playerAlive = true; g.lives = 99; g.cheatInvincible = true;
+    for (let f = 0; f < 900 && !g.allEntered; f++) G.update();
+    let prevT = g.diveTimer, lastTrigFrame = -1;
+    for (let f = 0; f < 4000; f++) {
+      G.update();
+      // The timer only ever DROPS on a trigger; it otherwise counts up by one.
+      if (g.diveTimer < prevT) {
+        triggers++;
+        if ((g.animFrame % B.BEAT) === 0) onGrid++;
+        if (lastTrigFrame >= 0) minGap = Math.min(minGap, g.animFrame - lastTrigFrame);
+        lastTrigFrame = g.animFrame;
+      }
+      prevT = g.diveTimer;
+    }
+  }
+  ok(triggers > 20, 'the probe actually observed dive triggers (' + triggers + ')');
+  eq(onGrid, triggers, 'EVERY dive trigger landed on a beat line — the swarm attacks '
+     + 'on the count the floor and the music already keep');
+  ok(minGap === Infinity || minGap % B.BEAT === 0,
+     'and every gap between triggers is a whole number of beats (' + minGap + 'f)');
+  // The carry holds only the overshoot, so it can never accumulate into a burst:
+  // consecutive triggers still cannot be closer than one beat.
+  ok(minGap === Infinity || minGap >= B.BEAT,
+     'no two triggers are closer than one beat — the carry cannot stack into a burst');
+  ok(!!g0, 'the harness had a live game to drive');
+  G.resetGame();
+} else { console.log('  (skipped — the bar is not drivable)'); }
+
+section('BGM TABLES — a zero-beat note would hang every harness and the browser');
+{
+  if (typeof G.validateBgmTables === 'function') {
+    eq(G.validateBgmTables().length, 0, 'the shipped tables are all valid');
+    // Each voice loop is `while (cursor < horizon) cursor += beats * beatSec`.
+    // beats <= 0 never advances the cursor: an infinite loop with no stack, in a
+    // scheduler that runs on a timer the test harness stubs to a no-op.
+    const bad = {
+      zeroBeat: { bpm: 150, notes: [[440, 0]] },
+      negBeat:  { bpm: 150, notes: [[440, -1]] },
+      noBpm:    { bpm: 0,   notes: [[440, 1]] },
+      emptyLead:{ bpm: 150, notes: [] },
+      badPad:   { bpm: 150, notes: [[440, 1]], pad: [[220, 0]] },
+      badRow:   { bpm: 150, notes: [[440]] },
+      negKick:  { bpm: 150, notes: [[440, 1]], kick: -1 },
+    };
+    const found = G.validateBgmTables(bad);
+    for (const k of Object.keys(bad)) {
+      ok(found.some(p => p.indexOf(k) === 0), 'rejects ' + k);
+    }
+    eq(G.validateBgmTables({ fine: { bpm: 150, notes: [[440, 0.5]], kick: 0 } }).length, 0,
+       'and a valid table with kick 0 (an explicit "no kick") passes');
+    eq(G.validateBgmTables(null).length, 0, 'a missing table set is not a throw');
+  } else { console.log('  (skipped — validateBgmTables not exposed)'); }
+}
+
+section('playSound — the six cues that were falling through to a full-scale click');
+{
+  // `default:` starts an oscillator with no type, no frequency and NO GAIN
+  // ENVELOPE: a 10ms 440Hz sine at unity gain, louder than every real cue in the
+  // file (the loudest is 0.18). Six call sites landed there, including the LAST
+  // LIFE warning. This scans the source so a future deletion re-opens the hole
+  // loudly instead of silently.
+  const called = new Set(
+    [...scriptSrc.matchAll(/playSound\('([a-zA-Z]+)'/g)].map(x => x[1]));
+  const body = scriptSrc.slice(
+    scriptSrc.indexOf('function playSound('),
+    scriptSrc.indexOf('// --- Sprite drawing ---'));
+  const cases = new Set(
+    [...body.matchAll(/case '([a-zA-Z]+)':/g)].map(x => x[1]));
+  ok(called.size > 20, 'the scan found the call sites (' + called.size + ' distinct cues)');
+  const missing = [...called].filter(c => !cases.has(c));
+  eq(missing.length, 0, 'every cue the game asks for has a case: '
+     + (missing.length ? 'MISSING ' + missing.join(', ') : 'none missing'));
+  for (const must of ['hit', 'explosion', 'lowHealth']) {
+    ok(cases.has(must), "'" + must + "' is a real cue, not a click");
+  }
+}
 
 // ============================================================
 console.log(`\n${'='.repeat(48)}`);

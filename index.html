@@ -227,6 +227,51 @@ function isCombatState() {
   return s === STATE.PLAYING || s === STATE.CHALLENGING || s === STATE.BOSS_STAGE;
 }
 
+// ===================== THE BAR — the world's one clock =====================
+// Until now the tempo was a function-local `const beatSec` inside
+// scheduleBGMNotes that nothing in 24,000 lines could read, so the music and the
+// game were two objects that happened to run at the same time. THE BAR publishes
+// it, and the whole world can finally agree on WHEN.
+//
+// THE CLOCK IS `game.animFrame`, NOT THE AUDIO CONTEXT. This is the load-bearing
+// decision and it is not a convenience:
+//   * `bgmTrack` is null whenever audio has not started, is muted, or is paused,
+//     so a tempo read from `BGM[bgmTrack].bpm` is `undefined` → NaN. A NaN that
+//     reaches a telegraph length makes `if (previewTimer > 0)` FALSE, and the
+//     threat fires with ZERO warning — the exact inversion THE FAIRNESS BUDGET
+//     exists to prevent, arriving through the fairness system's own front door.
+//   * `animFrame` advances in BOTH gameLoop branches (the hit-stop branch bumps
+//     it explicitly), resets only in resetGame, and is frozen-clock-safe under
+//     every Node harness. The beat therefore exists with the sound off, which is
+//     the only way a rhythm can be allowed to touch the simulation at all.
+//
+// 150bpm at 60fps gives exact integers — 24 frames a beat, 96 a bar — so the
+// grid never drifts and never needs a resync.
+const SIM_BPM = 150;
+const BEATS_PER_BAR = 4;
+const BEAT_FRAMES = 24;            // 60 * 60 / SIM_BPM
+const BAR_FRAMES = BEAT_FRAMES * BEATS_PER_BAR;   // 96
+// Pure: pass a frame to test it, omit it to read the live clock.
+function beatPhase(frame) {
+  const f = (typeof frame === 'number' && isFinite(frame))
+    ? Math.max(0, Math.floor(frame))
+    : ((game && game.animFrame) || 0);
+  const inBar = f % BAR_FRAMES;
+  return {
+    bar: Math.floor(f / BAR_FRAMES),
+    beat: Math.floor(inBar / BEAT_FRAMES),        // 0..3
+    barPhase: inBar / BAR_FRAMES,                 // 0..1 across the bar
+    beatPhase: (f % BEAT_FRAMES) / BEAT_FRAMES,   // 0..1 across the beat
+    onBeat: (f % BEAT_FRAMES) === 0,
+    onBar: inBar === 0,
+  };
+}
+// THE MOTION VALVE — every continuous luminance/camera channel THE BAR adds
+// multiplies through this. Its sibling effectiveShakeMul caps shake; this caps
+// pulsing. Kept as a function (not a const) because reduceMotion is read at load
+// and a const would snapshot before that read in some orderings.
+function motionScale() { return reduceMotion ? 0.25 : 1; }
+
 // --- Colors ---
 const COL = {
   red: '#e44', cyan: '#0ff', yellow: '#ff0', white: '#fff', green: '#0f0',
@@ -1198,11 +1243,65 @@ function computeBgmIntensity() {
   return Math.min(1.55, m);
 }
 
+// TABLE VALIDATOR — run once at load, before a single note is scheduled.
+// Every voice loop in scheduleBGMNotes is `while (cursor < horizon) { cursor +=
+// beats * beatSec; }`. A note with `beats <= 0`, or a track with `bpm <= 0`,
+// advances the cursor by zero or backwards and the loop NEVER TERMINATES — it
+// hangs the browser tab and every Node harness (where audioCtx.currentTime is
+// frozen at 0 and setTimeout is a no-op, so there is not even a stall to notice).
+// The tables are hand-written and about to be re-authored, so the failure mode is
+// one typo away. Returns the list of problems rather than throwing: a bad table
+// must not take the whole game down with it, it must be dropped and reported.
+function validateBgmTables(tables) {
+  const problems = [];
+  const t = tables || (typeof BGM !== 'undefined' ? BGM : null);
+  if (!t) return problems;
+  for (const name in t) {
+    const trk = t[name];
+    if (!trk) { problems.push(name + ': missing'); continue; }
+    if (!(trk.bpm > 0)) problems.push(name + ': bpm must be > 0');
+    for (const voice of ['notes', 'bass', 'pad']) {
+      const rows = trk[voice];
+      if (rows === undefined) continue;              // bass/pad are optional
+      if (!Array.isArray(rows) || rows.length === 0) {
+        problems.push(name + '.' + voice + ': present but empty');
+        continue;
+      }
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!Array.isArray(row) || row.length < 2) {
+          problems.push(name + '.' + voice + '[' + i + ']: not a [freq, beats] pair');
+        } else if (!(row[1] > 0)) {
+          problems.push(name + '.' + voice + '[' + i + ']: beats must be > 0 (infinite loop)');
+        }
+      }
+    }
+    for (const perc of ['kick', 'hat']) {
+      if (trk[perc] !== undefined && trk[perc] !== 0 && !(trk[perc] > 0)) {
+        problems.push(name + '.' + perc + ': must be 0 or > 0 (infinite loop)');
+      }
+    }
+  }
+  return problems;
+}
+// Tracks that would hang the scheduler are removed at load rather than played.
+(function () {
+  const bad = validateBgmTables(BGM);
+  if (bad.length) {
+    try { console.error('BGM table validation failed:\n  ' + bad.join('\n  ')); } catch (e) {}
+    const broken = {};
+    for (const p of bad) broken[p.split(/[.:]/)[0]] = true;
+    for (const name in broken) delete BGM[name];
+  }
+})();
+
 function scheduleBGMNotes() {
   bgmTimerId = null;
   if (!bgmScheduled || !audioCtx) return;
   const t = BGM[bgmTrack];
-  if (!t) return;
+  // An unknown track name would otherwise leave bgmScheduled true with the timer
+  // chain already severed above — "playing" forever with no scheduler alive.
+  if (!t) { bgmScheduled = false; return; }
   const beatSec = 60 / t.bpm;
   const AHEAD = 0.4;
   const horizon = audioCtx.currentTime + AHEAD;
@@ -1220,7 +1319,10 @@ function scheduleBGMNotes() {
     ? biomeBgmPitch(biomeForStage(game.stage)) : 1.0;
 
   // --- Lead voice (main + detuned chorus partner for shimmer/width) ---
-  while (bgmNextTime < horizon) {
+  // Guarded exactly like t.bass / t.pad below. Unguarded, an empty notes array
+  // destructures `undefined` and throws INSIDE the scheduler — which has already
+  // nulled bgmTimerId, so the music stops permanently with no re-arm.
+  while (t.notes && t.notes.length && bgmNextTime < horizon) {
     const [freq, beats] = t.notes[bgmNoteIdx % t.notes.length];
     const dur = beats * beatSec;
     if (freq > 0) {
@@ -1723,8 +1825,55 @@ function playSound(type, panX, detuneAdd) {
       [440,523,659,784].forEach((f,i)=> o.frequency.setValueAtTime(f, now+i*0.15));
       g.gain.setValueAtTime(0.08,now); g.gain.linearRampToValueAtTime(0,now+0.7);
       o.start(now); o.stop(now+0.7); break;
+    // ---- THREE CUES THAT WERE FALLING THROUGH TO `default:` ----
+    // `default:` starts the oscillator with NO type, NO frequency and NO gain
+    // envelope: a 10ms 440Hz sine at unity gain. That is a CLICK, and at 1.0 it is
+    // louder than every real SFX in this file (the loudest is 0.18). Six call sites
+    // landed there — every non-lethal hit on a DIRECTOR actor (rival 6041, courier
+    // 6565, magpie 6786, supply crate 6965), the meteor-rock shatter (4833), and the
+    // LAST LIFE warning (16844). The most important warning in the game was a pop.
+    case 'hit':
+      // Non-lethal impact on armour — a short, dry metallic tick. Deliberately
+      // duller than 'crit' and shorter than 'explode' so a chip reads as a chip.
+      o.type = 'square';
+      o.frequency.setValueAtTime(900, now);
+      o.frequency.exponentialRampToValueAtTime(420, now + 0.05);
+      g.gain.setValueAtTime(0.09, now);
+      g.gain.linearRampToValueAtTime(0, now + 0.07);
+      o.start(now); o.stop(now + 0.07); break;
+    case 'explosion':
+      // Heavier sibling of 'explode' — a rock breaking, not a ship dying: longer
+      // noise tail plus a low body thud so it reads as mass rather than energy.
+      var nX = audioCtx.createBufferSource();
+      var bufX = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.42), audioCtx.sampleRate);
+      var dX = bufX.getChannelData(0);
+      for (var iX = 0; iX < dX.length; iX++) {
+        dX[iX] = (Math.random() * 2 - 1) * Math.pow(1 - iX / dX.length, 1.6);
+      }
+      nX.buffer = bufX; nX.connect(g);
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(150, now);
+      o.frequency.exponentialRampToValueAtTime(45, now + 0.22);
+      g.gain.setValueAtTime(0.17, now);
+      g.gain.linearRampToValueAtTime(0, now + 0.42);
+      nX.start(now); nX.stop(now + 0.42); o.start(now); o.stop(now + 0.42); break;
+    case 'lowHealth':
+      // LAST LIFE. A two-tone descending alarm, not a blip — this is the single
+      // most consequential state change the player can be told about, and it has
+      // to survive a screen full of explosions.
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(520, now);
+      o.frequency.setValueAtTime(392, now + 0.16);
+      o.frequency.exponentialRampToValueAtTime(190, now + 0.52);
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.15, now + 0.02);
+      g.gain.setValueAtTime(0.15, now + 0.14);
+      g.gain.linearRampToValueAtTime(0.05, now + 0.17);
+      g.gain.linearRampToValueAtTime(0.13, now + 0.20);
+      g.gain.linearRampToValueAtTime(0, now + 0.55);
+      o.start(now); o.stop(now + 0.55); break;
     default:
-      o.start(now); o.stop(now+0.01); break;
+      o.start(now); o.stop(now + 0.01); break;
   }
 }
 
@@ -7190,6 +7339,15 @@ function updateVectorGrid() {
     // clamp so a chained-explosion stack can't fling a node across the screen
     if (p.dx > MAXD) p.dx = MAXD; else if (p.dx < -MAXD) p.dx = -MAXD;
     if (p.dy > MAXD) p.dy = MAXD; else if (p.dy < -MAXD) p.dy = -MAXD;
+  }
+  // THE BAR, ON THE FLOOR. One wide, soft swell from the bottom edge on every bar
+  // line. This is the beat's PHYSICAL carrier: it is spatial, not a luminance
+  // flash, so it is readable with the sound off, survives bloom being off, and
+  // cannot contribute to a photosensitivity hazard the way a full-frame brightness
+  // pulse can. Strength 0.9 against an explosion's ~4.6 and a radius of 120 make it
+  // a breath under the fight rather than an event in it.
+  if (game && game.state !== STATE.PAUSED && (game.animFrame % BAR_FRAMES) === 0) {
+    gridRipple(BASE_W / 2, BASE_H + 4, 0.9 * motionScale(), 120);
   }
   // Single hook: feed every NEW explosion into the grid as a ripple, then flag it.
   // Covers all 8+ explosions.push() sites for free (enemy/boss/bomb/player death).
@@ -15086,10 +15244,23 @@ function updateEnemies() {
   }
 
   // Trigger dives
+  // THE BAR MOVES THE START OF A THREAT, NEVER ITS LENGTH. The launch waits for
+  // the next beat (at most 23 frames), so the swarm attacks ON the count the floor
+  // and the music are already keeping — the player can hear an attack coming
+  // before they can see it. Every telegraph downstream keeps its literal frame
+  // constant: previewTimer is still DIVE_PREVIEW, so a snapped launch can only
+  // ever arrive LATER than it would have, never sooner. A warning cannot be
+  // shortened by this change by construction rather than by tuning.
+  //
+  // CADENCE-NEUTRAL BY CARRY: subtract the interval, never zero the timer. Zeroing
+  // would silently discard the up-to-23 frames spent waiting for the beat, which
+  // at the floored deep-stage interval of 80 frames is a ~15% cut to dives per
+  // minute — buying "readability" by quietly making deep stages easier, which is
+  // exactly the trade THE DEEP PRESSURE LADDER forbids.
   if (game.allEntered) {
     game.diveTimer++;
-    if (game.diveTimer >= game.diveInterval) {
-      game.diveTimer = 0;
+    if (game.diveTimer >= game.diveInterval && (game.animFrame % BEAT_FRAMES) === 0) {
+      game.diveTimer -= game.diveInterval;
       // Pick a random formation enemy to dive
       const candidates = game.enemies.filter(e => e.alive && e.state === 'formation');
       // WING TACTICS — the Dive Director. On normal PLAYING stages, sometimes launch a
@@ -15106,7 +15277,14 @@ function updateEnemies() {
         );
         if (_tactic && launchDiveTactic(_tactic, candidates)) {
           _wingLaunched = true;
-          game.diveTimer = -WING_COOLDOWN; // extend the gap before the next dive trigger
+          // Extend the gap before the next dive trigger. SUBTRACT, do not assign:
+          // the timer already holds this trigger's carry (the frames it spent
+          // waiting for the beat), and an absolute set silently throws that credit
+          // away every time a maneuver fires. Measured: assigning cost 2-4% of
+          // triggers per minute across five stages and six seeds. Identical to the
+          // old `= -WING_COOLDOWN` before the beat-snap existed, because the
+          // residue was always exactly 0 then.
+          game.diveTimer -= WING_COOLDOWN;
         }
       }
       // DEEP PRESSURE — at deep stages a trigger can send a SECOND lone diver.
@@ -19245,7 +19423,16 @@ function draw() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
     ctx.imageSmoothingEnabled = true;
-    ctx.globalAlpha = 0.32 + 0.04 * _heat; // single soft pass; heat nudges it slightly
+    // THE BAR, IN THE LIGHT. The frame breathes once per bar — 96 frames, i.e.
+    // 0.625 Hz, at ±0.02 alpha, multiplied by the motion valve.
+    // THIS RATE AND AMPLITUDE ARE A SAFETY LIMIT, NOT A TASTE SETTING. A
+    // full-frame additive pulse is a photosensitive-seizure surface: driving it
+    // from the BEAT would be 2.5 Hz, and driving it from the audible kick would be
+    // 7.0 Hz at the boss track and 9.83 Hz at bossEnrage — over 3x the WCAG 2.3.1
+    // flash threshold. The bar is the only rate slow enough to be safe at every
+    // tempo the game will ever run. Never raise it; add carriers elsewhere.
+    const _barBreath = 0.02 * Math.sin(beatPhase().barPhase * Math.PI * 2) * motionScale();
+    ctx.globalAlpha = 0.32 + 0.04 * _heat + _barBreath; // single soft pass; heat nudges it slightly
     ctx.drawImage(_bloomCv, 0, 0, bw, bh, 0, 0, cw, ch);
     // Dynamic vignette grade — BIOME ATMOSPHERIC GRADE drives the hue: each biome
     // darkens the edges in its own mood (corona red, ice cyan, nebula violet…);
