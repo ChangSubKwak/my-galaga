@@ -244,6 +244,9 @@ const shim = `
   OPEN: VENT_OPEN, MIN: VENT_MIN, RAMP: VENT_RAMP, HALF: VENT_HALF,
   OFF: VENT_OFF, SLOW: VENT_SLOW, GAIN: STAGGER_GAIN, DECAY: STAGGER_DECAY,
   STUN: STAGGER_STUN }; }; } catch (e) {}
+;try { globalThis.__getTransitionFade = function () { return transitionFade; }; } catch (e) {}
+;try { globalThis.__setReduceMotion = function (v) { reduceMotion = !!v; }; } catch (e) {}
+;try { globalThis.__getReduceMotion = function () { return reduceMotion; }; } catch (e) {}
 ;try { globalThis.__getManifestConst = function () { return {
   PERKS: PERKS, IDS: PERK_IDS, MAX_RANK: PERK_MAX_RANK,
   SELECT_FRAMES: PERK_SELECT_FRAMES, ARM: DRAFT_ARM, WITCH_WINDOW: WITCH_WINDOW,
@@ -6346,6 +6349,74 @@ section('BGM TABLES — a zero-beat note would hang every harness and the browse
        'and a valid table with kick 0 (an explicit "no kick") passes');
     eq(G.validateBgmTables(null).length, 0, 'a missing table set is not a throw');
   } else { console.log('  (skipped — validateBgmTables not exposed)'); }
+}
+
+section('THE LIGHT — the motion valve, and the last draw-side state mutation');
+{
+  if (typeof G.motionScale === 'function' && G.__setReduceMotion) {
+    const was = G.__getReduceMotion();
+    // --- the valve every new pulse multiplies through ---
+    G.__setReduceMotion(false);
+    eq(G.motionScale(), 1, 'full motion is 1x');
+    G.__setReduceMotion(true);
+    ok(G.motionScale() < 1, 'reduce-motion strictly damps every new pulse ('
+       + G.motionScale() + 'x)');
+    ok(G.motionScale() >= 0, 'and never inverts one');
+    // the same contract effectiveShakeMul already has, now extended to LUMINANCE:
+    // reduceMotion had exactly four consumers and none of them was the bloom.
+    ok(G.effectiveShakeMul('full', true) < G.effectiveShakeMul('full', false),
+       'shake was already damped; the light now is too');
+    G.__setReduceMotion(was);
+  } else { console.log('  (skipped — motionScale not exposed)'); }
+
+  // --- transitionFade must tick at the SIM rate, not the refresh rate ---
+  // This was the last state mutation left inside draw(), and it was the variable's
+  // ONLY decrement site: on a 144Hz display every major transition in the game ran
+  // 2.4x fast, so the fade was a different length on different hardware.
+  if (typeof G.triggerTransitionFade === 'function' && G.__getTransitionFade) {
+    G.triggerTransitionFade(30);
+    eq(G.__getTransitionFade(), 30, 'the fade is armed at 30');
+    for (let i = 0; i < 10; i++) G.draw();
+    eq(G.__getTransitionFade(), 30, 'TEN DRAWS do not advance it — draw() is a pure read');
+    for (let i = 0; i < 10; i++) G.update();
+    eq(G.__getTransitionFade(), 20, 'ten updates advance it by exactly ten');
+    for (let i = 0; i < 40; i++) G.update();
+    eq(G.__getTransitionFade(), 0, 'and it lands on zero without going negative');
+  } else { console.log('  (skipped — transitionFade not exposed)'); }
+
+  // --- the three full-screen washes are now ONE border ---
+  ok(!/WITCH TIME SCANLINES/.test(scriptSrc),
+     'the witch-time scanline pass is gone (it was a third layer on the same frame)');
+  ok(!/BOSS PHASE 2 ARENA AURA/.test(scriptSrc),
+     'and the boss phase-2 aura with its four corner halos');
+  ok(/ONE STATE BORDER/.test(scriptSrc), 'replaced by a single state border');
+  // every full-frame luminance pulse rides the BAR, never the beat and never the kick
+  const pulses = (scriptSrc.match(/Math\.sin\(beatPhase\(\)\.barPhase \* Math\.PI \* 2\)/g) || []).length;
+  ok(pulses >= 2, 'the bloom and the state border both breathe on the bar (' + pulses + ' sites)');
+  // The three collapsed washes all pulsed at Math.sin(animFrame * 0.18) — about
+  // 1.7 Hz. NOTHING THAT PAINTS THE WHOLE FRAME may run that fast any more.
+  //
+  // The rate itself is not banned, and should not be: five small elements still
+  // use it (an intro screen's 1px side bands, a threat telegraph rectangle, a
+  // panicked enemy's outline, a buff ring, the dash-ready pip). WCAG 2.3.1 is
+  // about flashing that covers a large area of the visual field, so a 1px band
+  // and a full-frame additive wash are not the same object. This scans for the
+  // combination: a fast pulse whose very next fill covers the playfield.
+  {
+    const FAST = 'Math.sin(game.animFrame * 0.18)';
+    const FULL = [
+      'fillRect(0, 0, BASE_W, BASE_H)',
+      'fillRect(-20, -20, BASE_W + 40, BASE_H + 40)',
+      'fillRect(-10, -10, BASE_W + 20, BASE_H + 20)',
+    ];
+    let bad = 0, at = -1;
+    while ((at = scriptSrc.indexOf(FAST, at + 1)) >= 0) {
+      const window = scriptSrc.slice(at, at + 340);
+      if (FULL.some(f => window.indexOf(f) >= 0)) bad++;
+    }
+    eq(bad, 0, 'no full-frame wash pulses at the old ~1.7 Hz rate — only small, '
+       + 'local elements still use it, which is not the same hazard');
+  }
 }
 
 section('THE MANIFEST — cards stack instead of erasing each other');

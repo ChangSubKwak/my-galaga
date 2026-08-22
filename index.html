@@ -181,6 +181,8 @@ function nextBloomPerfState(off, fps, low, high) {
 // enough that only the binary valve above is needed as a backstop.)
 // Reused offscreen buffer for the downsampled bloom (allocated lazily in draw tail).
 let _bloomCv = null, _bloomCtx = null;
+// The linear copy the soft-knee bright pass mixes back in (see the bloom tail).
+let _kneeCv = null, _kneeCtx = null;
 // ===== SPECTRAL LENS GRADE — pure post-process drivers (logic-tested) =====
 // One "combat heat" scalar (0..1) drives the chromatic-aberration split + grade so
 // the whole frame intensifies under pressure. Inputs are the same signals the grid /
@@ -7536,9 +7538,12 @@ function drawVectorGrid() {
     && game.megaBosses && game.megaBosses.some && game.megaBosses.some(b => b && b.phase2);
   const danger = _phase2 || (game.lives === 1 && isCombatState());
   const baseRGB = danger ? '190,64,84' : '60,104,196';
-  // BASE_A kept low: the grid spans the WHOLE screen and is additive, so it sets the
-  // bloom's brightness FLOOR — too high and combat brightness tips the frame to white.
-  const BASE_A = 0.17;
+  // BASE_A: the grid spans the WHOLE screen and is additive, so it used to set the
+  // bloom's brightness floor — which is why it was pinned at 0.17 and barely
+  // visible. The bright pass removed that coupling: at this brightness the grid
+  // contributes almost nothing to the bloom's squared term, so it can finally be
+  // authored for how it should LOOK instead of for what it did to the glare.
+  const BASE_A = 0.26;
   // Displayed positions = anchor + ripple displacement + stateless idle breathing.
   // Perf: module-level reused buffers — the old per-frame `new Array(...)`×3 + a
   // closure + per-hot-segment rgba strings churned GC every frame (sweep finding).
@@ -18734,6 +18739,7 @@ function update() {
         game.scoreDisplay = (game.scoreDisplay || 0) + Math.sign(_gap) * Math.min(_step, Math.abs(_gap));
       }
     }
+    if (transitionFade > 0) transitionFade--;
     if (game.camNudgeX || game.camNudgeY) {
       game.camNudgeX = (game.camNudgeX || 0) * 0.78;
       game.camNudgeY = (game.camNudgeY || 0) * 0.78;
@@ -19376,74 +19382,48 @@ function draw() {
   if (game.state === STATE.TITLE && game.helpOverlay) drawHelpOverlay();
   if (game.state === STATE.TITLE && game.statsOverlay) drawStatsOverlay();
 
-  // WITCH TIME edge glow — pulsing white border during the slow window so the player knows
-  // they're in the dodge window. Drawn before stage-50 pulse so it overlays on top.
-  if ((game.witchTimer || 0) > 0) {
-    ctx.save();
-    const ratio = game.witchTimer / WITCH_WINDOW;
-    ctx.globalAlpha = 0.45 + 0.35 * ratio;
-    ctx.fillStyle = '#fff';
-    const w = 4;
-    ctx.fillRect(-10, -10, BASE_W + 20, w);
-    ctx.fillRect(-10, BASE_H - w, BASE_W + 20, w + 10);
-    ctx.fillRect(-10, -10, w, BASE_H + 20);
-    ctx.fillRect(BASE_W - w, -10, w + 10, BASE_H + 20);
-    // Subtle inner desaturation tint for the slow-mo "vision" feel
-    ctx.globalAlpha = 0.10 * ratio;
-    ctx.fillStyle = '#48f';
-    ctx.fillRect(0, 0, BASE_W, BASE_H);
-    // WITCH TIME SCANLINES — 3 horizontal lines drifting fast (counter to slow-mo)
-    // create a "time fracture" feel. Distinct from edge glow as it crosses the playfield.
-    ctx.globalAlpha = 0.20 * ratio;
-    ctx.fillStyle = '#fff';
-    const _wt = game.animFrame;
-    for (let s = 0; s < 3; s++) {
-      const _phase = (s * 95) % 280;
-      const _sy = ((_wt * 6 + _phase) % (BASE_H + 20)) - 10;
-      ctx.fillRect(0, Math.round(_sy), BASE_W, 1);
+  // ===================== ONE STATE BORDER =====================
+  // Three separate full-screen washes used to live here — a white witch-time
+  // border plus an inner blue tint plus three drifting scanlines, a red boss
+  // phase-2 border plus four corner halos, and a full-frame cyan slow-time tint
+  // plus its own edge ripples. Any two could be up at once (witch time triggers
+  // inside a phase-2 boss fight constantly), stacking three alpha layers and
+  // eleven fillRects over the frame and turning "the edge means danger" into
+  // "the edge means something changed".
+  //
+  // Now one border: HUE says WHICH state, and BRIGHTNESS BREATHES ON THE BAR.
+  // The old pulses ran at Math.sin(animFrame * 0.18) — about 1.7 Hz. Everything
+  // that pulses in this game now shares the 96-frame bar (0.625 Hz), which is
+  // both calmer to look at and the only rate that is provably safe on a
+  // full-frame luminance channel at every tempo the game will ever run.
+  {
+    let _sbCol = null, _sbA = 0, _sbW = 4, _sbTint = 0;
+    if ((game.witchTimer || 0) > 0) {
+      const _r = game.witchTimer / WITCH_WINDOW;
+      _sbCol = '#fff'; _sbA = 0.42 + 0.30 * _r; _sbTint = 0.09 * _r;
+    } else if (game.state === STATE.BOSS_STAGE
+               && (game.megaBosses || []).some(mb => mb.alive && mb.phase2)) {
+      _sbCol = '#f44'; _sbA = 0.22; _sbW = 5; _sbTint = 0.05;
+    } else if ((game.slowTimer || 0) > 0) {
+      const _f = Math.min(1, game.slowTimer / 30);
+      _sbCol = '#0cf'; _sbA = 0.20 * _f; _sbTint = 0.10 * _f;
     }
-    ctx.restore();
-  }
-  // BOSS PHASE 2 ARENA AURA — red edge pulse while any boss is in phase 2 (enrage).
-  // Adds visual urgency to the audio (bossEnrage BGM + pitch shift + taunts) so
-  // the player feels the encounter escalating from all sides.
-  if (game.state === STATE.BOSS_STAGE && (game.megaBosses || []).some(mb => mb.alive && mb.phase2)) {
-    ctx.save();
-    const enragePulse = 0.5 + 0.5 * Math.sin(game.animFrame * 0.18);
-    ctx.globalAlpha = 0.18 + 0.10 * enragePulse;
-    ctx.fillStyle = '#f44';
-    // Thicker bands than legendary stage pulse so it dominates the frame
-    ctx.fillRect(-10, -10, BASE_W + 20, 5);
-    ctx.fillRect(-10, BASE_H - 5, BASE_W + 20, 15);
-    ctx.fillRect(-10, -10, 5, BASE_H + 20);
-    ctx.fillRect(BASE_W - 5, -10, 15, BASE_H + 20);
-    // Inner halo at corners (extra-strong tension)
-    ctx.globalAlpha = 0.10 + 0.06 * enragePulse;
-    ctx.fillStyle = '#f88';
-    ctx.fillRect(0, 0, 16, 16);
-    ctx.fillRect(BASE_W - 16, 0, 16, 16);
-    ctx.fillRect(0, BASE_H - 16, 16, 16);
-    ctx.fillRect(BASE_W - 16, BASE_H - 16, 16, 16);
-    ctx.restore();
-  }
-  // (GUI-simplify DELETE: the stage-50+ golden edge pulse — a PERMANENT decorative
-  // border diluted the semantics of transient danger borders; the stage label's
-  // tier colour already encodes depth.)
-  // High-combo edge glow — removed: edges mean DANGER, and a combo is not danger.
-
-  // Slow-time cyan tint (subtle, full-screen) + radial vignette
-  if ((game.slowTimer || 0) > 0) {
-    ctx.save();
-    const fade = Math.min(1, game.slowTimer / 30); // fade out in last 0.5s
-    ctx.globalAlpha = 0.18 * fade + 0.06 * Math.sin(game.animFrame * 0.18);
-    ctx.fillStyle = '#0cf';
-    ctx.fillRect(-20, -20, BASE_W + 40, BASE_H + 40);
-    // Edge ripples
-    ctx.globalAlpha = 0.10 * fade;
-    ctx.fillStyle = '#0ff';
-    ctx.fillRect(-20, -20, BASE_W + 40, 8);
-    ctx.fillRect(-20, BASE_H - 8, BASE_W + 40, 28);
-    ctx.restore();
+    if (_sbCol) {
+      // +-0.03 on the bar, through the motion valve. Same ceiling as the bloom.
+      const _breathe = 0.03 * Math.sin(beatPhase().barPhase * Math.PI * 2) * motionScale();
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, _sbA + _breathe);
+      ctx.fillStyle = _sbCol;
+      ctx.fillRect(-10, -10, BASE_W + 20, _sbW);
+      ctx.fillRect(-10, BASE_H - _sbW, BASE_W + 20, _sbW + 10);
+      ctx.fillRect(-10, -10, _sbW, BASE_H + 20);
+      ctx.fillRect(BASE_W - _sbW, -10, _sbW + 10, BASE_H + 20);
+      if (_sbTint > 0) {
+        ctx.globalAlpha = _sbTint;
+        ctx.fillRect(0, 0, BASE_W, BASE_H);
+      }
+      ctx.restore();
+    }
   }
 
   // Screen flash overlay (drawn last, before transform restore so shake stays applied)
@@ -19462,7 +19442,11 @@ function draw() {
     ctx.fillStyle = '#000';
     ctx.fillRect(-20, -20, BASE_W + 40, BASE_H + 40);
     ctx.restore();
-    transitionFade--;
+    // (transitionFade-- moved to update(). This was its ONLY decrement site, and
+    // draw() runs at the display's refresh rate — so the universal fade ran 2.4x
+    // fast on a 144Hz monitor and the game's every major transition was a
+    // different length depending on the hardware. It is also the last draw-side
+    // state mutation in the file.)
   }
 
   // WORLD CORRUPTION — late-stage atmospheric "deep territory" effect. Scales 0..1
@@ -19747,6 +19731,34 @@ function draw() {
     _bloomCtx.globalCompositeOperation = 'copy'; // overwrite — no clearRect needed
     _bloomCtx.imageSmoothingEnabled = true;
     _bloomCtx.drawImage(canvas, 0, 0, bw, bh);
+    // ---- BRIGHT PASS ----
+    // The old form added the WHOLE downsampled frame back at 0.32: the void, the
+    // dark nebulae, the HUD backings and every mid-grey glyph all bloomed. That is
+    // veiling glare — it lifts the black floor, and a game whose entire look rests
+    // on "deep black makes neon read" was quietly grey.
+    //
+    // A bright pass fixes that, but a HARD threshold (multiply the buffer by
+    // itself) squares 8-bit values and deletes everything faint outright. So: SOFT
+    // KNEE. Keep a linear copy, square the other, and add both back at k and
+    // (1-k) — src*src*k + src*(1-k), composited with drawImage only. ctx.filter
+    // stays banned here after four documented whiteout regressions.
+    //
+    // ORDER MATTERS: this runs AFTER the 'copy' drawImage above. Self-compositing
+    // before it would multiply against STALE CONTENT from the previous frame,
+    // which is the progressive-brightening class this file has been burned by.
+    if (!_kneeCv || _kneeCv.width !== bw || _kneeCv.height !== bh) {
+      if (!_kneeCv) _kneeCv = document.createElement('canvas');
+      _kneeCv.width = bw; _kneeCv.height = bh;
+      _kneeCtx = _kneeCv.getContext('2d');
+    }
+    _kneeCtx.globalCompositeOperation = 'copy';
+    _kneeCtx.imageSmoothingEnabled = true;
+    _kneeCtx.drawImage(_bloomCv, 0, 0);        // the linear copy
+    try {
+      _bloomCtx.globalCompositeOperation = 'multiply';
+      _bloomCtx.drawImage(_kneeCv, 0, 0);      // _bloomCv is now the SQUARED buffer
+      _bloomCtx.globalCompositeOperation = 'copy';
+    } catch (e) { /* no 'multiply' support: degrades to the old linear bloom */ }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
@@ -19760,8 +19772,31 @@ function draw() {
     // flash threshold. The bar is the only rate slow enough to be safe at every
     // tempo the game will ever run. Never raise it; add carriers elsewhere.
     const _barBreath = 0.02 * Math.sin(beatPhase().barPhase * Math.PI * 2) * motionScale();
-    ctx.globalAlpha = 0.32 + 0.04 * _heat + _barBreath; // single soft pass; heat nudges it slightly
+    // ALPHA BUDGET — this is a whiteout guard, and the arithmetic is the reason.
+    // The three draws below add A*(KNEE*L^2 + (1-KNEE)*L + OCT*L^2) for a source of
+    // luminance L, i.e. A*1.40 at L=1. A must therefore stay near 0.27 to keep the
+    // PEAK additive stack at the ~0.38 the single linear pass already had — this
+    // file has four documented whiteout regressions and every one of them was an
+    // additive stack that looked reasonable per-pass. What actually changes is the
+    // DISTRIBUTION: at L=0.13 (the void, the grid, HUD backings) the same formula
+    // adds 0.015 where the old linear pass added 0.049. Same energy on the bright
+    // things, three times less veiling glare on the dark ones. Black is black.
+    const _A = 0.22 + 0.035 * _heat + _barBreath;
+    const _KNEE = 0.72;                        // how much of the add is the bright pass
+    const _OCT = 0.40;                         // the wide, soft second octave
+    // The bright core.
+    ctx.globalAlpha = _A * _KNEE;
     ctx.drawImage(_bloomCv, 0, 0, bw, bh, 0, 0, cw, ch);
+    // The linear residue, so faint sources still shed a little light.
+    ctx.globalAlpha = _A * (1 - _KNEE);
+    ctx.drawImage(_kneeCv, 0, 0, bw, bh, 0, 0, cw, ch);
+    // A SECOND, WIDER OCTAVE. The buffer is below the game's own 224x288 logical
+    // resolution, so one pass at this scale is a ~1.3-game-pixel radius — too tight
+    // to read as light rather than as a slightly soft edge. Drawing the bright
+    // buffer again, slightly oversized, costs one more tiny drawImage and is what
+    // makes a bullet look like it is emitting rather than merely being pale.
+    ctx.globalAlpha = _A * _OCT;
+    ctx.drawImage(_bloomCv, 0, 0, bw, bh, -cw * 0.012, -ch * 0.012, cw * 1.024, ch * 1.024);
     // Dynamic vignette grade — BIOME ATMOSPHERIC GRADE drives the hue: each biome
     // darkens the edges in its own mood (corona red, ice cyan, nebula violet…);
     // danger (boss phase2 / last-life) overrides to crimson. source-over darkening.
