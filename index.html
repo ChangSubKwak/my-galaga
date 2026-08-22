@@ -2419,7 +2419,7 @@ function drawBee(x, y, frame) {
   const f = frame % 2;
   const ax = f === 0 ? 0 : 1;
   // Antennae stalks (animated wobble)
-  ctx.fillStyle = '#553';
+  ctx.fillStyle = '#f80';
   ctx.fillRect(-2 - ax, -5, 1, 2);
   ctx.fillRect(2 + ax, -5, 1, 2);
   // Antennae bobbles
@@ -2427,7 +2427,7 @@ function drawBee(x, y, frame) {
   ctx.fillRect(-2 - ax, -6, 1, 1);
   ctx.fillRect(2 + ax, -6, 1, 1);
   // Wings (soft cyan, drawn under body)
-  ctx.fillStyle = '#cef';
+  ctx.fillStyle = '#ff8';
   if (f === 0) {
     ctx.fillRect(-7, -3, 4, 4);
     ctx.fillRect(4, -3, 4, 4);
@@ -2450,20 +2450,12 @@ function drawBee(x, y, frame) {
   ctx.fillRect(-4, -1, 9, 2);
   ctx.fillRect(-3, 1, 7, 2);
   // Bee stripe
-  ctx.fillStyle = '#332';
+  ctx.fillStyle = '#f80';
   ctx.fillRect(-4, 1, 9, 1);
   // Big white eyes
   ctx.fillStyle = '#fff';
   ctx.fillRect(-2, -2, 2, 2);
   ctx.fillRect(1, -2, 2, 2);
-  // Pupils
-  ctx.fillStyle = '#222';
-  ctx.fillRect(-1, -1, 1, 1);
-  ctx.fillRect(2, -1, 1, 1);
-  // Cheek blush
-  ctx.fillStyle = '#f8a';
-  ctx.fillRect(-4, 0, 1, 1);
-  ctx.fillRect(4, 0, 1, 1);
   ctx.restore();
 }
 
@@ -2471,7 +2463,7 @@ function drawButterfly(x, y, frame) {
   ctx.save(); ctx.translate(x, y);
   const f = frame % 2;
   // Antennae
-  ctx.fillStyle = '#553';
+  ctx.fillStyle = '#f0a';
   ctx.fillRect(-2, -6, 1, 2);
   ctx.fillRect(2, -6, 1, 2);
   // Antennae bobbles (heart-pink)
@@ -2515,7 +2507,7 @@ function drawButterfly(x, y, frame) {
     ctx.fillRect(3, 1, 1, 1);
   }
   // Body (red column, taller)
-  ctx.fillStyle = COL.red;
+  ctx.fillStyle = '#f04';
   ctx.fillRect(-2, -2, 5, 6);
   // Orange head
   ctx.fillStyle = '#f80';
@@ -2524,16 +2516,8 @@ function drawButterfly(x, y, frame) {
   ctx.fillStyle = '#fff';
   ctx.fillRect(-2, -4, 2, 2);
   ctx.fillRect(1, -4, 2, 2);
-  // Pupils
-  ctx.fillStyle = '#222';
-  ctx.fillRect(-1, -3, 1, 1);
-  ctx.fillRect(2, -3, 1, 1);
-  // Cheek blush on body
-  ctx.fillStyle = '#fab';
-  ctx.fillRect(-2, -1, 1, 1);
-  ctx.fillRect(2, -1, 1, 1);
   // Body stripe accents (segmented look)
-  ctx.fillStyle = '#a22';
+  ctx.fillStyle = '#f04';
   ctx.fillRect(-2, 1, 5, 1);
   ctx.fillRect(-2, 3, 5, 1);
   ctx.restore();
@@ -2558,7 +2542,7 @@ function drawGoldenBee(x, y, frame) {
   ctx.restore();
 
   // Antennae
-  ctx.fillStyle = '#a70';
+  ctx.fillStyle = '#fc0';
   ctx.fillRect(-2 - ax, -5, 1, 2);
   ctx.fillRect(2 + ax, -5, 1, 2);
   ctx.fillStyle = '#fff';
@@ -2574,7 +2558,7 @@ function drawGoldenBee(x, y, frame) {
   else         { ctx.fillRect(-5, -4, 1, 2); ctx.fillRect(5, -4, 1, 2); }
 
   // Body — bright gold
-  ctx.fillStyle = '#fc4';
+  ctx.fillStyle = '#fe0';
   ctx.fillRect(-3, -3, 7, 4);
   ctx.fillRect(-4, -1, 9, 2);
   ctx.fillRect(-3, 1, 7, 2);
@@ -2583,16 +2567,8 @@ function drawGoldenBee(x, y, frame) {
   ctx.fillRect(-2, -3, 3, 1);
   ctx.fillRect(-3, -1, 4, 1);
   // Stripe (deep amber)
-  ctx.fillStyle = '#a60';
+  ctx.fillStyle = '#f80';
   ctx.fillRect(-3, 0, 7, 1);
-  // Eyes
-  ctx.fillStyle = '#000';
-  ctx.fillRect(-2, -2, 1, 1);
-  ctx.fillRect(2, -2, 1, 1);
-  // Eye sparkles
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(-2, -3, 1, 1);
-  ctx.fillRect(2, -3, 1, 1);
   ctx.restore();
 }
 
@@ -2702,7 +2678,7 @@ function drawHoverer(x, y, frame) {
   const t = performance.now() * 0.012;
   // Rotating top rotor (4-blade, fast)
   const ph = (frame * 0.6 + t) % (Math.PI * 2);
-  ctx.fillStyle = '#888';
+  ctx.fillStyle = '#9f0';
   for (let k = 0; k < 4; k++) {
     const a = ph + k * Math.PI / 2;
     const len = 7;
@@ -2710,10 +2686,10 @@ function drawHoverer(x, y, frame) {
     ctx.fillRect(Math.round(ex) - 0, Math.round(ey - 6), 1, 1);
   }
   // Top hub
-  ctx.fillStyle = '#bbb';
+  ctx.fillStyle = '#cf8';
   ctx.fillRect(-1, -7, 2, 1);
   // Body — round-ish chunky cabin
-  ctx.fillStyle = '#a85';
+  ctx.fillStyle = '#7d0';
   ctx.fillRect(-6, -5, 12, 5);
   ctx.fillRect(-7, -3, 14, 4);
   ctx.fillRect(-5, 1, 10, 2);
@@ -2726,11 +2702,11 @@ function drawHoverer(x, y, frame) {
   ctx.fillStyle = '#000';
   ctx.fillRect(2, -2, 2, 2);
   // Side wings (gun barrels)
-  ctx.fillStyle = '#642';
+  ctx.fillStyle = '#4a0';
   ctx.fillRect(-9, -1, 3, 1);
   ctx.fillRect(6, -1, 3, 1);
   // Tail rotor (small, on the right)
-  ctx.fillStyle = '#999';
+  ctx.fillStyle = '#9f0';
   ctx.fillRect(7, -6, 1, ((frame % 4 < 2) ? 4 : 1));
   ctx.restore();
 }
@@ -2739,13 +2715,13 @@ function drawUFO(x, y, frame) {
   ctx.save(); ctx.translate(x, y);
   const f = frame % 4;
   // Hull underside
-  ctx.fillStyle = '#888';
+  ctx.fillStyle = '#0ee';
   ctx.fillRect(-7, 0, 15, 2);
   ctx.fillRect(-9, -1, 19, 2);
   // Disc body
-  ctx.fillStyle = '#bbb';
+  ctx.fillStyle = '#cff';
   ctx.fillRect(-6, -3, 13, 2);
-  ctx.fillStyle = '#ddd';
+  ctx.fillStyle = '#cff';
   ctx.fillRect(-5, -4, 11, 1);
   // Dome (cyan, top)
   ctx.fillStyle = '#0ef';
@@ -2792,7 +2768,7 @@ function drawSplitter(x, y, frame) {
   ctx.save(); ctx.translate(x, y);
   const f = frame % 2;
   // Wings (green)
-  ctx.fillStyle = '#0e6';
+  ctx.fillStyle = '#0f6';
   if (f === 0) {
     ctx.fillRect(-7, -2, 3, 4);
     ctx.fillRect(4, -2, 3, 4);
@@ -2805,17 +2781,17 @@ function drawSplitter(x, y, frame) {
   ctx.fillRect(-3, -3, 7, 6);
   ctx.fillRect(-4, -1, 9, 2);
   // Diagonal black stripes
-  ctx.fillStyle = '#222';
+  ctx.fillStyle = '#f60';
   ctx.fillRect(-3, -2, 2, 1);
   ctx.fillRect(0, -1, 2, 1);
   ctx.fillRect(2, 0, 2, 1);
   ctx.fillRect(-2, 1, 2, 1);
   // Eyes (red, hostile)
-  ctx.fillStyle = COL.red;
+  ctx.fillStyle = '#f04';
   ctx.fillRect(-2, -2, 1, 1);
   ctx.fillRect(2, -2, 1, 1);
   // Antennae
-  ctx.fillStyle = '#222';
+  ctx.fillStyle = '#f60';
   ctx.fillRect(-2, -5, 1, 2);
   ctx.fillRect(2, -5, 1, 2);
   ctx.restore();
@@ -2825,7 +2801,7 @@ function drawSplitter(x, y, frame) {
 function drawMiniBee(x, y, frame) {
   ctx.save(); ctx.translate(x, y);
   const f = frame % 2;
-  ctx.fillStyle = '#cef';
+  ctx.fillStyle = '#ff8';
   if (f === 0) {
     ctx.fillRect(-3, -1, 1, 2);
     ctx.fillRect(2, -1, 1, 2);
@@ -2835,7 +2811,7 @@ function drawMiniBee(x, y, frame) {
   }
   ctx.fillStyle = COL.yellow;
   ctx.fillRect(-2, -1, 4, 3);
-  ctx.fillStyle = '#222';
+  ctx.fillStyle = '#f60';
   ctx.fillRect(-2, 1, 4, 1);
   ctx.fillRect(-1, -1, 1, 1);
   ctx.fillRect(1, -1, 1, 1);
@@ -2856,12 +2832,12 @@ function drawKamikaze(x, y, frame) {
   }
   ctx.globalAlpha = 1;
   // Body (red diamond)
-  ctx.fillStyle = '#e22';
+  ctx.fillStyle = '#f00';
   ctx.fillRect(-3, -3, 7, 4);
   ctx.fillRect(-4, -1, 9, 3);
   ctx.fillRect(-3, 2, 7, 2);
   // Side spikes (animated)
-  ctx.fillStyle = '#a11';
+  ctx.fillStyle = '#c00';
   if (f === 0) {
     ctx.fillRect(-6, 0, 2, 2);
     ctx.fillRect(4, 0, 2, 2);
@@ -2873,10 +2849,6 @@ function drawKamikaze(x, y, frame) {
   ctx.fillStyle = '#ff4';
   ctx.fillRect(-2, -2, 2, 1);
   ctx.fillRect(1, -2, 2, 1);
-  // Pupils
-  ctx.fillStyle = '#000';
-  ctx.fillRect(-1, -2, 1, 1);
-  ctx.fillRect(2, -2, 1, 1);
   // Sharp mouth/fangs
   ctx.fillStyle = '#fff';
   ctx.fillRect(-2, 3, 1, 1);
@@ -2887,8 +2859,8 @@ function drawKamikaze(x, y, frame) {
 function drawBoss(x, y, frame, hit) {
   ctx.save(); ctx.translate(x, y);
   const f = frame % 2;
-  const main = hit ? COL.gray : '#a6f';        // soft purple body
-  const wing = hit ? COL.darkBlue : '#fae';    // soft pink wings/cheeks
+  const main = hit ? COL.gray : '#0fc';        // soft purple body
+  const wing = hit ? COL.darkBlue : '#8fd';    // soft pink wings/cheeks
   // Antenna stalks (animated wobble)
   ctx.fillStyle = main;
   if (f === 0) {
@@ -2899,7 +2871,7 @@ function drawBoss(x, y, frame, hit) {
     ctx.fillRect(3, -7, 1, 2);
   }
   // Heart toppers on antennae
-  ctx.fillStyle = '#f4a';
+  ctx.fillStyle = '#0fc';
   if (f === 0) {
     ctx.fillRect(-3, -8, 1, 1);
     ctx.fillRect(2, -8, 1, 1);
@@ -2916,10 +2888,6 @@ function drawBoss(x, y, frame, hit) {
   ctx.fillStyle = '#fff';
   ctx.fillRect(-3, -3, 3, 3);
   ctx.fillRect(1, -3, 3, 3);
-  // Pupils (deep blue)
-  ctx.fillStyle = '#226';
-  ctx.fillRect(-2, -2, 2, 2);
-  ctx.fillRect(2, -2, 2, 2);
   // Eye sparkles
   ctx.fillStyle = '#fff';
   ctx.fillRect(-1, -2, 1, 1);
@@ -12807,17 +12775,17 @@ function pickPerkOffer() {
 // Each entry: name + 1-line trait. Persisted via localStorage 'galagaDexUnlocked'.
 // Unlock trigger: first kill of that type → toast "FIRST CONTACT: <name>" + dex entry.
 const ENEMY_INFO = {
-  bee:        { name: 'BEE',         trait: 'BASIC SCOUT — 50 PTS',          col: '#fc4' },
+  bee:        { name: 'BEE',         trait: 'BASIC SCOUT — 50 PTS',          col: '#fd0' },
   butterfly:  { name: 'BUTTERFLY',   trait: 'PINK FLYER — 80 PTS',           col: '#f6a' },
   boss:       { name: 'CAPTAIN',     trait: 'GREEN, CAPTURES SHIPS — 150 PTS', col: '#0f8' },
   mirror:     { name: 'MIRROR',      trait: 'DODGES BULLETS, AGGRESSIVE',     col: '#0ff' },
   splitter:   { name: 'SPLITTER',    trait: 'SPLITS INTO MINIBEES ON DEATH', col: '#fa0' },
   shielded:   { name: 'SHIELDED',    trait: 'NEEDS 2 HITS — BREAK THE SHELL',col: '#cef' },
   ufo:        { name: 'UFO',         trait: 'RARE, SLOW HORIZONTAL — BIG PTS',col: '#0ef' },
-  hoverer:    { name: 'HOVERER',     trait: 'SUSPENDED MID-AIR, AIMED FIRE',  col: '#aaa' },
+  hoverer:    { name: 'HOVERER',     trait: 'SUSPENDED MID-AIR, AIMED FIRE',  col: '#9f0' },
   kamikaze:   { name: 'KAMIKAZE',    trait: 'NO PATTERN — RAMS PLAYER',       col: '#f44' },
   warper:     { name: 'WARPER',      trait: 'TELEPORTS WHILE DIVING — 350 PTS', col: '#a0f' },
-  goldenBee:  { name: 'GOLDEN BEE',  trait: 'RARE — METEOR SHOWER ON KILL',   col: '#fc4' },
+  goldenBee:  { name: 'GOLDEN BEE',  trait: 'RARE — METEOR SHOWER ON KILL',   col: '#fe0' },
   minibee:    { name: 'MINIBEE',     trait: 'SPLITTER FRAGMENT — WEAK',       col: '#fa0' },
   rival:      { name: 'RIVAL ACE',   trait: 'MIRROR DUELIST — DODGES, 2000 PTS', col: '#ff3b3b' },
   magpie:     { name: 'MAGPIE',      trait: 'LOOT THIEF — SHOOT TO RECOVER',  col: '#fc4' }
@@ -17229,7 +17197,7 @@ function bulletCap() {
 }
 
 const DEBRIS_PROFILE = {
-  bee:       { count: 4,  cols: ['#ff4', '#fc4', '#fff'] },
+  bee:       { count: 4,  cols: ['#ff4', '#fd0', '#fff'] },
   butterfly: { count: 6,  cols: ['#f8a', '#f6a', '#fff'] },
   shielded:  { count: 8,  cols: ['#cef', '#88f', '#fff'] },
   splitter:  { count: 6,  cols: ['#0f8', '#8f8', '#fff'] },
@@ -17237,7 +17205,7 @@ const DEBRIS_PROFILE = {
   minibee:   { count: 3,  cols: ['#ff4', '#fff'] },
   boss:      { count: 10, cols: ['#0ff', '#0cf', '#fff'] },
   ufo:       { count: 12, cols: ['#bbb', '#0ef', '#fff', '#f44'] },
-  goldenBee: { count: 14, cols: ['#fc4', '#ff8', '#fff'] }
+  goldenBee: { count: 14, cols: ['#fe0', '#ff8', '#fff'] }
 };
 function spawnDebris(x, y, type) {
   const prof = DEBRIS_PROFILE[type] || DEBRIS_PROFILE.bee;

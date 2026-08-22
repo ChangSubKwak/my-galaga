@@ -1727,6 +1727,53 @@ section('PERKS: every activePerk reference resolves to a defined perk');
 }
 
 // ============================================================
+section('THE FILAMENT — the roster emits, and no enemy is grey');
+{
+  const INFO = G.__getEnemyInfo && G.__getEnemyInfo();
+  if (INFO) {
+    // MEASURED, by test/silhouette-audit.js, against the SHIPPED bright pass —
+    // which downsamples to device/5 BEFORE squaring and is a PER-CHANNEL
+    // multiply. Retention by colour: #ff0 86%, #0ff 86%, #f4f 80% ... #bbb 67%,
+    // #a85 55%, #888 54%, #553 38%, #332 30%, #222 26%. A grey enemy is a sprite
+    // the game's own headline visual system cannot see.
+    const chans = (hex) => {
+      let s = String(hex).replace('#', '');
+      if (s.length === 3) s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+      return [0, 1, 2].map(i => parseInt(s.slice(i * 2, i * 2 + 2), 16) / 255);
+    };
+    let greys = [];
+    for (const k in INFO) {
+      const c = chans(INFO[k].col);
+      // "saturated" = at least one channel at or near full. #aaa (0.67,0.67,0.67)
+      // fails; #fd0, #0ff, #9f0, #f44 all pass.
+      if (Math.max(c[0], c[1], c[2]) < 0.85) greys.push(k + ' ' + INFO[k].col);
+    }
+    eq(greys.join(', '), '', 'no enemy type is drawn in a colour the bright pass cannot see');
+
+    // TYPE IS CARRIED BY HUE, so two types may not share one. The silhouette
+    // column measured 39 of 66 pairs over the 0.45 IoU threshold at 15x13
+    // through the same 1/5 buffer — SHAPE CANNOT CARRY TYPE at this size, which
+    // makes a duplicated hue a type the player genuinely cannot identify.
+    const byCol = {};
+    for (const k in INFO) (byCol[INFO[k].col] = byCol[INFO[k].col] || []).push(k);
+    const dupes = Object.keys(byCol).filter(c => byCol[c].length > 1)
+      .map(c => c + ' -> ' + byCol[c].join('+')).sort();
+    // ONE deliberate pair: a splitter and the fragments it bursts into are one
+    // family on purpose, and the bestiary says so ('SPLITTER FRAGMENT').
+    eq(dupes.join(' | '), '#fa0 -> splitter+minibee',
+       'the only shared hue is the parent/fragment pair (bee and goldenBee both '
+       + 'sat on #fc4 with 0.81 silhouette IoU — indistinguishable on BOTH channels)');
+
+    // and the Captain is the colour its own bestiary entry claims
+    ok(/GREEN/.test(INFO.boss.trait), 'the bestiary calls the Captain green');
+    const bc = chans(INFO.boss.col);
+    ok(bc[1] > bc[0] && bc[1] >= 0.85, '  and its registry colour is actually green');
+    ok(scriptSrc.indexOf("'#a6f'") < 0,
+       '  and the sprite no longer draws it soft purple, which it did for the '
+       + "game's entire life while the bestiary said GREEN");
+  } else { console.log('  (skipped — ENEMY_INFO not exposed)'); }
+}
+
 section('THE SHELL — the file around the script, which nothing was watching');
 {
   // A helper of mine with a broken predicate overwrote index.html LINE 1 and the
