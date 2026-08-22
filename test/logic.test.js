@@ -222,9 +222,6 @@ const shim = `
   BEAM_START: CAPTURE_BEAM_START, BEAM_END: CAPTURE_BEAM_END }; }; } catch (e) {}
 ;try { globalThis.__getSalvageConst = function () { return {
   TTL: SALVAGE_TTL, DRIFT: SALVAGE_DRIFT }; }; } catch (e) {}
-;try { globalThis.__getHeistConst = function () { return {
-  NEED: SIPHON_NEED, GAIN: SIPHON_GAIN, LEAK: SIPHON_LEAK,
-  GRAB_HALF_W: CAPTURE_GRAB_HALF_W, BEAM_START: CAPTURE_BEAM_START }; }; } catch (e) {}
 ;try { globalThis.__getDebriefConst = function () { return {
   WAVES: DEBRIEF_WAVES, DESCEND: COURIER_DESCEND, UPLINK: COURIER_UPLINK,
   HP: COURIER_HP, SEED_W: DEBRIEF_SEED_W, SIGHT: LEDGER_SIGHT }; }; } catch (e) {}
@@ -1730,6 +1727,28 @@ section('PERKS: every activePerk reference resolves to a defined perk');
 }
 
 // ============================================================
+section('THE SHELL — the file around the script, which nothing was watching');
+{
+  // A helper of mine with a broken predicate overwrote index.html LINE 1 and the
+  // change was COMMITTED: the page shipped without a doctype, in quirks mode, and
+  // all four gate steps stayed green — because every one of them reads only what
+  // sits between the <script> tags. Found by diffing a commit against its parent,
+  // which is not a gate. This is the gate.
+  const shell = html;
+  ok(/^<!DOCTYPE html>/i.test(shell), 'index.html opens with a doctype (quirks mode is not a look)');
+  ok(/<html[^>]*\slang=/i.test(shell), 'the html element declares a language');
+  ok(/<meta\s+charset=/i.test(shell), 'a charset is declared');
+  ok(/<meta[^>]+name="viewport"/i.test(shell), 'the viewport meta survives');
+  ok(/<canvas/i.test(shell), 'the canvas element survives');
+  // exactly one inline script — the extractor in every harness assumes it
+  eq((shell.match(/<script>/g) || []).length, 1, 'there is exactly one inline <script>');
+  eq((shell.match(/<\/script>/g) || []).length, 1, '  and one closing tag');
+  // and the shell is not accidentally holding game code
+  const beforeScript = shell.slice(0, shell.indexOf('<script>'));
+  ok(!/game\.|ctx\./.test(beforeScript),
+     'no game statement has leaked out of the script and into the shell');
+}
+
 section('THE STAKES — a life is scarce again, so the defensive verbs mean something');
 {
   if (typeof G.extraLivesFor === 'function') {
@@ -4887,45 +4906,6 @@ if (ST && typeof G.startStage === 'function' && G.__getGame && G.__getGame()
      'the grief decays once the killing stops — a memory, not a ledger');
   G.resetGame();
 } else { console.log('  (skipped — killing field not drivable)'); }
-
-section('THE HEIST — the pure wager (siphon, the closing window)');
-{
-  const H = G.__getHeistConst && G.__getHeistConst();
-  if (H && typeof G.siphonStep === 'function' && typeof G.heistStillWinnable === 'function') {
-    let m = 0;
-    for (let i = 0; i < H.NEED; i++) m = G.siphonStep(m, true, true);
-    ok(G.heistResolve(m), H.NEED + ' consecutive wind-up frames inside the band fill the meter to the steal');
-    let m2 = 0;
-    for (let i = 0; i < H.NEED - 1; i++) m2 = G.siphonStep(m2, true, true);
-    ok(!G.heistResolve(m2), 'one frame short is not a steal');
-
-    const up = G.siphonStep(0.5, true, true) - 0.5;
-    const down = 0.5 - G.siphonStep(0.5, false, true);
-    ok(Math.abs(down - 2 * up) < 1e-9,
-       'the leak is exactly twice the gain — dipping in and out is strictly losing');
-    eq(G.siphonStep(0.9, true, false), 0, 'no wind-up, no meter — a live beam cannot be siphoned');
-    eq(G.siphonStep(0.01, false, true), 0, 'the meter clamps at zero, never negative');
-    eq(G.siphonStep(NaN, true, true), G.siphonStep(0, true, true),
-       'a poisoned meter reads as zero, never NaN');
-
-    // --- the closing window: the telegraph announces its own point of no return ---
-    ok(G.heistStillWinnable(0, 0), 'a fresh wind-up is winnable');
-    ok(G.heistStillWinnable(0, H.BEAM_START - H.NEED),
-       'the last winnable entry from zero is frame ' + (H.BEAM_START - H.NEED));
-    ok(!G.heistStillWinnable(0, H.BEAM_START - H.NEED + 1),
-       'one frame later the math no longer closes — the gold ticks turn to an X');
-    ok(G.heistStillWinnable(0.5, H.BEAM_START - H.NEED / 2),
-       'half a meter buys half the deadline');
-    ok(!G.heistStillWinnable(0.5, H.BEAM_START - H.NEED / 2 + 1), 'and not one frame more');
-
-    // --- wiring pins (source scan, same contract as the ACHIEVEMENTS guard) ---
-    ok(scriptSrc.includes('!e.capturedShip && !e._robbed'),
-       'the capture roll is gated on !_robbed — one boss can never be farmed twice');
-    ok((scriptSrc.match(/CAPTURE_GRAB_HALF_W/g) || []).length >= 3,
-       'the grab band and the siphon zone share ONE constant — the zone that can rob '
-       + 'is byte-identical to the zone that can be robbed from');
-  } else { console.log('  (skipped — heist not exposed)'); }
-}
 
 section('THE HEIST — driven: the wind-up is raidable, and the stake is real');
 // The pure layer proves the wager's math; this proves the WIRING through the real

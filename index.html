@@ -2971,84 +2971,16 @@ function captureTelegraphProgress(timer) {
   return clamp01(timer / CAPTURE_BEAM_START);
 }
 
-// ================================ THE HEIST =================================
-// Every telegraph in this game has only ever been a WARNING — the fairness
-// budget's whole vocabulary is "threat announces, player evades". THE HEIST
-// inverts the sign on one of them for the first time: the wind-up of the single
-// most expensive threat (the only one that costs a LIFE) becomes a drawn, timed
-// PRIZE. Stand inside the grab band — the exact pixels you were taught to flee —
-// for SIPHON_NEED of the wind-up's 60 frames and you ROB the beam: +1 shield,
-// capture denied, the boss sent home empty-handed. Stay past the point the math
-// closes and the beam goes live with you in its jaws — the failure path is the
-// already-shipped, already-audited capture, zero new code.
-//
-// One telegraph, four flown answers: FLEE (safe, the shipped game) / RAID (a
-// life staked for a shield + denial) / raid failed → STRUGGLE (tear free, keep
-// the life, forfeit the rescue) / SUBMIT (pay the life for the dual-fighter
-// shot). Each is chosen with the stick, not a menu.
-//
-// ZERO new score. The payoff is a shield (hard-capped at SHIELD_MAX), a denial,
-// and tempo — and the price quietly includes information: camping the band
-// feeds THE SWARM MIND's read of your lane the whole time you siphon.
-//
-// Anti-cheese: the leak is 2× the gain (dipping in and out is strictly losing),
-// `_robbed` is per-boss (one boss can never be farmed twice), and the latest
-// winnable entry from meter 0 is frame 60−36 = 24 — the decision must be made
-// EARLY, while the drawn column is still thin.
-const CAPTURE_GRAB_HALF_W = 20;      // the beam's grab half-width — and the siphon zone,
-                                     // byte-identical by construction (shared constant)
-const SIPHON_NEED = 36;              // frames-in-band to rob — a full WING_PREVIEW of commitment
-const SIPHON_GAIN = 1 / SIPHON_NEED; // meter per wind-up frame inside the band
-const SIPHON_LEAK = 2 / SIPHON_NEED; // meter lost per wind-up frame outside — 2× gain
-
-// One frame of the siphon. Only the wind-up can be robbed: once the beam is
-// live (or the state ends) the meter is dead, hard zero.
-function siphonStep(meter, inside, windup) {
-  if (!windup) return 0;
-  return clamp01((meter || 0) + (inside ? SIPHON_GAIN : -SIPHON_LEAK));
-}
-
-// Can continued commitment still close the math? Frames still needed vs wind-up
-// frames left. Drives the bail cue: the telegraph's gold ticks turn to a white X
-// the moment this flips false — the raid announcing its own point of no return.
-function heistStillWinnable(meter, timer) {
-  return (1 - clamp01(meter || 0)) * SIPHON_NEED <= CAPTURE_BEAM_START - timer + 1e-9;
-}
-
-// The single steal predicate robBeam() commits on (epsilon absorbs the float
-// dust of summing SIPHON_NEED × SIPHON_GAIN).
-function heistResolve(meter) {
-  return (meter || 0) >= 1 - 1e-9;
-}
-
-// Impure commit: the robbery. The boss leaves by the EXISTING empty-handed
-// return path (the same three lines the wind-up timeout uses), so a robbed
-// capture ends exactly like an expired one — minus the shield in your pocket.
-function robBeam(e) {
-  e._robbed = true;
-  e.siphon = 0;
-  e.state = 'returning';
-  e.path = createEntryPath(e.x, e.y, e.homeX, e.homeY, 1);
-  e.pathProgress = 0;
-  const wasMax = (game.shieldCharges || 0) >= SHIELD_MAX;
-  game.shieldCharges = Math.min(SHIELD_MAX, (game.shieldCharges || 0) + 1);
-  game.beamHeists = (game.beamHeists || 0) + 1;
-  // Lifetime total is the player's record — same demo guard as every other.
-  if (!game.isDemo) {
-    try {
-      const _hT = (parseInt(localStorage.getItem('galagaHeistTotal') || '0', 10) || 0) + 1;
-      localStorage.setItem('galagaHeistTotal', String(_hT));
-    } catch (_e) {}
-  }
-  game.floatTexts.push({
-    x: e.x, y: e.y + 10, text: wasMax ? 'BEAM ROBBED' : 'BEAM ROBBED +1 SHIELD',
-    color: '#fc4', life: 60, maxLife: 60, size: 6
-  });
-  game.flashTimer = Math.max(game.flashTimer || 0, 5);
-  game.flashColor = '#fc4';
-  if (typeof pushIntercept === 'function') pushIntercept('beamHeist');
-  playSound('powerUp');
-}
+// (THE HEIST was deleted here. During a capture wind-up you could stand in the
+// grab band and siphon the beam dry for a shield charge. It sat behind FOUR
+// conditions at once — a formation boss picked as a diver, a 20% roll,
+// !dualFighter, and an empty capture slot — so it fired nought to one times in
+// a whole run: a full vocabulary of constants, a meter, a bail cue, a coach
+// lesson, an achievement, a lifetime key and a comms intercept, for an event
+// most players would never see twice. The wind-up is still telegraphed, and the
+// capture it belongs to is untouched: CAPTURE_GRAB_HALF_W stays because the
+// LIVE BEAM grabs with it.)
+const CAPTURE_GRAB_HALF_W = 20;      // the live beam's grab half-width
 
 // ==================== THE STRUGGLE — the capture answers back ===============
 //
@@ -3148,7 +3080,7 @@ function breakCaptureFree() {
   rumble(220, 0.8, 0.5);
 }
 
-function drawCaptureTelegraph(x, y, h, p, siphon, winnable) {
+function drawCaptureTelegraph(x, y, h, p) {
   // Outline only, and GROWING — so it reads as a column forming, not a beam
   // already firing. That distinction is the whole point: one says "move", the
   // other says "too late".
@@ -3172,33 +3104,6 @@ function drawCaptureTelegraph(x, y, h, p, siphon, winnable) {
   const cy = y + h - 6;
   ctx.moveTo(x - 5, cy - 3); ctx.lineTo(x, cy + 2); ctx.lineTo(x + 5, cy - 3);
   ctx.stroke();
-  // THE HEIST — gold tick marks climb the two dashed edges in proportion to the
-  // siphon (positional progress: colorblind-safe by construction, elite-gold
-  // vocabulary). The moment the raid math no longer closes (`winnable` false),
-  // the ticks turn white and an X overprints the chevron — the telegraph itself
-  // announcing "get out". A siphon of 0 renders pixel-identical to the shipped
-  // telegraph (byte-identical-at-zero contract).
-  if (siphon > 0) {
-    const col = winnable ? '#fc4' : '#fff';
-    ctx.strokeStyle = col;
-    ctx.globalAlpha = 0.9;
-    const n = Math.min(6, Math.floor(siphon * 6) + 1);
-    for (let i = 0; i < n; i++) {
-      const tt = 1 - (i + 0.5) / 6;                 // ticks climb bottom → top
-      const yy = y + h * tt;
-      const w = 8 * p + (30 * p - 8 * p) * tt;
-      ctx.beginPath();
-      ctx.moveTo(x - w - 2, yy); ctx.lineTo(x - w + 2, yy);
-      ctx.moveTo(x + w - 2, yy); ctx.lineTo(x + w + 2, yy);
-      ctx.stroke();
-    }
-    if (!winnable) {
-      ctx.beginPath();
-      ctx.moveTo(x - 4, cy - 4); ctx.lineTo(x + 4, cy + 4);
-      ctx.moveTo(x + 4, cy - 4); ctx.lineTo(x - 4, cy + 4);
-      ctx.stroke();
-    }
-  }
   ctx.restore();
 }
 
@@ -5798,7 +5703,6 @@ const INTERCEPT_MSG = {
   magpieSpotted: ['MAGPIE UNIT DEPLOYED!', 'STEAL THEIR SUPPLIES!', 'THE MAGPIE HUNTS YOUR LOOT!'],
   mindLock:      ['PATTERN LOCKED.', 'THE TARGET HAS A HABIT.', 'FIRING SOLUTION: ITS LANE.'],
   dreadRoute:    ['THAT LANE IS A GRAVE!', 'REROUTE — TOO MANY LOST!', 'AVOID THE KILLING FIELD!'],
-  beamHeist:     ['IT\'S DRAINING THE BEAM!', 'THE PRIZE ROBS US?!', 'CUT THE TRACTOR — TOO LATE!'],
   breakout:      ['IT TORE LOOSE!', 'BEAM BROKEN — HOW?', 'WE LOST THE PRIZE!']
 };
 const INTERCEPT_COOLDOWN_FRAMES = 300;
@@ -6095,7 +5999,6 @@ const COACH_LESSONS = {
   mind:    'THEY READ YOUR LANE — MOVE OR BAIT',
   dread:   'THEY AVOID WHERE THEY DIE — HERD THEM',
   struggle:'BEAM GOT YOU? MASH L-R TO TEAR FREE',
-  heist:   'STAND IN THE WINDUP TO ROB THE BEAM',
   debrief: 'SHOOT THE COURIER — DENY THE UPLINK',
   vent:    'SHOOT THE OPEN WOUND — BREAK ITS STANCE',
   cover:   'THE HULL EATS FIRE — BOTH WAYS',
@@ -6866,7 +6769,7 @@ function drawSalvageShards() {
 }
 
 // ================================ THE DEBRIEF ===============================
-// Every adaptive system (mind, dread, wing tactics, heist) lives in normal
+// Every adaptive system (mind, dread, wing tactics) lives in normal
 // PLAYING stages — the challenge round was a dead zone in the game's most
 // distinctive dimension. THE DEBRIEF makes the breather a FRONT in the adaptive
 // war without breaking its identity: the challenge stage was never a breather —
@@ -8886,8 +8789,6 @@ function resetGame() {
     swarmDread: makeSwarmDread(),
     divesHerded: 0,
     _dreadSeen: false,
-    // THE HEIST — tractor beams robbed during their wind-up this run.
-    beamHeists: 0,
     // THE DEBRIEF — the challenge drill's footage reel, the courier drone that
     // uplinks it, frames of stolen-ledger sight, and the run's deny count.
     drillLog: null,
@@ -15144,20 +15045,6 @@ function updateEnemies() {
       // Boss flies down
       if (e.captureTimer < CAPTURE_BEAM_START) {
         e.y += 1.5;
-        // THE HEIST — the wind-up is raidable. The siphon zone is the grab band
-        // itself (CAPTURE_GRAB_HALF_W, the same constant the live beam grabs
-        // with), so the pixels that can rob are the pixels that can be robbed
-        // FROM. Taught only after 'struggle': the first witnessed beam teaches
-        // escape, a later one teaches robbery — never both in one sequence.
-        if (e.captureTimer === 1 && typeof coachFire === 'function'
-            && typeof coachLearned !== 'undefined' && coachLearned.has('struggle')) {
-          coachFire('heist');
-        }
-        const _inBand = game.playerAlive
-          && Math.abs(game.playerX - e.x) < CAPTURE_GRAB_HALF_W
-          && game.playerY > e.y;
-        e.siphon = siphonStep(e.siphon || 0, _inBand, true);
-        if (heistResolve(e.siphon)) robBeam(e);
       } else if (e.captureTimer < CAPTURE_BEAM_END) {
         // Teach the escape verb on the frame the beam goes live — the player is
         // still alive and in control here, which is the only window where a
@@ -15329,10 +15216,9 @@ function updateEnemies() {
         // random when it has no read (which is the shipped behaviour, unchanged).
         const e = mindPickDiver(candidates);
         // Boss might try to capture
-        if (e.type === 'boss' && !e.capturedShip && !e._robbed && !game.dualFighter && Math.random() < 0.2 && game.capturedShipEnemy === null) {
+        if (e.type === 'boss' && !e.capturedShip && !game.dualFighter && Math.random() < 0.2 && game.capturedShipEnemy === null) {
           e.state = 'capturing';
           e.captureTimer = 0;
-          e.siphon = 0; // THE HEIST — the wind-up starts unrobbed
 
           // If the boss diving is the commander, strip the tag so it doesn't persist during capture.
           if (e.isCommander) e.isCommander = false;
@@ -20187,11 +20073,6 @@ function pickRunHighlights() {
   if (herded >= 3)        out.push({ label: 'DIVES HERDED',   value: String(herded),    prio: herded * 14, col: '#f80' });
   const broke = game.capturesEscaped || 0;
   if (broke >= 1)         out.push({ label: 'BEAMS BROKEN',   value: String(broke),     prio: 60 + broke * 40, col: '#0cf' });
-  // BEAMS ROBBED — THE HEIST: wind-ups siphoned dry before the beam went live.
-  // Gold to match the siphon ticks. Slightly below BEAMS BROKEN (a completed
-  // struggle outranks a completed raid — the struggle risked more).
-  const robbed = game.beamHeists || 0;
-  if (robbed >= 1)        out.push({ label: 'BEAMS ROBBED',   value: String(robbed),    prio: 55 + robbed * 40, col: '#fc4' });
   // DEBRIEFS DENIED — courier drones shot down before their drill footage
   // reached THE SWARM MIND. An information-war stat: zero score in the system.
   const denied = game.debriefsDenied || 0;
@@ -21183,8 +21064,7 @@ function drawGameplay() {
           // gives the player the same warning every other threat gives.
           if (e.state === 'capturing') {
             const _ctp = captureTelegraphProgress(e.captureTimer);
-            if (_ctp >= 0) drawCaptureTelegraph(e.x, e.y + 6, 80, _ctp,
-              e.siphon || 0, heistStillWinnable(e.siphon || 0, e.captureTimer));
+            if (_ctp >= 0) drawCaptureTelegraph(e.x, e.y + 6, 80, _ctp);
             else if (e.captureTimer < CAPTURE_BEAM_END) drawTractorBeam(e.x, e.y + 6, 80);
           }
           break;
