@@ -258,7 +258,59 @@ function draftRun(taker) {
 }
 
 // ---------------------------------------------------------------------------
-// COLUMN 4 — RHYTHM. The gap between a random bot and a beat-locked one IS the
+// COLUMN 4 — THE STAKES. Every defensive verb in this game (the shield, witch
+// time, dash i-frames, THE STRUGGLE's whole existence) is a decision about a
+// LIFE. If lives are abundant, none of those decisions is about anything.
+//
+// TWO CORRECTIONS THIS COLUMN NEEDED, BOTH FOUND BY READING ITS OWN OUTPUT:
+//  1. It first drove a MORTAL bot and reported "reached stage 1, 3 deaths" —
+//     which measures how badly a fixed sine-wave flight path dodges, not what the
+//     faucets pay. It now drives a SURVIVING run to collect the real income curve.
+//  2. It then reported what a 30k MODULO faucet WOULD pay, which is a hypothetical
+//     and kept printing the old number after the faucet was replaced. It now
+//     counts ACTUAL life grants (game.lives going up) and reports the modulo
+//     figure only as the BEFORE, clearly labelled.
+// ---------------------------------------------------------------------------
+function stakesRun(stages) {
+  _seed = 0x7f2d19c3;
+  G.resetGame();
+  const g = G.__g();
+  g.stage = 1;
+  G.startStage();
+  g.playerAlive = true; g.lives = 3; g.cheatInvincible = true;
+  clearKeys();
+
+  const scoreAtStage = {}, grantedAtStage = {};
+  let granted = 0, grazeIncome = 0, prevStage = 1, prevLives = g.lives;
+  for (let f = 0; f < 400000; f++) {
+    K[' '] = (f % 5) < 3;
+    K['ArrowRight'] = ((f >> 7) & 1) === 0;
+    K['ArrowLeft'] = ((f >> 7) & 1) === 1;
+    const beforeScore = g.score || 0;
+    const beforeGraze = g.grazeCount || 0;
+    G.update();
+    if ((g.grazeCount || 0) > beforeGraze) grazeIncome += (g.score || 0) - beforeScore;
+    // ACTUAL grants — whatever source they came from. Invincible, so lives never fall.
+    if (g.lives > prevLives) granted += g.lives - prevLives;
+    prevLives = g.lives;
+    if (g.stage !== prevStage) {
+      scoreAtStage[prevStage] = g.score || 0;
+      grantedAtStage[prevStage] = granted;
+      prevStage = g.stage;
+      if (g.stage > stages) break;
+    }
+  }
+  scoreAtStage[prevStage] = g.score || 0;
+  grantedAtStage[prevStage] = granted;
+  clearKeys();
+  return { scoreAtStage, grantedAtStage, granted, grazeIncome,
+           score: g.score || 0, grazes: g.grazeCount || 0, stage: g.stage };
+}
+
+// What the OLD modulo faucet would have paid for the same score — the before.
+function moduloLives(score) { return Math.floor(score / 30000); }
+
+// COLUMN 5 — RHYTHM. The gap between a random bot and a beat-locked one IS the
 // skill expression. If there is no gap, the verb is decoration.
 // ---------------------------------------------------------------------------
 function rhythmRun(beatLocked) {
@@ -381,6 +433,39 @@ for (const [label, r] of [['committing', takerRun], ['declining', idleRun]]) {
         k + ' ' + pct(r.stemSeen[k], f).padStart(5)).join('   '));
 }
 console.log('    (a declining run should still open layers on COMBO alone — two ways in)');
+
+// ---- STAKES ----
+console.log('');
+console.log('  STAKES — does a life mean anything?');
+console.log('  ' + '-'.repeat(68));
+const stakes = stakesRun(26);
+console.log('    a driven run, counting the lives the game ACTUALLY hands over:');
+console.log('      stage    score     GRANTED    (the old 30k modulo would pay)');
+for (const st of [10, 20, 25]) {
+  const sc = stakes.scoreAtStage[st];
+  if (sc == null) continue;
+  console.log('      ' + pad(st, 5) + pad(sc, 10) + pad(stakes.grantedAtStage[st], 11)
+    + pad(moduloLives(sc), 21));
+}
+console.log('      reached stage ' + stakes.stage + ', final score ' + stakes.score);
+console.log('      graze income  ' + stakes.grazeIncome + '  ('
+  + pct(stakes.grazeIncome, stakes.score) + ' of all score, over ' + stakes.grazes + ' grazes)');
+console.log('');
+const g25 = stakes.grantedAtStage[25] != null ? stakes.grantedAtStage[25] : stakes.granted;
+const m25 = moduloLives(stakes.scoreAtStage[25] || stakes.score);
+console.log('    BY STAGE 25 THE GAME HAS HANDED OVER ' + g25 + ' EXTRA LIVES.');
+console.log('      The score faucet alone used to pay ' + m25 + ', and a combo milestone');
+console.log('      printed one more every 40 kills in a chain on top of that.');
+if (g25 <= 9) {
+  console.log('    -> SCARCE. A life is a stake again, so the shield, witch time, dash');
+  console.log('       i-frames, THE STRUGGLE and SALVAGE are decisions about something.');
+} else {
+  console.log('    -> ABUNDANT. At ' + g25 + ' lives none of the defensive systems is a');
+  console.log('       decision about anything. Single digits at stage 25 is the target.');
+}
+console.log('    Graze income above a few percent would mean a passive faucet is');
+console.log('    out-earning play (a driven bot does not park in a stream, so this');
+console.log('    column cannot prove the farm — only the per-bullet cooldown can).');
 
 // ---- RHYTHM ----
 console.log('');

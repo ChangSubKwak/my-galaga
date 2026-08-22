@@ -211,7 +211,34 @@ const STAR_COUNT = 80;
 // --- Game state enum ---
 const STATE = { TITLE: 0, STAGE_INTRO: 1, PLAYING: 2, CHALLENGING: 3, GAME_OVER: 4, PAUSED: 5, CAPTURED: 6, RESPAWN: 7, BOSS_STAGE: 8, BONUS_GAME: 9 };
 const BOSS_STAGE_INTERVAL = 10; // production cadence
-const EXTRA_LIFE_SCORE = 30000; // award an extra life each time score crosses a multiple (normal mode only)
+// ===================== THE STAKES =====================
+// EXTRA_LIFE_SCORE used to be a MODULO: a life every 30,000 points, forever.
+// Measured on a driven run (test/measure-audit.js, STAKES column): a player is
+// handed 32 lives from this faucet by stage 25, plus 28 more from the combo
+// milestone — SIXTY EXTRA LIVES. Every defensive system this game owns is a
+// decision about a life: the shield, WITCH TIME, dash i-frames, THE STRUGGLE
+// (which was built and tuned by measurement specifically to make the capture a
+// choice), SALVAGE PROTOCOL (the death-spiral brake). All of them were decisions
+// about a resource the player had sixty of.
+//
+// A GEOMETRIC LADDER instead: the first life at 30k, the next 90k after that,
+// then 270k, then 810k. The same measured run earns THREE. Death costs again,
+// and every one of those systems switches on without a line being written.
+const EXTRA_LIFE_SCORE = 30000;      // the FIRST threshold (kept: HUD + tests read it)
+const EXTRA_LIFE_GROWTH = 3;         // each subsequent gap is 3x the last
+// Pure: how many extra lives a given score has earned in total.
+function extraLivesFor(score) {
+  if (!(score > 0)) return 0;
+  let n = 0, next = EXTRA_LIFE_SCORE, step = EXTRA_LIFE_SCORE;
+  while (score >= next && n < 32) { n++; step *= EXTRA_LIFE_GROWTH; next += step; }
+  return n;
+}
+// The score at which the NEXT life arrives (for the HUD readout).
+function nextExtraLifeAt(score) {
+  let n = 0, next = EXTRA_LIFE_SCORE, step = EXTRA_LIFE_SCORE;
+  while (score >= next && n < 32) { n++; step *= EXTRA_LIFE_GROWTH; next += step; }
+  return next;
+}
 // Single source of truth for which mode a stage runs in (mirrors startStage's
 // branching): every BOSS_STAGE_INTERVAL-th stage is a boss stage, otherwise every
 // 4th is a CHALLENGING bonus wave, otherwise a normal formation stage.
@@ -11941,7 +11968,7 @@ function addScore(pts) {
     spawnConfetti(16);
   }
   // Extra life every EXTRA_LIFE_SCORE — disabled in challenge mode (hardcore = 1 life)
-  if (!game.challengeMode && Math.floor(old / EXTRA_LIFE_SCORE) < Math.floor(game.score / EXTRA_LIFE_SCORE)) {
+  if (!game.challengeMode && extraLivesFor(old) < extraLivesFor(game.score)) {
     game.lives++;
     // Re-arm LAST LIFE ALERT — leaving 1-life state means next drop to 1 can re-fire
     if (game.lives >= 2) game._lastLifeAlertFired = false;
@@ -12549,11 +12576,19 @@ function updateBullets() {
       }
     }
     // Graze detection: tight close-pass (dx 6-11px, dy < 9) on a bullet also moving DOWN past the player.
-    if (!b.grazed && game.playerAlive && game.invincibleTimer <= 0 && b.vy > 0) {
+    // The SCORELESS near-miss recognition has had a 24-frame global cooldown for a
+    // long time; the SCORING graze never did — it was gated per-bullet by
+    // `b.grazed` alone, so parking at a 7-10px offset in a stream is uncapped
+    // income, and GHOST WAKE (which stacking now makes permanent) triples it.
+    // A driven bot does not park, so this does not show up in a normal run's
+    // numbers — which is exactly why it needed reading rather than measuring.
+    if (!b.grazed && game.playerAlive && game.invincibleTimer <= 0 && b.vy > 0
+        && (game.grazePayCooldown || 0) <= 0) {
       const dx = Math.abs(b.x - game.playerX);
       const dy = Math.abs(b.y - game.playerY);
       if (dx < 11 && dx > 6 && dy < 9) {
         b.grazed = true;
+        game.grazePayCooldown = 24;
         // Two-tier graze: only the inner band (≤8px) and mid band (9-10px) score now.
         // Wider passes (11-13px) used to grant +25, but were trivially farmable at low risk.
         const close = dx <= 8;
@@ -14891,21 +14926,17 @@ function bumpCombo() {
   const tier = Math.floor(game.combo / COMBO_MILESTONE);
   if (tier > game.comboMilestoneClaimed) {
     game.comboMilestoneClaimed = tier;
-    if (game.challengeMode) {
-      // Use addScore so the combo bonus flows through daily-mode multiplier,
-      // milestone toasts, SCORE_CAP, and the live NEW-HIGH check.
-      addScore(5000);
-    } else {
-      game.lives++;
-      if (game.lives >= 2) game._lastLifeAlertFired = false;
-      game.extraShipsRun = (game.extraShipsRun || 0) + 1;
-      // LIFE GAIN PULSE — flag for HUD lives row to pulse gold for 30 frames
-      game.lifeGainPulseTimer = 30;
-    }
+    // THE SECOND FAUCET, CLOSED. This granted a LIFE every 40 kills in a chain in
+    // normal mode, and 5000 points in challenge mode. Measured: 28 lives over a
+    // driven run to stage 25, on top of 32 from the score faucet. It now pays the
+    // challenge-mode reward in EVERY mode — one code path instead of two, the
+    // reward kept, the life removed. (Not new score: this value already existed,
+    // it was simply unreachable outside challenge mode.)
+    addScore(5000);
     playSound('extraLife');
     game.floatTexts.push({
       x: BASE_W/2, y: BASE_H/2 - 14,
-      text: game.challengeMode ? 'COMBO BONUS +5000' : 'EXTRA LIFE!',
+      text: 'COMBO BONUS +5000',
       color: '#ff4', life: 90, maxLife: 90, size: 12
     });
     game.floatTexts.push({
@@ -17136,6 +17167,7 @@ function updateCollisions() {
     }
   }
   if ((game.nearMissCooldown || 0) > 0) game.nearMissCooldown--;
+  if ((game.grazePayCooldown || 0) > 0) game.grazePayCooldown--;
   // GRAZE CHAIN decay — 90f without a fresh near-miss resets the chain. Mirrors
   // comboTimer cadence. nearMissChain itself stays 0 once expired; nearMissChainBest
   // (per-run peak) persists for the runHighlights summary.
@@ -23383,7 +23415,7 @@ function drawHUD() {
 
   // Extra-life threshold indicator — small note showing distance to next 30K extra life
   if (!game.challengeMode && game.score > 0 && (game.state === STATE.PLAYING || game.state === STATE.BOSS_STAGE || game.state === STATE.CHALLENGING)) {
-    const next = Math.ceil(game.score / EXTRA_LIFE_SCORE) * EXTRA_LIFE_SCORE;
+    const next = nextExtraLifeAt(game.score);
   }
   // Lives — pulse red and add LAST LIFE warning when down to one
   const dangerLives = game.lives === 1;

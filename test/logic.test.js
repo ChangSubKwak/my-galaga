@@ -262,6 +262,7 @@ const shim = `
   scheduled: (typeof bgmScheduled !== 'undefined') ? bgmScheduled : null,
   trackNames: (typeof BGM !== 'undefined') ? Object.keys(BGM) : null,
 }; }; } catch (e) {}
+;try { globalThis.__getComboMilestone = function () { return COMBO_MILESTONE; }; } catch (e) {}
 ;try { globalThis.__getBar = function () { return {
   BPM: SIM_BPM, BEATS_PER_BAR: BEATS_PER_BAR,
   BEAT: BEAT_FRAMES, BAR: BAR_FRAMES, WING_COOLDOWN: WING_COOLDOWN,
@@ -1752,7 +1753,80 @@ section('PERKS: every activePerk reference resolves to a defined perk');
 }
 
 // ============================================================
-section('addScore — extra life on 30000 crossing, challenge-mode disabled, cap');
+section('THE STAKES — a life is scarce again, so the defensive verbs mean something');
+{
+  if (typeof G.extraLivesFor === 'function') {
+    // MEASURED, NOT ASSUMED. test/measure-audit.js drove a run to stage 25 and
+    // counted what the game handed over: 32 lives from the 30k MODULO faucet plus
+    // 28 more from the combo milestone — SIXTY. Every defensive system this game
+    // owns (the shield, WITCH TIME, dash i-frames, THE STRUGGLE, SALVAGE) is a
+    // decision about a life, and all of them were decisions about a resource the
+    // player had sixty of. The same run now earns THREE.
+    eq(G.extraLivesFor(0), 0, 'no score, no lives');
+    eq(G.extraLivesFor(29999), 0, 'just under the first threshold');
+    eq(G.extraLivesFor(30000), 1, 'the FIRST life still arrives at 30k — unchanged');
+    eq(G.extraLivesFor(119999), 1, 'and the second does NOT arrive 30k later');
+    eq(G.extraLivesFor(120000), 2, 'it costs 90k more');
+    eq(G.extraLivesFor(389999), 2, 'the third costs 270k more');
+    eq(G.extraLivesFor(390000), 3, '  arriving at 390k');
+    eq(G.extraLivesFor(1200000), 4, 'and the fourth at 1.2M');
+    // the shape: strictly increasing, and each gap strictly larger than the last
+    let prev = 0, dips = 0, gaps = [];
+    for (let sc = 0; sc <= 3000000; sc += 1000) {
+      const nn = G.extraLivesFor(sc);
+      if (nn < prev) dips++;
+      prev = nn;
+    }
+    eq(dips, 0, 'the ladder never decreases across 0..3M (3000 samples)');
+    for (let k = 1; k <= 5; k++) {
+      const at = (() => { let x = 0; while (G.extraLivesFor(x) < k) x += 1000; return x; })();
+      gaps.push(at);
+    }
+    for (let k = 1; k < gaps.length; k++) {
+      ok(gaps[k] - gaps[k - 1] > (k > 1 ? gaps[k - 1] - gaps[k - 2] : 0),
+         'each life costs strictly more than the last (' + gaps.join(' < ') + ')');
+    }
+    // a modulo faucet would pay 34 by the measured stage-25 score; the ladder pays 3
+    ok(G.extraLivesFor(1028599) <= 4,
+       'at the measured stage-25 score the ladder pays ' + G.extraLivesFor(1028599)
+       + ', where the modulo paid ' + Math.floor(1028599 / 30000));
+    // malformed input is zero lives, never a throw or an infinite loop
+    for (const bad of [undefined, null, NaN, -1, 'x', Infinity]) {
+      const v = G.extraLivesFor(bad);
+      ok(typeof v === 'number' && isFinite(v) && v >= 0,
+         'extraLivesFor(' + String(bad) + ') is a finite count (' + v + ')');
+    }
+    ok(G.nextExtraLifeAt(0) === 30000, 'the HUD readout points at the first threshold');
+    ok(G.nextExtraLifeAt(50000) === 120000, '  and then at the second');
+  } else { console.log('  (skipped — the ladder is not exposed)'); }
+
+  // THE SECOND FAUCET IS CLOSED. A combo milestone paid a LIFE in normal mode and
+  // 5000 points in challenge mode; it now pays the points in both, which is the
+  // reward kept and the life removed — and one code path instead of two.
+  if (typeof G.bumpCombo === 'function' && G.__getGame) {
+    const g = fresh();
+    g.challengeMode = false; g.dailyMode = false;
+    g.lives = 3; g.combo = 0; g.comboMilestoneClaimed = 0; g.score = 0;
+    const CM = G.__getComboMilestone ? G.__getComboMilestone() : 40;
+    for (let i = 0; i < CM + 2; i++) G.bumpCombo();
+    eq(g.lives, 3, 'a ' + CM + '-kill chain no longer PRINTS A LIFE');
+    ok((g.score || 0) >= 5000, '  it pays the score bonus instead (' + g.score + ')');
+    ok(!/game\.lives\+\+;[\s\S]{0,400}comboMilestoneClaimed/.test(scriptSrc),
+       'and no life grant survives in the combo milestone path');
+  }
+
+  // THE SCORING GRAZE GETS THE COOLDOWN ITS SCORELESS SIBLING ALWAYS HAD.
+  // It was gated per-bullet by b.grazed alone, so parking at a 7-10px offset in a
+  // stream is uncapped income — and GHOST WAKE, which stacking makes permanent,
+  // triples it. A driven bot does not park, so no run's numbers can show this;
+  // it had to be read.
+  ok(scriptSrc.indexOf('grazePayCooldown') > 0, 'the scoring graze has a cooldown');
+  const grazeBlock = scriptSrc.slice(scriptSrc.indexOf('// Graze detection'),
+                                     scriptSrc.indexOf('// Graze detection') + 900);
+  ok(grazeBlock.indexOf('grazePayCooldown') > 0, '  and it gates the paying branch');
+}
+
+section('addScore — extra life on the first threshold, challenge-mode disabled, cap');
 if (typeof G.addScore === 'function') {
   // crossing a 30000 boundary awards exactly one life
   let g = fresh();
